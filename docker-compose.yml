@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  leoc-app:
+    build: .
+    image: leoc-app:latest
+    container_name: leoc-app
+    restart: unless-stopped
+    ports:
+      - "5002:5002"
+    volumes:
+      - ./instance:/app/instance
+      - ./static/uploads:/app/static/uploads
+      - ./:/app  # Mount the entire app directory
+    environment:
+      - FLASK_ENV=production
+      - SECRET_KEY=${SECRET_KEY:-your-default-secret-key}
+      - SQLALCHEMY_DATABASE_URI=sqlite:////app/instance/leoc.db
+      - UPLOAD_FOLDER=/app/static/uploads
+      - CACHE_TIMEOUT=300
+    env_file:
+      - .env
+
+volumes:
+  instance:
+  uploads:

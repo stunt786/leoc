@@ -1,0 +1,446 @@
+{% extends "base.html" %}
+
+{% block title %}Settings - LEOC{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row">
+        <div class="col-lg-10">
+            <!-- Relief Items Settings -->
+            <div class="card shadow-lg mb-4">
+                <div class="card-header bg-gradient" style="background: linear-gradient(135deg, #007bff, #0062cc);">
+                    <h4 class="mb-0 text-dark">
+                        <i class="bi bi-bag text-dark"></i> राहात वितरण सामाग्री
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">Manage relief items that appear in distribution forms</p>
+                    <div id="reliefItemsContainer" class="mb-3"></div>
+                    <button type="button" class="btn btn-success btn-sm" onclick="addReliefItem()">
+                        <i class="bi bi-plus-circle"></i> Add New Item
+                    </button>
+                    <button type="button" class="btn btn-primary btn-sm" onclick="saveReliefItems()">
+                        <i class="bi bi-save"></i> Save Items
+                    </button>
+                </div>
+            </div>
+
+            <!-- Fiscal Years Settings -->
+            <div class="card shadow-lg mb-4">
+                <div class="card-header bg-gradient" style="background: linear-gradient(135deg, #17a2b8, #117a8b);">
+                    <h4 class="mb-0 text-dark">
+                        <i class="bi bi-calendar2 text-dark"></i> आर्थिक वर्षहरू
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">Manage fiscal years for disaster classification</p>
+                    <div id="fiscalYearsContainer" class="mb-3"></div>
+                    <button type="button" class="btn btn-success btn-sm" onclick="addFiscalYear()">
+                        <i class="bi bi-plus-circle"></i> Add New Year
+                    </button>
+                    <button type="button" class="btn btn-primary btn-sm" onclick="saveFiscalYears()">
+                        <i class="bi bi-save"></i> Save Years
+                    </button>
+                </div>
+            </div>
+
+            <!-- SSF Types Settings -->
+            <div class="card shadow-lg mb-4">
+                <div class="card-header bg-gradient" style="background: linear-gradient(135deg, #ffc107, #e0a800);">
+                    <h4 class="mb-0 text-dark">
+                        <i class="bi bi-shield-check text-dark"></i> सामाजिक सुरक्षा भत्ता (SSF) प्रकारहरू
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">Manage SSF benefit types available in the system</p>
+                    <div id="ssfTypesContainer" class="mb-3"></div>
+                    <button type="button" class="btn btn-success btn-sm" onclick="addSSFType()">
+                        <i class="bi bi-plus-circle"></i> Add New Type
+                    </button>
+                    <button type="button" class="btn btn-primary btn-sm" onclick="saveSSFTypes()">
+                        <i class="bi bi-save"></i> Save Types
+                    </button>
+                </div>
+            </div>
+
+            <!-- Disaster Types Settings -->
+            <div class="card shadow-lg mb-4">
+                <div class="card-header bg-gradient" style="background: linear-gradient(135deg, #dc3545, #bd2130);">
+                    <h4 class="mb-0 text-dark">
+                        <i class="bi bi-exclamation-triangle text-dark"></i> विपद् प्रकारहरू
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">Manage disaster types used in the system</p>
+                    <div id="disasterTypesContainer" class="mb-3"></div>
+                    <button type="button" class="btn btn-success btn-sm" onclick="addDisasterType()">
+                        <i class="bi bi-plus-circle"></i> Add New Type
+                    </button>
+                    <button type="button" class="btn btn-primary btn-sm" onclick="saveDisasterTypes()">
+                        <i class="bi bi-save"></i> Save Types
+                    </button>
+                </div>
+            </div>
+
+            <!-- Alert Box -->
+            <div id="alertBox" style="display: none;"></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // ============ RELIEF ITEMS ============
+    async function loadReliefItems() {
+        try {
+            const response = await fetch('/api/settings/relief_items');
+            const data = await response.json();
+            console.log('Loaded relief items:', data);
+            
+            let items = [];
+            if (data.value && Array.isArray(data.value)) {
+                items = data.value;
+            } else if (data.value && typeof data.value === 'string') {
+                // Handle case where it might be stringified
+                try {
+                    items = JSON.parse(data.value);
+                } catch (e) {
+                    items = [data.value];
+                }
+            } else {
+                items = ['Food Packages', 'Water Bottles', 'Medical Supplies', 'Blankets', 'Clothing', 'Hygiene Kits', 'Shelter Materials', 'Baby Care', 'Other'];
+            }
+            
+            console.log('Relief items to display:', items);
+            displayItems('reliefItemsContainer', items, 'relief-item');
+        } catch (error) {
+            console.error('Error loading relief items:', error);
+            showAlert('danger', '<i class="bi bi-exclamation-circle"></i> Error loading relief items');
+        }
+    }
+
+    function addReliefItem() {
+        const container = document.getElementById('reliefItemsContainer');
+        const item = document.createElement('div');
+        item.className = 'input-group mb-2 relief-item';
+        item.innerHTML = `
+            <input type="text" class="form-control" placeholder="Relief item name" value="">
+            <button type="button" class="btn btn-outline-danger" onclick="removeItemFromUI(this, 'relief-item')">
+                <i class="bi bi-trash"></i> Remove
+            </button>
+        `;
+        container.appendChild(item);
+        showAlert('info', '<i class="bi bi-info-circle"></i> Item row added. Fill in the name and click Save');
+    }
+
+    async function saveReliefItems() {
+        const items = [];
+        document.querySelectorAll('.relief-item input').forEach(input => {
+            const value = input.value.trim();
+            if (value && !items.includes(value)) {
+                items.push(value);
+            }
+        });
+
+        if (items.length === 0) {
+            showAlert('warning', '<i class="bi bi-exclamation-triangle"></i> Please add at least one relief item');
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/settings/relief_items', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ value: items })
+            });
+            const data = await response.json();
+            console.log('Save response:', data);
+            
+            if (data.success) {
+                showAlert('success', '<i class="bi bi-check-circle"></i> Relief items saved successfully');
+                // Reload to show all saved items from database
+                setTimeout(() => loadReliefItems(), 800);
+            } else {
+                showAlert('danger', '<i class="bi bi-exclamation-circle"></i> Error: ' + data.message);
+            }
+        } catch (error) {
+            console.error('Save error:', error);
+            showAlert('danger', '<i class="bi bi-exclamation-circle"></i> Error: ' + error.message);
+        }
+    }
+
+    // ============ FISCAL YEARS ============
+    async function loadFiscalYears() {
+        try {
+            const response = await fetch('/api/settings/fiscal_years');
+            const data = await response.json();
+            console.log('Loaded fiscal years:', data);
+            
+            let years = [];
+            if (data.value && Array.isArray(data.value)) {
+                years = data.value;
+            } else if (data.value && typeof data.value === 'string') {
+                try {
+                    years = JSON.parse(data.value);
+                } catch (e) {
+                    years = [data.value];
+                }
+            } else {
+                years = ['2080/81', '2081/82', '2082/83'];
+            }
+            
+            console.log('Fiscal years to display:', years);
+            displayItems('fiscalYearsContainer', years, 'fiscal-year');
+        } catch (error) {
+            console.error('Error loading fiscal years:', error);
+            showAlert('danger', '<i class="bi bi-exclamation-circle"></i> Error loading fiscal years');
+        }
+    }
+
+    function addFiscalYear() {
+        const container = document.getElementById('fiscalYearsContainer');
+        const item = document.createElement('div');
+        item.className = 'input-group mb-2 fiscal-year';
+        item.innerHTML = `
+            <input type="text" class="form-control" placeholder="e.g., 2080/81" value="">
+            <button type="button" class="btn btn-outline-danger" onclick="removeItemFromUI(this, 'fiscal-year')">
+                <i class="bi bi-trash"></i> Remove
+            </button>
+        `;
+        container.appendChild(item);
+        showAlert('info', '<i class="bi bi-info-circle"></i> Fiscal year row added. Fill in and click Save');
+    }
+
+    async function saveFiscalYears() {
+        const years = [];
+        document.querySelectorAll('.fiscal-year input').forEach(input => {
+            const value = input.value.trim();
+            if (value && !years.includes(value)) {
+                years.push(value);
+            }
+        });
+
+        if (years.length === 0) {
+            showAlert('warning', '<i class="bi bi-exclamation-triangle"></i> Please add at least one fiscal year');
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/settings/fiscal_years', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ value: years })
+            });
+            const data = await response.json();
+            console.log('Save response:', data);
+            
+            if (data.success) {
+                showAlert('success', '<i class="bi bi-check-circle"></i> Fiscal years saved successfully');
+                // Reload to show all saved items from database
+                setTimeout(() => loadFiscalYears(), 800);
+            } else {
+                showAlert('danger', '<i class="bi bi-exclamation-circle"></i> Error: ' + data.message);
+            }
+        } catch (error) {
+            console.error('Save error:', error);
+            showAlert('danger', '<i class="bi bi-exclamation-circle"></i> Error: ' + error.message);
+        }
+    }
+
+    // ============ SSF TYPES ============
+    async function loadSSFTypes() {
+        try {
+            const response = await fetch('/api/settings/ssf_types');
+            const data = await response.json();
+            console.log('Loaded SSF types:', data);
+            
+            let types = [];
+            if (data.value && Array.isArray(data.value)) {
+                types = data.value;
+            } else if (data.value && typeof data.value === 'string') {
+                try {
+                    types = JSON.parse(data.value);
+                } catch (e) {
+                    types = [data.value];
+                }
+            } else {
+                types = ['OAS', 'Widow', 'Disabled', 'Child'];
+            }
+            
+            console.log('SSF types to display:', types);
+            displayItems('ssfTypesContainer', types, 'ssf-type');
+        } catch (error) {
+            console.error('Error loading SSF types:', error);
+            showAlert('danger', '<i class="bi bi-exclamation-circle"></i> Error loading SSF types');
+        }
+    }
+
+    function addSSFType() {
+        const container = document.getElementById('ssfTypesContainer');
+        const item = document.createElement('div');
+        item.className = 'input-group mb-2 ssf-type';
+        item.innerHTML = `
+            <input type="text" class="form-control" placeholder="SSF type (e.g., OAS, Widow)" value="">
+            <button type="button" class="btn btn-outline-danger" onclick="removeItemFromUI(this, 'ssf-type')">
+                <i class="bi bi-trash"></i> Remove
+            </button>
+        `;
+        container.appendChild(item);
+        showAlert('info', '<i class="bi bi-info-circle"></i> SSF type row added. Fill in and click Save');
+    }
+
+    async function saveSSFTypes() {
+        const types = [];
+        document.querySelectorAll('.ssf-type input').forEach(input => {
+            const value = input.value.trim();
+            if (value && !types.includes(value)) {
+                types.push(value);
+            }
+        });
+
+        if (types.length === 0) {
+            showAlert('warning', '<i class="bi bi-exclamation-triangle"></i> Please add at least one SSF type');
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/settings/ssf_types', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ value: types })
+            });
+            const data = await response.json();
+            console.log('Save response:', data);
+            
+            if (data.success) {
+                showAlert('success', '<i class="bi bi-check-circle"></i> SSF types saved successfully');
+                // Reload to show all saved items from database
+                setTimeout(() => loadSSFTypes(), 800);
+            } else {
+                showAlert('danger', '<i class="bi bi-exclamation-circle"></i> Error: ' + data.message);
+            }
+        } catch (error) {
+            console.error('Save error:', error);
+            showAlert('danger', '<i class="bi bi-exclamation-circle"></i> Error: ' + error.message);
+        }
+    }
+
+    // ============ DISASTER TYPES ============
+    async function loadDisasterTypes() {
+        try {
+            const response = await fetch('/api/settings/disaster_types');
+            const data = await response.json();
+            console.log('Loaded disaster types:', data);
+            
+            let types = [];
+            if (data.value && Array.isArray(data.value)) {
+                types = data.value;
+            } else if (data.value && typeof data.value === 'string') {
+                try {
+                    types = JSON.parse(data.value);
+                } catch (e) {
+                    types = [data.value];
+                }
+            } else {
+                types = ['Earthquake', 'Flood', 'Landslide', 'Fire', 'Storm'];
+            }
+            
+            console.log('Disaster types to display:', types);
+            displayItems('disasterTypesContainer', types, 'disaster-type');
+        } catch (error) {
+            console.error('Error loading disaster types:', error);
+            showAlert('danger', '<i class="bi bi-exclamation-circle"></i> Error loading disaster types');
+        }
+    }
+
+    function addDisasterType() {
+        const container = document.getElementById('disasterTypesContainer');
+        const item = document.createElement('div');
+        item.className = 'input-group mb-2 disaster-type';
+        item.innerHTML = `
+            <input type="text" class="form-control" placeholder="Disaster type" value="">
+            <button type="button" class="btn btn-outline-danger" onclick="removeItemFromUI(this, 'disaster-type')">
+                <i class="bi bi-trash"></i> Remove
+            </button>
+        `;
+        container.appendChild(item);
+        showAlert('info', '<i class="bi bi-info-circle"></i> Disaster type row added. Fill in and click Save');
+    }
+
+    async function saveDisasterTypes() {
+        const types = [];
+        document.querySelectorAll('.disaster-type input').forEach(input => {
+            const value = input.value.trim();
+            if (value && !types.includes(value)) {
+                types.push(value);
+            }
+        });
+
+        if (types.length === 0) {
+            showAlert('warning', '<i class="bi bi-exclamation-triangle"></i> Please add at least one disaster type');
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/settings/disaster_types', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ value: types })
+            });
+            const data = await response.json();
+            console.log('Save response:', data);
+            
+            if (data.success) {
+                showAlert('success', '<i class="bi bi-check-circle"></i> Disaster types saved successfully');
+                // Reload to show all saved items from database
+                setTimeout(() => loadDisasterTypes(), 800);
+            } else {
+                showAlert('danger', '<i class="bi bi-exclamation-circle"></i> Error: ' + data.message);
+            }
+        } catch (error) {
+            console.error('Save error:', error);
+            showAlert('danger', '<i class="bi bi-exclamation-circle"></i> Error: ' + error.message);
+        }
+    }
+
+    // ============ UTILITY FUNCTIONS ============
+    function displayItems(containerId, items, className) {
+        const container = document.getElementById(containerId);
+        container.innerHTML = '';
+        items.forEach(item => {
+            const div = document.createElement('div');
+            div.className = `input-group mb-2 ${className}`;
+            div.innerHTML = `
+                <input type="text" class="form-control" value="${item}">
+                <button type="button" class="btn btn-outline-danger" onclick="removeItemFromUI(this, '${className}')">
+                    <i class="bi bi-trash"></i> Remove
+                </button>
+            `;
+            container.appendChild(div);
+        });
+    }
+
+    function removeItemFromUI(button, className) {
+        button.parentElement.remove();
+        showAlert('info', '<i class="bi bi-info-circle"></i> Item removed from list. Click Save to update');
+    }
+
+    function showAlert(type, message) {
+        const alertBox = document.getElementById('alertBox');
+        alertBox.innerHTML = `<div class="alert alert-${type} alert-dismissible fade show">${message}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>`;
+        alertBox.style.display = 'block';
+        setTimeout(() => {
+            alertBox.style.display = 'none';
+        }, 5000);
+    }
+
+    // Load all settings on page load
+    document.addEventListener('DOMContentLoaded', () => {
+        loadReliefItems();
+        loadFiscalYears();
+        loadSSFTypes();
+        loadDisasterTypes();
+    });
+</script>
+{% endblock %}

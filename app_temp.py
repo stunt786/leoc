@@ -1,0 +1,2183 @@
+from flask import Flask, render_template, request, jsonify, send_from_directory
+from flask_sqlalchemy import SQLAlchemy
+from datetime import datetime
+import os
+import json
+import folium
+from folium import plugins
+from werkzeug.utils import secure_filename
+import re
+from functools import wraps
+import time
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Simple in-memory cache
+cache = {}
+CACHE_TIMEOUT = int(os.getenv('CACHE_TIMEOUT', 30))  # Cache timeout in seconds
+
+def cached(timeout=CACHE_TIMEOUT):
+    """Simple caching decorator"""
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            # Create a cache key based on the function name and request args
+            cache_key = f"{func.__name__}:{str(request.args)}"
+
+            # Check if we have a cached result
+            if cache_key in cache:
+                result, timestamp = cache[cache_key]
+                # Check if cache is still valid
+                if time.time() - timestamp < timeout:
+                    return result
+
+            # Call the original function
+            result = func(*args, **kwargs)
+
+            # Store in cache
+            cache[cache_key] = (result, time.time())
+
+            return result
+        return wrapper
+    return decorator
+
+app = Flask(__name__)
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-key-please-change-in-production')
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('SQLALCHEMY_DATABASE_URI', 'sqlite:///instance/leoc.db')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['MAX_CONTENT_LENGTH'] = int(os.getenv('MAX_CONTENT_LENGTH', 16 * 1024 * 1024))
+app.config['UPLOAD_FOLDER'] = os.getenv('UPLOAD_FOLDER', 'static/uploads')
+
+# Create upload folder if it doesn't exist
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
+db = SQLAlchemy(app)
+
+# Create tables if they don't exist
+def # create_tables():
+    with app.app_context():
+        db.create_all()
+
+# Initialize tables when the app starts
+# create_tables()
+
+# ============ VALIDATION HELPER FUNCTIONS ============
+def is_valid_nepali_date(date_string):
+    """
+    Validate Nepali calendar date (and AD dates for reference).
+    Supports both:
+    - Nepali dates: 2025-2090 (approximately 56-57 years ahead of AD)
+    - AD dates: 1968-2033 (for reference)
+    
+    Format: YYYY-MM-DD
+    Returns: True if valid, False otherwise
+    """
+    if not isinstance(date_string, str):
+        return False
+    
+    # Check format YYYY-MM-DD
+    if not re.match(r'^\d{4}-\d{2}-\d{2}$', date_string):
+        return False
+    
+    try:
+        year, month, day = map(int, date_string.split('-'))
+    except ValueError:
+        return False
+    
+    # Validate month and day ranges
+    if month < 1 or month > 12:
+        return False
+    if day < 1 or day > 32:
+        return False
+    
+    # Allow both Nepali calendar (2025-2090) and AD dates (1968-2033)
+    # Nepali year is approximately 56-57 years ahead of AD
+    if (year >= 2025 and year <= 2090) or (year >= 1968 and year <= 2033):
+        return True
+    
+    return False
+
+# Database Models
+class ReliefDistribution(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+
+    # Beneficiary Information
+    beneficiary_name = db.Column(db.String(200), nullable=False, index=True)  # Added index
+    beneficiary_id = db.Column(db.String(100), nullable=False, unique=True)
+    father_name = db.Column(db.String(200), index=True)  # Added index
+    phone = db.Column(db.String(20))
+
+    # Lock Status
+    is_locked = db.Column(db.Boolean, default=False, index=True)  # Added index
+
+    # Disaster Information
+    disaster_date = db.Column(db.String(10), index=True)  # YYYY-MM-DD format (supports both Nepali and AD dates) - Added index
+    disaster_type = db.Column(db.String(100), index=True)  # Added index
+    fiscal_year = db.Column(db.String(20), index=True)  # e.g., "2080/81" - Added index
+
+    # Location Information
+    ward = db.Column(db.Integer, index=True)  # 1-9 - Added index
+    tole = db.Column(db.String(200), index=True)  # Added index
+    location = db.Column(db.String(200), index=True)  # Building name/address - Added index
+    latitude = db.Column(db.Float)
+    longitude = db.Column(db.Float)
+    current_shelter_location = db.Column(db.String(200), index=True)  # Added index
+
+    # Family Details (JSON)
+    family_members_json = db.Column(db.Text)  # [{"name": "...", "relation": "...", "age": ..., "gender": "M/F"}, ...]
+    male_count = db.Column(db.Integer, default=0)
+    female_count = db.Column(db.Integer, default=0)
+    children_count = db.Column(db.Integer, default=0)
+
+    # Special Cases
+    pregnant_mother_count = db.Column(db.Integer, default=0)
+    mother_under_2_baby = db.Column(db.Integer, default=0)  # Mothers with babies under 2 years
+    deaths_during_disaster = db.Column(db.Integer, default=0)
+
+    # Beneficiary Status
+    in_social_security_fund = db.Column(db.Boolean, default=False, index=True)  # Added index
+    ssf_type = db.Column(db.String(100), index=True)  # Type of SSF (OAS, Widow, Disabled, etc) - Added index
+    poverty_card_holder = db.Column(db.Boolean, default=False, index=True)  # Added index
+
+    # Harm Information
+    harms_json = db.Column(db.Text)  # [{"member_name": "...", "harm": "...", "severity": "..."}, ...]
+
+    # Bank Account Details
+    bank_account_holder_name = db.Column(db.String(200))
+    bank_account_number = db.Column(db.String(50))
+    bank_name = db.Column(db.String(200))
+
+    # Relief Distribution
+    relief_items_json = db.Column(db.Text)  # Store as JSON: [{"item": "Food", "quantity": 5}, ...]
+    cash_received = db.Column(db.Float, default=0.0)
+    distribution_date = db.Column(db.DateTime, default=datetime.utcnow, index=True)  # Added index
+    status = db.Column(db.String(50), default='Distributed', index=True)  # Added index
+
+    # Documentation
+    documents = db.Column(db.Text)  # Comma-separated filenames
+    image_filename = db.Column(db.String(255))
+    notes = db.Column(db.Text)
+
+    # Metadata
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)  # Added index
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, index=True)  # Added index
+
+    def get_relief_items(self):
+        try:
+            return json.loads(self.relief_items_json) if self.relief_items_json else []
+        except:
+            return []
+
+    def set_relief_items(self, items):
+        self.relief_items_json = json.dumps(items)
+
+    def get_family_members(self):
+        try:
+            return json.loads(self.family_members_json) if self.family_members_json else []
+        except:
+            return []
+
+    def set_family_members(self, members):
+        self.family_members_json = json.dumps(members)
+
+    def get_harms(self):
+        try:
+            return json.loads(self.harms_json) if self.harms_json else []
+        except:
+            return []
+
+    def set_harms(self, harms):
+        self.harms_json = json.dumps(harms)
+
+    def get_documents(self):
+        return [d.strip() for d in self.documents.split(',') if d.strip()] if self.documents else []
+
+    def set_documents(self, docs):
+        self.documents = ','.join(docs) if docs else None
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'beneficiary_name': self.beneficiary_name,
+            'beneficiary_id': self.beneficiary_id,
+            'father_name': self.father_name,
+            'phone': self.phone,
+            'disaster_date': self.disaster_date if self.disaster_date else None,  # Already stored as string YYYY-MM-DD
+            'disaster_type': self.disaster_type,
+            'fiscal_year': self.fiscal_year,
+            'ward': self.ward,
+            'tole': self.tole,
+            'location': self.location,
+            'latitude': self.latitude,
+            'longitude': self.longitude,
+            'current_shelter_location': self.current_shelter_location,
+            'family_members': self.get_family_members(),
+            'male_count': self.male_count,
+            'female_count': self.female_count,
+            'children_count': self.children_count,
+            'pregnant_mother_count': self.pregnant_mother_count,
+            'mother_under_2_baby': self.mother_under_2_baby,
+            'deaths_during_disaster': self.deaths_during_disaster,
+            'in_social_security_fund': self.in_social_security_fund,
+            'ssf_type': self.ssf_type,
+            'poverty_card_holder': self.poverty_card_holder,
+            'harms': self.get_harms(),
+            'bank_account_holder_name': self.bank_account_holder_name,
+            'bank_account_number': self.bank_account_number,
+            'bank_name': self.bank_name,
+            'relief_items': self.get_relief_items(),
+            'cash_received': self.cash_received,
+            'distribution_date': self.distribution_date.strftime('%Y-%m-%d %H:%M'),
+            'status': self.status,
+            'documents': self.get_documents(),
+            'image_filename': self.image_filename,
+            'notes': self.notes,
+            'is_locked': self.is_locked,
+            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M'),
+            'updated_at': self.updated_at.strftime('%Y-%m-%d %H:%M')
+        }
+
+# Disaster Model
+class Disaster(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    disaster_type = db.Column(db.String(100), nullable=False, index=True)  # Added index
+    disaster_date = db.Column(db.Date, nullable=False, index=True)  # Added index
+    ward = db.Column(db.Integer, nullable=False, index=True)  # Added index
+    tole = db.Column(db.String(200), index=True)  # Added index
+    latitude = db.Column(db.Float)
+    longitude = db.Column(db.Float)
+    fiscal_year = db.Column(db.String(20), index=True)  # Added index
+    description = db.Column(db.Text)
+    affected_households = db.Column(db.Integer, default=0)
+    affected_people = db.Column(db.Integer, default=0)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)  # Added index
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, index=True)  # Added index
+
+    # Additional disaster impact fields
+    deaths = db.Column(db.Integer, default=0)
+    missing_persons = db.Column(db.Integer, default=0)
+    road_blocked_status = db.Column(db.Boolean, default=False)
+    electricity_blocked_status = db.Column(db.Boolean, default=False)
+    communication_blocked_status = db.Column(db.Boolean, default=False)
+    drinking_water_status = db.Column(db.Boolean, default=False)  # True if disrupted
+    public_building_destruction = db.Column(db.Integer, default=0)  # Number of buildings destroyed
+    public_building_damage = db.Column(db.Integer, default=0)  # Number of buildings damaged
+    livestock_injured = db.Column(db.Integer, default=0)
+    livestock_death = db.Column(db.Integer, default=0)
+    agriculture_crop_damage = db.Column(db.Text)  # Description of crop damage
+    affected_people_male = db.Column(db.Integer, default=0)
+    affected_people_female = db.Column(db.Integer, default=0)
+
+    # Lock Status
+    is_locked = db.Column(db.Boolean, default=False, index=True)  # Added index
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'disaster_type': self.disaster_type,
+            'disaster_date': self.disaster_date.strftime('%Y-%m-%d'),
+            'ward': self.ward,
+            'tole': self.tole,
+            'latitude': self.latitude,
+            'longitude': self.longitude,
+            'fiscal_year': self.fiscal_year,
+            'description': self.description,
+            'affected_households': self.affected_households,
+            'affected_people': self.affected_people,
+            'deaths': self.deaths,
+            'missing_persons': self.missing_persons,
+            'road_blocked_status': self.road_blocked_status,
+            'electricity_blocked_status': self.electricity_blocked_status,
+            'communication_blocked_status': self.communication_blocked_status,
+            'drinking_water_status': self.drinking_water_status,
+            'public_building_destruction': self.public_building_destruction,
+            'public_building_damage': self.public_building_damage,
+            'livestock_injured': self.livestock_injured,
+            'livestock_death': self.livestock_death,
+            'agriculture_crop_damage': self.agriculture_crop_damage,
+            'affected_people_male': self.affected_people_male,
+            'affected_people_female': self.affected_people_female,
+            'is_locked': self.is_locked,
+            'created_at': self.created_at.strftime('%Y-%m-%d')
+        }
+
+# Social Security Beneficiary Model
+class SocialSecurityBeneficiary(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    beneficiary_name = db.Column(db.String(200), nullable=False, index=True)  # Added index
+    beneficiary_id = db.Column(db.String(100), nullable=False, unique=True)
+    ssf_type = db.Column(db.String(100), nullable=False, index=True)  # OAS, Widow, Disabled, Endangered, etc - Added index
+    age = db.Column(db.Integer)
+    gender = db.Column(db.String(10), index=True)  # Added index
+    ward = db.Column(db.Integer, index=True)  # Added index
+    tole = db.Column(db.String(200), index=True)  # Added index
+    latitude = db.Column(db.Float)
+    longitude = db.Column(db.Float)
+    phone = db.Column(db.String(20))
+    bank_account_holder_name = db.Column(db.String(200))
+    bank_account_number = db.Column(db.String(50))
+    bank_name = db.Column(db.String(200))
+    notes = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)  # Added index
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, index=True)  # Added index
+
+    # Lock Status
+    is_locked = db.Column(db.Boolean, default=False, index=True)  # Added index
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'beneficiary_name': self.beneficiary_name,
+            'beneficiary_id': self.beneficiary_id,
+            'ssf_type': self.ssf_type,
+            'age': self.age,
+            'gender': self.gender,
+            'ward': self.ward,
+            'tole': self.tole,
+            'latitude': self.latitude,
+            'longitude': self.longitude,
+            'phone': self.phone,
+            'bank_account_holder_name': self.bank_account_holder_name,
+            'bank_account_number': self.bank_account_number,
+            'bank_name': self.bank_name,
+            'notes': self.notes,
+            'is_locked': self.is_locked,
+            'created_at': self.created_at.strftime('%Y-%m-%d')
+        }
+
+# Settings Model
+class AppSettings(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    setting_key = db.Column(db.String(100), unique=True, nullable=False)
+    setting_value = db.Column(db.Text, nullable=False)  # JSON for arrays
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    @staticmethod
+    def get_setting(key, default=None):
+        setting = AppSettings.query.filter_by(setting_key=key).first()
+        if setting:
+            try:
+                return json.loads(setting.setting_value)
+            except:
+                return setting.setting_value
+        return default
+
+    @staticmethod
+    def set_setting(key, value):
+        setting = AppSettings.query.filter_by(setting_key=key).first()
+        if not setting:
+            setting = AppSettings(setting_key=key)
+        setting.setting_value = json.dumps(value) if isinstance(value, (list, dict)) else str(value)
+        db.session.add(setting)
+        db.session.commit()
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'setting_key': self.setting_key,
+            'setting_value': json.loads(self.setting_value) if self.setting_value.startswith('[') or self.setting_value.startswith('{') else self.setting_value,
+            'updated_at': self.updated_at.strftime('%Y-%m-%d')
+        }
+
+# Event Log Model
+class EventLog(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+    event_type = db.Column(db.String(100), nullable=False, index=True)  # e.g., "Incident Report", "Assessment", "Relief Distribution"
+    description = db.Column(db.Text, nullable=False)
+    location = db.Column(db.String(200), index=True)
+    responsible_unit = db.Column(db.String(100), index=True)
+    status = db.Column(db.String(50), default='Active', index=True)  # Active, Completed, etc.
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, index=True)
+
+    # Lock Status
+    is_locked = db.Column(db.Boolean, default=False, index=True)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'timestamp': self.timestamp.strftime('%Y-%m-%d %H:%M'),
+            'event_type': self.event_type,
+            'description': self.description,
+            'location': self.location,
+            'responsible_unit': self.responsible_unit,
+            'status': self.status,
+            'is_locked': self.is_locked,
+            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M'),
+            'updated_at': self.updated_at.strftime('%Y-%m-%d %H:%M')
+        }
+
+# Situation Report Model
+class SituationReport(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    report_date = db.Column(db.Date, default=datetime.today, index=True)
+    current_situation_summary = db.Column(db.Text)
+    weather_conditions = db.Column(db.Text)
+    detailed_report = db.Column(db.Text)
+    resources_deployed = db.Column(db.Text)
+    next_update_time = db.Column(db.String(20))  # e.g., "18:00 hrs"
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, index=True)
+
+    # Lock Status
+    is_locked = db.Column(db.Boolean, default=False, index=True)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'report_date': self.report_date.strftime('%Y-%m-%d'),
+            'current_situation_summary': self.current_situation_summary,
+            'weather_conditions': self.weather_conditions,
+            'detailed_report': self.detailed_report,
+            'resources_deployed': self.resources_deployed,
+            'next_update_time': self.next_update_time,
+            'is_locked': self.is_locked,
+            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M'),
+            'updated_at': self.updated_at.strftime('%Y-%m-%d %H:%M')
+        }
+
+# Public Information Model
+class PublicInformation(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(200), nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    info_type = db.Column(db.String(50), default='General', index=True)  # General, Weather Advisory, Emergency Contact, Safety Instruction
+    priority = db.Column(db.String(20), default='Normal', index=True)  # Low, Normal, High, Critical
+    is_active = db.Column(db.Boolean, default=True, index=True)
+    valid_from = db.Column(db.DateTime, default=datetime.utcnow)
+    valid_until = db.Column(db.DateTime)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, index=True)
+
+    # Lock Status
+    is_locked = db.Column(db.Boolean, default=False, index=True)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'title': self.title,
+            'content': self.content,
+            'info_type': self.info_type,
+            'priority': self.priority,
+            'is_active': self.is_active,
+            'valid_from': self.valid_from.strftime('%Y-%m-%d %H:%M') if self.valid_from else None,
+            'valid_until': self.valid_until.strftime('%Y-%m-%d %H:%M') if self.valid_until else None,
+            'is_locked': self.is_locked,
+            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M'),
+            'updated_at': self.updated_at.strftime('%Y-%m-%d %H:%M')
+        }
+
+# Routes
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+@app.route('/map')
+def map_view():
+    return render_template('map.html')
+
+@app.route('/thalara_wards.json')
+def get_wards_json():
+    return send_from_directory('.', 'thalara_wards.json')
+
+@app.route('/thalara_boundary.json')
+def get_boundary_json():
+    return send_from_directory('.', 'thalara_boundary.json')
+
+@app.route('/form')
+def form():
+    return render_template('form.html')
+
+@app.route('/disaster-report')
+def disaster_report():
+    return render_template('disaster_report.html')
+
+@app.route('/view/<int:id>')
+def view_distribution(id):
+    distribution = ReliefDistribution.query.get(id)
+    if not distribution:
+        return "Distribution not found", 404
+    
+    # Convert JSON strings to Python objects for template
+    if distribution.family_members_json:
+        distribution.family_members_json = json.loads(distribution.family_members_json) if isinstance(distribution.family_members_json, str) else distribution.family_members_json
+    else:
+        distribution.family_members_json = []
+    
+    if distribution.harms_json:
+        distribution.harms_json = json.loads(distribution.harms_json) if isinstance(distribution.harms_json, str) else distribution.harms_json
+    else:
+        distribution.harms_json = []
+    
+    if distribution.relief_items_json:
+        distribution.relief_items = json.loads(distribution.relief_items_json) if isinstance(distribution.relief_items_json, str) else distribution.relief_items_json
+    else:
+        distribution.relief_items = []
+    
+    # Get documents list for template
+    distribution.documents = distribution.get_documents()
+    
+    return render_template('view.html', distribution=distribution)
+
+@app.route('/settings')
+def settings():
+    return render_template('settings.html')
+
+@app.route('/api/distributions', methods=['GET'])
+def get_distributions():
+    # Get pagination parameters
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 10, type=int)
+
+    # Limit per_page to prevent abuse
+    per_page = min(per_page, 100)
+
+    # Get filter parameters
+    fiscal_year = request.args.get('fiscal_year')
+    disaster_type = request.args.get('disaster_type')
+    ward = request.args.get('ward')
+
+    # Build query with filters
+    query = ReliefDistribution.query
+
+    if fiscal_year:
+        query = query.filter(ReliefDistribution.fiscal_year == fiscal_year)
+    if disaster_type:
+        query = query.filter(ReliefDistribution.disaster_type == disaster_type)
+    if ward:
+        query = query.filter(ReliefDistribution.ward == int(ward))
+
+    # Order by distribution date descending
+    query = query.order_by(ReliefDistribution.distribution_date.desc())
+
+    # Paginate results
+    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+    distributions = pagination.items
+
+    return jsonify({
+        'distributions': [d.to_dict() for d in distributions],
+        'pagination': {
+            'page': page,
+            'pages': pagination.pages,
+            'per_page': per_page,
+            'total': pagination.total,
+            'has_next': pagination.has_next,
+            'has_prev': pagination.has_prev
+        }
+    })
+
+@app.route('/api/distributions', methods=['POST'])
+def add_distribution():
+    try:
+        data = request.form
+        
+        # ============ SERVER-SIDE VALIDATION ============
+        errors = []
+        
+        # Beneficiary Information Validations
+        beneficiary_name = data.get('beneficiary_name', '').strip()
+        if not beneficiary_name:
+            errors.append('Beneficiary name is required')
+        elif len(beneficiary_name) < 3:
+            errors.append('Beneficiary name must be at least 3 characters')
+        
+        beneficiary_id = data.get('beneficiary_id', '').strip()
+        if not beneficiary_id:
+            errors.append('Beneficiary ID is required')
+        elif len(beneficiary_id) < 2:
+            errors.append('Beneficiary ID must be at least 2 characters')
+        else:
+            # Check if ID already exists
+            existing = ReliefDistribution.query.filter_by(beneficiary_id=beneficiary_id).first()
+            if existing:
+                errors.append('Beneficiary ID already exists. Please use a unique ID.')
+        
+        # Disaster Information Validations
+        disaster_date_str = data.get('disaster_date', '').strip()
+        if not disaster_date_str:
+            errors.append('Disaster date is required')
+        else:
+            # Validate Nepali date format (supports both Nepali 2025-2090 and AD 1968-2033)
+            if not is_valid_nepali_date(disaster_date_str):
+                errors.append('Disaster date format is invalid. Use YYYY-MM-DD format. Nepali dates: 2025-2090, AD dates: 1968-2033')
+            else:
+                # Note: We're storing dates as strings in format YYYY-MM-DD since they could be Nepali dates
+                # The date is validated for format only, not for being in the future
+                pass
+        
+        disaster_type = data.get('disaster_type', '').strip()
+        if not disaster_type:
+            errors.append('Disaster type is required')
+        
+        location = data.get('location', '').strip()
+        if not location:
+            errors.append('Location/Building name is required')
+        elif len(location) < 3:
+            errors.append('Location must be at least 3 characters')
+        
+        ward = data.get('ward', '').strip()
+        if not ward:
+            errors.append('Ward selection is required')
+        else:
+            try:
+                ward_num = int(ward)
+                if ward_num < 1 or ward_num > 9:
+                    errors.append('Ward must be between 1 and 9')
+            except ValueError:
+                errors.append('Ward must be a valid number')
+        
+        # Phone Validation (if provided)
+        phone = data.get('phone', '').strip()
+        if phone and len(phone) < 7:
+            errors.append('Phone number must be at least 7 digits')
+        
+        # Latitude/Longitude Validation (if provided)
+        try:
+            if data.get('latitude'):
+                lat = float(data.get('latitude'))
+                if lat < -90 or lat > 90:
+                    errors.append('Latitude must be between -90 and 90')
+        except (ValueError, TypeError):
+            errors.append('Latitude must be a valid number')
+        
+        try:
+            if data.get('longitude'):
+                lon = float(data.get('longitude'))
+                if lon < -180 or lon > 180:
+                    errors.append('Longitude must be between -180 and 180')
+        except (ValueError, TypeError):
+            errors.append('Longitude must be a valid number')
+        
+        # Family counts validation
+        try:
+            male_count = int(data.get('male_count', 0)) or 0
+            female_count = int(data.get('female_count', 0)) or 0
+            children_count = int(data.get('children_count', 0)) or 0
+            deaths = int(data.get('deaths_during_disaster', 0)) or 0
+            
+            if male_count < 0 or female_count < 0 or children_count < 0 or deaths < 0:
+                errors.append('Family counts cannot be negative')
+        except (ValueError, TypeError):
+            errors.append('Family counts must be valid numbers')
+        
+        # Cash amount validation
+        try:
+            cash_received = float(data.get('cash_received', 0)) or 0.0
+            if cash_received < 0:
+                errors.append('Cash received cannot be negative')
+        except (ValueError, TypeError):
+            errors.append('Cash received must be a valid number')
+        
+        # Relief items validation
+        items_json = data.get('relief_items_json', '[]')
+        try:
+            relief_items = json.loads(items_json)
+            if relief_items and len(relief_items) > 0:
+                for item in relief_items:
+                    if not item.get('item') or not item.get('quantity'):
+                        errors.append('All relief items must have item name and quantity')
+                        break
+                    try:
+                        qty = int(item.get('quantity', 0))
+                        if qty < 1:
+                            errors.append('Relief item quantities must be at least 1')
+                            break
+                    except (ValueError, TypeError):
+                        errors.append('Relief item quantities must be valid numbers')
+                        break
+                    # Unit is optional, but if provided, it should be a string
+                    if 'unit' in item and not isinstance(item.get('unit'), str):
+                        errors.append('Relief item units must be strings')
+                        break
+        except json.JSONDecodeError:
+            errors.append('Invalid relief items format')
+        
+        # File validation
+        file_size_limit = 10 * 1024 * 1024  # 10MB
+        allowed_image_types = {'image/jpeg', 'image/png', 'image/gif', 'image/webp'}
+        allowed_doc_types = {'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'image/jpeg', 'image/png'}
+        
+        if 'image' in request.files:
+            file = request.files['image']
+            if file and file.filename != '':
+                file.seek(0, 2)  # Seek to end
+                file_size = file.tell()  # Get size
+                file.seek(0)  # Reset to beginning
+                if file_size > file_size_limit:
+                    errors.append('Image file is too large (maximum 10MB)')
+                elif file.content_type not in allowed_image_types:
+                    errors.append('Image file type not allowed (allowed: JPEG, PNG, GIF, WebP)')
+        
+        if 'documents' in request.files:
+            files = request.files.getlist('documents')
+            for file in files:
+                if file and file.filename != '':
+                    file.seek(0, 2)  # Seek to end
+                    file_size = file.tell()  # Get size
+                    file.seek(0)  # Reset to beginning
+                    if file_size > file_size_limit:
+                        errors.append(f'Document "{file.filename}" is too large (maximum 10MB)')
+                    elif file.content_type not in allowed_doc_types:
+                        errors.append(f'Document type not allowed for "{file.filename}"')
+        
+        # Return validation errors if any
+        if errors:
+            return jsonify({
+                'success': False,
+                'message': 'Validation failed',
+                'errors': errors
+            }), 400
+        
+        image_filename = None
+        documents = []
+        
+        # Handle main image upload
+        if 'image' in request.files:
+            file = request.files['image']
+            if file and file.filename != '':
+                filename = secure_filename(f"{datetime.now().timestamp()}_{file.filename}")
+                file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+                image_filename = filename
+        
+        # Handle multiple documents upload
+        if 'documents' in request.files:
+            files = request.files.getlist('documents')
+            for file in files:
+                if file and file.filename != '':
+                    filename = secure_filename(f"{datetime.now().timestamp()}_{file.filename}")
+                    file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+                    documents.append(filename)
+        
+        # Parse JSON fields
+        relief_items = json.loads(items_json)
+        
+        family_members = []
+        family_json = data.get('family_members_json')
+        if family_json:
+            family_members = json.loads(family_json)
+        
+        harms = []
+        harms_json = data.get('harms_json')
+        if harms_json:
+            harms = json.loads(harms_json)
+        
+        # Store disaster date as string (supports both Nepali and AD formats YYYY-MM-DD)
+        disaster_date = data.get('disaster_date', '').strip() if data.get('disaster_date') else None
+        
+        # Create distribution with all new fields
+        distribution = ReliefDistribution(
+            # Beneficiary Information
+            beneficiary_name=data.get('beneficiary_name'),
+            beneficiary_id=data.get('beneficiary_id'),
+            father_name=data.get('father_name'),
+            phone=data.get('phone'),
+            
+            # Disaster Information
+            disaster_date=disaster_date,
+            disaster_type=data.get('disaster_type'),
+            fiscal_year=data.get('fiscal_year'),
+            
+            # Location Information
+            ward=int(data.get('ward')) if data.get('ward') else None,
+            tole=data.get('tole'),
+            location=data.get('location'),
+            latitude=float(data.get('latitude')) if data.get('latitude') else None,
+            longitude=float(data.get('longitude')) if data.get('longitude') else None,
+            current_shelter_location=data.get('current_shelter_location'),
+            
+            # Family Details
+            male_count=int(data.get('male_count', 0)) or 0,
+            female_count=int(data.get('female_count', 0)) or 0,
+            children_count=int(data.get('children_count', 0)) or 0,
+            pregnant_mother_count=int(data.get('pregnant_mother_count', 0)) or 0,
+            mother_under_2_baby=int(data.get('mother_under_2_baby', 0)) or 0,
+            deaths_during_disaster=int(data.get('deaths_during_disaster', 0)) or 0,
+            
+            # Social Security & Status
+            in_social_security_fund=data.get('in_social_security_fund') in ['1', 'on', 'true', True],
+            ssf_type=data.get('ssf_type'),
+            poverty_card_holder=data.get('poverty_card_holder') in ['1', 'on', 'true', True],
+            
+            # Bank Account
+            bank_account_holder_name=data.get('bank_account_holder_name'),
+            bank_account_number=data.get('bank_account_number'),
+            bank_name=data.get('bank_name'),
+            
+            # Relief Distribution
+            cash_received=float(data.get('cash_received', 0)) or 0.0,
+            status=data.get('status', 'Distributed'),
+            
+            # Files
+            image_filename=image_filename,
+            notes=data.get('notes')
+        )
+        
+        distribution.set_relief_items(relief_items)
+        distribution.set_family_members(family_members)
+        distribution.set_harms(harms)
+        distribution.set_documents(documents)
+        
+        db.session.add(distribution)
+        db.session.commit()
+
+        # Clear cache after modification
+        clear_cache()
+
+        return jsonify({
+            'success': True,
+            'message': 'Relief distribution recorded successfully',
+            'data': distribution.to_dict()
+        }), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 400
+
+@app.route('/api/distributions/<int:id>', methods=['GET'])
+def get_distribution(id):
+    try:
+        distribution = ReliefDistribution.query.get(id)
+        if not distribution:
+            return jsonify({'success': False, 'message': 'Distribution not found'}), 404
+        return jsonify({
+            'success': True,
+            'data': distribution.to_dict()
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+@app.route('/api/distributions/<int:id>', methods=['PUT'])
+def edit_distribution(id):
+    try:
+        distribution = ReliefDistribution.query.get(id)
+        if not distribution:
+            return jsonify({'success': False, 'message': 'Distribution not found'}), 404
+
+        # Check if the record is locked
+        if distribution.is_locked:
+            return jsonify({
+                'success': False,
+                'message': 'Cannot edit: Record is locked. Please unlock first.'
+            }), 403
+
+        data = request.form
+        documents = distribution.get_documents()
+        
+        # Handle main image upload
+        if 'image' in request.files:
+            file = request.files['image']
+            if file and file.filename != '':
+                # Delete old image
+                if distribution.image_filename:
+                    old_path = os.path.join(app.config['UPLOAD_FOLDER'], distribution.image_filename)
+                    if os.path.exists(old_path):
+                        os.remove(old_path)
+                
+                filename = secure_filename(f"{datetime.now().timestamp()}_{file.filename}")
+                file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+                distribution.image_filename = filename
+        
+        # Handle new documents upload
+        if 'documents' in request.files:
+            files = request.files.getlist('documents')
+            for file in files:
+                if file and file.filename != '':
+                    filename = secure_filename(f"{datetime.now().timestamp()}_{file.filename}")
+                    file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+                    documents.append(filename)
+        
+        # Update beneficiary information
+        distribution.beneficiary_name = data.get('beneficiary_name', distribution.beneficiary_name)
+        distribution.beneficiary_id = data.get('beneficiary_id', distribution.beneficiary_id)
+        distribution.father_name = data.get('father_name', distribution.father_name)
+        distribution.phone = data.get('phone', distribution.phone)
+        
+        # Update disaster information
+        if data.get('disaster_date'):
+            distribution.disaster_date = data.get('disaster_date').strip()
+        distribution.disaster_type = data.get('disaster_type', distribution.disaster_type)
+        distribution.fiscal_year = data.get('fiscal_year', distribution.fiscal_year)
+        
+        # Update location information
+        if data.get('ward'):
+            distribution.ward = int(data.get('ward'))
+        distribution.tole = data.get('tole', distribution.tole)
+        distribution.location = data.get('location', distribution.location)
+        if data.get('latitude'):
+            distribution.latitude = float(data.get('latitude'))
+        if data.get('longitude'):
+            distribution.longitude = float(data.get('longitude'))
+        distribution.current_shelter_location = data.get('current_shelter_location', distribution.current_shelter_location)
+        
+        # Update family details
+        distribution.male_count = int(data.get('male_count', distribution.male_count)) or 0
+        distribution.female_count = int(data.get('female_count', distribution.female_count)) or 0
+        distribution.children_count = int(data.get('children_count', distribution.children_count)) or 0
+        distribution.pregnant_mother_count = int(data.get('pregnant_mother_count', distribution.pregnant_mother_count)) or 0
+        distribution.mother_under_2_baby = int(data.get('mother_under_2_baby', distribution.mother_under_2_baby)) or 0
+        distribution.deaths_during_disaster = int(data.get('deaths_during_disaster', distribution.deaths_during_disaster)) or 0
+        
+        # Update social security & status
+        distribution.in_social_security_fund = data.get('in_social_security_fund') in ['1', 'on', 'true', True]
+        distribution.ssf_type = data.get('ssf_type', distribution.ssf_type)
+        distribution.poverty_card_holder = data.get('poverty_card_holder') in ['1', 'on', 'true', True]
+        
+        # Update bank account details
+        distribution.bank_account_holder_name = data.get('bank_account_holder_name', distribution.bank_account_holder_name)
+        distribution.bank_account_number = data.get('bank_account_number', distribution.bank_account_number)
+        distribution.bank_name = data.get('bank_name', distribution.bank_name)
+        
+        # Update relief distribution
+        distribution.cash_received = float(data.get('cash_received', distribution.cash_received)) or 0.0
+        distribution.status = data.get('status', distribution.status)
+        distribution.notes = data.get('notes', distribution.notes)
+        
+        # Parse JSON fields
+        items_json = data.get('relief_items_json')
+        if items_json:
+            relief_items = json.loads(items_json)
+            distribution.set_relief_items(relief_items)
+        
+        family_json = data.get('family_members_json')
+        if family_json:
+            family_members = json.loads(family_json)
+            distribution.set_family_members(family_members)
+        
+        harms_json = data.get('harms_json')
+        if harms_json:
+            harms = json.loads(harms_json)
+            distribution.set_harms(harms)
+        
+        distribution.set_documents(documents)
+        distribution.updated_at = datetime.utcnow()
+
+        db.session.commit()
+
+        # Clear cache after modification
+        clear_cache()
+
+        return jsonify({
+            'success': True,
+            'message': 'Relief distribution updated successfully',
+            'data': distribution.to_dict()
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 400
+
+@app.route('/api/statistics', methods=['GET'])
+@cached(timeout=60)  # Cache for 60 seconds
+def get_statistics():
+    try:
+        # Get filter parameters
+        fiscal_year = request.args.get('fiscal_year')
+        disaster_type = request.args.get('disaster_type')
+        ward = request.args.get('ward')
+
+        # Build base query
+        base_query = ReliefDistribution.query
+
+        # Apply filters to base query
+        if fiscal_year:
+            base_query = base_query.filter(ReliefDistribution.fiscal_year == fiscal_year)
+        if disaster_type:
+            base_query = base_query.filter(ReliefDistribution.disaster_type == disaster_type)
+        if ward:
+            try:
+                ward_int = int(ward)
+                base_query = base_query.filter(ReliefDistribution.ward == ward_int)
+            except (ValueError, TypeError):
+                pass  # Invalid ward value, don't filter
+
+        # Get basic statistics
+        filtered_distributions = base_query.all()
+        total_distributions = len(filtered_distributions)
+
+        # Calculate total cash and items from the filtered results
+        total_cash = sum(dist.cash_received for dist in filtered_distributions)
+        total_items = 0
+        items_count = {}
+
+        for dist in filtered_distributions:
+            for item in dist.get_relief_items():
+                try:
+                    qty = int(item.get('quantity', 0))
+                    total_items += qty
+                    item_name = item.get('item', 'Unknown')
+                    items_count[item_name] = items_count.get(item_name, 0) + qty
+                except (ValueError, TypeError):
+                    continue
+
+        # Efficient aggregation queries for other statistics
+        # Ward distribution - with proper filtering
+        ward_base_query = db.session.query(
+            ReliefDistribution.ward,
+            db.func.count(ReliefDistribution.id).label('count')
+        ).filter(ReliefDistribution.ward.isnot(None))
+
+        # Apply the same filters to the ward query
+        if fiscal_year:
+            ward_base_query = ward_base_query.filter(ReliefDistribution.fiscal_year == fiscal_year)
+        if disaster_type:
+            ward_base_query = ward_base_query.filter(ReliefDistribution.disaster_type == disaster_type)
+        if ward:
+            try:
+                ward_int = int(ward)
+                ward_base_query = ward_base_query.filter(ReliefDistribution.ward == ward_int)
+            except (ValueError, TypeError):
+                pass
+
+        ward_data = ward_base_query.group_by(ReliefDistribution.ward).all()
+
+        # Fiscal year distribution - with proper filtering
+        fiscal_year_base_query = db.session.query(
+            ReliefDistribution.fiscal_year,
+            db.func.count(ReliefDistribution.id).label('count')
+        ).filter(ReliefDistribution.fiscal_year.isnot(None))
+
+        # Apply the same filters to the fiscal year query
+        if fiscal_year:
+            fiscal_year_base_query = fiscal_year_base_query.filter(ReliefDistribution.fiscal_year == fiscal_year)
+        if disaster_type:
+            fiscal_year_base_query = fiscal_year_base_query.filter(ReliefDistribution.disaster_type == disaster_type)
+        if ward:
+            try:
+                ward_int = int(ward)
+                fiscal_year_base_query = fiscal_year_base_query.filter(ReliefDistribution.ward == ward_int)
+            except (ValueError, TypeError):
+                pass
+
+        fiscal_year_data = fiscal_year_base_query.group_by(ReliefDistribution.fiscal_year).all()
+
+        return jsonify({
+            'total_distributions': total_distributions,
+            'total_items': total_items,
+            'total_cash': float(total_cash),
+            'items_distribution': [
+                {'item': item, 'quantity': count}
+                for item, count in items_count.items()
+            ],
+            'ward_distribution': [
+                {'ward': ward, 'count': count}
+                for ward, count in ward_data if ward is not None  # Only include non-null wards
+            ],
+            'fiscal_year_distribution': [
+                {'fiscal_year': fiscal_year, 'count': count}
+                for fiscal_year, count in fiscal_year_data if fiscal_year is not None  # Only include non-null fiscal years
+            ]
+        })
+    except Exception as e:
+        print(f"Error in get_statistics: {str(e)}")  # Log the error
+        return jsonify({
+            'total_distributions': 0,
+            'total_items': 0,
+            'total_cash': 0.0,
+            'items_distribution': [],
+            'ward_distribution': [],
+            'fiscal_year_distribution': []
+        })
+
+@app.route('/api/map-data', methods=['GET'])
+@cached(timeout=30)  # Cache for 30 seconds
+def get_map_data():
+    """API endpoint to get minimal data needed for the map visualization"""
+    try:
+        # Get distributions with coordinates for the map
+        distributions = ReliefDistribution.query.filter(
+            ReliefDistribution.latitude.isnot(None),
+            ReliefDistribution.longitude.isnot(None)
+        ).with_entities(
+            ReliefDistribution.id,
+            ReliefDistribution.beneficiary_name,
+            ReliefDistribution.disaster_type,
+            ReliefDistribution.disaster_date,
+            ReliefDistribution.location,
+            ReliefDistribution.ward,
+            ReliefDistribution.latitude,
+            ReliefDistribution.longitude,
+            ReliefDistribution.relief_items_json,
+            ReliefDistribution.cash_received,
+            ReliefDistribution.notes
+        ).all()
+
+        # Format distributions for map
+        dist_data = []
+        for dist in distributions:
+            relief_items = json.loads(dist.relief_items_json) if dist.relief_items_json else []
+            items_str = ", ".join([f"{i.get('item')}: {i.get('quantity')} {i.get('unit', 'units')}" for i in relief_items])
+
+            dist_data.append({
+                'id': dist.id,
+                'beneficiary_name': dist.beneficiary_name,
+                'disaster_type': dist.disaster_type,
+                'disaster_date': dist.disaster_date,
+                'location': dist.location,
+                'ward': dist.ward,
+                'latitude': dist.latitude,
+                'longitude': dist.longitude,
+                'relief_items': items_str,
+                'cash_received': dist.cash_received,
+                'notes': dist.notes
+            })
+
+        # Get disasters with coordinates for the map
+        disasters = Disaster.query.filter(
+            Disaster.latitude.isnot(None),
+            Disaster.longitude.isnot(None)
+        ).with_entities(
+            Disaster.id,
+            Disaster.disaster_type,
+            Disaster.disaster_date,
+            Disaster.ward,
+            Disaster.latitude,
+            Disaster.longitude,
+            Disaster.affected_households,
+            Disaster.affected_people,
+            Disaster.deaths,
+            Disaster.missing_persons,
+            Disaster.public_building_damage,
+            Disaster.public_building_destruction,
+            Disaster.livestock_injured,
+            Disaster.livestock_death,
+            Disaster.affected_people_male,
+            Disaster.affected_people_female
+        ).all()
+
+        # Format disasters for map
+        dis_data = []
+        for disaster in disasters:
+            dis_data.append({
+                'id': disaster.id,
+                'disaster_type': disaster.disaster_type,
+                'disaster_date': disaster.disaster_date.strftime('%Y-%m-%d') if disaster.disaster_date else None,
+                'ward': disaster.ward,
+                'latitude': disaster.latitude,
+                'longitude': disaster.longitude,
+                'affected_households': disaster.affected_households,
+                'affected_people': disaster.affected_people,
+                'deaths': disaster.deaths,
+                'missing_persons': disaster.missing_persons,
+                'public_building_damage': disaster.public_building_damage,
+                'public_building_destruction': disaster.public_building_destruction,
+                'livestock_injured': disaster.livestock_injured,
+                'livestock_death': disaster.livestock_death,
+                'affected_people_male': disaster.affected_people_male,
+                'affected_people_female': disaster.affected_people_female
+            })
+
+        return jsonify({
+            'success': True,
+            'distributions': dist_data,
+            'disasters': dis_data
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+
+def clear_cache():
+    """Clear the cache when data is modified"""
+    global cache
+    cache.clear()
+
+@app.route('/api/distributions/<int:id>/lock', methods=['POST'])
+def toggle_lock_distribution(id):
+    try:
+        distribution = ReliefDistribution.query.get(id)
+        if not distribution:
+            return jsonify({'success': False, 'message': 'Distribution not found'}), 404
+
+        # Get the unlock key from request
+        data = request.get_json()
+        unlock_key = data.get('unlock_key') if data else None
+
+        # Check if the key is correct (in a real app, this would be more secure)
+        # For now, we'll use a simple hardcoded key from environment variable
+        correct_unlock_key = os.getenv('UNLOCK_KEY', 'admin123')
+
+        if unlock_key == correct_unlock_key:
+            # Toggle the lock status
+            distribution.is_locked = not distribution.is_locked
+            db.session.commit()
+
+            # Clear cache after modification
+            clear_cache()
+
+            action = "unlocked" if not distribution.is_locked else "locked"
+            return jsonify({
+                'success': True,
+                'message': f'Record {action} successfully',
+                'is_locked': distribution.is_locked
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': 'Invalid unlock key'
+            }), 403
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+@app.route('/api/distributions/<int:id>', methods=['DELETE'])
+def delete_distribution(id):
+    try:
+        distribution = ReliefDistribution.query.get(id)
+        if not distribution:
+            return jsonify({'success': False, 'message': 'Distribution not found'}), 404
+
+        # Check if the record is locked
+        if distribution.is_locked:
+            return jsonify({
+                'success': False,
+                'message': 'Cannot delete: Record is locked. Please unlock first.'
+            }), 403
+
+        # Delete image if exists
+        if distribution.image_filename:
+            image_path = os.path.join(app.config['UPLOAD_FOLDER'], distribution.image_filename)
+            if os.path.exists(image_path):
+                os.remove(image_path)
+
+        # Delete documents if exist
+        for doc in distribution.get_documents():
+            doc_path = os.path.join(app.config['UPLOAD_FOLDER'], doc)
+            if os.path.exists(doc_path):
+                os.remove(doc_path)
+
+        db.session.delete(distribution)
+        db.session.commit()
+
+        # Clear cache after modification
+        clear_cache()
+
+        return jsonify({'success': True, 'message': 'Distribution deleted successfully'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+# ============================================
+# Settings API
+# ============================================
+
+@app.route('/api/settings', methods=['GET'])
+def get_settings():
+    try:
+        settings = AppSettings.query.all()
+        return jsonify({
+            'success': True,
+            'data': [s.to_dict() for s in settings]
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+@app.route('/api/settings/<key>', methods=['GET'])
+def get_setting(key):
+    try:
+        setting = AppSettings.query.filter_by(setting_key=key).first()
+        if setting:
+            try:
+                value = json.loads(setting.setting_value)
+            except:
+                value = setting.setting_value
+        else:
+            value = None
+        return jsonify({
+            'success': True,
+            'key': key,
+            'value': value
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+@app.route('/api/settings/<key>', methods=['POST'])
+def set_setting(key):
+    try:
+        data = request.get_json()
+        setting = AppSettings.query.filter_by(setting_key=key).first()
+        if not setting:
+            setting = AppSettings(setting_key=key)
+        
+        value = data.get('value')
+        if isinstance(value, (list, dict)):
+            setting.setting_value = json.dumps(value)
+        else:
+            setting.setting_value = str(value)
+        
+        db.session.add(setting)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Setting {key} updated successfully',
+            'key': key,
+            'value': value
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+# ============================================
+# Disaster APIs
+# ============================================
+
+@app.route('/api/disasters', methods=['GET'])
+def get_disasters():
+    try:
+        # Get pagination parameters
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 10, type=int)
+
+        # Build query
+        query = Disaster.query.order_by(Disaster.disaster_date.desc())
+
+        # Paginate
+        pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+
+        return jsonify({
+            'disasters': [d.to_dict() for d in pagination.items],
+            'pagination': {
+                'page': page,
+                'pages': pagination.pages,
+                'per_page': per_page,
+                'total': pagination.total,
+                'has_next': pagination.has_next,
+                'has_prev': pagination.has_prev
+            }
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+@app.route('/api/disaster-statistics', methods=['GET'])
+def get_disaster_statistics():
+    try:
+        # Get filter parameters
+        fiscal_year = request.args.get('fiscal_year')
+        disaster_type = request.args.get('disaster_type')
+        ward = request.args.get('ward')
+
+        # Build base query
+        base_query = Disaster.query
+
+        # Apply filters to base query
+        if fiscal_year:
+            base_query = base_query.filter(Disaster.fiscal_year == fiscal_year)
+        if disaster_type:
+            base_query = base_query.filter(Disaster.disaster_type == disaster_type)
+        if ward:
+            try:
+                # Handle multi-ward selection if needed
+                if ',' in ward:
+                    ward_list = [int(w.strip()) for w in ward.split(',')]
+                    base_query = base_query.filter(Disaster.ward.in_(ward_list))
+                else:
+                    base_query = base_query.filter(Disaster.ward == int(ward))
+            except (ValueError, TypeError):
+                pass  # Invalid ward value, don't filter
+
+        # Get basic statistics
+        filtered_disasters = base_query.all()
+        total_disasters = len(filtered_disasters)
+
+        # Calculate totals from the filtered results
+        total_affected_people = sum(d.affected_people for d in filtered_disasters)
+        total_deaths = sum(d.deaths for d in filtered_disasters)
+        total_missing = sum(d.missing_persons for d in filtered_disasters)
+        total_affected_households = sum(d.affected_households for d in filtered_disasters)
+        total_public_buildings_destroyed = sum(d.public_building_destruction for d in filtered_disasters)
+        total_public_buildings_damaged = sum(d.public_building_damage for d in filtered_disasters)
+        total_livestock_injured = sum(d.livestock_injured for d in filtered_disasters)
+        total_livestock_death = sum(d.livestock_death for d in filtered_disasters)
+        total_affected_males = sum(d.affected_people_male for d in filtered_disasters)
+        total_affected_females = sum(d.affected_people_female for d in filtered_disasters)
+
+        # Ward distribution - with proper filtering
+        ward_base_query = db.session.query(
+            Disaster.ward,
+            db.func.count(Disaster.id).label('count')
+        ).filter(Disaster.ward.isnot(None))
+
+        # Apply the same filters to the ward query
+        if fiscal_year:
+            ward_base_query = ward_base_query.filter(Disaster.fiscal_year == fiscal_year)
+        if disaster_type:
+            ward_base_query = ward_base_query.filter(Disaster.disaster_type == disaster_type)
+        if ward:
+            try:
+                if ',' in ward:
+                    ward_list = [int(w.strip()) for w in ward.split(',')]
+                    ward_base_query = ward_base_query.filter(Disaster.ward.in_(ward_list))
+                else:
+                    ward_base_query = ward_base_query.filter(Disaster.ward == int(ward))
+            except (ValueError, TypeError):
+                pass
+
+        ward_data = ward_base_query.group_by(Disaster.ward).all()
+
+        # Disaster type distribution - with proper filtering
+        disaster_type_base_query = db.session.query(
+            Disaster.disaster_type,
+            db.func.count(Disaster.id).label('count')
+        ).filter(Disaster.disaster_type.isnot(None))
+
+        # Apply the same filters to the disaster type query
+        if fiscal_year:
+            disaster_type_base_query = disaster_type_base_query.filter(Disaster.fiscal_year == fiscal_year)
+        if disaster_type:
+            disaster_type_base_query = disaster_type_base_query.filter(Disaster.disaster_type == disaster_type)
+        if ward:
+            try:
+                if ',' in ward:
+                    ward_list = [int(w.strip()) for w in ward.split(',')]
+                    disaster_type_base_query = disaster_type_base_query.filter(Disaster.ward.in_(ward_list))
+                else:
+                    disaster_type_base_query = disaster_type_base_query.filter(Disaster.ward == int(ward))
+            except (ValueError, TypeError):
+                pass
+
+        disaster_type_data = disaster_type_base_query.group_by(Disaster.disaster_type).all()
+
+        return jsonify({
+            'total_disasters': total_disasters,
+            'total_affected_people': total_affected_people,
+            'total_deaths': total_deaths,
+            'total_missing': total_missing,
+            'total_affected_households': total_affected_households,
+            'total_public_buildings_destroyed': total_public_buildings_destroyed,
+            'total_public_buildings_damaged': total_public_buildings_damaged,
+            'total_livestock_injured': total_livestock_injured,
+            'total_livestock_death': total_livestock_death,
+            'total_affected_males': total_affected_males,
+            'total_affected_females': total_affected_females,
+            'ward_distribution': [
+                {'ward': ward, 'count': count}
+                for ward, count in ward_data if ward is not None  # Only include non-null wards
+            ],
+            'disaster_type_distribution': [
+                {'disaster_type': disaster_type, 'count': count}
+                for disaster_type, count in disaster_type_data if disaster_type is not None  # Only include non-null disaster types
+            ]
+        })
+    except Exception as e:
+        print(f"Error in get_disaster_statistics: {str(e)}")  # Log the error
+        return jsonify({
+            'total_disasters': 0,
+            'total_affected_people': 0,
+            'total_deaths': 0,
+            'total_missing': 0,
+            'total_affected_households': 0,
+            'total_public_buildings_destroyed': 0,
+            'total_public_buildings_damaged': 0,
+            'total_livestock_injured': 0,
+            'total_livestock_death': 0,
+            'total_affected_males': 0,
+            'total_affected_females': 0,
+            'ward_distribution': [],
+            'disaster_type_distribution': []
+        })
+
+@app.route('/api/disasters', methods=['POST'])
+def add_disaster():
+    try:
+        data = request.get_json()
+        disaster = Disaster(
+            disaster_type=data.get('disaster_type'),
+            disaster_date=datetime.strptime(data.get('disaster_date'), '%Y-%m-%d').date(),
+            ward=int(data.get('ward')),
+            tole=data.get('tole'),
+            latitude=float(data.get('latitude', 0)) if data.get('latitude') else None,
+            longitude=float(data.get('longitude', 0)) if data.get('longitude') else None,
+            fiscal_year=data.get('fiscal_year'),
+            description=data.get('description'),
+            affected_households=int(data.get('affected_households', 0)),
+            affected_people=int(data.get('affected_people', 0)),
+            deaths=int(data.get('deaths', 0)),
+            missing_persons=int(data.get('missing_persons', 0)),
+            road_blocked_status=bool(data.get('road_blocked_status', False)),
+            electricity_blocked_status=bool(data.get('electricity_blocked_status', False)),
+            communication_blocked_status=bool(data.get('communication_blocked_status', False)),
+            drinking_water_status=bool(data.get('drinking_water_status', False)),
+            public_building_destruction=int(data.get('public_building_destruction', 0)),
+            public_building_damage=int(data.get('public_building_damage', 0)),
+            livestock_injured=int(data.get('livestock_injured', 0)),
+            livestock_death=int(data.get('livestock_death', 0)),
+            agriculture_crop_damage=data.get('agriculture_crop_damage'),
+            affected_people_male=int(data.get('affected_people_male', 0)),
+            affected_people_female=int(data.get('affected_people_female', 0))
+        )
+        db.session.add(disaster)
+        db.session.commit()
+        return jsonify({
+            'success': True,
+            'message': 'Disaster recorded successfully',
+            'data': disaster.to_dict()
+        }), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+@app.route('/api/disaster-reports', methods=['POST'])
+def add_disaster_report():
+    try:
+        data = request.get_json()
+
+        # Handle multi-select ward field - if it's a comma-separated string, take the first value
+        ward_value = data.get('ward')
+        if isinstance(ward_value, str) and ',' in ward_value:
+            # Take the first ward if multiple are selected
+            ward = int(ward_value.split(',')[0])
+        else:
+            ward = int(ward_value) if ward_value else None
+
+        # Create disaster record
+        disaster = Disaster(
+            disaster_type=data.get('disaster_type'),
+            disaster_date=datetime.strptime(data.get('disaster_date'), '%Y-%m-%d').date(),
+            ward=ward,
+            tole=data.get('tole'),
+            latitude=float(data.get('latitude')) if data.get('latitude') else None,
+            longitude=float(data.get('longitude')) if data.get('longitude') else None,
+            description=data.get('description'),
+            affected_households=int(data.get('affected_households', 0)),
+            affected_people=int(data.get('affected_people', 0)),
+            deaths=int(data.get('deaths', 0)),
+            missing_persons=int(data.get('missing_persons', 0)),
+            road_blocked_status=bool(data.get('road_blocked_status', False)),
+            electricity_blocked_status=bool(data.get('electricity_blocked_status', False)),
+            communication_blocked_status=bool(data.get('communication_blocked_status', False)),
+            drinking_water_status=bool(data.get('drinking_water_status', False)),
+            public_building_destruction=int(data.get('public_building_destruction', 0)),
+            public_building_damage=int(data.get('public_building_damage', 0)),
+            livestock_injured=int(data.get('livestock_injured', 0)),
+            livestock_death=int(data.get('livestock_death', 0)),
+            agriculture_crop_damage=data.get('agriculture_crop_damage'),
+            affected_people_male=int(data.get('affected_people_male', 0)),
+            affected_people_female=int(data.get('affected_people_female', 0))
+        )
+        db.session.add(disaster)
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'message': 'Disaster report submitted successfully',
+            'data': disaster.to_dict()
+        }), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+@app.route('/api/disasters/<int:id>/lock', methods=['POST'])
+def toggle_lock_disaster(id):
+    try:
+        disaster = Disaster.query.get(id)
+        if not disaster:
+            return jsonify({'success': False, 'message': 'Disaster not found'}), 404
+
+        # Get the unlock key from request
+        data = request.get_json()
+        unlock_key = data.get('unlock_key') if data else None
+
+        # Check if the key is correct
+        correct_unlock_key = os.getenv('UNLOCK_KEY', 'admin123')
+
+        if unlock_key == correct_unlock_key:
+            # Toggle the lock status
+            disaster.is_locked = not disaster.is_locked
+            db.session.commit()
+
+            # Clear cache after modification
+            clear_cache()
+
+            action = "unlocked" if not disaster.is_locked else "locked"
+            return jsonify({
+                'success': True,
+                'message': f'Record {action} successfully',
+                'is_locked': disaster.is_locked
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': 'Invalid unlock key'
+            }), 403
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+@app.route('/api/disasters/<int:id>', methods=['PUT'])
+def edit_disaster(id):
+    try:
+        disaster = Disaster.query.get(id)
+        if not disaster:
+            return jsonify({'success': False, 'message': 'Disaster not found'}), 404
+
+        # Check if the record is locked
+        if disaster.is_locked:
+            return jsonify({
+                'success': False,
+                'message': 'Cannot edit: Record is locked. Please unlock first.'
+            }), 403
+
+        data = request.get_json()
+        disaster.disaster_type = data.get('disaster_type', disaster.disaster_type)
+        disaster.disaster_date = datetime.strptime(data.get('disaster_date'), '%Y-%m-%d').date()
+
+        # Handle multi-select ward field - if it's a comma-separated string, take the first value
+        ward_value = data.get('ward', disaster.ward)
+        if isinstance(ward_value, str) and ',' in str(ward_value):
+            # Take the first ward if multiple are selected
+            disaster.ward = int(str(ward_value).split(',')[0])
+        else:
+            disaster.ward = int(ward_value) if ward_value else disaster.ward
+
+        disaster.tole = data.get('tole', disaster.tole)
+        disaster.latitude = float(data.get('latitude')) if data.get('latitude') else None
+        disaster.longitude = float(data.get('longitude')) if data.get('longitude') else None
+        disaster.fiscal_year = data.get('fiscal_year', disaster.fiscal_year)
+        disaster.description = data.get('description', disaster.description)
+        disaster.affected_households = int(data.get('affected_households', disaster.affected_households))
+        disaster.affected_people = int(data.get('affected_people', disaster.affected_people))
+        disaster.deaths = int(data.get('deaths', disaster.deaths))
+        disaster.missing_persons = int(data.get('missing_persons', disaster.missing_persons))
+        disaster.road_blocked_status = bool(data.get('road_blocked_status', disaster.road_blocked_status))
+        disaster.electricity_blocked_status = bool(data.get('electricity_blocked_status', disaster.electricity_blocked_status))
+        disaster.communication_blocked_status = bool(data.get('communication_blocked_status', disaster.communication_blocked_status))
+        disaster.drinking_water_status = bool(data.get('drinking_water_status', disaster.drinking_water_status))
+        disaster.public_building_destruction = int(data.get('public_building_destruction', disaster.public_building_destruction))
+        disaster.public_building_damage = int(data.get('public_building_damage', disaster.public_building_damage))
+        disaster.livestock_injured = int(data.get('livestock_injured', disaster.livestock_injured))
+        disaster.livestock_death = int(data.get('livestock_death', disaster.livestock_death))
+        disaster.agriculture_crop_damage = data.get('agriculture_crop_damage', disaster.agriculture_crop_damage)
+        disaster.affected_people_male = int(data.get('affected_people_male', disaster.affected_people_male))
+        disaster.affected_people_female = int(data.get('affected_people_female', disaster.affected_people_female))
+
+        db.session.commit()
+
+        # Clear cache after modification
+        clear_cache()
+
+        return jsonify({
+            'success': True,
+            'message': 'Disaster updated successfully',
+            'data': disaster.to_dict()
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+@app.route('/api/disasters/<int:id>', methods=['DELETE'])
+def delete_disaster(id):
+    try:
+        disaster = Disaster.query.get(id)
+        if not disaster:
+            return jsonify({'success': False, 'message': 'Disaster not found'}), 404
+
+        # Check if the record is locked
+        if disaster.is_locked:
+            return jsonify({
+                'success': False,
+                'message': 'Cannot delete: Record is locked. Please unlock first.'
+            }), 403
+
+        db.session.delete(disaster)
+        db.session.commit()
+
+        # Clear cache after modification
+        clear_cache()
+
+        return jsonify({'success': True, 'message': 'Disaster deleted successfully'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+# ============================================
+# Event Log APIs
+# ============================================
+
+@app.route('/api/event-logs', methods=['GET'])
+def get_event_logs():
+    try:
+        # Get pagination parameters
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 10, type=int)
+
+        # Get filter parameters
+        event_type = request.args.get('event_type')
+        status = request.args.get('status')
+        date_from = request.args.get('date_from')
+        date_to = request.args.get('date_to')
+
+        # Build query
+        query = EventLog.query.order_by(EventLog.timestamp.desc())
+
+        # Apply filters
+        if event_type:
+            query = query.filter(EventLog.event_type == event_type)
+        if status:
+            query = query.filter(EventLog.status == status)
+        if date_from:
+            query = query.filter(EventLog.timestamp >= datetime.strptime(date_from, '%Y-%m-%d'))
+        if date_to:
+            query = query.filter(EventLog.timestamp <= datetime.strptime(date_to, '%Y-%m-%d'))
+
+        # Paginate
+        pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+        events = pagination.items
+
+        return jsonify({
+            'success': True,
+            'event_logs': [event.to_dict() for event in events],
+            'pagination': {
+                'page': page,
+                'pages': pagination.pages,
+                'per_page': per_page,
+                'total': pagination.total,
+                'has_next': pagination.has_next,
+                'has_prev': pagination.has_prev
+            }
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+@app.route('/api/event-logs', methods=['POST'])
+def add_event_log():
+    try:
+        data = request.get_json()
+
+        event_log = EventLog(
+            event_type=data.get('event_type'),
+            description=data.get('description'),
+            location=data.get('location'),
+            responsible_unit=data.get('responsible_unit'),
+            status=data.get('status', 'Active')
+        )
+
+        db.session.add(event_log)
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'message': 'Event log added successfully',
+            'data': event_log.to_dict()
+        }), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+# ============================================
+# Situation Report APIs
+# ============================================
+
+@app.route('/api/situation-reports', methods=['GET'])
+def get_situation_reports():
+    try:
+        # Get pagination parameters
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 10, type=int)
+
+        # Get filter parameters
+        date_from = request.args.get('date_from')
+        date_to = request.args.get('date_to')
+
+        # Build query
+        query = SituationReport.query.order_by(SituationReport.report_date.desc())
+
+        # Apply filters
+        if date_from:
+            query = query.filter(SituationReport.report_date >= datetime.strptime(date_from, '%Y-%m-%d').date())
+        if date_to:
+            query = query.filter(SituationReport.report_date <= datetime.strptime(date_to, '%Y-%m-%d').date())
+
+        # Paginate
+        pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+        reports = pagination.items
+
+        return jsonify({
+            'success': True,
+            'situation_reports': [report.to_dict() for report in reports],
+            'pagination': {
+                'page': page,
+                'pages': pagination.pages,
+                'per_page': per_page,
+                'total': pagination.total,
+                'has_next': pagination.has_next,
+                'has_prev': pagination.has_prev
+            }
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+@app.route('/api/situation-reports', methods=['POST'])
+def add_situation_report():
+    try:
+        data = request.get_json()
+
+        report = SituationReport(
+            current_situation_summary=data.get('current_situation_summary'),
+            weather_conditions=data.get('weather_conditions'),
+            detailed_report=data.get('detailed_report'),
+            resources_deployed=data.get('resources_deployed'),
+            next_update_time=data.get('next_update_time')
+        )
+
+        db.session.add(report)
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'message': 'Situation report added successfully',
+            'data': report.to_dict()
+        }), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+# ============================================
+# Public Information APIs
+# ============================================
+
+@app.route('/api/public-information', methods=['GET'])
+def get_public_information():
+    try:
+        # Get filter parameters
+        info_type = request.args.get('info_type')
+        priority = request.args.get('priority')
+        is_active = request.args.get('is_active')
+
+        # Build query
+        query = PublicInformation.query.order_by(PublicInformation.created_at.desc())
+
+        # Apply filters
+        if info_type:
+            query = query.filter(PublicInformation.info_type == info_type)
+        if priority:
+            query = query.filter(PublicInformation.priority == priority)
+        if is_active is not None:
+            query = query.filter(PublicInformation.is_active == (is_active.lower() == 'true'))
+
+        # Get all results (no pagination for public info)
+        infos = query.all()
+
+        return jsonify({
+            'success': True,
+            'public_information': [info.to_dict() for info in infos]
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+@app.route('/api/public-information', methods=['POST'])
+def add_public_information():
+    try:
+        data = request.get_json()
+
+        info = PublicInformation(
+            title=data.get('title'),
+            content=data.get('content'),
+            info_type=data.get('info_type', 'General'),
+            priority=data.get('priority', 'Normal'),
+            is_active=data.get('is_active', True),
+            valid_from=datetime.strptime(data.get('valid_from'), '%Y-%m-%d %H:%M') if data.get('valid_from') else None,
+            valid_until=datetime.strptime(data.get('valid_until'), '%Y-%m-%d %H:%M') if data.get('valid_until') else None
+        )
+
+        db.session.add(info)
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'message': 'Public information added successfully',
+            'data': info.to_dict()
+        }), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+# ============================================
+# Social Security Beneficiary APIs
+# ============================================
+
+@app.route('/api/ssf-beneficiaries', methods=['GET'])
+def get_ssf_beneficiaries():
+    try:
+        # Get pagination parameters
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 10, type=int)
+        
+        # Build query
+        query = SocialSecurityBeneficiary.query.order_by(SocialSecurityBeneficiary.created_at.desc())
+        
+        # Paginate
+        pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+        
+        return jsonify({
+            'beneficiaries': [b.to_dict() for b in pagination.items],
+            'pagination': {
+                'page': page,
+                'pages': pagination.pages,
+                'per_page': per_page,
+                'total': pagination.total,
+                'has_next': pagination.has_next,
+                'has_prev': pagination.has_prev
+            }
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+@app.route('/api/ssf-beneficiaries', methods=['POST'])
+def add_ssf_beneficiary():
+    try:
+        data = request.get_json()
+        beneficiary = SocialSecurityBeneficiary(
+            beneficiary_name=data.get('beneficiary_name'),
+            beneficiary_id=data.get('beneficiary_id'),
+            ssf_type=data.get('ssf_type'),
+            age=int(data.get('age', 0)) if data.get('age') else None,
+            gender=data.get('gender'),
+            ward=int(data.get('ward', 0)) if data.get('ward') else None,
+            tole=data.get('tole'),
+            latitude=float(data.get('latitude', 0)) if data.get('latitude') else None,
+            longitude=float(data.get('longitude', 0)) if data.get('longitude') else None,
+            phone=data.get('phone'),
+            bank_account_holder_name=data.get('bank_account_holder_name'),
+            bank_account_number=data.get('bank_account_number'),
+            bank_name=data.get('bank_name'),
+            notes=data.get('notes')
+        )
+        db.session.add(beneficiary)
+        db.session.commit()
+        return jsonify({
+            'success': True,
+            'message': 'SSF Beneficiary added successfully',
+            'data': beneficiary.to_dict()
+        }), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+@app.route('/api/ssf-beneficiaries/<int:id>/lock', methods=['POST'])
+def toggle_lock_ssf_beneficiary(id):
+    try:
+        beneficiary = SocialSecurityBeneficiary.query.get(id)
+        if not beneficiary:
+            return jsonify({'success': False, 'message': 'SSF Beneficiary not found'}), 404
+
+        # Get the unlock key from request
+        data = request.get_json()
+        unlock_key = data.get('unlock_key') if data else None
+
+        # Check if the key is correct
+        correct_unlock_key = os.getenv('UNLOCK_KEY', 'admin123')
+
+        if unlock_key == correct_unlock_key:
+            # Toggle the lock status
+            beneficiary.is_locked = not beneficiary.is_locked
+            db.session.commit()
+
+            # Clear cache after modification
+            clear_cache()
+
+            action = "unlocked" if not beneficiary.is_locked else "locked"
+            return jsonify({
+                'success': True,
+                'message': f'Record {action} successfully',
+                'is_locked': beneficiary.is_locked
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': 'Invalid unlock key'
+            }), 403
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+@app.route('/api/ssf-beneficiaries/<int:id>', methods=['PUT'])
+def edit_ssf_beneficiary(id):
+    try:
+        beneficiary = SocialSecurityBeneficiary.query.get(id)
+        if not beneficiary:
+            return jsonify({'success': False, 'message': 'SSF Beneficiary not found'}), 404
+
+        # Check if the record is locked
+        if beneficiary.is_locked:
+            return jsonify({
+                'success': False,
+                'message': 'Cannot edit: Record is locked. Please unlock first.'
+            }), 403
+
+        data = request.get_json()
+        beneficiary.beneficiary_name = data.get('beneficiary_name', beneficiary.beneficiary_name)
+        beneficiary.beneficiary_id = data.get('beneficiary_id', beneficiary.beneficiary_id)
+        beneficiary.ssf_type = data.get('ssf_type', beneficiary.ssf_type)
+        beneficiary.age = int(data.get('age', 0)) if data.get('age') else None
+        beneficiary.gender = data.get('gender', beneficiary.gender)
+        beneficiary.ward = int(data.get('ward', 0)) if data.get('ward') else None
+        beneficiary.tole = data.get('tole', beneficiary.tole)
+        beneficiary.latitude = float(data.get('latitude', 0)) if data.get('latitude') else None
+        beneficiary.longitude = float(data.get('longitude', 0)) if data.get('longitude') else None
+        beneficiary.phone = data.get('phone', beneficiary.phone)
+        beneficiary.bank_account_holder_name = data.get('bank_account_holder_name', beneficiary.bank_account_holder_name)
+        beneficiary.bank_account_number = data.get('bank_account_number', beneficiary.bank_account_number)
+        beneficiary.bank_name = data.get('bank_name', beneficiary.bank_name)
+        beneficiary.notes = data.get('notes', beneficiary.notes)
+
+        db.session.commit()
+
+        # Clear cache after modification
+        clear_cache()
+
+        return jsonify({
+            'success': True,
+            'message': 'SSF Beneficiary updated successfully',
+            'data': beneficiary.to_dict()
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+@app.route('/api/ssf-beneficiaries/<int:id>', methods=['DELETE'])
+def delete_ssf_beneficiary(id):
+    try:
+        beneficiary = SocialSecurityBeneficiary.query.get(id)
+        if not beneficiary:
+            return jsonify({'success': False, 'message': 'SSF Beneficiary not found'}), 404
+
+        # Check if the record is locked
+        if beneficiary.is_locked:
+            return jsonify({
+                'success': False,
+                'message': 'Cannot delete: Record is locked. Please unlock first.'
+            }), 403
+
+        db.session.delete(beneficiary)
+        db.session.commit()
+
+        # Clear cache after modification
+        clear_cache()
+
+        return jsonify({'success': True, 'message': 'SSF Beneficiary deleted successfully'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+# Database Initialization Function
+def init_db():
+    with app.app_context():
+        try:
+            # Create all tables if they don't exist
+            db.create_all()
+
+            # Check if the is_locked column exists in each table and add it if missing
+            from sqlalchemy import text
+
+            # Check and add is_locked column to relief_distribution table
+            result = db.session.execute(text("PRAGMA table_info(relief_distribution)"))
+            columns = [row[1] for row in result.fetchall()]
+            if 'is_locked' not in columns:
+                db.session.execute(text("ALTER TABLE relief_distribution ADD COLUMN is_locked BOOLEAN DEFAULT 0"))
+                print("Added is_locked column to relief_distribution table")
+
+            # Check and add is_locked column to disaster table
+            result = db.session.execute(text("PRAGMA table_info(disaster)"))
+            columns = [row[1] for row in result.fetchall()]
+            if 'is_locked' not in columns:
+                db.session.execute(text("ALTER TABLE disaster ADD COLUMN is_locked BOOLEAN DEFAULT 0"))
+                print("Added is_locked column to disaster table")
+
+            # Check and add is_locked column to social_security_beneficiary table
+            result = db.session.execute(text("PRAGMA table_info(social_security_beneficiary)"))
+            columns = [row[1] for row in result.fetchall()]
+            if 'is_locked' not in columns:
+                db.session.execute(text("ALTER TABLE social_security_beneficiary ADD COLUMN is_locked BOOLEAN DEFAULT 0"))
+                print("Added is_locked column to social_security_beneficiary table")
+
+            # Check and add new disaster impact columns to disaster table
+            result = db.session.execute(text("PRAGMA table_info(disaster)"))
+            columns = [row[1] for row in result.fetchall()]
+
+            if 'deaths' not in columns:
+                db.session.execute(text("ALTER TABLE disaster ADD COLUMN deaths INTEGER DEFAULT 0"))
+                print("Added deaths column to disaster table")
+
+            if 'missing_persons' not in columns:
+                db.session.execute(text("ALTER TABLE disaster ADD COLUMN missing_persons INTEGER DEFAULT 0"))
+                print("Added missing_persons column to disaster table")
+
+            if 'road_blocked_status' not in columns:
+                db.session.execute(text("ALTER TABLE disaster ADD COLUMN road_blocked_status BOOLEAN DEFAULT 0"))
+                print("Added road_blocked_status column to disaster table")
+
+            if 'electricity_blocked_status' not in columns:
+                db.session.execute(text("ALTER TABLE disaster ADD COLUMN electricity_blocked_status BOOLEAN DEFAULT 0"))
+                print("Added electricity_blocked_status column to disaster table")
+
+            if 'communication_blocked_status' not in columns:
+                db.session.execute(text("ALTER TABLE disaster ADD COLUMN communication_blocked_status BOOLEAN DEFAULT 0"))
+                print("Added communication_blocked_status column to disaster table")
+
+            if 'drinking_water_status' not in columns:
+                db.session.execute(text("ALTER TABLE disaster ADD COLUMN drinking_water_status BOOLEAN DEFAULT 0"))
+                print("Added drinking_water_status column to disaster table")
+
+            if 'public_building_destruction' not in columns:
+                db.session.execute(text("ALTER TABLE disaster ADD COLUMN public_building_destruction INTEGER DEFAULT 0"))
+                print("Added public_building_destruction column to disaster table")
+
+            if 'public_building_damage' not in columns:
+                db.session.execute(text("ALTER TABLE disaster ADD COLUMN public_building_damage INTEGER DEFAULT 0"))
+                print("Added public_building_damage column to disaster table")
+
+            if 'livestock_injured' not in columns:
+                db.session.execute(text("ALTER TABLE disaster ADD COLUMN livestock_injured INTEGER DEFAULT 0"))
+                print("Added livestock_injured column to disaster table")
+
+            if 'livestock_death' not in columns:
+                db.session.execute(text("ALTER TABLE disaster ADD COLUMN livestock_death INTEGER DEFAULT 0"))
+                print("Added livestock_death column to disaster table")
+
+            if 'agriculture_crop_damage' not in columns:
+                db.session.execute(text("ALTER TABLE disaster ADD COLUMN agriculture_crop_damage TEXT"))
+                print("Added agriculture_crop_damage column to disaster table")
+
+            if 'affected_people_male' not in columns:
+                db.session.execute(text("ALTER TABLE disaster ADD COLUMN affected_people_male INTEGER DEFAULT 0"))
+                print("Added affected_people_male column to disaster table")
+
+            if 'affected_people_female' not in columns:
+                db.session.execute(text("ALTER TABLE disaster ADD COLUMN affected_people_female INTEGER DEFAULT 0"))
+                print("Added affected_people_female column to disaster table")
+
+            # Commit the changes
+            db.session.commit()
+
+            # Initialize default settings
+            if not AppSettings.get_setting('relief_items'):
+                AppSettings.set_setting('relief_items', [
+                    'खाद्य सामाग्री (Food Packages)', 'पानीको बोतल (Water Bottles)', 'औषधि सामाग्री (Medical Supplies)', 'कम्बल (Blankets)',
+                    'लुगा सामाग्री (Clothing)', 'स्वास्थ्य सामाग्री (Hygiene Kits)', 'घर बनाउने सामाग्री (Shelter Materials)', 'बच्चाको हेरचाह (Baby Care)', 'अन्य (Other)'
+                ])
+            if not AppSettings.get_setting('fiscal_years'):
+                AppSettings.set_setting('fiscal_years', ['2080/81', '2081/82', '2082/83', '2083/84'])
+            if not AppSettings.get_setting('ssf_types'):
+                AppSettings.set_setting('ssf_types', ['OAS (बर्षा पेन्सन)', 'विधवा (Widow)', 'अपाङ्गता (Disabled)', 'कोही नभएको (Endangered)', 'बाल भत्ता (Child Grant)', 'अन्य (Other)'])
+            if not AppSettings.get_setting('disaster_types'):
+                AppSettings.set_setting('disaster_types', ['भूकम्प (Earthquake)', 'बाढी (Flood)', 'पहिरो (Landslide)', 'आँधी (Storm)', 'आगलागी (Fire)', 'अन्य (Other)'])
+            print("Database initialized successfully.")
+        except Exception as e:
+            print(f"Error initializing database: {e}")
+
+# Run initialization
+init_db()
+
+if __name__ == '__main__':
+    # When running directly, use debug mode
+    app.run(debug=True, port=int(os.getenv('PORT', 5002)))

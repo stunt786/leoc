@@ -1,0 +1,305 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - LEOC{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1 class="display-6 fw-bold mb-2">
+                <i class="bi bi-graph-up"></i> राहात वितरण ड्यासबोर्ड
+            </h1>
+            <p class="text-muted">आपतकालीन राहत वितरणको अनुगमन र व्यवस्थापन</p>
+        </div>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="row mb-4">
+        <div class="col-md-6 col-lg-3 mb-3">
+            <div class="stat-card stat-card-primary">
+                <div class="stat-icon">
+                    <i class="bi bi-box-seam"></i>
+                </div>
+                <div class="stat-content">
+                    <h5 class="stat-label">जम्मा वितरण</h5>
+                    <h2 class="stat-value" id="total-distributions">0</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-3 mb-3">
+            <div class="stat-card stat-card-success">
+                <div class="stat-icon">
+                    <i class="bi bi-bag-check"></i>
+                </div>
+                <div class="stat-content">
+                    <h5 class="stat-label">जम्मा वस्तु</h5>
+                    <h2 class="stat-value" id="total-items">0</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-3 mb-3">
+            <div class="stat-card stat-card-warning">
+                <div class="stat-icon">
+                    <i class="bi bi-cash-coin"></i>
+                </div>
+                <div class="stat-content">
+                    <h5 class="stat-label">जम्मा रकम</h5>
+                    <h2 class="stat-value" id="total-cash">₹0</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-3 mb-3">
+            <div class="stat-card stat-card-danger">
+                <div class="stat-icon">
+                    <i class="bi bi-people"></i>
+                </div>
+                <div class="stat-content">
+                    <h5 class="stat-label">लाभग्राहि</h5>
+                    <h2 class="stat-value" id="total-beneficiaries">0</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="row mb-4">
+        <div class="col-lg-4 mb-4">
+            <div class="card chart-card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="bi bi-pie-chart"></i> सामाग्री वितरण</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="itemsChart"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4 mb-4">
+            <div class="card chart-card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="bi bi-bar-chart"></i> वडा अनुसार विवरण</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="wardsChart"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4 mb-4">
+            <div class="card chart-card">
+                <div class="card-header bg-warning text-white">
+                    <h5 class="mb-0"><i class="bi bi-calendar"></i> आ.ब अनुसार विवरण</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="fiscalYearChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- GIS Map Row -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-geo-alt"></i> Disaster & Relief GIS Map</h5>
+                    <div class="btn-group">
+                        <button class="btn btn-sm btn-outline-light"
+                            onclick="document.getElementById('map-iframe').src = '/map'">
+                            <i class="bi bi-arrow-clockwise"></i> Refresh
+                        </button>
+                        <a href="/map" target="_blank" class="btn btn-sm btn-outline-info">
+                            <i class="bi bi-arrows-fullscreen"></i> View Full Map
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="map-container">
+                        <iframe id="map-iframe" src="/map" width="100%" height="600px" frameborder="0"></iframe>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Distributions Table -->
+
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-list-check"></i> वितरण विवरण</h5>
+                    <div class="d-flex gap-2">
+                        <div class="dropdown">
+                            <button class="btn btn-sm btn-success dropdown-toggle" type="button" id="exportDropdown"
+                                data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="bi bi-download"></i> Export
+                            </button>
+                            <ul class="dropdown-menu" aria-labelledby="exportDropdown">
+                                <li><a class="dropdown-item" href="#" onclick="exportFilteredData('xlsx')"><i
+                                            class="bi bi-file-spreadsheet"></i> Export as XLSX</a></li>
+                                <li><a class="dropdown-item" href="#" onclick="exportFilteredData('pdf')"><i
+                                            class="bi bi-file-pdf"></i> Export as PDF</a></li>
+                            </ul>
+                        </div>
+                        <a href="/form" class="btn btn-sm btn-light">
+                            <i class="bi bi-plus-circle"></i> Add New
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Filter Controls -->
+                <div class="card-header bg-light py-2">
+                    <div class="row g-2">
+                        <div class="col-md-4">
+                            <label class="form-label text-muted small mb-1">Fiscal Year</label>
+                            <select id="fiscalYearFilter" class="form-select form-select-sm">
+                                <option value="">All Fiscal Years</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label text-muted small mb-1">Disaster Type</label>
+                            <select id="disasterTypeFilter" class="form-select form-select-sm">
+                                <option value="">All Disaster Types</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label text-muted small mb-1">Ward</label>
+                            <select id="wardFilter" class="form-select form-select-sm">
+                                <option value="">All Wards</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row mt-2">
+                        <div class="col-md-12">
+                            <button id="applyFiltersBtn" class="btn btn-sm btn-primary me-2">
+                                <i class="bi bi-funnel"></i> Apply Filters
+                            </button>
+                            <button id="resetFiltersBtn" class="btn btn-sm btn-outline-secondary">
+                                <i class="bi bi-x-circle"></i> Reset
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div class="d-flex align-items-center gap-2">
+                            <label class="form-label text-muted small mb-0">Show</label>
+                            <select id="perPageSelector" class="form-select form-select-sm" style="width: auto;">
+                                <option value="10" selected>10</option>
+                                <option value="25">25</option>
+                                <option value="50">50</option>
+                            </select>
+                            <label class="form-label text-muted small mb-0">records</label>
+                        </div>
+                        <div id="tableInfo" class="text-muted small">
+                            Showing 0 - 0 of 0 records
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-hover" id="distributionsTable">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>लाभग्राहिको नाम थर</th>
+                                    <th>ना.प्र.प्र.नं</th>
+                                    <th>ठेगाना</th>
+                                    <th>राहात सामाग्री</th>
+                                    <th>रकम रु</th>
+                                    <th>मिति</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tableBody">
+                                <tr class="text-center" id="emptyRow">
+                                    <td colspan="8" class="py-4">
+                                        <p class="text-muted mb-0">No distributions recorded yet. <a href="/form">Add
+                                                one now</a></p>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <!-- Pagination Controls -->
+                        <nav aria-label="Table pagination" class="mt-3">
+                            <ul class="pagination justify-content-center" id="paginationControls">
+                                <!-- Pagination will be generated by JavaScript -->
+                            </ul>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Distribution Modal -->
+<div class="modal fade" id="editModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="bi bi-pencil-square"></i> Edit Distribution</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editForm" enctype="multipart/form-data">
+                    <input type="hidden" id="edit_id" name="edit_id">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label"><i class="bi bi-person"></i> Beneficiary Name</label>
+                            <input type="text" class="form-control" id="edit_beneficiary_name" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label"><i class="bi bi-telephone"></i> Phone</label>
+                            <input type="tel" class="form-control" id="edit_phone">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label"><i class="bi bi-geo-alt"></i> Location</label>
+                            <input type="text" class="form-control" id="edit_location" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label"><i class="bi bi-cash-coin"></i> Cash Received</label>
+                            <input type="number" class="form-control" id="edit_cash_received" step="0.01">
+                        </div>
+                    </div>
+                    <div class="card border-info mb-3">
+                        <div class="card-header bg-info text-white">
+                            <h6 class="mb-0"><i class="bi bi-bag"></i> Relief Items</h6>
+                        </div>
+                        <div class="card-body">
+                            <div id="editItemsContainer"></div>
+                            <button type="button" class="btn btn-sm btn-success mt-2" onclick="addEditItemRow()">
+                                <i class="bi bi-plus-circle"></i> Add Item
+                            </button>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label"><i class="bi bi-check-circle"></i> Status</label>
+                        <select class="form-control" id="edit_status">
+                            <option value="Distributed">Distributed</option>
+                            <option value="Pending">Pending</option>
+                            <option value="In Progress">In Progress</option>
+                            <option value="Delivered">Delivered</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label"><i class="bi bi-pencil-square"></i> Notes</label>
+                        <textarea class="form-control" id="edit_notes" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveEdit()">Save Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+{% endblock %}

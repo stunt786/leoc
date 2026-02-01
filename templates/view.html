@@ -1,0 +1,445 @@
+{% extends "base.html" %}
+
+{% block title %}View Distribution - LEOC{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-11">
+            <!-- Header with Print/Back Buttons -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2 class="mb-0">
+                    <i class="bi bi-file-text"></i> Relief Distribution Record
+                </h2>
+                <div class="btn-group">
+                    <button class="btn btn-primary" onclick="window.print()">
+                        <i class="bi bi-printer"></i> Print
+                    </button>
+                    <a href="/" class="btn btn-secondary">
+                        <i class="bi bi-arrow-left"></i> Back
+                    </a>
+                </div>
+            </div>
+
+            <!-- Main Content Card -->
+            <div class="card shadow-lg" id="printContent">
+                <!-- Header Section -->
+                <div class="card-header bg-primary text-white">
+                    <div class="row align-items-center">
+                        <div class="col-md-8">
+                            <h5 class="mb-2">Local Emergency Operating Centre (LEOC)</h5>
+                            <p class="mb-0 text-light">Relief Distribution Record</p>
+                        </div>
+                        <div class="col-md-4 text-end">
+                            <h6 class="mb-1">Record ID: <code>{{ distribution.id }}</code></h6>
+                            <small>Date: {{ distribution.created_at.strftime('%Y-%m-%d') }}</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-body">
+                    <!-- BENEFICIARY INFORMATION -->
+                    <div class="section-break mb-4">
+                        <h5 class="border-bottom pb-2 mb-3">
+                            <i class="bi bi-person-vcard"></i> Beneficiary Information
+                        </h5>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="fw-bold text-muted">Beneficiary Name:</label>
+                                <p class="fs-5">{{ distribution.beneficiary_name }}</p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="fw-bold text-muted">Beneficiary ID:</label>
+                                <p class="fs-5"><code>{{ distribution.beneficiary_id }}</code></p>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="fw-bold text-muted">Father's Name:</label>
+                                <p>{{ distribution.father_name or 'N/A' }}</p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="fw-bold text-muted">Phone Number:</label>
+                                <p>{{ distribution.phone or 'N/A' }}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- DISASTER INFORMATION -->
+                    <div class="section-break mb-4">
+                        <h5 class="border-bottom pb-2 mb-3">
+                            <i class="bi bi-exclamation-triangle"></i> Disaster Information
+                        </h5>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="fw-bold text-muted">Disaster Date:</label>
+                                <p>{{ distribution.disaster_date or 'N/A' }}</p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="fw-bold text-muted">Disaster Type:</label>
+                                <p>{{ distribution.disaster_type or 'N/A' }}</p>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label class="fw-bold text-muted">Fiscal Year:</label>
+                                <p>{{ distribution.fiscal_year or 'N/A' }}</p>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="fw-bold text-muted">Ward:</label>
+                                <p>{{ distribution.ward or 'N/A' }}</p>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="fw-bold text-muted">Tole:</label>
+                                <p>{{ distribution.tole or 'N/A' }}</p>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="fw-bold text-muted">Location:</label>
+                                <p>{{ distribution.location or 'N/A' }}</p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="fw-bold text-muted">Current Shelter Location:</label>
+                                <p>{{ distribution.current_shelter_location or 'N/A' }}</p>
+                            </div>
+                        </div>
+                        {% if distribution.latitude or distribution.longitude %}
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="fw-bold text-muted">Latitude:</label>
+                                <p>{{ "%.6f"|format(distribution.latitude) if distribution.latitude else 'N/A' }}</p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="fw-bold text-muted">Longitude:</label>
+                                <p>{{ "%.6f"|format(distribution.longitude) if distribution.longitude else 'N/A' }}</p>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- FAMILY DETAILS -->
+                    <div class="section-break mb-4">
+                        <h5 class="border-bottom pb-2 mb-3">
+                            <i class="bi bi-people"></i> Family Details
+                        </h5>
+                        <div class="row">
+                            <div class="col-md-3 mb-3">
+                                <label class="fw-bold text-muted">Male Count:</label>
+                                <p class="badge bg-primary fs-6">{{ distribution.male_count or 0 }}</p>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="fw-bold text-muted">Female Count:</label>
+                                <p class="badge bg-danger fs-6">{{ distribution.female_count or 0 }}</p>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="fw-bold text-muted">Children Count:</label>
+                                <p class="badge bg-warning fs-6">{{ distribution.children_count or 0 }}</p>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="fw-bold text-muted">Deaths:</label>
+                                <p class="badge bg-dark fs-6">{{ distribution.deaths_during_disaster or 0 }}</p>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="fw-bold text-muted">Pregnant Mothers:</label>
+                                <p>{{ distribution.pregnant_mother_count or 0 }}</p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="fw-bold text-muted">Mothers with Baby &lt;2 Years:</label>
+                                <p>{{ distribution.mother_under_2_baby or 0 }}</p>
+                            </div>
+                        </div>
+
+                        <!-- Family Members Table -->
+                        {% if distribution.family_members_json %}
+                        <div class="mt-3">
+                            <label class="fw-bold text-muted">Family Members:</label>
+                            <table class="table table-bordered table-sm mt-2">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Relation</th>
+                                        <th>Age</th>
+                                        <th>Gender</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for member in distribution.family_members_json %}
+                                    <tr>
+                                        <td>{{ member.name }}</td>
+                                        <td>{{ member.relation or '-' }}</td>
+                                        <td>{{ member.age or '-' }}</td>
+                                        <td>{{ member.gender or '-' }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- SOCIAL SECURITY & STATUS -->
+                    <div class="section-break mb-4">
+                        <h5 class="border-bottom pb-2 mb-3">
+                            <i class="bi bi-shield-check"></i> Social Security & Status
+                        </h5>
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label class="fw-bold text-muted">In Social Security Fund:</label>
+                                <p>
+                                    {% if distribution.in_social_security_fund %}
+                                    <span class="badge bg-success">Yes</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">No</span>
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="fw-bold text-muted">SSF Type:</label>
+                                <p>{{ distribution.ssf_type or 'N/A' }}</p>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="fw-bold text-muted">Poverty Card Holder:</label>
+                                <p>
+                                    {% if distribution.poverty_card_holder %}
+                                    <span class="badge bg-success">Yes</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">No</span>
+                                    {% endif %}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- HARMS & DAMAGES -->
+                    {% if distribution.harms_json %}
+                    <div class="section-break mb-4">
+                        <h5 class="border-bottom pb-2 mb-3">
+                            <i class="bi bi-bandaid"></i> Harms & Damages
+                        </h5>
+                        <table class="table table-bordered table-sm">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Family Member</th>
+                                    <th>Type of Harm</th>
+                                    <th>Severity</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for harm in distribution.harms_json %}
+                                <tr>
+                                    <td>{{ harm.member_name }}</td>
+                                    <td>{{ harm.harm }}</td>
+                                    <td>
+                                        <span
+                                            class="badge bg-{{ 'success' if harm.severity == 'Minor' else 'warning' if harm.severity == 'Moderate' else 'danger' }}">
+                                            {{ harm.severity }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% endif %}
+
+                    <!-- BANK ACCOUNT DETAILS -->
+                    {% if distribution.bank_account_holder_name or distribution.bank_name %}
+                    <div class="section-break mb-4">
+                        <h5 class="border-bottom pb-2 mb-3">
+                            <i class="bi bi-bank"></i> Bank Account Details
+                        </h5>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="fw-bold text-muted">Account Holder:</label>
+                                <p>{{ distribution.bank_account_holder_name or 'N/A' }}</p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="fw-bold text-muted">Account Number:</label>
+                                <p><code>{{ distribution.bank_account_number or 'N/A' }}</code></p>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="fw-bold text-muted">Bank Name:</label>
+                                <p>{{ distribution.bank_name or 'N/A' }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- RELIEF ITEMS -->
+                    <div class="section-break mb-4">
+                        <h5 class="border-bottom pb-2 mb-3">
+                            <i class="bi bi-bag"></i> Relief Items Distribution
+                        </h5>
+                        {% if distribution.relief_items %}
+                        <table class="table table-bordered table-striped">
+                            <thead class="table-primary">
+                                <tr>
+                                    <th>#</th>
+                                    <th>Item Name</th>
+                                    <th class="text-center">Quantity</th>
+                                    <th class="text-center">Unit</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in distribution.relief_items %}
+                                <tr>
+                                    <td>{{ loop.index }}</td>
+                                    <td>{{ item.item }}</td>
+                                    <td class="text-center"><strong>{{ item.quantity }}</strong></td>
+                                    <td class="text-center">{{ item.unit or 'units' }}</td>
+                                </tr>
+                                {% endfor %}
+                                <tr class="table-light">
+                                    <td colspan="3" class="fw-bold text-end">Total Items:</td>
+                                    <td class="text-center fw-bold">{{ distribution.relief_items|length }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        {% else %}
+                        <p class="text-muted">No relief items recorded</p>
+                        {% endif %}
+                    </div>
+
+                    <!-- CASH & STATUS -->
+                    <div class="section-break mb-4">
+                        <h5 class="border-bottom pb-2 mb-3">
+                            <i class="bi bi-cash-coin"></i> Cash & Status
+                        </h5>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="fw-bold text-muted">Cash Received:</label>
+                                <p class="h5 text-success">₹{{ "%.2f"|format(distribution.cash_received) }}</p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="fw-bold text-muted">Status:</label>
+                                <p>
+                                    {% if distribution.status == 'Delivered' %}
+                                    <span class="badge bg-success">{{ distribution.status }}</span>
+                                    {% elif distribution.status == 'In Progress' %}
+                                    <span class="badge bg-warning">{{ distribution.status }}</span>
+                                    {% elif distribution.status == 'Pending' %}
+                                    <span class="badge bg-danger">{{ distribution.status }}</span>
+                                    {% else %}
+                                    <span class="badge bg-primary">{{ distribution.status }}</span>
+                                    {% endif %}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- NOTES -->
+                    {% if distribution.notes %}
+                    <div class="section-break mb-4">
+                        <h5 class="border-bottom pb-2 mb-3">
+                            <i class="bi bi-pencil-square"></i> Additional Notes
+                        </h5>
+                        <div class="alert alert-info">
+                            <p>{{ distribution.notes }}</p>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- UPLOADED PHOTO -->
+                    {% if distribution.image_filename %}
+                    <div class="section-break mb-4">
+                        <h5 class="border-bottom pb-2 mb-3">
+                            <i class="bi bi-image"></i> Evidence Photo
+                        </h5>
+                        <div class="text-center">
+                            <img src="/static/uploads/{{ distribution.image_filename }}" alt="Evidence Photo"
+                                class="img-fluid rounded shadow-sm" style="max-width: 500px; max-height: 500px;">
+                            <p class="text-muted mt-2 small">File: {{ distribution.image_filename }}</p>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- UPLOADED DOCUMENTS -->
+                    {% if distribution.documents %}
+                    <div class="section-break mb-4">
+                        <h5 class="border-bottom pb-2 mb-3">
+                            <i class="bi bi-file-earmark-pdf"></i> Supporting Documents
+                        </h5>
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-hover">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Document Name</th>
+                                        <th class="text-center">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for doc in distribution.documents %}
+                                    <tr>
+                                        <td>{{ loop.index }}</td>
+                                        <td>
+                                            <i class="bi bi-file-earmark"></i>
+                                            {{ doc }}
+                                        </td>
+                                        <td class="text-center">
+                                            <a href="/static/uploads/{{ doc }}" target="_blank"
+                                                class="btn btn-sm btn-outline-primary">
+                                                <i class="bi bi-download"></i> View/Download
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- METADATA -->
+                    <div class="section-break mt-4 pt-3 border-top">
+                        <div class="row text-muted small">
+                            <div class="col-md-6">
+                                <p><strong>Created:</strong> {{ distribution.created_at.strftime('%Y-%m-%d %H:%M:%S') }}
+                                </p>
+                            </div>
+                            <div class="col-md-6 text-end">
+                                <p><strong>Last Updated:</strong> {{ distribution.updated_at.strftime('%Y-%m-%d
+                                    %H:%M:%S') if distribution.updated_at else 'N/A' }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Print Styles -->
+<style media="print">
+    @media print {
+        body {
+            padding: 0;
+            margin: 0;
+        }
+
+        .navbar,
+        .btn-group,
+        footer {
+            display: none !important;
+        }
+
+        #printContent {
+            box-shadow: none !important;
+            border: 1px solid #ccc;
+        }
+
+        .section-break {
+            page-break-inside: avoid;
+        }
+
+        table {
+            page-break-inside: avoid;
+        }
+    }
+</style>
+{% endblock %}

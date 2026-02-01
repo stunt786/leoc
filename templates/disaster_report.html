@@ -1,0 +1,2193 @@
+{% extends 'base.html' %}
+
+{% block title %}Daily Disaster Incidents Reporting - LEOC{% endblock %}
+
+{% block extra_css %}
+<style>
+    body {
+        background-color: #f8f9fa;
+    }
+
+    .card {
+        border: none;
+        border-radius: 10px;
+        box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+        transition: box-shadow 0.15s ease-in-out;
+    }
+
+    .card:hover {
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    }
+
+    .stat-card {
+        text-align: center;
+        padding: 1.5rem;
+    }
+
+    .stat-card .icon {
+        font-size: 2.5rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .stat-card .number {
+        font-size: 2rem;
+        font-weight: bold;
+        margin: 0.5rem 0;
+    }
+
+    .stat-card .label {
+        font-size: 0.9rem;
+        color: #6c757d;
+    }
+
+    .chart-container {
+        position: relative;
+        height: 200px;
+        margin-bottom: 1rem;
+    }
+
+    .incident-table th {
+        background-color: #e9ecef;
+    }
+
+    .ward-badge {
+        font-size: 0.8em;
+    }
+
+    .disaster-type-badge {
+        font-size: 0.8em;
+    }
+
+    .navbar-brand {
+        font-weight: bold;
+    }
+
+    .nav-tabs .nav-link.active {
+        background-color: #fff;
+        border-bottom: 3px solid #0d6efd;
+    }
+
+
+    /* Reduce white space in assessment tabs */
+    #damage-assessment .row.mb-3,
+    #livestock-damage .row.mb-3,
+    #human-impact .row.mb-3,
+    #overview .row.mb-3 {
+        margin-bottom: 0.5rem !important;
+        /* Reduced from default 1rem */
+    }
+
+    /* Improved styling for multi-select dropdown */
+    .multi-select-container {
+        position: relative;
+    }
+
+    .multi-select-container select[multiple] {
+        height: auto;
+        min-height: 40px;
+        padding: 0.375rem 0.75rem;
+    }
+
+    .multi-select-container .form-text {
+        margin-top: 0.25rem;
+        font-size: 0.875em;
+    }
+
+    /* Better styling for form sections */
+    .form-section-card {
+        border: 1px solid #dee2e6;
+        border-radius: 0.375rem;
+        margin-bottom: 1rem;
+    }
+
+    .form-section-card .card-header {
+        background-color: #f8f9fa;
+        border-bottom: 1px solid #dee2e6;
+        padding: 0.75rem 1rem;
+    }
+
+    .form-section-card .card-body {
+        padding: 1.25rem;
+    }
+
+    /* Custom dropdown styling */
+    #wardDropdownMenu {
+        max-height: 200px;
+        overflow-y: auto;
+    }
+
+    #wardDropdownMenu .dropdown-item {
+        cursor: pointer;
+        padding: 0.5rem 1rem;
+    }
+
+    #wardDropdownMenu .dropdown-item:hover {
+        background-color: #f8f9fa;
+    }
+
+    #wardDropdownMenu .dropdown-item.active {
+        background-color: #0d6efd;
+        color: white;
+    }
+
+    /* Ensure label text is visible on stat cards */
+    .stat-card .label {
+        color: inherit;
+    }
+
+    /* Specific overrides for better visibility */
+    .stat-card[style*="ffc107"],
+    .stat-card[style*="e0a800"],
+    .stat-card[style*="fd7e14"],
+    .stat-card[style*="e66100"] {
+        color: #212529 !important;
+    }
+
+    .stat-card[style*="ffc107"] .label,
+    .stat-card[style*="e0a800"] .label,
+    .stat-card[style*="fd7e14"] .label,
+    .stat-card[style*="e66100"] .label {
+        color: #212529 !important;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <h2 class="mb-4"><i class="bi bi-exclamation-triangle text-danger"></i> Daily Disaster Incidents Reporting
+            </h2>
+
+            <!-- Navigation Tabs -->
+            <ul class="nav nav-tabs mb-4" id="disasterTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="overview-tab" data-bs-toggle="tab" data-bs-target="#overview"
+                        type="button" role="tab">Overview</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="event-log-tab" data-bs-toggle="tab" data-bs-target="#event-log"
+                        type="button" role="tab">Event Action Log</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="situation-report-tab" data-bs-toggle="tab"
+                        data-bs-target="#situation-report" type="button" role="tab">Situation Report</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="human-impact-tab" data-bs-toggle="tab" data-bs-target="#human-impact"
+                        type="button" role="tab">Human Impact</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="damage-assessment-tab" data-bs-toggle="tab"
+                        data-bs-target="#damage-assessment" type="button" role="tab">Damage Assessment</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="livestock-damage-tab" data-bs-toggle="tab"
+                        data-bs-target="#livestock-damage" type="button" role="tab">Livestock Damage</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="public-info-tab" data-bs-toggle="tab" data-bs-target="#public-info"
+                        type="button" role="tab">Public Info</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="input-form-tab" data-bs-toggle="tab" data-bs-target="#input-form"
+                        type="button" role="tab">Input Data</button>
+                </li>
+            </ul>
+
+            <!-- Tab Content -->
+            <div class="tab-content" id="disasterTabsContent">
+                <!-- Overview Tab -->
+                <div class="tab-pane fade show active" id="overview" role="tabpanel">
+                    <div class="row mb-3">
+                        <div class="col-md-3 mb-3">
+                            <div class="card stat-card text-center p-4"
+                                style="background: linear-gradient(135deg, #007bff, #0062cc); color: white; border: none; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+                                <div class="icon mb-2">
+                                    <i class="bi bi-exclamation-circle fs-1"></i>
+                                </div>
+                                <div class="number fs-2 fw-bold" id="total-incidents">0</div>
+                                <div class="label fs-6">Total Incidents Today</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="card stat-card text-center p-4"
+                                style="background: linear-gradient(135deg, #dc3545, #bd2130); color: white; border: none; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+                                <div class="icon mb-2">
+                                    <i class="bi bi-people fs-1"></i>
+                                </div>
+                                <div class="number fs-2 fw-bold" id="affected-people">0</div>
+                                <div class="label fs-6">People Affected</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="card stat-card text-center p-4"
+                                style="background: linear-gradient(135deg, #ffc107, #e0a800); color: #212529; border: none; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+                                <div class="icon mb-2">
+                                    <i class="bi bi-house-door fs-1"></i>
+                                </div>
+                                <div class="number fs-2 fw-bold" id="damaged-houses">0</div>
+                                <div class="label fs-6">Houses Damaged</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="card stat-card text-center p-4"
+                                style="background: linear-gradient(135deg, #28a745, #1e7e34); color: white; border: none; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+                                <div class="icon mb-2">
+                                    <i class="bi bi-shield-check fs-1"></i>
+                                </div>
+                                <div class="number fs-2 fw-bold" id="relief-actions">0</div>
+                                <div class="label fs-6">Relief Actions</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-8 mb-4">
+                            <div class="card h-100">
+                                <div class="card-header bg-primary text-white">
+                                    <h5 class="mb-0"><i class="bi bi-graph-up"></i> Incidents by Type</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="chart-container">
+                                        <canvas id="incidentsByTypeChart"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-4">
+                            <div class="card h-100">
+                                <div class="card-header bg-primary text-white">
+                                    <h5 class="mb-0"><i class="bi bi-geo-alt"></i> Incidents by Ward</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="chart-container">
+                                        <canvas id="incidentsByWardChart"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0"><i class="bi bi-list-ul"></i> Recent Incidents</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-hover incident-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Time</th>
+                                            <th>Disaster Type</th>
+                                            <th>Ward</th>
+                                            <th>Location</th>
+                                            <th>Severity</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="recent-incidents-body">
+                                        <!-- Data will be populated by JavaScript -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Event Action Log Tab -->
+                <div class="tab-pane fade" id="event-log" role="tabpanel">
+                    <div class="card">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0"><i class="bi bi-journal-text"></i> Event Action Log</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-hover incident-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Timestamp</th>
+                                            <th>Event Type</th>
+                                            <th>Description</th>
+                                            <th>Location</th>
+                                            <th>Responsible Unit</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="event-log-body">
+                                        <!-- Data will be populated by JavaScript -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Situation Report Tab -->
+                <div class="tab-pane fade" id="situation-report" role="tabpanel">
+                    <div class="card">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0"><i class="bi bi-clipboard-data"></i> Situation Report</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="card mb-3">
+                                        <div class="card-body">
+                                            <h6 class="card-title">Current Situation Summary</h6>
+                                            <p id="situation-summary">No current situation reported.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="card mb-3">
+                                        <div class="card-body">
+                                            <h6 class="card-title">Weather Conditions</h6>
+                                            <p id="weather-conditions">Weather data not available.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-12">
+                                    <div class="card">
+                                        <div class="card-body">
+                                            <h6 class="card-title">Detailed Report</h6>
+                                            <div id="detailed-report">No detailed report available.</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Situation Report Form Section -->
+                    <div class="card mt-3">
+                        <div class="card-header bg-success text-white">
+                            <h5 class="mb-0"><i class="bi bi-plus-circle"></i> Add New Situation Report</h5>
+                        </div>
+                        <div class="card-body">
+                            <form id="situationReportForm">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="situationSummary" class="form-label">Current Situation
+                                                Summary</label>
+                                            <textarea class="form-control" id="situationSummary" rows="2"
+                                                required></textarea>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="weatherConditions" class="form-label">Weather Conditions</label>
+                                            <textarea class="form-control" id="weatherConditions" rows="2"
+                                                required></textarea>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="detailedReport" class="form-label">Detailed Report</label>
+                                    <textarea class="form-control" id="detailedReport" rows="3" required></textarea>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="resourcesDeployed" class="form-label">Resources Deployed</label>
+                                            <input type="text" class="form-control" id="resourcesDeployed"
+                                                placeholder="e.g., 3 emergency teams, 2 ambulances">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="nextUpdateTime" class="form-label">Next Update Time</label>
+                                            <input type="text" class="form-control" id="nextUpdateTime"
+                                                placeholder="e.g., 18:00 hrs">
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                                    <button type="button" class="btn btn-secondary me-md-2"
+                                        id="resetSituationReportForm">Reset</button>
+                                    <button type="submit" class="btn btn-success">Add Situation Report</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Human Impact Tab -->
+                <div class="tab-pane fade" id="human-impact" role="tabpanel">
+                        <div class="row mb-3">
+                            <div class="col-md-3 mb-3">
+                                <div class="card stat-card text-center p-4"
+                                    style="background: linear-gradient(135deg, #dc3545, #bd2130); color: white; border: none; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+                                    <div class="icon mb-2">
+                                        <i class="bi bi-emoji-frown fs-1"></i>
+                                    </div>
+                                    <div class="number fs-2 fw-bold" id="casualties">0</div>
+                                    <div class="label fs-6">Casualties</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <div class="card stat-card text-center p-4"
+                                    style="background: linear-gradient(135deg, #ffc107, #e0a800); color: #212529; border: none; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+                                    <div class="icon mb-2">
+                                        <i class="bi bi-person-standing fs-1"></i>
+                                    </div>
+                                    <div class="number fs-2 fw-bold" id="injured">0</div>
+                                    <div class="label fs-6">Injured</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <div class="card stat-card text-center p-4"
+                                    style="background: linear-gradient(135deg, #17a2b8, #117a8b); color: white; border: none; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+                                    <div class="icon mb-2">
+                                        <i class="bi bi-people-fill fs-1"></i>
+                                    </div>
+                                    <div class="number fs-2 fw-bold" id="displaced">0</div>
+                                    <div class="label fs-6">Displaced</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <div class="card stat-card text-center p-4"
+                                    style="background: linear-gradient(135deg, #28a745, #1e7e34); color: white; border: none; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+                                    <div class="icon mb-2">
+                                        <i class="bi bi-heart-pulse fs-1"></i>
+                                    </div>
+                                    <div class="number fs-2 fw-bold" id="rescued">0</div>
+                                    <div class="label fs-6">Rescued</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="mb-0"><i class="bi bi-people"></i> Human Impact by Demographics</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="chart-container">
+                                    <canvas id="humanImpactChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Damage Assessment Tab -->
+                    <div class="tab-pane fade" id="damage-assessment" role="tabpanel">
+                        <div class="row mb-3">
+                            <div class="col-md-3 mb-3">
+                                <div class="card stat-card text-center p-4"
+                                    style="background: linear-gradient(135deg, #ffc107, #e0a800); color: #212529; border: none; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+                                    <div class="icon mb-2">
+                                        <i class="bi bi-house-down fs-1"></i>
+                                    </div>
+                                    <div class="number fs-2 fw-bold" id="destroyed-houses">0</div>
+                                    <div class="label fs-6">Houses Destroyed</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <div class="card stat-card text-center p-4"
+                                    style="background: linear-gradient(135deg, #fd7e14, #e66100); color: white; border: none; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+                                    <div class="icon mb-2">
+                                        <i class="bi bi-building fs-1"></i>
+                                    </div>
+                                    <div class="number fs-2 fw-bold" id="damaged-buildings">0</div>
+                                    <div class="label fs-6">Buildings Damaged</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <div class="card stat-card text-center p-4"
+                                    style="background: linear-gradient(135deg, #17a2b8, #117a8b); color: white; border: none; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+                                    <div class="icon mb-2">
+                                        <i class="bi bi-signpost-split fs-1"></i>
+                                    </div>
+                                    <div class="number fs-2 fw-bold" id="infrastructure-damage">0</div>
+                                    <div class="label fs-6">Infrastructure</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <div class="card stat-card text-center p-4"
+                                    style="background: linear-gradient(135deg, #6c757d, #545b62); color: white; border: none; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+                                    <div class="icon mb-2">
+                                        <i class="bi bi-currency-dollar fs-1"></i>
+                                    </div>
+                                    <div class="number fs-2 fw-bold" id="estimated-loss">0</div>
+                                    <div class="label fs-6">Estimated Loss (Rs.)</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="mb-0"><i class="bi bi-bar-chart"></i> Damage Assessment by Category</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="chart-container">
+                                    <canvas id="damageAssessmentChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Livestock Damage Tab -->
+                    <div class="tab-pane fade" id="livestock-damage" role="tabpanel">
+                        <div class="row mb-3">
+                            <div class="col-md-3 mb-3">
+                                <div class="card stat-card text-center p-4"
+                                    style="background: linear-gradient(135deg, #dc3545, #bd2130); color: white; border: none; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+                                    <div class="icon mb-2">
+                                        <i class="bi bi-cow fs-1"></i>
+                                    </div>
+                                    <div class="number fs-2 fw-bold" id="cattle-lost">0</div>
+                                    <div class="label fs-6">Cattle Lost</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <div class="card stat-card text-center p-4"
+                                    style="background: linear-gradient(135deg, #ffc107, #e0a800); color: #212529; border: none; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+                                    <div class="icon mb-2">
+                                        <i class="bi bi-bug fs-1"></i>
+                                    </div>
+                                    <div class="number fs-2 fw-bold" id="small-livestock-lost">0</div>
+                                    <div class="label fs-6">Small Livestock Lost</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <div class="card stat-card text-center p-4"
+                                    style="background: linear-gradient(135deg, #17a2b8, #117a8b); color: white; border: none; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+                                    <div class="icon mb-2">
+                                        <i class="bi bi-egg fs-1"></i>
+                                    </div>
+                                    <div class="number fs-2 fw-bold" id="poultry-lost">0</div>
+                                    <div class="label fs-6">Poultry Lost</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <div class="card stat-card text-center p-4"
+                                    style="background: linear-gradient(135deg, #28a745, #1e7e34); color: white; border: none; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+                                    <div class="icon mb-2">
+                                        <i class="bi bi-currency-dollar fs-1"></i>
+                                    </div>
+                                    <div class="number fs-2 fw-bold" id="livestock-loss">0</div>
+                                    <div class="label fs-6">Livestock Loss (Rs.)</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="mb-0"><i class="bi bi-pie-chart"></i> Livestock Damage by Type</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="chart-container">
+                                    <canvas id="livestockDamageChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Public Info Tab -->
+                    <div class="tab-pane fade" id="public-info" role="tabpanel">
+                        <div class="card">
+                            <div class="card-header bg-success text-white">
+                                <h5 class="mb-0"><i class="bi bi-megaphone"></i> Public Information & Advisories</h5>
+                            </div>
+                            <div class="card-body">
+                                <form id="publicInfoForm">
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label for="publicInfoTitle" class="form-label">Title</label>
+                                                <input type="text" class="form-control" id="publicInfoTitle" required>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label for="publicInfoType" class="form-label">Type</label>
+                                                <select class="form-control" id="publicInfoType">
+                                                    <option value="General">General</option>
+                                                    <option value="Weather Advisory">Weather Advisory</option>
+                                                    <option value="Emergency Contact">Emergency Contact</option>
+                                                    <option value="Safety Instruction">Safety Instruction</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label for="publicInfoPriority" class="form-label">Priority</label>
+                                                <select class="form-control" id="publicInfoPriority">
+                                                    <option value="Low">Low</option>
+                                                    <option value="Normal">Normal</option>
+                                                    <option value="High">High</option>
+                                                    <option value="Critical">Critical</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="mb-3 form-check mt-4">
+                                                <input type="checkbox" class="form-check-input" id="publicInfoActive"
+                                                    checked>
+                                                <label class="form-check-label" for="publicInfoActive">Active</label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="publicInfoContent" class="form-label">Content</label>
+                                        <textarea class="form-control" id="publicInfoContent" rows="3"
+                                            required></textarea>
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label for="publicInfoValidFrom" class="form-label">Valid From</label>
+                                                <input type="datetime-local" class="form-control"
+                                                    id="publicInfoValidFrom">
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label for="publicInfoValidUntil" class="form-label">Valid Until</label>
+                                                <input type="datetime-local" class="form-control"
+                                                    id="publicInfoValidUntil">
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                                        <button type="button" class="btn btn-secondary me-md-2"
+                                            id="resetPublicInfoForm">Reset</button>
+                                        <button type="submit" class="btn btn-success">Add Public Information</button>
+                                    </div>
+                                </form>
+
+                                <hr class="my-4">
+                                <h6><i class="bi bi-info-circle"></i> Current Active Advisories</h6>
+                                <div id="advisories-list" class="mt-3">
+                                    <p class="text-muted">Loading advisories...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Input Form Tab -->
+    <div class="tab-pane fade" id="input-form" role="tabpanel">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-clipboard-plus"></i> Daily Disaster Data Entry Form</h5>
+            </div>
+            <div class="card-body">
+                <form id="disasterReportForm">
+                    <!-- Basic Incident Information -->
+                    <div class="card mb-3 form-section-card">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0"><i class="bi bi-info-circle"></i> Basic Incident Information</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="disasterDate" class="form-label">Date <span
+                                                class="text-danger">*</span></label>
+                                        <input type="date" class="form-control" id="disasterDate" required>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="disasterTime" class="form-label">Time <span
+                                                class="text-danger">*</span></label>
+                                        <input type="time" class="form-control" id="disasterTime" required>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="disasterType" class="form-label">Disaster Type <span
+                                                class="text-danger">*</span></label>
+                                        <select class="form-control" id="disasterType" required>
+                                            <option value="">Select Disaster Type</option>
+                                            <option value="earthquake">Earthquake</option>
+                                            <option value="flood">Flood</option>
+                                            <option value="landslide">Landslide</option>
+                                            <option value="storm">Storm</option>
+                                            <option value="fire">Fire</option>
+                                            <option value="drought">Drought</option>
+                                            <option value="avalanche">Avalanche</option>
+                                            <option value="cold_wave">Cold Wave</option>
+                                            <option value="heat_wave">Heat Wave</option>
+                                            <option value="other">Other</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label">Ward <span class="text-danger">*</span></label>
+                                        <div class="position-relative">
+                                            <button class="btn btn-outline-secondary w-100 text-start" type="button"
+                                                id="wardDropdownToggle">
+                                                Select Ward(s)
+                                            </button>
+                                            <div class="position-absolute w-100 bg-white border rounded shadow"
+                                                id="wardDropdownMenu"
+                                                style="display: none; z-index: 1000; max-height: 200px; overflow-y: auto;">
+                                                <a class="dropdown-item p-2" href="#" data-value="1">Ward 1</a>
+                                                <a class="dropdown-item p-2" href="#" data-value="2">Ward 2</a>
+                                                <a class="dropdown-item p-2" href="#" data-value="3">Ward 3</a>
+                                                <a class="dropdown-item p-2" href="#" data-value="4">Ward 4</a>
+                                                <a class="dropdown-item p-2" href="#" data-value="5">Ward 5</a>
+                                                <a class="dropdown-item p-2" href="#" data-value="6">Ward 6</a>
+                                                <a class="dropdown-item p-2" href="#" data-value="7">Ward 7</a>
+                                                <a class="dropdown-item p-2" href="#" data-value="8">Ward 8</a>
+                                                <a class="dropdown-item p-2" href="#" data-value="9">Ward 9</a>
+                                            </div>
+                                            <input type="hidden" id="ward" name="ward" required>
+                                        </div>
+                                        <div class="mt-2">
+                                            <div id="selectedWards" class="d-flex flex-wrap gap-1"></div>
+                                        </div>
+                                        <small class="form-text text-muted">Click to select multiple wards</small>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="latitude" class="form-label">Latitude</label>
+                                        <input type="number" class="form-control" id="latitude" step="any"
+                                            placeholder="Enter latitude (e.g., 27.7172)">
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="longitude" class="form-label">Longitude</label>
+                                        <input type="number" class="form-control" id="longitude" step="any"
+                                            placeholder="Enter longitude (e.g., 85.324)">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="location" class="form-label">Location/Tole <span
+                                        class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="location"
+                                    placeholder="Enter specific location" required>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="description" class="form-label">Description</label>
+                                <textarea class="form-control" id="description" rows="3"
+                                    placeholder="Describe the incident in detail"></textarea>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <div class="mb-3">
+                                        <label for="severity" class="form-label">Severity</label>
+                                        <select class="form-control" id="severity">
+                                            <option value="low">Low</option>
+                                            <option value="medium" selected>Medium</option>
+                                            <option value="high">High</option>
+                                            <option value="critical">Critical</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="mb-3">
+                                        <label for="weatherStatus" class="form-label">Weather Status</label>
+                                        <input type="text" class="form-control" id="weatherStatus"
+                                            placeholder="e.g., Heavy Rain, Storm">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Human Impact -->
+                    <div class="card mb-3 form-section-card">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0"><i class="bi bi-people"></i> Human Impact</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <div class="mb-3">
+                                        <label for="affectedPeople" class="form-label">Affected People</label>
+                                        <input type="number" class="form-control" id="affectedPeople" min="0" value="0">
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="mb-3">
+                                        <label for="injuredCount" class="form-label">Injured</label>
+                                        <input type="number" class="form-control" id="injuredCount" min="0" value="0">
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="mb-3">
+                                        <label for="casualtiesCount" class="form-label">Casualties</label>
+                                        <input type="number" class="form-control" id="casualtiesCount" min="0"
+                                            value="0">
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="mb-3">
+                                        <label for="deaths" class="form-label">Deaths</label>
+                                        <input type="number" class="form-control" id="deaths" min="0" value="0">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <div class="mb-3">
+                                        <label for="missingPersons" class="form-label">Missing Persons</label>
+                                        <input type="number" class="form-control" id="missingPersons" min="0" value="0">
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="mb-3">
+                                        <label for="affectedPeopleMale" class="form-label">Affected Males</label>
+                                        <input type="number" class="form-control" id="affectedPeopleMale" min="0"
+                                            value="0">
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="mb-3">
+                                        <label for="affectedPeopleFemale" class="form-label">Affected Females</label>
+                                        <input type="number" class="form-control" id="affectedPeopleFemale" min="0"
+                                            value="0">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Property Damage -->
+                    <div class="card mb-3 form-section-card">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0"><i class="bi bi-house"></i> Property Damage</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <div class="mb-3">
+                                        <label for="housesDamaged" class="form-label">Houses Damaged</label>
+                                        <input type="number" class="form-control" id="housesDamaged" min="0" value="0">
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="mb-3">
+                                        <label for="housesDestroyed" class="form-label">Houses Destroyed</label>
+                                        <input type="number" class="form-control" id="housesDestroyed" min="0"
+                                            value="0">
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="mb-3">
+                                        <label for="publicBuildingDestruction" class="form-label">Public Buildings
+                                            Destroyed</label>
+                                        <input type="number" class="form-control" id="publicBuildingDestruction" min="0"
+                                            value="0">
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="mb-3">
+                                        <label for="publicBuildingDamage" class="form-label">Public Buildings
+                                            Damaged</label>
+                                        <input type="number" class="form-control" id="publicBuildingDamage" min="0"
+                                            value="0">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <div class="mb-3">
+                                        <label for="estimatedLoss" class="form-label">Estimated Loss (Rs.)</label>
+                                        <input type="number" class="form-control" id="estimatedLoss" min="0" value="0">
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="agricultureCropDamage" class="form-label">Agriculture Crop
+                                            Damage</label>
+                                        <input type="text" class="form-control" id="agricultureCropDamage"
+                                            placeholder="Brief description">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Livestock Impact -->
+                    <div class="card mb-3 form-section-card">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0"><i class="bi bi-cow"></i> Livestock Impact</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <div class="mb-3">
+                                        <label for="livestockLost" class="form-label">Livestock Lost</label>
+                                        <input type="number" class="form-control" id="livestockLost" min="0" value="0">
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="mb-3">
+                                        <label for="livestockInjured" class="form-label">Livestock Injured</label>
+                                        <input type="number" class="form-control" id="livestockInjured" min="0"
+                                            value="0">
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="mb-3">
+                                        <label for="livestockDeath" class="form-label">Livestock Death</label>
+                                        <input type="number" class="form-control" id="livestockDeath" min="0" value="0">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Infrastructure Impact -->
+                    <div class="card mb-3 form-section-card">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0"><i class="bi bi-signpost-split"></i> Infrastructure Impact</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <div class="form-check mb-3">
+                                        <input type="checkbox" class="form-check-input" id="roadBlocked">
+                                        <label class="form-check-label" for="roadBlocked">Road Blocked</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="form-check mb-3">
+                                        <input type="checkbox" class="form-check-input" id="electricityBlocked">
+                                        <label class="form-check-label" for="electricityBlocked">Electricity
+                                            Blocked</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="form-check mb-3">
+                                        <input type="checkbox" class="form-check-input" id="communicationBlocked">
+                                        <label class="form-check-label" for="communicationBlocked">Communication
+                                            Blocked</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="form-check mb-3">
+                                        <input type="checkbox" class="form-check-input" id="drinkingWaterDisrupted">
+                                        <label class="form-check-label" for="drinkingWaterDisrupted">Drinking Water
+                                            Disrupted</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Additional Information -->
+                    <div class="card mb-3 form-section-card">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0"><i class="bi bi-clipboard"></i> Additional Information</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label for="rescueOperations" class="form-label">Rescue Operations</label>
+                                <textarea class="form-control" id="rescueOperations" rows="2"
+                                    placeholder="Describe rescue and relief operations conducted"></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <button type="button" class="btn btn-secondary me-md-2" id="resetForm">Reset</button>
+                        <button type="button" class="btn btn-warning me-md-2" id="noIncidentsBtn">No Incidents
+                            Today</button>
+                        <button type="submit" class="btn btn-primary">Submit Report</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+</div>
+</div>
+
+<!-- Success/Error Alert -->
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index: 11">
+    <div id="toastPlaceholder"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    // Global variables
+    let incidentsByTypeChart = null;
+    let incidentsByWardChart = null;
+    let humanImpactChart = null;
+    let damageAssessmentChart = null;
+    let livestockDamageChart = null;
+
+    // Initialize the page when DOM is loaded
+    document.addEventListener('DOMContentLoaded', function () {
+        // Load data and initialize charts
+        loadData();
+
+        // Set today's date as default in the form
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('disasterDate').value = today;
+
+        // Set current time as default
+        const now = new Date();
+        const currentTime = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
+        document.getElementById('disasterTime').value = currentTime;
+
+        // Setup form submission
+        document.getElementById('disasterReportForm').addEventListener('submit', submitDisasterReport);
+
+        // Setup public info form submission
+        document.getElementById('publicInfoForm').addEventListener('submit', submitPublicInfo);
+
+        // Setup situation report form submission
+        document.getElementById('situationReportForm').addEventListener('submit', submitSituationReport);
+
+        // Setup reset buttons
+        document.getElementById('resetForm').addEventListener('click', resetForm);
+        document.getElementById('resetPublicInfoForm').addEventListener('click', resetPublicInfoForm);
+        document.getElementById('resetSituationReportForm').addEventListener('click', resetSituationReportForm);
+    });
+
+    // Load data from API
+    async function loadData() {
+        try {
+            // Load disaster statistics
+            const statsResponse = await fetch('/api/disaster-statistics');
+            const statsData = await statsResponse.json();
+
+            // Update UI with statistics
+            updateStatsUI(statsData);
+
+            // Load disaster data for recent incidents and charts
+            const response = await fetch('/api/disasters');
+            const data = await response.json();
+
+            if (data.disasters) {
+                renderRecentIncidents(data.disasters);
+                renderCharts(data.disasters, statsData);
+            }
+
+            // Load situation report data
+            loadSituationReport();
+        } catch (error) {
+            console.error('Error loading data:', error);
+            showToast('Error loading data. Please try again.', 'danger');
+        }
+    }
+
+    // New function to load just disaster statistics (used by tab listeners)
+    async function loadDisasterStatistics() {
+        try {
+            const statsResponse = await fetch('/api/disaster-statistics');
+            const statsData = await statsResponse.json();
+            updateStatsUI(statsData);
+
+            // Re-render charts as they may depend on statsData
+            const response = await fetch('/api/disasters');
+            const data = await response.json();
+            if (data.disasters) {
+                renderCharts(data.disasters, statsData);
+            }
+        } catch (error) {
+            console.error('Error loading disaster statistics:', error);
+        }
+    }
+
+    // Update statistics cards UI
+    function updateStatsUI(statsData) {
+        // Main Overview Stats
+        const totalIncidentsEl = document.getElementById('total-incidents');
+        if (totalIncidentsEl) totalIncidentsEl.textContent = statsData.total_disasters || 0;
+
+        const affectedPeopleEl = document.getElementById('affected-people');
+        if (affectedPeopleEl) affectedPeopleEl.textContent = statsData.total_affected_people || 0;
+
+        const casualtiesEl = document.getElementById('casualties');
+        if (casualtiesEl) casualtiesEl.textContent = statsData.total_deaths || 0;
+
+        const displacedEl = document.getElementById('displaced');
+        if (displacedEl) displacedEl.textContent = statsData.total_affected_people || 0; // Proxy
+
+        const injuredEl = document.getElementById('injured');
+        if (injuredEl) injuredEl.textContent = 0; // Not in model yet
+
+        const rescuedEl = document.getElementById('rescued');
+        if (rescuedEl) rescuedEl.textContent = (statsData.total_affected_people || 0) - (statsData.total_deaths || 0); // Proxy
+
+        const reliefActionsEl = document.getElementById('relief-actions');
+        if (reliefActionsEl) reliefActionsEl.textContent = '0'; // Placeholder
+
+        // Damage Assessment Stats
+        const destroyedHousesEl = document.getElementById('destroyed-houses');
+        if (destroyedHousesEl) destroyedHousesEl.textContent = statsData.total_affected_households || 0;
+
+        const damagedBuildingsEl = document.getElementById('damaged-buildings');
+        if (damagedBuildingsEl) damagedBuildingsEl.textContent = statsData.total_public_buildings_damaged || 0;
+
+        const infrastructureDamageEl = document.getElementById('infrastructure-damage');
+        if (infrastructureDamageEl) infrastructureDamageEl.textContent = statsData.total_public_buildings_destroyed || 0;
+
+        const estimatedLossEl = document.getElementById('estimated-loss');
+        if (estimatedLossEl) estimatedLossEl.textContent = '0';
+
+        // Livestock Damage Stats
+        const cattleLostEl = document.getElementById('cattle-lost');
+        if (cattleLostEl) cattleLostEl.textContent = statsData.total_livestock_death || 0;
+
+        const smallLivestockLostEl = document.getElementById('small-livestock-lost');
+        if (smallLivestockLostEl) smallLivestockLostEl.textContent = statsData.total_livestock_injured || 0;
+
+        const poultryLostEl = document.getElementById('poultry-lost');
+        if (poultryLostEl) poultryLostEl.textContent = '0';
+
+        const livestockLossEl = document.getElementById('livestock-loss');
+        if (livestockLossEl) livestockLossEl.textContent = statsData.total_livestock_death || 0;
+    }
+
+
+    // Update statistics cards
+    function updateStats(disasters) {
+        // Total incidents today
+        document.getElementById('total-incidents').textContent = disasters.length;
+
+        // Affected people
+        const totalAffected = disasters.reduce((sum, incident) => sum + incident.affected_people, 0);
+        document.getElementById('affected-people').textContent = totalAffected;
+
+        // Damaged houses (we'll use affected households as proxy)
+        const totalHouses = disasters.reduce((sum, incident) => sum + incident.affected_households, 0);
+        document.getElementById('damaged-houses').textContent = totalHouses;
+
+        // Relief actions (placeholder - would come from relief distribution data)
+        document.getElementById('relief-actions').textContent = '0';
+
+        // Human impact stats
+        document.getElementById('casualties').textContent = '0'; // Placeholder
+        document.getElementById('injured').textContent = '0'; // Placeholder
+        document.getElementById('displaced').textContent = totalAffected; // Using affected as displaced
+        document.getElementById('rescued').textContent = '0'; // Placeholder
+
+        // Damage assessment stats
+        document.getElementById('destroyed-houses').textContent = '0'; // Placeholder
+        document.getElementById('damaged-buildings').textContent = totalHouses; // Using affected as damaged
+        document.getElementById('infrastructure-damage').textContent = '0'; // Placeholder
+        document.getElementById('estimated-loss').textContent = '0'; // Placeholder
+
+        // Livestock damage stats
+        document.getElementById('cattle-lost').textContent = '0'; // Placeholder
+        document.getElementById('small-livestock-lost').textContent = '0'; // Placeholder
+        document.getElementById('poultry-lost').textContent = '0'; // Placeholder
+        document.getElementById('livestock-loss').textContent = '0'; // Placeholder
+    }
+
+    // Render recent incidents table
+    function renderRecentIncidents(disasters) {
+        const tbody = document.getElementById('recent-incidents-body');
+        tbody.innerHTML = '';
+
+        // Sort by date (most recent first) and take the last 10
+        const recent = disasters.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 10);
+
+        recent.forEach(incident => {
+            const row = document.createElement('tr');
+
+            // Format date
+            const incidentDate = new Date(incident.created_at);
+            const formattedDate = incidentDate.toLocaleDateString();
+            const formattedTime = incidentDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+            row.innerHTML = `
+                    <td>${formattedDate}</td>
+                    <td>${formattedTime}</td>
+                    <td><span class="badge bg-warning disaster-type-badge">${incident.disaster_type}</span></td>
+                    <td><span class="badge bg-info ward-badge">Ward ${incident.ward}</span></td>
+                    <td>${incident.tole || incident.location || 'N/A'}</td>
+                    <td><span class="badge bg-${getSeverityClass(incident.description || '')}">${getSeverityLabel(incident.description || '')}</span></td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary" onclick="viewIncidentDetails(${incident.id})">
+                            <i class="bi bi-eye"></i>
+                        </button>
+                    </td>
+                `;
+
+            tbody.appendChild(row);
+        });
+
+        if (recent.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center">No incidents reported</td></tr>';
+        }
+    }
+
+    // Helper function to determine severity class
+    function getSeverityClass(description) {
+        if (description.toLowerCase().includes('critical') || description.toLowerCase().includes('severe')) {
+            return 'danger';
+        } else if (description.toLowerCase().includes('moderate') || description.toLowerCase().includes('medium')) {
+            return 'warning';
+        } else {
+            return 'info';
+        }
+    }
+
+    // Helper function to determine severity label
+    function getSeverityLabel(description) {
+        if (description.toLowerCase().includes('critical') || description.toLowerCase().includes('severe')) {
+            return 'Critical';
+        } else if (description.toLowerCase().includes('moderate') || description.toLowerCase().includes('medium')) {
+            return 'Medium';
+        } else {
+            return 'Low';
+        }
+    }
+
+    // Render charts
+    function renderCharts(disasters, statsData) {
+        // Chart 1: Incidents by type
+        // Use the statistics data if available
+        let typeLabels = [];
+        let typeData = [];
+
+        if (statsData && statsData.disaster_type_distribution) {
+            typeLabels = statsData.disaster_type_distribution.map(item => item.disaster_type);
+            typeData = statsData.disaster_type_distribution.map(item => item.count);
+        } else {
+            // Fallback to calculating from disasters data
+            const typeCounts = {};
+            disasters.forEach(incident => {
+                const type = incident.disaster_type;
+                typeCounts[type] = (typeCounts[type] || 0) + 1;
+            });
+
+            typeLabels = Object.keys(typeCounts);
+            typeData = Object.values(typeCounts);
+        }
+
+        const typeCtx = document.getElementById('incidentsByTypeChart').getContext('2d');
+        if (incidentsByTypeChart) {
+            incidentsByTypeChart.destroy();
+        }
+        incidentsByTypeChart = new Chart(typeCtx, {
+            type: 'bar',
+            data: {
+                labels: typeLabels,
+                datasets: [{
+                    label: 'Number of Incidents',
+                    data: typeData,
+                    backgroundColor: [
+                        'rgba(255, 99, 132, 0.7)',
+                        'rgba(54, 162, 235, 0.7)',
+                        'rgba(255, 206, 86, 0.7)',
+                        'rgba(75, 192, 192, 0.7)',
+                        'rgba(153, 102, 255, 0.7)',
+                        'rgba(255, 159, 64, 0.7)'
+                    ],
+                    borderColor: [
+                        'rgba(255, 99, 132, 1)',
+                        'rgba(54, 162, 235, 1)',
+                        'rgba(255, 206, 86, 1)',
+                        'rgba(75, 192, 192, 1)',
+                        'rgba(153, 102, 255, 1)',
+                        'rgba(255, 159, 64, 1)'
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+
+        // Chart 2: Incidents by ward
+        let wardLabels = [];
+        let wardData = [];
+
+        if (statsData && statsData.ward_distribution) {
+            wardLabels = statsData.ward_distribution.map(item => `Ward ${item.ward}`);
+            wardData = statsData.ward_distribution.map(item => item.count);
+        } else {
+            // Fallback to calculating from disasters data
+            const wardCounts = {};
+            disasters.forEach(incident => {
+                const ward = `Ward ${incident.ward}`;
+                wardCounts[ward] = (wardCounts[ward] || 0) + 1;
+            });
+
+            wardLabels = Object.keys(wardCounts);
+            wardData = Object.values(wardCounts);
+        }
+
+        const wardCtx = document.getElementById('incidentsByWardChart').getContext('2d');
+        if (incidentsByWardChart) {
+            incidentsByWardChart.destroy();
+        }
+        incidentsByWardChart = new Chart(wardCtx, {
+            type: 'doughnut',
+            data: {
+                labels: wardLabels,
+                datasets: [{
+                    data: wardData,
+                    backgroundColor: [
+                        'rgba(255, 99, 132, 0.7)',
+                        'rgba(54, 162, 235, 0.7)',
+                        'rgba(255, 206, 86, 0.7)',
+                        'rgba(75, 192, 192, 0.7)',
+                        'rgba(153, 102, 255, 0.7)',
+                        'rgba(255, 159, 64, 0.7)',
+                        'rgba(199, 192, 192, 0.7)',
+                        'rgba(83, 102, 255, 0.7)',
+                        'rgba(255, 95, 64, 0.7)'
+                    ],
+                    borderColor: [
+                        'rgba(255, 99, 132, 1)',
+                        'rgba(54, 162, 235, 1)',
+                        'rgba(255, 206, 86, 1)',
+                        'rgba(75, 192, 192, 1)',
+                        'rgba(153, 102, 255, 1)',
+                        'rgba(255, 159, 64, 1)',
+                        'rgba(199, 192, 192, 1)',
+                        'rgba(83, 102, 255, 1)',
+                        'rgba(255, 95, 64, 1)'
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'right'
+                    }
+                }
+            }
+        });
+
+        // Human Impact Chart
+        if (statsData) {
+            renderHumanImpactChart(statsData);
+        } else {
+            renderPlaceholderChart('humanImpactChart', 'Human Impact by Demographics', ['Men', 'Women', 'Children', 'Elderly'], [12, 19, 9, 5]);
+        }
+
+        // Damage Assessment Chart
+        if (statsData) {
+            renderDamageAssessmentChart(statsData);
+        } else {
+            renderPlaceholderChart('damageAssessmentChart', 'Damage Assessment by Category', ['Houses', 'Buildings', 'Infrastructure', 'Agriculture'], [8, 3, 5, 7]);
+        }
+
+        // Livestock Damage Chart
+        if (statsData) {
+            renderLivestockDamageChart(statsData);
+        } else {
+            renderPlaceholderChart('livestockDamageChart', 'Livestock Damage by Type', ['Cattle', 'Goats/Sheep', 'Poultry', 'Others'], [4, 12, 25, 3]);
+        }
+    }
+
+    // Render Human Impact Chart
+    function renderHumanImpactChart(statsData) {
+        const ctx = document.getElementById('humanImpactChart').getContext('2d');
+        if (humanImpactChart) humanImpactChart.destroy();
+
+        humanImpactChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['Males', 'Females', 'Deaths', 'Missing'],
+                datasets: [{
+                    label: 'Human Impact',
+                    data: [
+                        statsData.total_affected_males || 0,
+                        statsData.total_affected_females || 0,
+                        statsData.total_deaths || 0,
+                        statsData.total_missing || 0
+                    ],
+                    backgroundColor: [
+                        'rgba(54, 162, 235, 0.7)',
+                        'rgba(255, 99, 132, 0.7)',
+                        'rgba(255, 159, 64, 0.7)',
+                        'rgba(153, 102, 255, 0.7)'
+                    ],
+                    borderColor: [
+                        'rgba(54, 162, 235, 1)',
+                        'rgba(255, 99, 132, 1)',
+                        'rgba(255, 159, 64, 1)',
+                        'rgba(153, 102, 255, 1)'
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    }
+
+    // Render Damage Assessment Chart
+    function renderDamageAssessmentChart(statsData) {
+        const ctx = document.getElementById('damageAssessmentChart').getContext('2d');
+        if (damageAssessmentChart) damageAssessmentChart.destroy();
+
+        damageAssessmentChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['Houses', 'Buildings', 'Infrastructure', 'Agriculture'],
+                datasets: [{
+                    label: 'Damage Assessment',
+                    data: [
+                        statsData.total_affected_households || 0,
+                        statsData.total_public_buildings_damaged || 0,
+                        statsData.total_public_buildings_destroyed || 0,
+                        statsData.total_affected_people || 0  // Placeholder for agriculture
+                    ],
+                    backgroundColor: [
+                        'rgba(255, 99, 132, 0.7)',
+                        'rgba(54, 162, 235, 0.7)',
+                        'rgba(255, 206, 86, 0.7)',
+                        'rgba(75, 192, 192, 0.7)'
+                    ],
+                    borderColor: [
+                        'rgba(255, 99, 132, 1)',
+                        'rgba(54, 162, 235, 1)',
+                        'rgba(255, 206, 86, 1)',
+                        'rgba(75, 192, 192, 1)'
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    }
+
+    // Render Livestock Damage Chart
+    function renderLivestockDamageChart(statsData) {
+        const ctx = document.getElementById('livestockDamageChart').getContext('2d');
+        if (livestockDamageChart) livestockDamageChart.destroy();
+
+        livestockDamageChart = new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: ['Cattle', 'Goats/Sheep', 'Poultry', 'Others'],
+                datasets: [{
+                    data: [
+                        statsData.total_livestock_death || 0,
+                        statsData.total_livestock_injured || 0,
+                        statsData.total_affected_people || 0,  // Placeholder for poultry
+                        statsData.total_deaths || 0  // Placeholder for others
+                    ],
+                    backgroundColor: [
+                        'rgba(255, 99, 132, 0.7)',
+                        'rgba(54, 162, 235, 0.7)',
+                        'rgba(255, 206, 86, 0.7)',
+                        'rgba(75, 192, 192, 0.7)'
+                    ],
+                    borderColor: [
+                        'rgba(255, 99, 132, 1)',
+                        'rgba(54, 162, 235, 1)',
+                        'rgba(255, 206, 86, 1)',
+                        'rgba(75, 192, 192, 1)'
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false
+            }
+        });
+    }
+
+    // Render placeholder chart
+    function renderPlaceholderChart(canvasId, label, labels, data) {
+        const ctx = document.getElementById(canvasId).getContext('2d');
+        let chartInstance;
+
+        switch (canvasId) {
+            case 'humanImpactChart':
+                if (humanImpactChart) humanImpactChart.destroy();
+                humanImpactChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: label,
+                            data: data,
+                            backgroundColor: 'rgba(54, 162, 235, 0.7)',
+                            borderColor: 'rgba(54, 162, 235, 1)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true
+                            }
+                        }
+                    }
+                });
+                break;
+
+            case 'damageAssessmentChart':
+                if (damageAssessmentChart) damageAssessmentChart.destroy();
+                damageAssessmentChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: label,
+                            data: data,
+                            backgroundColor: [
+                                'rgba(255, 99, 132, 0.7)',
+                                'rgba(54, 162, 235, 0.7)',
+                                'rgba(255, 206, 86, 0.7)',
+                                'rgba(75, 192, 192, 0.7)'
+                            ],
+                            borderColor: [
+                                'rgba(255, 99, 132, 1)',
+                                'rgba(54, 162, 235, 1)',
+                                'rgba(255, 206, 86, 1)',
+                                'rgba(75, 192, 192, 1)'
+                            ],
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true
+                            }
+                        }
+                    }
+                });
+                break;
+
+            case 'livestockDamageChart':
+                if (livestockDamageChart) livestockDamageChart.destroy();
+                livestockDamageChart = new Chart(ctx, {
+                    type: 'pie',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            data: data,
+                            backgroundColor: [
+                                'rgba(255, 99, 132, 0.7)',
+                                'rgba(54, 162, 235, 0.7)',
+                                'rgba(255, 206, 86, 0.7)',
+                                'rgba(75, 192, 192, 0.7)'
+                            ],
+                            borderColor: [
+                                'rgba(255, 99, 132, 1)',
+                                'rgba(54, 162, 235, 1)',
+                                'rgba(255, 206, 86, 1)',
+                                'rgba(75, 192, 192, 1)'
+                            ],
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false
+                    }
+                });
+                break;
+        }
+    }
+
+    // Load situation report data
+    async function loadSituationReport() {
+        try {
+            const response = await fetch('/api/situation-reports?page=1&per_page=1'); // Get most recent report
+            const data = await response.json();
+
+            if (data.success && data.situation_reports && data.situation_reports.length > 0) {
+                // Get the most recent report
+                const report = data.situation_reports[0];
+
+                document.getElementById('situation-summary').textContent = report.current_situation_summary || 'No situation summary available.';
+                document.getElementById('weather-conditions').textContent = report.weather_conditions || 'Weather data not available.';
+                document.getElementById('detailed-report').innerHTML = `
+                        <p><strong>Current Status:</strong> ${report.detailed_report || 'No detailed report available.'}</p>
+                        <p><strong>Resources Deployed:</strong> ${report.resources_deployed || 'No resource deployment information.'}</p>
+                        <p><strong>Next Update:</strong> ${report.next_update_time || 'Update time not specified.'}</p>
+                    `;
+            } else {
+                // If no reports are available, show default message
+                document.getElementById('situation-summary').textContent = 'No situation reports available.';
+                document.getElementById('weather-conditions').textContent = 'Weather data not available.';
+                document.getElementById('detailed-report').innerHTML = `
+                        <p><strong>Current Status:</strong> No situation reports available.</p>
+                        <p><strong>Resources Deployed:</strong> No resource deployment information.</p>
+                        <p><strong>Next Update:</strong> No update time specified.</p>
+                    `;
+            }
+        } catch (error) {
+            console.error('Error loading situation report:', error);
+            document.getElementById('situation-summary').textContent = 'Error loading situation report.';
+            document.getElementById('weather-conditions').textContent = 'Error loading weather conditions.';
+            document.getElementById('detailed-report').innerHTML = '<p>Error loading detailed report.</p>';
+        }
+
+        // Load event log data
+        loadEventLog();
+
+        // Load public advisories
+        loadPublicAdvisories();
+    }
+
+    // Load event log data
+    async function loadEventLog() {
+        try {
+            const response = await fetch('/api/event-logs');
+            const data = await response.json();
+
+            if (data.success && data.event_logs) {
+                const eventLogBody = document.getElementById('event-log-body');
+                eventLogBody.innerHTML = '';
+
+                data.event_logs.forEach(log => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                            <td>${log.timestamp}</td>
+                            <td>${log.event_type}</td>
+                            <td>${log.description}</td>
+                            <td>${log.location}</td>
+                            <td>${log.responsible_unit}</td>
+                            <td><span class="badge bg-${getStatusBadgeClass(log.status)}">${log.status}</span></td>
+                        `;
+                    eventLogBody.appendChild(row);
+                });
+            }
+        } catch (error) {
+            console.error('Error loading event log:', error);
+            showToast('Error loading event log. Please try again.', 'danger');
+        }
+    }
+
+    // Helper function to determine badge class based on status
+    function getStatusBadgeClass(status) {
+        switch (status.toLowerCase()) {
+            case 'active':
+                return 'info';
+            case 'completed':
+                return 'success';
+            case 'pending':
+                return 'warning';
+            case 'critical':
+                return 'danger';
+            default:
+                return 'secondary';
+        }
+    }
+
+    // Load public advisories
+    async function loadPublicAdvisories() {
+        try {
+            const response = await fetch('/api/public-information');
+            const data = await response.json();
+
+            if (data.success && data.public_information) {
+                const advisoriesList = document.getElementById('advisories-list');
+                advisoriesList.innerHTML = '';
+
+                // Filter active public information
+                const activeInfos = data.public_information.filter(info => info.is_active);
+
+                if (activeInfos.length > 0) {
+                    activeInfos.forEach(info => {
+                        const alertDiv = document.createElement('div');
+
+                        // Determine alert type based on priority
+                        let alertType = 'info';
+                        switch (info.priority.toLowerCase()) {
+                            case 'critical':
+                                alertType = 'danger';
+                                break;
+                            case 'high':
+                                alertType = 'warning';
+                                break;
+                            case 'normal':
+                                alertType = 'info';
+                                break;
+                            case 'low':
+                                alertType = 'secondary';
+                                break;
+                        }
+
+                        alertDiv.className = `alert alert-${alertType}`;
+                        alertDiv.innerHTML = `
+                                <strong>${info.title}:</strong> ${info.content}
+                            `;
+
+                        advisoriesList.appendChild(alertDiv);
+                    });
+                } else {
+                    advisoriesList.innerHTML = '<p>No current advisories.</p>';
+                }
+            }
+        } catch (error) {
+            console.error('Error loading public advisories:', error);
+            const advisoriesList = document.getElementById('advisories-list');
+            advisoriesList.innerHTML = '<p>Error loading public advisories.</p>';
+        }
+    }
+
+    // Submit disaster report
+    async function submitDisasterReport(event) {
+        event.preventDefault();
+
+        // Get form values
+        const formData = {
+            disaster_date: document.getElementById('disasterDate').value,
+            disaster_time: document.getElementById('disasterTime').value,
+            disaster_type: document.getElementById('disasterType').value,
+            ward: document.getElementById('ward').value, // Value from hidden input
+            tole: document.getElementById('location').value,
+            latitude: parseFloat(document.getElementById('latitude').value) || null,
+            longitude: parseFloat(document.getElementById('longitude').value) || null,
+            description: document.getElementById('description').value,
+            severity: document.getElementById('severity').value,
+            affected_people: parseInt(document.getElementById('affectedPeople').value) || 0,
+            injured: parseInt(document.getElementById('injuredCount').value) || 0,
+            casualties: parseInt(document.getElementById('casualtiesCount').value) || 0,
+            affected_households: parseInt(document.getElementById('housesDamaged').value) || 0,
+            destroyed_houses: parseInt(document.getElementById('housesDestroyed').value) || 0,
+            livestock_lost: parseInt(document.getElementById('livestockLost').value) || 0,
+            estimated_loss: parseInt(document.getElementById('estimatedLoss').value) || 0,
+            deaths: parseInt(document.getElementById('deaths').value) || 0,
+            missing_persons: parseInt(document.getElementById('missingPersons').value) || 0,
+            affected_people_male: parseInt(document.getElementById('affectedPeopleMale').value) || 0,
+            affected_people_female: parseInt(document.getElementById('affectedPeopleFemale').value) || 0,
+            livestock_injured: parseInt(document.getElementById('livestockInjured').value) || 0,
+            livestock_death: parseInt(document.getElementById('livestockDeath').value) || 0,
+            public_building_destruction: parseInt(document.getElementById('publicBuildingDestruction').value) || 0,
+            public_building_damage: parseInt(document.getElementById('publicBuildingDamage').value) || 0,
+            road_blocked_status: document.getElementById('roadBlocked').checked,
+            electricity_blocked_status: document.getElementById('electricityBlocked').checked,
+            communication_blocked_status: document.getElementById('communicationBlocked').checked,
+            drinking_water_status: document.getElementById('drinkingWaterDisrupted').checked,
+            agriculture_crop_damage: document.getElementById('agricultureCropDamage').value,
+            rescue_operations: document.getElementById('rescueOperations').value
+        };
+
+        try {
+            const response = await fetch('/api/disaster-reports', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                showToast('Disaster report submitted successfully!', 'success');
+                resetForm();
+                loadData(); // Refresh data
+            } else {
+                showToast('Error submitting report: ' + result.message, 'danger');
+            }
+        } catch (error) {
+            showToast('Error submitting report: ' + error.message, 'danger');
+        }
+    }
+
+    // Submit public information
+    async function submitPublicInfo(event) {
+        event.preventDefault();
+
+        // Get form values
+        const publicInfoData = {
+            title: document.getElementById('publicInfoTitle').value || '',
+            content: document.getElementById('publicInfoContent').value || '',
+            info_type: document.getElementById('publicInfoType').value || 'General',
+            priority: document.getElementById('publicInfoPriority').value || 'Normal',
+            is_active: document.getElementById('publicInfoActive').checked,
+            valid_from: document.getElementById('publicInfoValidFrom').value || null,
+            valid_until: document.getElementById('publicInfoValidUntil').value || null
+        };
+
+        try {
+            const response = await fetch('/api/public-information', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(publicInfoData)
+            });
+
+            // Check if response is OK before parsing JSON
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const result = await response.json();
+
+            if (result.success) {
+                showToast('Public information added successfully!', 'success');
+                document.getElementById('publicInfoForm').reset();
+                document.getElementById('publicInfoActive').checked = true; // Reset checkbox to checked
+                loadPublicAdvisories(); // Refresh public info
+            } else {
+                showToast('Error adding public info: ' + result.message, 'danger');
+            }
+        } catch (error) {
+            // Check if it's a JSON parsing error
+            if (error instanceof SyntaxError) {
+                showToast('Error: Server returned invalid response. Please try again.', 'danger');
+            } else {
+                showToast('Error adding public info: ' + error.message, 'danger');
+            }
+            console.error('Error submitting public info:', error);
+        }
+    }
+
+    // Reset public information form
+    function resetPublicInfoForm() {
+        document.getElementById('publicInfoForm').reset();
+        document.getElementById('publicInfoActive').checked = true; // Reset checkbox to checked
+        showToast('Public information form reset.', 'info');
+    }
+
+    // Submit situation report
+    async function submitSituationReport(event) {
+        event.preventDefault();
+
+        // Get form values
+        const situationReportData = {
+            current_situation_summary: document.getElementById('situationSummary').value || '',
+            weather_conditions: document.getElementById('weatherConditions').value || '',
+            detailed_report: document.getElementById('detailedReport').value || '',
+            resources_deployed: document.getElementById('resourcesDeployed').value || '',
+            next_update_time: document.getElementById('nextUpdateTime').value || ''
+        };
+
+        try {
+            const response = await fetch('/api/situation-reports', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(situationReportData)
+            });
+
+            // Check if response is OK before parsing JSON
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const result = await response.json();
+
+            if (result.success) {
+                showToast('Situation report added successfully!', 'success');
+                document.getElementById('situationReportForm').reset();
+                loadSituationReport(); // Refresh situation report
+            } else {
+                showToast('Error adding situation report: ' + result.message, 'danger');
+            }
+        } catch (error) {
+            // Check if it's a JSON parsing error
+            if (error instanceof SyntaxError) {
+                showToast('Error: Server returned invalid response. Please try again.', 'danger');
+            } else {
+                showToast('Error adding situation report: ' + error.message, 'danger');
+            }
+            console.error('Error submitting situation report:', error);
+        }
+    }
+
+    // Reset situation report form
+    function resetSituationReportForm() {
+        document.getElementById('situationReportForm').reset();
+        showToast('Situation report form reset.', 'info');
+    }
+
+    // Reset form
+    function resetForm() {
+        document.getElementById('disasterReportForm').reset();
+
+        // Reset to today's date and current time
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('disasterDate').value = today;
+
+        const now = new Date();
+        const currentTime = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
+        document.getElementById('disasterTime').value = currentTime;
+
+        // Reset custom ward selection
+        selectedWards.clear();
+        window.updateSelectedWardsDisplay();
+
+        // Hide the dropdown menu
+        document.getElementById('wardDropdownMenu').style.display = 'none';
+
+        // Remove active classes from dropdown items
+        const dropdownItems = document.querySelectorAll('#wardDropdownMenu .dropdown-item');
+        dropdownItems.forEach(item => item.classList.remove('active'));
+    }
+
+    // Set all fields to zero for "No Incidents Today"
+    document.getElementById('noIncidentsBtn').addEventListener('click', function () {
+        // Set all numeric fields to 0
+        document.getElementById('affectedPeople').value = 0;
+        document.getElementById('injuredCount').value = 0;
+        document.getElementById('casualtiesCount').value = 0;
+        document.getElementById('housesDamaged').value = 0;
+        document.getElementById('housesDestroyed').value = 0;
+        document.getElementById('livestockLost').value = 0;
+        document.getElementById('estimatedLoss').value = 0;
+        document.getElementById('deaths').value = 0;
+        document.getElementById('missingPersons').value = 0;
+        document.getElementById('affectedPeopleMale').value = 0;
+        document.getElementById('affectedPeopleFemale').value = 0;
+        document.getElementById('livestockInjured').value = 0;
+        document.getElementById('livestockDeath').value = 0;
+        document.getElementById('publicBuildingDestruction').value = 0;
+        document.getElementById('publicBuildingDamage').value = 0;
+
+        // Uncheck all checkboxes
+        document.getElementById('roadBlocked').checked = false;
+        document.getElementById('electricityBlocked').checked = false;
+        document.getElementById('communicationBlocked').checked = false;
+        document.getElementById('drinkingWaterDisrupted').checked = false;
+
+        // Clear text areas
+        document.getElementById('agricultureCropDamage').value = '';
+        document.getElementById('rescueOperations').value = '';
+
+        // Set disaster type to "No Incident" or similar
+        const disasterTypeSelect = document.getElementById('disasterType');
+        if (!disasterTypeSelect.querySelector('option[value="no_incident"]')) {
+            const noIncidentOption = document.createElement('option');
+            noIncidentOption.value = 'no_incident';
+            noIncidentOption.textContent = 'No Incident';
+            disasterTypeSelect.appendChild(noIncidentOption);
+        }
+        disasterTypeSelect.value = 'no_incident';
+
+        // Set location to "No Specific Location"
+        document.getElementById('location').value = 'No incidents reported today';
+
+        showToast('All fields set to zero for "No Incidents Today"', 'info');
+    });
+
+    // View incident details
+    function viewIncidentDetails(id) {
+        // This would typically open a modal with incident details
+        alert(`Viewing details for incident ID: ${id}`);
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        // Load data when Human Impact tab is shown
+        const humanImpactTab = document.querySelector('#disasterTabs a[data-bs-target="#human-impact"]');
+        if (humanImpactTab) {
+            humanImpactTab.addEventListener('shown.bs.tab', function () {
+                // Load disaster statistics for human impact
+                loadDisasterStatistics();
+            });
+        }
+
+        // Load data when Damage Assessment tab is shown
+        const damageAssessmentTab = document.querySelector('#disasterTabs a[data-bs-target="#damage-assessment"]');
+        if (damageAssessmentTab) {
+            damageAssessmentTab.addEventListener('shown.bs.tab', function () {
+                // Load disaster statistics for damage assessment
+                loadDisasterStatistics();
+            });
+        }
+
+        // Load data when Livestock Damage tab is shown
+        const livestockDamageTab = document.querySelector('#disasterTabs a[data-bs-target="#livestock-damage"]');
+        if (livestockDamageTab) {
+            livestockDamageTab.addEventListener('shown.bs.tab', function () {
+                // Load disaster statistics for livestock damage
+                loadDisasterStatistics();
+            });
+        }
+
+        // Load data when Public Info tab is shown
+        const publicInfoTab = document.querySelector('#disasterTabs a[data-bs-target="#public-info"]');
+        if (publicInfoTab) {
+            publicInfoTab.addEventListener('shown.bs.tab', function () {
+                // Load public information
+                loadPublicAdvisories();
+            });
+        }
+    });
+
+    // Show toast notification
+    function showToast(message, type) {
+        const toastPlaceholder = document.getElementById('toastPlaceholder');
+        const toastId = 'toast-' + Date.now();
+
+        const toastDiv = document.createElement('div');
+        toastDiv.className = `toast align-items-center text-white bg-${type} border-0`;
+        toastDiv.id = toastId;
+        toastDiv.setAttribute('role', 'alert');
+        toastDiv.setAttribute('aria-live', 'assertive');
+        toastDiv.setAttribute('aria-atomic', 'true');
+
+        toastDiv.innerHTML = `
+                <div class="d-flex">
+                    <div class="toast-body">
+                        ${message}
+                    </div>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                </div>
+            `;
+
+        toastPlaceholder.appendChild(toastDiv);
+
+        const toast = new bootstrap.Toast(toastDiv, { delay: 5000 });
+        toast.show();
+
+        // Remove toast after it's hidden
+        toastDiv.addEventListener('hidden.bs.toast', function () {
+            toastDiv.remove();
+        });
+    }
+
+    // Custom ward selection dropdown functionality
+    let selectedWards = new Set(); // Make global for reset function
+    document.addEventListener('DOMContentLoaded', function () {
+        const dropdownButton = document.getElementById('wardDropdownToggle');
+        const dropdownMenu = document.getElementById('wardDropdownMenu');
+        const selectedWardsContainer = document.getElementById('selectedWards');
+        const hiddenInput = document.getElementById('ward');
+
+        // Toggle dropdown visibility when button is clicked
+        dropdownButton.addEventListener('click', function (e) {
+            e.stopPropagation();
+            dropdownMenu.style.display = dropdownMenu.style.display === 'none' ? 'block' : 'none';
+        });
+
+        // Handle dropdown item clicks
+        dropdownMenu.addEventListener('click', function (e) {
+            if (e.target.classList.contains('dropdown-item')) {
+                e.preventDefault();
+                const value = e.target.getAttribute('data-value');
+
+                if (selectedWards.has(value)) {
+                    // Remove if already selected
+                    selectedWards.delete(value);
+                    e.target.classList.remove('active');
+                } else {
+                    // Add if not selected
+                    selectedWards.add(value);
+                    e.target.classList.add('active');
+                }
+
+                // Update the hidden input and display
+                window.updateSelectedWardsDisplay();
+            }
+        });
+
+        // Close dropdown when clicking elsewhere
+        document.addEventListener('click', function (e) {
+            if (!dropdownButton.contains(e.target) && !dropdownMenu.contains(e.target)) {
+                dropdownMenu.style.display = 'none';
+            }
+        });
+
+        window.updateSelectedWardsDisplay = function () {
+            // Clear the container
+            selectedWardsContainer.innerHTML = '';
+
+            // Update the hidden input
+            hiddenInput.value = Array.from(selectedWards).join(',');
+
+            // Update the button text
+            if (selectedWards.size === 0) {
+                dropdownButton.textContent = 'Select Ward(s)';
+            } else if (selectedWards.size === 1) {
+                dropdownButton.textContent = `Ward ${Array.from(selectedWards)[0]} selected`;
+            } else {
+                dropdownButton.textContent = `${selectedWards.size} wards selected`;
+            }
+
+            // Show selected wards as badges
+            selectedWards.forEach(ward => {
+                const badge = document.createElement('span');
+                badge.className = 'badge bg-primary me-1 mb-1';
+                badge.textContent = `Ward ${ward}`;
+
+                // Add remove functionality
+                const removeBtn = document.createElement('button');
+                removeBtn.className = 'btn-close btn-close-white btn-sm ms-1';
+                removeBtn.onclick = function () {
+                    selectedWards.delete(ward);
+                    updateSelectedWardsDisplay();
+
+                    // Remove active class from dropdown item
+                    const dropdownItem = document.querySelector(`[data-value="${ward}"]`);
+                    if (dropdownItem) {
+                        dropdownItem.classList.remove('active');
+                    }
+                };
+
+                badge.appendChild(removeBtn);
+                selectedWardsContainer.appendChild(badge);
+            });
+        }
+
+        // Form validation for ward selection
+        document.getElementById('disasterReportForm').addEventListener('submit', function (e) {
+            if (selectedWards.size === 0) {
+                e.preventDefault();
+                alert('Please select at least one ward.');
+                return false;
+            }
+        });
+    });
+</script>
+
+
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

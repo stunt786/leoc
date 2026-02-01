@@ -1,0 +1,1416 @@
+{% extends "base.html" %}
+
+{% block title %}New Distribution - LEOC{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            <div class="card shadow-lg">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">
+                        <i class="bi bi-clipboard-plus"></i> राहात वितरण फारम
+                    </h4>
+                </div>
+                <div class="card-body p-4">
+                    <form id="distributionForm" enctype="multipart/form-data">
+                        <!-- BENEFICIARY INFORMATION -->
+                        <div class="card border-primary mb-4">
+                            <div class="card-header bg-light">
+                                <h5 class="mb-0"><i class="bi bi-person-vcard"></i> लाभग्राहि विवरण</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <!-- Beneficiary Name -->
+                                    <div class="col-md-6 mb-3">
+                                        <label for="beneficiary_name" class="form-label">
+                                            <i class="bi bi-person"></i> लाभग्राहि नाम थर *
+                                        </label>
+                                        <input type="text" class="form-control" id="beneficiary_name"
+                                            name="beneficiary_name" required placeholder="Enter beneficiary name"
+                                            minlength="3" oninput="validateField('beneficiary_name')">
+                                        <small class="text-muted">Full name of the beneficiary (minimum 3
+                                            characters)</small>
+                                        <div id="beneficiary_name_error" class="invalid-feedback d-block"></div>
+                                    </div>
+
+                                    <!-- Beneficiary ID -->
+                                    <div class="col-md-6 mb-3">
+                                        <label for="beneficiary_id" class="form-label">
+                                            <i class="bi bi-card-list"></i> लाभग्राहि ना.प्र.प्र नं *
+                                        </label>
+                                        <input type="text" class="form-control" id="beneficiary_id"
+                                            name="beneficiary_id" required placeholder="e.g., BEN-001" minlength="2"
+                                            oninput="validateField('beneficiary_id')">
+                                        <small class="text-muted">Unique identifier for beneficiary (minimum 2
+                                            characters)</small>
+                                        <div id="beneficiary_id_error" class="invalid-feedback d-block"></div>
+                                    </div>
+                                </div>
+
+                                <div class="row">
+                                    <!-- Father's Name -->
+                                    <div class="col-md-6 mb-3">
+                                        <label for="father_name" class="form-label">
+                                            <i class="bi bi-person-fill"></i> बुवाको नाम थर
+                                        </label>
+                                        <input type="text" class="form-control" id="father_name" name="father_name"
+                                            placeholder="Enter father's name">
+                                        <small class="text-muted">Father's name for identification</small>
+                                    </div>
+
+                                    <!-- Phone -->
+                                    <div class="col-md-6 mb-3">
+                                        <label for="phone" class="form-label">
+                                            <i class="bi bi-telephone"></i> फोन नम्बर *
+                                        </label>
+                                        <input type="tel" class="form-control" id="phone" name="phone"
+                                            placeholder="9841000000" minlength="7" oninput="validateField('phone')">
+                                        <small class="text-muted">Contact number of beneficiary (minimum 10
+                                            digits)</small>
+                                        <div id="phone_error" class="invalid-feedback d-block"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- DISASTER INFORMATION -->
+                        <div class="card border-danger mb-4">
+                            <div class="card-header bg-light">
+                                <h5 class="mb-0"><i class="bi bi-exclamation-triangle"></i> विपद् घटना सम्बन्धी विवरण
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <!-- Disaster Date (Nepali Calendar) -->
+                                    <div class="col-md-6 mb-3">
+                                        <label for="disaster_date" class="form-label">
+                                            <i class="bi bi-calendar"></i> घटना घट्टेको मिति (BS) *
+                                        </label>
+                                        <input type="text" class="form-control" id="disaster_date" name="disaster_date"
+                                            required placeholder="YYYY-MM-DD (e.g., 2080-10-15)"
+                                            pattern="\d{4}-\d{2}-\d{2}" oninput="validateField('disaster_date')">
+                                        <small class="text-muted">Nepali date in format YYYY-MM-DD (e.g.,
+                                            2080-10-15)</small>
+                                        <div id="disaster_date_error" class="invalid-feedback d-block"></div>
+                                        <div id="nepaliDateHelper" class="mt-2">
+                                            <a href="#" onclick="openNepaliCalendar(); return false;"
+                                                class="btn btn-sm btn-outline-primary">
+                                                <i class="bi bi-calendar2-event"></i> मिति छानौट गर्नुहोस्
+                                            </a>
+                                        </div>
+                                    </div>
+
+                                    <!-- Disaster Type -->
+                                    <div class="col-md-6 mb-3">
+                                        <label for="disaster_type" class="form-label">
+                                            <i class="bi bi-bookmark"></i> विपद्को प्रकार *
+                                        </label>
+                                        <select class="form-control" id="disaster_type" name="disaster_type" required
+                                            onchange="validateField('disaster_type')">
+                                            <option value="">-- Loading --</option>
+                                        </select>
+                                        <small class="text-muted">Type of disaster</small>
+                                    </div>
+                                </div>
+
+                                <div class="row">
+                                    <!-- Fiscal Year -->
+                                    <div class="col-md-4 mb-3">
+                                        <label for="fiscal_year" class="form-label">
+                                            <i class="bi bi-calendar2"></i> आर्थिक वर्ष *
+                                        </label>
+                                        <select class="form-control" id="fiscal_year" name="fiscal_year">
+                                            <option value="">-- Loading --</option>
+                                        </select>
+                                        <small class="text-muted">Fiscal year (e.g., 2080/81)</small>
+                                    </div>
+
+                                    <!-- Ward -->
+                                    <div class="col-md-4 mb-3">
+                                        <label for="ward" class="form-label">
+                                            <i class="bi bi-map"></i> वडा नं *
+                                        </label>
+                                        <select class="form-control" id="ward" name="ward" required>
+                                            <option value="">-- Select Ward --</option>
+                                            <option value="1">वडा नं १</option>
+                                            <option value="2">वडा नं २</option>
+                                            <option value="3">वडा नं ३</option>
+                                            <option value="4">वडा नं ४</option>
+                                            <option value="5">वडा नं ५</option>
+                                            <option value="6">वडा नं ६</option>
+                                            <option value="7">वडा नं ७</option>
+                                            <option value="8">वडा नं ८</option>
+                                            <option value="9">वडा नं ९</option>
+                                        </select>
+                                        <small class="text-muted">Administrative ward (1-9)</small>
+                                    </div>
+
+                                    <!-- Tole -->
+                                    <div class="col-md-4 mb-3">
+                                        <label for="tole" class="form-label">
+                                            <i class="bi bi-signpost"></i> टोल
+                                        </label>
+                                        <input type="text" class="form-control" id="tole" name="tole"
+                                            placeholder="Tole name">
+                                        <small class="text-muted">Neighborhood/tole name</small>
+                                    </div>
+                                </div>
+
+                                <div class="row">
+                                    <!-- Location/Building -->
+                                    <div class="col-md-6 mb-3">
+                                        <label for="location" class="form-label">
+                                            <i class="bi bi-building"></i> स्थायी बसोबास ठेगाना *
+                                        </label>
+                                        <input type="text" class="form-control" id="location" name="location" required
+                                            placeholder="e.g., Downtown Shelter / House #123" minlength="3"
+                                            oninput="validateField('location')">
+                                        <small class="text-muted">Specific building or location name (minimum 3
+                                            characters)</small>
+                                        <div id="location_error" class="invalid-feedback d-block"></div>
+                                    </div>
+
+                                    <!-- Current Shelter Location -->
+                                    <div class="col-md-6 mb-3">
+                                        <label for="current_shelter_location" class="form-label">
+                                            <i class="bi bi-house"></i> हाल बसोबास स्थान
+                                        </label>
+                                        <input type="text" class="form-control" id="current_shelter_location"
+                                            name="current_shelter_location"
+                                            placeholder="Where are they currently sheltering?">
+                                        <small class="text-muted">Current shelter location if displaced</small>
+                                    </div>
+                                </div>
+
+                                <div class="row">
+                                    <!-- Latitude -->
+                                    <div class="col-md-6 mb-3">
+                                        <label for="latitude" class="form-label">
+                                            <i class="bi bi-geo-alt"></i> आक्षांश (Latitude)
+                                        </label>
+                                        <input type="number" class="form-control" id="latitude" name="latitude"
+                                            step="0.000001" placeholder="e.g., 27.717245" min="-90" max="90"
+                                            oninput="validateField('latitude')">
+                                        <small class="text-muted">Geographic latitude (-90 to 90)</small>
+                                        <div id="latitude_error" class="invalid-feedback d-block"></div>
+                                    </div>
+
+                                    <!-- Longitude -->
+                                    <div class="col-md-6 mb-3">
+                                        <label for="longitude" class="form-label">
+                                            <i class="bi bi-geo-alt"></i> देशान्तर (Longitude)
+                                        </label>
+                                        <input type="number" class="form-control" id="longitude" name="longitude"
+                                            step="0.000001" placeholder="e.g., 85.324021" min="-180" max="180"
+                                            oninput="validateField('longitude')">
+                                        <small class="text-muted">Geographic longitude (-180 to 180)</small>
+                                        <div id="longitude_error" class="invalid-feedback d-block"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- FAMILY DETAILS -->
+                        <div class="card border-success mb-4">
+                            <div class="card-header bg-light">
+                                <h5 class="mb-0"><i class="bi bi-people"></i> पारिवारिक विवरण</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <!-- Male Count -->
+                                    <div class="col-md-3 mb-3">
+                                        <label for="male_count" class="form-label">
+                                            <i class="bi bi-person"></i> पुरुष संख्या
+                                        </label>
+                                        <input type="number" class="form-control" id="male_count" name="male_count"
+                                            min="0" value="0">
+                                        <small class="text-muted">Number of males in family</small>
+                                    </div>
+
+                                    <!-- Female Count -->
+                                    <div class="col-md-3 mb-3">
+                                        <label for="female_count" class="form-label">
+                                            <i class="bi bi-person-fill"></i> महिला संख्या
+                                        </label>
+                                        <input type="number" class="form-control" id="female_count" name="female_count"
+                                            min="0" value="0">
+                                        <small class="text-muted">Number of females in family</small>
+                                    </div>
+
+                                    <!-- Children Count -->
+                                    <div class="col-md-3 mb-3">
+                                        <label for="children_count" class="form-label">
+                                            <i class="bi bi-person-check"></i> बालबालिका संख्या
+                                        </label>
+                                        <input type="number" class="form-control" id="children_count"
+                                            name="children_count" min="0" value="0">
+                                        <small class="text-muted">Number of children (&lt;18 yrs)</small>
+                                    </div>
+
+                                    <!-- Deaths -->
+                                    <div class="col-md-3 mb-3">
+                                        <label for="deaths_during_disaster" class="form-label">
+                                            <i class="bi bi-exclamation-lg"></i> विपद्बाट मृतक संख्या
+                                        </label>
+                                        <input type="number" class="form-control" id="deaths_during_disaster"
+                                            name="deaths_during_disaster" min="0" value="0">
+                                        <small class="text-muted">Deaths in family during disaster</small>
+                                    </div>
+                                </div>
+
+                                <div class="row">
+                                    <!-- Pregnant Mother Count -->
+                                    <div class="col-md-6 mb-3">
+                                        <label for="pregnant_mother_count" class="form-label">
+                                            <i class="bi bi-heart"></i> सुत्केरी महिला
+                                        </label>
+                                        <input type="number" class="form-control" id="pregnant_mother_count"
+                                            name="pregnant_mother_count" min="0" value="0">
+                                        <small class="text-muted">Number of pregnant mothers</small>
+                                    </div>
+
+                                    <!-- Mother with Under 2 Baby -->
+                                    <div class="col-md-6 mb-3">
+                                        <label for="mother_under_2_baby" class="form-label">
+                                            <i class="bi bi-stars"></i> स्तनपान गर्दै गरेको बच्चा भएको आमा
+                                        </label>
+                                        <input type="number" class="form-control" id="mother_under_2_baby"
+                                            name="mother_under_2_baby" min="0" value="0">
+                                        <small class="text-muted">Mothers with children under 2 years old</small>
+                                    </div>
+                                </div>
+
+                                <!-- Detailed Family Members -->
+                                <div class="mb-3">
+                                    <label class="form-label"><i class="bi bi-list-ul"></i> परिवार सदस्य विवरण</label>
+                                    <div id="familyMembersContainer"></div>
+                                    <button type="button" class="btn btn-success btn-sm mt-2"
+                                        onclick="addFamilyMember()">
+                                        <i class="bi bi-plus-circle"></i> परिवार सदस्य थप
+                                    </button>
+                                    <input type="hidden" id="family_members_json" name="family_members_json" value="[]">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- SOCIAL SECURITY & POVERTY -->
+                        <div class="card border-warning mb-4">
+                            <div class="card-header bg-light">
+                                <h5 class="mb-0"><i class="bi bi-shield-check"></i> सामाजिक सुरक्षा र स्थिति</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <!-- Social Security Fund -->
+                                    <div class="col-md-4 mb-3">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="in_social_security_fund"
+                                                name="in_social_security_fund">
+                                            <label class="form-check-label" for="in_social_security_fund">
+                                                In Social Security Fund
+                                            </label>
+                                        </div>
+                                        <small class="text-muted">Is beneficiary in social security scheme?</small>
+                                    </div>
+
+                                    <!-- SSF Type -->
+                                    <div class="col-md-4 mb-3" id="ssf_type_div" style="display:none;">
+                                        <label for="ssf_type" class="form-label">सा.सु प्रकार</label>
+                                        <select class="form-control" id="ssf_type" name="ssf_type">
+                                            <option value="">-- Select --</option>
+                                            <!-- Options will be populated dynamically -->
+                                        </select>
+                                        <script>
+                                            // Dynamically populate SSF types from backend settings
+                                            async function populateSSFTypes() {
+                                                try {
+                                                    const response = await fetch('/api/settings/ssf_types');
+                                                    const result = await response.json();
+                                                    if (result.success && Array.isArray(result.value)) {
+                                                        const select = document.getElementById('ssf_type');
+                                                        // Remove all except the first option
+                                                        while (select.options.length > 1) select.remove(1);
+                                                        result.value.forEach(type => {
+                                                            const opt = document.createElement('option');
+                                                            opt.value = type;
+                                                            opt.textContent = type;
+                                                            select.appendChild(opt);
+                                                        });
+                                                    }
+                                                } catch (e) {
+                                                    // Optionally handle error
+                                                }
+                                            }
+                                            // Call on page load
+                                            document.addEventListener('DOMContentLoaded', populateSSFTypes);
+                                        </script>
+                                    </div>
+
+                                    <!-- Poverty Card Holder -->
+                                    <div class="col-md-4 mb-3">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="poverty_card_holder"
+                                                name="poverty_card_holder">
+                                            <label class="form-check-label" for="poverty_card_holder">
+                                                गरिब परिचयपत्र छ/छैन
+                                            </label>
+                                        </div>
+                                        <small class="text-muted">Does beneficiary have poverty card?</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- HARMS/DAMAGES -->
+                        <div class="card border-danger mb-4">
+                            <div class="card-header bg-light">
+                                <h5 class="mb-0"><i class="bi bi-bandaid"></i> हानि र क्षति</h5>
+                            </div>
+                            <div class="card-body">
+                                <label class="form-label">हानिको विवरण</label>
+                                <div id="harmsContainer"></div>
+                                <button type="button" class="btn btn-danger btn-sm mt-2" onclick="addHarmRow()">
+                                    <i class="bi bi-plus-circle"></i> हानि थप्नुहोस्
+                                </button>
+                                <input type="hidden" id="harms_json" name="harms_json" value="[]">
+                            </div>
+                        </div>
+
+                        <!-- BANK ACCOUNT DETAILS -->
+                        <div class="card border-info mb-4">
+                            <div class="card-header bg-light">
+                                <h5 class="mb-0"><i class="bi bi-bank"></i> बैंक खाता विवरण</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <!-- Account Holder Name -->
+                                    <div class="col-md-6 mb-3">
+                                        <label for="bank_account_holder_name" class="form-label">
+                                            <i class="bi bi-person"></i> खाताबालाको नाम अङ्रेजिमा
+                                        </label>
+                                        <input type="text" class="form-control" id="bank_account_holder_name"
+                                            name="bank_account_holder_name" placeholder="Name on bank account">
+                                        <small class="text-muted">Name as it appears on bank account</small>
+                                    </div>
+
+                                    <!-- Account Number -->
+                                    <div class="col-md-6 mb-3">
+                                        <label for="bank_account_number" class="form-label">
+                                            <i class="bi bi-credit-card"></i> खाता नंम्बर
+                                        </label>
+                                        <input type="text" class="form-control" id="bank_account_number"
+                                            name="bank_account_number" placeholder="Bank account number">
+                                        <small class="text-muted">Account number (masked for security)</small>
+                                    </div>
+                                </div>
+
+                                <div class="row">
+                                    <!-- Bank Name -->
+                                    <div class="col-md-12 mb-3">
+                                        <label for="bank_name" class="form-label">
+                                            <i class="bi bi-bank2"></i> बैंकको नाम
+                                        </label>
+                                        <input type="text" class="form-control" id="bank_name" name="bank_name"
+                                            placeholder="e.g., Nepal Bank Limited">
+                                        <small class="text-muted">Name of the bank</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- RELIEF ITEMS SECTION -->
+                        <div class="card border-info mb-4">
+                            <div class="card-header bg-info text-white">
+                                <h5 class="mb-0">
+                                    <i class="bi bi-bag"></i> राहात सामाग्री विवरण
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <div id="itemsContainer"></div>
+                                <button type="button" class="btn btn-success btn-sm mt-2" onclick="addItemRow()">
+                                    <i class="bi bi-plus-circle"></i> Add More Items
+                                </button>
+                                <input type="hidden" id="relief_items_json" name="relief_items_json" value="[]">
+                            </div>
+                        </div>
+
+                        <!-- CASH RECEIVED -->
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="cash_received" class="form-label">
+                                    <i class="bi bi-cash-coin"></i> नगद प्राप्त रकम *
+                                </label>
+                                <div class="input-group">
+                                    <span class="input-group-text">₹</span>
+                                    <input type="number" class="form-control" id="cash_received" name="cash_received"
+                                        step="0.01" value="0.00" placeholder="0.00" min="0"
+                                        oninput="validateField('cash_received')">
+                                </div>
+                                <small class="text-muted">Amount of cash received (minimum 0)</small>
+                                <div id="cash_received_error" class="invalid-feedback d-block"></div>
+                            </div>
+
+                            <!-- Status -->
+                            <div class="col-md-6 mb-3">
+                                <label for="status" class="form-label">
+                                    <i class="bi bi-check-circle"></i> स्थिति
+                                </label>
+                                <select class="form-control" id="status" name="status">
+                                    <option value="Distributed">वितरण गरियो</option>
+                                    <option value="Pending">वितरण बाँकी</option>
+                                    <option value="In Progress">वितरण प्रक्रियामा रहेको</option>
+                                    <option value="Cancel">वितरण नभएको</option>
+                                </select>
+                                <small class="text-muted">Distribution status</small>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <!-- Image Upload -->
+                            <div class="col-md-6 mb-3">
+                                <label for="image" class="form-label">
+                                    <i class="bi bi-image"></i> प्रमाण फोटो
+                                </label>
+                                <input type="file" class="form-control" id="image" name="image" accept="image/*">
+                                <small class="text-muted">Evidence photo (optional)</small>
+                            </div>
+
+                            <!-- Documents Upload -->
+                            <div class="col-md-6 mb-3">
+                                <label for="documents" class="form-label">
+                                    <i class="bi bi-file-earmark"></i> सम्बन्धित कागजातहरू
+                                </label>
+                                <input type="file" class="form-control" id="documents" name="documents" multiple
+                                    accept=".pdf,.doc,.docx,.jpg,.png">
+                                <small class="text-muted">Receipts, certificates, etc.</small>
+                            </div>
+                        </div>
+
+                        <!-- Image Preview -->
+                        <div id="imagePreview" class="mb-3" style="display: none;">
+                            <img id="previewImage" src="" alt="Preview" class="img-fluid rounded"
+                                style="max-height: 200px;">
+                        </div>
+
+                        <!-- Notes -->
+                        <div class="mb-3">
+                            <label for="notes" class="form-label">
+                                <i class="bi bi-pencil-square"></i> विपद् घटना सम्बन्धी थप विवरण
+                            </label>
+                            <textarea class="form-control" id="notes" name="notes" rows="3"
+                                placeholder="Any additional information about this distribution..."></textarea>
+                            <small class="text-muted">Additional details or comments</small>
+                        </div>
+
+                        <!-- Form Actions -->
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary btn-lg flex-grow-1">
+                                <i class="bi bi-check-lg"></i> SAVE RECORD
+                            </button>
+                            <button type="reset" class="btn btn-secondary btn-lg" onclick="resetForm()">
+                                <i class="bi bi-arrow-clockwise"></i> Reset
+                            </button>
+                        </div>
+
+                        <a href="/" class="btn btn-link mt-3">
+                            <i class="bi bi-arrow-left"></i> Back to Dashboard
+                        </a>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Alert Box -->
+            <div id="alertBox" class="mt-3" style="display: none;"></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let reliefItemOptions = [];  // Will be loaded from API
+
+    // ============ LOAD SETTINGS FROM API ============
+    async function loadFormSettings() {
+        try {
+            // Load relief items
+            const reliefResponse = await fetch('/api/settings/relief_items');
+            const reliefData = await reliefResponse.json();
+            if (reliefData.success || reliefData.value) {
+                reliefItemOptions = Array.isArray(reliefData.value) ? reliefData.value :
+                    (typeof reliefData.value === 'string' ? JSON.parse(reliefData.value) : []);
+            }
+            console.log('Loaded relief items:', reliefItemOptions);
+        } catch (error) {
+            console.error('Error loading relief items:', error);
+            reliefItemOptions = ['Food Packages', 'Water Bottles', 'Medical Supplies', 'Blankets', 'Clothing'];
+        }
+
+        try {
+            // Load disaster types
+            const disasterResponse = await fetch('/api/settings/disaster_types');
+            const disasterData = await disasterResponse.json();
+            const disasterTypes = Array.isArray(disasterData.value) ? disasterData.value :
+                (typeof disasterData.value === 'string' ? JSON.parse(disasterData.value) : []);
+            console.log('Loaded disaster types:', disasterTypes);
+            populateDisasterTypeDropdown(disasterTypes);
+        } catch (error) {
+            console.error('Error loading disaster types:', error);
+        }
+
+        try {
+            // Load fiscal years
+            const fiscalResponse = await fetch('/api/settings/fiscal_years');
+            const fiscalData = await fiscalResponse.json();
+            const fiscalYears = Array.isArray(fiscalData.value) ? fiscalData.value :
+                (typeof fiscalData.value === 'string' ? JSON.parse(fiscalData.value) : []);
+            console.log('Loaded fiscal years:', fiscalYears);
+            populateFiscalYearDropdown(fiscalYears);
+        } catch (error) {
+            console.error('Error loading fiscal years:', error);
+        }
+    }
+
+    function populateDisasterTypeDropdown(types) {
+        const select = document.getElementById('disaster_type');
+        select.innerHTML = '<option value="">-- Select Disaster Type --</option>';
+        types.forEach(type => {
+            const option = document.createElement('option');
+            option.value = type;
+            option.textContent = type;
+            select.appendChild(option);
+        });
+    }
+
+    function populateFiscalYearDropdown(years) {
+        const select = document.getElementById('fiscal_year');
+        select.innerHTML = '<option value="">-- Select Fiscal Year --</option>';
+        years.forEach(year => {
+            const option = document.createElement('option');
+            option.value = year;
+            option.textContent = year;
+            select.appendChild(option);
+        });
+    }
+
+    // Initialize with one item row and one harm row
+    async function initializeForm() {
+        await loadFormSettings();  // Load settings first and WAIT for completion
+
+        // Check if editing an existing distribution
+        const urlParams = new URLSearchParams(window.location.search);
+        const editId = urlParams.get('edit');
+
+        if (editId) {
+            // Load distribution data for editing
+            loadDistributionForEdit(editId);
+        } else {
+            // New record - add one item row
+            addItemRow();
+        }
+    }
+
+    // Load distribution data for editing
+    async function loadDistributionForEdit(id) {
+        try {
+            const response = await fetch(`/api/distributions/${id}`);
+            const data = await response.json();
+
+            if (data.success) {
+                const dist = data.data;
+
+                // Populate beneficiary information
+                document.getElementById('beneficiary_name').value = dist.beneficiary_name || '';
+                document.getElementById('beneficiary_id').value = dist.beneficiary_id || '';
+                document.getElementById('father_name').value = dist.father_name || '';
+                document.getElementById('phone').value = dist.phone || '';
+
+                // Populate disaster information
+                document.getElementById('disaster_date').value = dist.disaster_date || '';
+                document.getElementById('disaster_type').value = dist.disaster_type || '';
+                document.getElementById('fiscal_year').value = dist.fiscal_year || '';
+                document.getElementById('ward').value = dist.ward || '';
+                document.getElementById('tole').value = dist.tole || '';
+                document.getElementById('location').value = dist.location || '';
+                document.getElementById('latitude').value = dist.latitude || '';
+                document.getElementById('longitude').value = dist.longitude || '';
+                document.getElementById('current_shelter_location').value = dist.current_shelter_location || '';
+
+                // Populate family information
+                document.getElementById('male_count').value = dist.male_count || 0;
+                document.getElementById('female_count').value = dist.female_count || 0;
+                document.getElementById('children_count').value = dist.children_count || 0;
+                document.getElementById('pregnant_mother_count').value = dist.pregnant_mother_count || 0;
+                document.getElementById('mother_under_2_baby').value = dist.mother_under_2_baby || 0;
+                document.getElementById('deaths_during_disaster').value = dist.deaths_during_disaster || 0;
+
+                // Populate family members
+                const familyMembersContainer = document.getElementById('familyMembersContainer');
+                familyMembersContainer.innerHTML = '';
+                if (dist.family_members && dist.family_members.length > 0) {
+                    dist.family_members.forEach(member => {
+                        addFamilyMember(member.name, member.relation, member.age, member.gender);
+                    });
+                }
+
+                // Populate social security and status
+                document.getElementById('in_social_security_fund').checked = dist.in_social_security_fund;
+                document.getElementById('ssf_type').value = dist.ssf_type || '';
+                document.getElementById('ssf_type_div').style.display = dist.in_social_security_fund ? 'block' : 'none';
+                document.getElementById('poverty_card_holder').checked = dist.poverty_card_holder;
+
+                // Populate harms
+                const harmsContainer = document.getElementById('harmsContainer');
+                harmsContainer.innerHTML = '';
+                if (dist.harms && dist.harms.length > 0) {
+                    dist.harms.forEach(harm => {
+                        addHarmRow(harm.member_name, harm.harm, harm.severity);
+                    });
+                }
+
+                // Populate bank account details
+                document.getElementById('bank_account_holder_name').value = dist.bank_account_holder_name || '';
+                document.getElementById('bank_account_number').value = dist.bank_account_number || '';
+                document.getElementById('bank_name').value = dist.bank_name || '';
+
+                // Populate relief items
+                const itemsContainer = document.getElementById('itemsContainer');
+                itemsContainer.innerHTML = '';
+                if (dist.relief_items && dist.relief_items.length > 0) {
+                    dist.relief_items.forEach(item => {
+                        addItemRowWithUnit(item.item, item.quantity, item.unit);
+                    });
+                } else {
+                    addItemRowWithUnit();
+                }
+
+                // Populate cash and status
+                document.getElementById('cash_received').value = dist.cash_received || 0;
+                document.getElementById('status').value = dist.status || 'Distributed';
+                document.getElementById('notes').value = dist.notes || '';
+
+                // Update form title
+                document.querySelector('.card-header h2, .card-header h3, .card h2, .card h3')?.parentElement.querySelector('h2, h3');
+                const titleEl = document.querySelector('.card-header h2') || document.querySelector('.card-header h3');
+                if (titleEl) {
+                    titleEl.innerHTML = '<i class="bi bi-pencil-square"></i> Edit Distribution Record';
+                }
+
+                // Store edit ID for submission
+                document.getElementById('distributionForm').setAttribute('data-edit-id', id);
+            }
+        } catch (error) {
+            console.error('Error loading distribution:', error);
+            showAlert('danger', 'Error loading distribution data: ' + error.message);
+        }
+    }
+
+    // ============ RELIEF ITEMS FUNCTIONS ============
+    function addItemRow(item = null, quantity = null) {
+        addItemRowWithUnit(item, quantity, '');
+    }
+
+    function addItemRowWithUnit(item = null, quantity = null, unit = null) {
+        const container = document.getElementById('itemsContainer');
+        const rowId = Date.now();
+
+        const row = document.createElement('div');
+        row.className = 'item-row mb-3 p-3 border rounded bg-light';
+        row.id = `item-${rowId}`;
+        row.innerHTML = `
+            <div class="row">
+                <div class="col-md-5">
+                    <label class="form-label">राहात सामाग्री</label>
+                    <select class="form-control item-select" data-id="${rowId}">
+                        <option value="">-- Select Item --</option>
+                        ${reliefItemOptions.map(opt => `<option value="${opt}" ${item === opt ? 'selected' : ''}>${opt}</option>`).join('')}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">परिणाम</label>
+                    <input type="number" class="form-control item-qty" data-id="${rowId}" min="1" value="${quantity || 1}">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">एकाइ</label>
+                    <input type="text" class="form-control item-unit" data-id="${rowId}" value="${unit || ''}" placeholder="e.g., kg, liters, packets">
+                </div>
+            </div>
+            <button type="button" class="btn btn-sm btn-danger mt-2" onclick="removeItemRow('${rowId}')">
+                <i class="bi bi-trash"></i> Remove
+            </button>
+        `;
+
+        container.appendChild(row);
+    }
+
+    function removeItemRow(rowId) {
+        const row = document.getElementById(`item-${rowId}`);
+        if (row) {
+            row.remove();
+        }
+    }
+
+    // ============ FAMILY MEMBERS FUNCTIONS ============
+    function addFamilyMember(name = '', relation = '', age = '', gender = '') {
+        const container = document.getElementById('familyMembersContainer');
+        const rowId = Date.now();
+
+        const row = document.createElement('div');
+        row.className = 'family-row mb-3 p-3 border rounded bg-light';
+        row.id = `family-${rowId}`;
+        row.innerHTML = `
+            <div class="row">
+                <div class="col-md-4">
+                    <label class="form-label">नाम थर</label>
+                    <input type="text" class="form-control family-name" data-id="${rowId}" value="${name}" placeholder="Family member name">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">सम्बन्ध</label>
+                    <select class="form-control family-relation" data-id="${rowId}">
+                        <option value="">Select</option>
+                        <option value="Father" ${relation === 'Father' ? 'selected' : ''}>बुबा (Father)</option>
+                        <option value="Mother" ${relation === 'Mother' ? 'selected' : ''}>आमा (Mother)</option>
+                        <option value="Spouse" ${relation === 'Spouse' ? 'selected' : ''}>पति/पत्नी (Spouse)</option>
+                        <option value="Grandparent" ${relation === 'Grandparent' ? 'selected' : ''}>हजुरवुवा/आमा (Grandparent)</option>
+                        <option value="Aunt" ${relation === 'Aunt' ? 'selected' : ''}>माउसी/फुपू (Aunt)</option>
+                        <option value="Uncle" ${relation === 'Uncle' ? 'selected' : ''}>मामा/ताता (Uncle)</option>
+                        <option value="Brother" ${relation === 'Brother' ? 'selected' : ''}>दाइ/भाइ (Brother)</option>
+                        <option value="Sister" ${relation === 'Sister' ? 'selected' : ''}>दिदी/बहिनी (Sister)</option>
+                        <option value="Son" ${relation === 'Son' ? 'selected' : ''}>छोरा (Son)</option>
+                        <option value="Daughter" ${relation === 'Daughter' ? 'selected' : ''}>छोरी (Daughter)</option>
+                        <option value="Sibling" ${relation === 'Sibling' ? 'selected' : ''}>भाइ/बहिनी (Sibling)</option>
+                        <option value="Other" ${relation === 'Other' ? 'selected' : ''}>अन्य (Other)</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">उमेर</label>
+                    <input type="number" class="form-control family-age" data-id="${rowId}" value="${age}" min="0" placeholder="Age">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">लिङ्ग</label>
+                    <select class="form-control family-gender" data-id="${rowId}">
+                        <option value="">Select</option>
+                        <option value="M" ${gender === 'M' ? 'selected' : ''}>Male</option>
+                        <option value="F" ${gender === 'F' ? 'selected' : ''}>Female</option>
+                        <option value="O" ${gender === 'O' ? 'selected' : ''}>Other</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button type="button" class="btn btn-sm btn-danger mt-4" onclick="removeFamilyMember('${rowId}')">
+                        <i class="bi bi-trash"></i> Remove
+                    </button>
+                </div>
+            </div>
+        `;
+
+        container.appendChild(row);
+    }
+
+    function removeFamilyMember(rowId) {
+        const row = document.getElementById(`family-${rowId}`);
+        if (row) {
+            row.remove();
+        }
+    }
+
+    // ============ HARMS FUNCTIONS ============
+    function addHarmRow(memberName = '', harm = '', severity = '') {
+        const container = document.getElementById('harmsContainer');
+        const rowId = Date.now();
+
+        const row = document.createElement('div');
+        row.className = 'harm-row mb-3 p-3 border rounded bg-light';
+        row.id = `harm-${rowId}`;
+        row.innerHTML = `
+            <div class="row">
+                <div class="col-md-4">
+                    <label class="form-label">परिवार सदस्यको नाम</label>
+                    <input type="text" class="form-control harm-name" data-id="${rowId}" value="${memberName}" placeholder="Name of affected family member">
+                </div>
+                <div class="col-md-5">
+                    <label class="form-label">हानि/क्षतिको किसिम</label>
+                    <input type="text" class="form-control harm-type" data-id="${rowId}" value="${harm}" placeholder="e.g., Injury, Disability, Loss...">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">गम्भीरता</label>
+                    <select class="form-control harm-severity" data-id="${rowId}">
+                        <option value="">Select</option>
+                        <option value="Minor" ${severity === 'Minor' ? 'selected' : ''}>सामान्य</option>
+                        <option value="Moderate" ${severity === 'Moderate' ? 'selected' : ''}>मध्यम</option>
+                        <option value="Severe" ${severity === 'Severe' ? 'selected' : ''}>गम्भीर</option>
+                        <option value="Critical" ${severity === 'Critical' ? 'selected' : ''}>अति गम्भीर</option>
+                    </select>
+                </div>
+                <div class="col-md-1">
+                    <button type="button" class="btn btn-sm btn-danger mt-4" onclick="removeHarmRow('${rowId}')">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+
+        container.appendChild(row);
+    }
+
+    function removeHarmRow(rowId) {
+        const row = document.getElementById(`harm-${rowId}`);
+        if (row) {
+            row.remove();
+        }
+    }
+
+    // Reset form to initial state
+    function resetForm() {
+        document.getElementById('distributionForm').reset();
+        document.getElementById('itemsContainer').innerHTML = '';
+        document.getElementById('familyMembersContainer').innerHTML = '';
+        document.getElementById('harmsContainer').innerHTML = '';
+        document.getElementById('imagePreview').style.display = 'none';
+        addItemRow();
+    }
+
+    // Collect items data
+    function collectItems() {
+        const items = [];
+        document.querySelectorAll('.item-row').forEach(row => {
+            const select = row.querySelector('.item-select');
+            const qty = row.querySelector('.item-qty');
+            const unit = row.querySelector('.item-unit');
+
+            if (select.value && qty.value) {
+                items.push({
+                    item: select.value,
+                    quantity: parseInt(qty.value),
+                    unit: unit.value || 'unit'  // Default to 'unit' if not specified
+                });
+            }
+        });
+        return items;
+    }
+
+    // Collect family members data
+    function collectFamilyMembers() {
+        const members = [];
+        document.querySelectorAll('.family-row').forEach(row => {
+            const name = row.querySelector('.family-name');
+            const relation = row.querySelector('.family-relation');
+            const age = row.querySelector('.family-age');
+            const gender = row.querySelector('.family-gender');
+
+            if (name.value) {
+                members.push({
+                    name: name.value,
+                    relation: relation.value || '',
+                    age: age.value ? parseInt(age.value) : null,
+                    gender: gender.value || ''
+                });
+            }
+        });
+        return members;
+    }
+
+    // Collect harms data
+    function collectHarms() {
+        const harms = [];
+        document.querySelectorAll('.harm-row').forEach(row => {
+            const name = row.querySelector('.harm-name');
+            const harm = row.querySelector('.harm-type');
+            const severity = row.querySelector('.harm-severity');
+
+            if (name.value && harm.value) {
+                harms.push({
+                    member_name: name.value,
+                    harm: harm.value,
+                    severity: severity.value || 'Minor'
+                });
+            }
+        });
+        return harms;
+    }
+
+    // ============ REAL-TIME FIELD VALIDATION ============
+    function validateField(fieldId) {
+        const field = document.getElementById(fieldId);
+        const errorDiv = document.getElementById(fieldId + '_error');
+        let error = '';
+
+        switch (fieldId) {
+            case 'beneficiary_name':
+                const name = field.value.trim();
+                if (!name) error = 'Beneficiary name is required';
+                else if (name.length < 3) error = 'Name must be at least 3 characters';
+                field.classList.toggle('is-invalid', !!error);
+                field.classList.toggle('is-valid', !error && name.length > 0);
+                break;
+
+            case 'beneficiary_id':
+                const id = field.value.trim();
+                if (!id) error = 'Beneficiary ID is required';
+                else if (id.length < 2) error = 'ID must be at least 2 characters';
+                field.classList.toggle('is-invalid', !!error);
+                field.classList.toggle('is-valid', !error && id.length > 0);
+                break;
+
+            case 'phone':
+                const phone = field.value.trim();
+                if (phone && phone.length < 7) error = 'Phone must be at least 7 digits';
+                if (errorDiv) errorDiv.textContent = error;
+                field.classList.toggle('is-invalid', !!error);
+                field.classList.toggle('is-valid', !error && phone.length > 0);
+                break;
+
+            case 'disaster_date':
+                const date = field.value.trim();
+                if (!date) error = 'Disaster date is required';
+                else if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) error = 'Use format YYYY-MM-DD (Nepali: 2025-2090, AD: 1968-2033)';
+                else {
+                    const [year, month, day] = date.split('-').map(Number);
+                    if (month < 1 || month > 12) error = 'Month must be 01-12';
+                    else if (day < 1 || day > 32) error = 'Day must be 01-32';
+                    else if (!((year >= 2025 && year <= 2090) || (year >= 1968 && year <= 2033))) error = 'Year must be 2025-2090 (Nepali) or 1968-2033 (AD)';
+                }
+                field.classList.toggle('is-invalid', !!error);
+                field.classList.toggle('is-valid', !error && date.length > 0);
+                break;
+
+            case 'disaster_type':
+                const dtype = field.value.trim();
+                error = dtype ? '' : 'Disaster type is required';
+                field.classList.toggle('is-invalid', !!error);
+                field.classList.toggle('is-valid', !error && dtype.length > 0);
+                break;
+
+            case 'location':
+                const loc = field.value.trim();
+                if (!loc) error = 'Location is required';
+                else if (loc.length < 3) error = 'Location must be at least 3 characters';
+                field.classList.toggle('is-invalid', !!error);
+                field.classList.toggle('is-valid', !error && loc.length > 0);
+                break;
+
+            case 'latitude':
+                const lat = parseFloat(field.value);
+                if (field.value && (isNaN(lat) || lat < -90 || lat > 90))
+                    error = 'Latitude must be between -90 and 90';
+                if (errorDiv) errorDiv.textContent = error;
+                field.classList.toggle('is-invalid', !!error);
+                field.classList.toggle('is-valid', !error && field.value.length > 0);
+                break;
+
+            case 'longitude':
+                const lon = parseFloat(field.value);
+                if (field.value && (isNaN(lon) || lon < -180 || lon > 180))
+                    error = 'Longitude must be between -180 and 180';
+                if (errorDiv) errorDiv.textContent = error;
+                field.classList.toggle('is-invalid', !!error);
+                field.classList.toggle('is-valid', !error && field.value.length > 0);
+                break;
+
+            case 'cash_received':
+                const cash = parseFloat(field.value);
+                if (field.value && (isNaN(cash) || cash < 0))
+                    error = 'Cash cannot be negative';
+                if (errorDiv) errorDiv.textContent = error;
+                field.classList.toggle('is-invalid', !!error);
+                field.classList.toggle('is-valid', !error && field.value.length > 0);
+                break;
+        }
+
+        if (errorDiv) errorDiv.textContent = error;
+    }
+
+    // ============ FORM VALIDATION FUNCTIONS ============
+    function validateForm() {
+        const errors = [];
+
+        // Beneficiary Information Validations
+        const beneficiary_name = document.getElementById('beneficiary_name').value.trim();
+        if (!beneficiary_name) {
+            errors.push('Beneficiary name is required');
+        } else if (beneficiary_name.length < 3) {
+            errors.push('Beneficiary name must be at least 3 characters');
+        }
+
+        const beneficiary_id = document.getElementById('beneficiary_id').value.trim();
+        if (!beneficiary_id) {
+            errors.push('Beneficiary ID is required');
+        } else if (beneficiary_id.length < 2) {
+            errors.push('Beneficiary ID must be at least 2 characters');
+        }
+
+        // Disaster Date Validation
+        const disaster_date = document.getElementById('disaster_date').value.trim();
+        if (!disaster_date) {
+            errors.push('Disaster date is required');
+        } else if (!isValidNepaliDate(disaster_date)) {
+            errors.push('Disaster date format is invalid. Use YYYY-MM-DD format. Nepali dates: 2025-2090, AD dates: 1968-2033');
+        }
+
+        // Location Validation
+        const location = document.getElementById('location').value.trim();
+        if (!location) {
+            errors.push('Location/Building name is required');
+        } else if (location.length < 3) {
+            errors.push('Location must be at least 3 characters');
+        }
+
+        // Ward Validation
+        const ward = document.getElementById('ward').value;
+        if (!ward) {
+            errors.push('Ward selection is required');
+        }
+
+        // Disaster Type Validation
+        const disaster_type = document.getElementById('disaster_type').value;
+        if (!disaster_type) {
+            errors.push('Disaster type is required');
+        }
+
+        // Phone Validation (if provided)
+        const phone = document.getElementById('phone').value.trim();
+        if (phone && !/^[\d\s\+\-\(\)]{7,15}$/.test(phone)) {
+            errors.push('Phone number format is invalid');
+        }
+
+        // Latitude/Longitude Validation (if provided)
+        const latitude = document.getElementById('latitude').value;
+        const longitude = document.getElementById('longitude').value;
+        if (latitude && (isNaN(latitude) || latitude < -90 || latitude > 90)) {
+            errors.push('Latitude must be between -90 and 90');
+        }
+        if (longitude && (isNaN(longitude) || longitude < -180 || longitude > 180)) {
+            errors.push('Longitude must be between -180 and 180');
+        }
+
+        // Family counts validation
+        const male_count = parseInt(document.getElementById('male_count').value) || 0;
+        const female_count = parseInt(document.getElementById('female_count').value) || 0;
+        const children_count = parseInt(document.getElementById('children_count').value) || 0;
+        const deaths = parseInt(document.getElementById('deaths_during_disaster').value) || 0;
+
+        if (male_count < 0 || female_count < 0 || children_count < 0 || deaths < 0) {
+            errors.push('Family counts cannot be negative');
+        }
+
+        // Cash amount validation
+        const cash_received = parseFloat(document.getElementById('cash_received').value) || 0;
+        if (cash_received < 0) {
+            errors.push('Cash received cannot be negative');
+        }
+
+        // Relief items validation (optional)
+        const items = collectItems();
+
+        // Validate that all items have quantity > 0
+        for (let item of items) {
+            if (!item.item || !item.quantity || item.quantity < 1) {
+                errors.push('All relief items must have a valid quantity (minimum 1)');
+                break;
+            }
+        }
+
+        return errors;
+    }
+
+    function isValidNepaliDate(dateString) {
+        // Format: YYYY-MM-DD
+        // Supports both Nepali dates (2025-2090, ~56-57 years ahead) and AD dates (1968-2033)
+        const regex = /^\d{4}-\d{2}-\d{2}$/;
+        if (!regex.test(dateString)) return false;
+
+        const [year, month, day] = dateString.split('-').map(Number);
+
+        // Basic validation
+        if (month < 1 || month > 12) return false;
+        if (day < 1 || day > 32) return false;
+
+        // Allow both Nepali calendar (2025-2090) and AD dates (1968-2033)
+        // Nepali year is approximately 56-57 years ahead of AD
+        // So year 2082 in Nepali ≈ 2026 in AD
+        if ((year >= 2025 && year <= 2090) || (year >= 1968 && year <= 2033)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    // Image preview
+    document.getElementById('image').addEventListener('change', function (e) {
+        const preview = document.getElementById('imagePreview');
+        const img = document.getElementById('previewImage');
+        if (this.files && this.files[0]) {
+            // Validate file size (max 5MB)
+            if (this.files[0].size > 5 * 1024 * 1024) {
+                showAlert('danger', '<i class="bi bi-exclamation-circle"></i> Image size must be less than 5MB');
+                this.value = '';
+                preview.style.display = 'none';
+                return;
+            }
+
+            // Validate file type
+            if (!this.files[0].type.match('image.*')) {
+                showAlert('danger', '<i class="bi bi-exclamation-circle"></i> Only image files are allowed');
+                this.value = '';
+                preview.style.display = 'none';
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function (event) {
+                img.src = event.target.result;
+                preview.style.display = 'block';
+            };
+            reader.readAsDataURL(this.files[0]);
+        } else {
+            preview.style.display = 'none';
+        }
+    });
+
+    // Toggle SSF Type dropdown
+    document.getElementById('in_social_security_fund').addEventListener('change', function () {
+        document.getElementById('ssf_type_div').style.display = this.checked ? 'block' : 'none';
+    });
+
+    // Form submission
+    document.getElementById('distributionForm').addEventListener('submit', async function (e) {
+        e.preventDefault();
+
+        // Validate form
+        const validationErrors = validateForm();
+        if (validationErrors.length > 0) {
+            const errorMessage = '<i class="bi bi-exclamation-triangle"></i> <strong>Validation Errors:</strong><br>' +
+                validationErrors.map(err => '• ' + err).join('<br>');
+            showAlert('danger', errorMessage);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            return;
+        }
+
+        const items = collectItems();
+
+        const formData = new FormData(this);
+        formData.set('relief_items_json', JSON.stringify(items));
+        formData.set('family_members_json', JSON.stringify(collectFamilyMembers()));
+        formData.set('harms_json', JSON.stringify(collectHarms()));
+
+        // Ensure latitude and longitude are included (even if empty)
+        const latitude = document.getElementById('latitude').value.trim();
+        const longitude = document.getElementById('longitude').value.trim();
+        if (latitude) formData.set('latitude', latitude);
+        if (longitude) formData.set('longitude', longitude);
+
+        // Convert checkbox values
+        formData.set('in_social_security_fund', document.getElementById('in_social_security_fund').checked ? '1' : '0');
+        formData.set('poverty_card_holder', document.getElementById('poverty_card_holder').checked ? '1' : '0');
+
+        const alertBox = document.getElementById('alertBox');
+
+        try {
+            // Check if editing or creating new
+            const editId = document.getElementById('distributionForm').getAttribute('data-edit-id');
+            const url = editId ? `/api/distributions/${editId}` : '/api/distributions';
+            const method = editId ? 'PUT' : 'POST';
+
+            const response = await fetch(url, {
+                method: method,
+                body: formData
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                showAlert('success', '<i class="bi bi-check-circle"></i> ' + data.message);
+                resetForm();
+                setTimeout(() => window.location.href = '/', 2000);
+            } else {
+                // Display server validation errors
+                let errorMessage = '<i class="bi bi-exclamation-circle"></i> <strong>Error: ' + data.message + '</strong>';
+                if (data.errors && data.errors.length > 0) {
+                    errorMessage += '<br>';
+                    errorMessage += data.errors.map(err => '• ' + err).join('<br>');
+                }
+                showAlert('danger', errorMessage);
+            }
+        } catch (error) {
+            showAlert('danger', '<i class="bi bi-exclamation-circle"></i> Error: ' + error.message);
+        }
+    });
+
+    function showAlert(type, message) {
+        const alertBox = document.getElementById('alertBox');
+        alertBox.innerHTML = `<div class="alert alert-${type} alert-dismissible fade show">${message}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>`;
+        alertBox.style.display = 'block';
+    }
+
+    // ============ NEPALI CALENDAR FUNCTIONS ============
+    // Simple Nepali calendar conversion functions
+    function openNepaliCalendar() {
+        // Create a simple modal for Nepali date picker
+        const modal = document.createElement('div');
+        modal.id = 'nepaliCalendarModal';
+        modal.className = 'modal fade';
+        modal.innerHTML = `
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Select Nepali Date</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Year (Year)</label>
+                            <input type="number" id="nepaliYear" class="form-control" min="2070" max="2090" placeholder="e.g., 2080">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Month (Month)</label>
+                            <input type="number" id="nepaliMonth" class="form-control" min="1" max="12" placeholder="1-12">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Day (Day)</label>
+                            <input type="number" id="nepaliDay" class="form-control" min="1" max="32" placeholder="1-32">
+                        </div>
+                        <small class="text-muted">Enter date in Nepali calendar format (YYYY-MM-DD)</small>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-primary" onclick="setNepaliDate()">Set Date</button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+        const bsModal = new bootstrap.Modal(modal);
+        bsModal.show();
+
+        // Clean up modal after close
+        modal.addEventListener('hidden.bs.modal', function () {
+            modal.remove();
+        });
+    }
+
+    function setNepaliDate() {
+        const year = document.getElementById('nepaliYear').value;
+        const month = document.getElementById('nepaliMonth').value;
+        const day = document.getElementById('nepaliDay').value;
+
+        // Validate inputs
+        if (!year || !month || !day) {
+            alert('Please fill in all fields');
+            return;
+        }
+
+        // Format as YYYY-MM-DD
+        const formattedDate = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+
+        // Set the value
+        document.getElementById('disaster_date').value = formattedDate;
+
+        // Close the modal
+        const modal = document.getElementById('nepaliCalendarModal');
+        const bsModal = bootstrap.Modal.getInstance(modal);
+        bsModal.hide();
+    }
+
+    // Initialize form on load
+    document.addEventListener('DOMContentLoaded', initializeForm);
+</script>
+
+<style>
+    /* Validation Styling */
+    .form-control.is-invalid {
+        border-color: #dc3545;
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' width='12' height='12' fill='none' stroke='%23dc3545'%3e%3ccircle cx='6' cy='6' r='4.5'/%3e%3cpath fill='%23dc3545' d='M6.8 3.5H5.2V7h1.6z'/%3e%3ccircle cx='6' cy='8.2' r='.6' fill='%23dc3545'/%3e%3c/svg%3e");
+        background-repeat: no-repeat;
+        background-position: right calc(0.375em + 0.1875rem) center;
+        background-size: calc(0.75em + 0.375rem) calc(0.75em + 0.375rem);
+        padding-right: calc(1.5em + 0.75rem);
+    }
+
+    .form-control.is-invalid:focus {
+        border-color: #dc3545;
+        box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25);
+    }
+
+    .form-control.is-valid {
+        border-color: #198754;
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8'%3e%3cpath fill='%23198754' d='M2.3 6.73L.6 4.53c-.4-1.04.46-1.4 1.1-.8l1.1 1.4 3.4-3.8c.6-.63 1.6-.27 1.2.7l-4 4.6c-.43.5-.8.4-1.1.1z'/%3e%3c/svg%3e");
+        background-repeat: no-repeat;
+        background-position: right calc(0.375em + 0.1875rem) center;
+        background-size: calc(0.75em + 0.375rem) calc(0.75em + 0.375rem);
+        padding-right: calc(1.5em + 0.75rem);
+    }
+
+    .form-control.is-valid:focus {
+        border-color: #198754;
+        box-shadow: 0 0 0 0.2rem rgba(25, 135, 84, 0.25);
+    }
+
+    .invalid-feedback {
+        display: block;
+        color: #dc3545;
+        font-size: 0.875rem;
+        margin-top: 0.25rem;
+        font-weight: 500;
+    }
+
+    .invalid-feedback::before {
+        content: "⚠ ";
+        margin-right: 0.25rem;
+    }
+
+    .valid-feedback {
+        display: block;
+        color: #198754;
+        font-size: 0.875rem;
+        margin-top: 0.25rem;
+        font-weight: 500;
+    }
+
+    .valid-feedback::before {
+        content: "✓ ";
+        margin-right: 0.25rem;
+    }
+
+    /* Form control focus effects */
+    .form-control:focus {
+        border-color: #80bdff;
+        box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+    }
+
+    /* Select dropdown validation styling */
+    .form-select.is-invalid {
+        border-color: #dc3545;
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' width='12' height='12' fill='none' stroke='%23dc3545'%3e%3ccircle cx='6' cy='6' r='4.5'/%3e%3cpath fill='%23dc3545' d='M6.8 3.5H5.2V7h1.6z'/%3e%3ccircle cx='6' cy='8.2' r='.6' fill='%23dc3545'/%3e%3c/svg%3e");
+        background-repeat: no-repeat;
+        background-position: right calc(0.375em + 0.1875rem) center;
+        background-size: calc(0.75em + 0.375rem) calc(0.75em + 0.375rem);
+        padding-right: calc(1.5em + 0.75rem);
+    }
+
+    .form-select.is-valid {
+        border-color: #198754;
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8'%3e%3cpath fill='%23198754' d='M2.3 6.73L.6 4.53c-.4-1.04.46-1.4 1.1-.8l1.1 1.4 3.4-3.8c.6-.63 1.6-.27 1.2.7l-4 4.6c-.43.5-.8.4-1.1.1z'/%3e%3c/svg%3e");
+        background-repeat: no-repeat;
+        background-position: right calc(0.375em + 0.1875rem) center;
+        background-size: calc(0.75em + 0.375rem) calc(0.75em + 0.375rem);
+        padding-right: calc(1.5em + 0.75rem);
+    }
+
+    /* Animation for error feedback */
+    @keyframes slideDown {
+        from {
+            opacity: 0;
+            transform: translateY(-10px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .invalid-feedback.d-block {
+        animation: slideDown 0.3s ease-out;
+    }
+</style>
+{% endblock %}
