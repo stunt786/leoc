@@ -149,6 +149,50 @@
     .stat-card[style*="e66100"] .label {
         color: #212529 !important;
     }
+
+    /* Validation error styles */
+    .validation-error {
+        color: #dc3545;
+        font-size: 0.875rem;
+        margin-top: 0.25rem;
+    }
+
+    .is-invalid {
+        border-color: #dc3545 !important;
+    }
+
+    /* Livestock grid layout */
+    .livestock-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 1rem;
+    }
+
+    @media (max-width: 992px) {
+        .livestock-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+
+    @media (max-width: 576px) {
+        .livestock-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .livestock-type-card {
+        border: 1px solid #dee2e6;
+        border-radius: 0.375rem;
+        padding: 1rem;
+        background-color: #f8f9fa;
+    }
+
+    .livestock-type-card h6 {
+        margin-bottom: 0.75rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid #dee2e6;
+        color: #495057;
+    }
 </style>
 {% endblock %}
 
@@ -156,8 +200,18 @@
 <div class="container-fluid mt-4">
     <div class="row">
         <div class="col-12">
-            <h2 class="mb-4"><i class="bi bi-exclamation-triangle text-danger"></i> Daily Disaster Incidents Reporting
-            </h2>
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2 class="mb-0"><i class="bi bi-exclamation-triangle text-danger"></i> Daily Disaster Incidents Reporting
+                </h2>
+                <div class="btn-group">
+                    <a href="/daily-report-preview" target="_blank" class="btn btn-outline-primary">
+                        <i class="bi bi-printer"></i> Print Preview
+                    </a>
+                    <a href="/api/generate-daily-report" class="btn btn-outline-danger">
+                        <i class="bi bi-file-earmark-pdf"></i> Download PDF
+                    </a>
+                </div>
+            </div>
 
             <!-- Navigation Tabs -->
             <ul class="nav nav-tabs mb-4" id="disasterTabs" role="tablist">
@@ -693,16 +747,18 @@
                             <div class="row">
                                 <div class="col-md-6">
                                     <div class="mb-3">
-                                        <label for="disasterDate" class="form-label">Date <span
+                                        <label for="disasterDateBS" class="form-label">Date (BS - Bikram Sambat) <span
                                                 class="text-danger">*</span></label>
-                                        <input type="date" class="form-control" id="disasterDate" required>
+                                        <input type="text" class="form-control" id="disasterDateBS" name="disaster_date_bs" required
+                                            placeholder="YYYY-MM-DD (e.g., 2081-10-18)" pattern="\d{4}-\d{2}-\d{2}">
+                                        <div class="form-text">Enter date in YYYY-MM-DD format (e.g., 2081-10-18)</div>
                                     </div>
                                 </div>
                                 <div class="col-md-6">
                                     <div class="mb-3">
                                         <label for="disasterTime" class="form-label">Time <span
                                                 class="text-danger">*</span></label>
-                                        <input type="time" class="form-control" id="disasterTime" required>
+                                        <input type="time" class="form-control" id="disasterTime" name="disaster_time" required>
                                     </div>
                                 </div>
                             </div>
@@ -712,18 +768,9 @@
                                     <div class="mb-3">
                                         <label for="disasterType" class="form-label">Disaster Type <span
                                                 class="text-danger">*</span></label>
-                                        <select class="form-control" id="disasterType" required>
+                                        <select class="form-control" id="disasterType" name="disaster_type" required>
                                             <option value="">Select Disaster Type</option>
-                                            <option value="earthquake">Earthquake</option>
-                                            <option value="flood">Flood</option>
-                                            <option value="landslide">Landslide</option>
-                                            <option value="storm">Storm</option>
-                                            <option value="fire">Fire</option>
-                                            <option value="drought">Drought</option>
-                                            <option value="avalanche">Avalanche</option>
-                                            <option value="cold_wave">Cold Wave</option>
-                                            <option value="heat_wave">Heat Wave</option>
-                                            <option value="other">Other</option>
+                                            <!-- Options will be populated dynamically from settings -->
                                         </select>
                                     </div>
                                 </div>
@@ -761,30 +808,26 @@
                             <div class="row">
                                 <div class="col-md-6">
                                     <div class="mb-3">
-                                        <label for="latitude" class="form-label">Latitude</label>
-                                        <input type="number" class="form-control" id="latitude" step="any"
-                                            placeholder="Enter latitude (e.g., 27.7172)">
+                                        <label for="coordinates" class="form-label">Coordinates (latitude, longitude)</label>
+                                        <input type="text" class="form-control" id="coordinates" name="coordinates"
+                                            placeholder="e.g., 27.7172, 85.3240"
+                                            pattern="^\s*-?\d+\.?\d*\s*,\s*-?\d+\.?\d*\s*$">
+                                        <small class="form-text text-muted">Format: latitude, longitude (e.g., 27.7172, 85.3240)</small>
                                     </div>
                                 </div>
                                 <div class="col-md-6">
                                     <div class="mb-3">
-                                        <label for="longitude" class="form-label">Longitude</label>
-                                        <input type="number" class="form-control" id="longitude" step="any"
-                                            placeholder="Enter longitude (e.g., 85.324)">
+                                        <label for="location" class="form-label">Location/Tole <span
+                                                class="text-danger">*</span></label>
+                                        <input type="text" class="form-control" id="location" name="tole"
+                                            placeholder="Enter specific location" required>
                                     </div>
                                 </div>
                             </div>
 
                             <div class="mb-3">
-                                <label for="location" class="form-label">Location/Tole <span
-                                        class="text-danger">*</span></label>
-                                <input type="text" class="form-control" id="location"
-                                    placeholder="Enter specific location" required>
-                            </div>
-
-                            <div class="mb-3">
                                 <label for="description" class="form-label">Description</label>
-                                <textarea class="form-control" id="description" rows="3"
+                                <textarea class="form-control" id="description" name="description" rows="3"
                                     placeholder="Describe the incident in detail"></textarea>
                             </div>
 
@@ -792,7 +835,7 @@
                                 <div class="col-md-3">
                                     <div class="mb-3">
                                         <label for="severity" class="form-label">Severity</label>
-                                        <select class="form-control" id="severity">
+                                        <select class="form-control" id="severity" name="severity">
                                             <option value="low">Low</option>
                                             <option value="medium" selected>Medium</option>
                                             <option value="high">High</option>
@@ -803,7 +846,7 @@
                                 <div class="col-md-3">
                                     <div class="mb-3">
                                         <label for="weatherStatus" class="form-label">Weather Status</label>
-                                        <input type="text" class="form-control" id="weatherStatus"
+                                        <input type="text" class="form-control" id="weatherStatus" name="weather_status"
                                             placeholder="e.g., Heavy Rain, Storm">
                                     </div>
                                 </div>
@@ -820,27 +863,28 @@
                             <div class="row">
                                 <div class="col-md-3">
                                     <div class="mb-3">
-                                        <label for="affectedPeople" class="form-label">Affected People</label>
-                                        <input type="number" class="form-control" id="affectedPeople" min="0" value="0">
+                                        <label for="affectedPeople" class="form-label">Affected People <span class="text-danger">*</span></label>
+                                        <input type="number" class="form-control" id="affectedPeople" name="affected_people" min="0" value="0" required>
+                                        <div class="validation-error" id="affectedPeopleError" style="display: none;"></div>
                                     </div>
                                 </div>
                                 <div class="col-md-3">
                                     <div class="mb-3">
                                         <label for="injuredCount" class="form-label">Injured</label>
-                                        <input type="number" class="form-control" id="injuredCount" min="0" value="0">
+                                        <input type="number" class="form-control" id="injuredCount" name="injured" min="0" value="0">
                                     </div>
                                 </div>
                                 <div class="col-md-3">
                                     <div class="mb-3">
                                         <label for="casualtiesCount" class="form-label">Casualties</label>
-                                        <input type="number" class="form-control" id="casualtiesCount" min="0"
+                                        <input type="number" class="form-control" id="casualtiesCount" name="casualties" min="0"
                                             value="0">
                                     </div>
                                 </div>
                                 <div class="col-md-3">
                                     <div class="mb-3">
                                         <label for="deaths" class="form-label">Deaths</label>
-                                        <input type="number" class="form-control" id="deaths" min="0" value="0">
+                                        <input type="number" class="form-control" id="deaths" name="deaths" min="0" value="0">
                                     </div>
                                 </div>
                             </div>
@@ -849,21 +893,28 @@
                                 <div class="col-md-3">
                                     <div class="mb-3">
                                         <label for="missingPersons" class="form-label">Missing Persons</label>
-                                        <input type="number" class="form-control" id="missingPersons" min="0" value="0">
+                                        <input type="number" class="form-control" id="missingPersons" name="missing_persons" min="0" value="0">
                                     </div>
                                 </div>
                                 <div class="col-md-3">
                                     <div class="mb-3">
-                                        <label for="affectedPeopleMale" class="form-label">Affected Males</label>
-                                        <input type="number" class="form-control" id="affectedPeopleMale" min="0"
-                                            value="0">
+                                        <label for="affectedPeopleMale" class="form-label">Affected Males <span class="text-danger">*</span></label>
+                                        <input type="number" class="form-control" id="affectedPeopleMale" name="affected_people_male" min="0"
+                                            value="0" required>
                                     </div>
                                 </div>
                                 <div class="col-md-3">
                                     <div class="mb-3">
-                                        <label for="affectedPeopleFemale" class="form-label">Affected Females</label>
-                                        <input type="number" class="form-control" id="affectedPeopleFemale" min="0"
-                                            value="0">
+                                        <label for="affectedPeopleFemale" class="form-label">Affected Females <span class="text-danger">*</span></label>
+                                        <input type="number" class="form-control" id="affectedPeopleFemale" name="affected_people_female" min="0"
+                                            value="0" required>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="mb-3">
+                                        <label class="form-label">Calculated Total</label>
+                                        <div class="form-control bg-light" id="calculatedTotal">0</div>
+                                        <small class="form-text" id="validationMessage"></small>
                                     </div>
                                 </div>
                             </div>
@@ -880,13 +931,13 @@
                                 <div class="col-md-3">
                                     <div class="mb-3">
                                         <label for="housesDamaged" class="form-label">Houses Damaged</label>
-                                        <input type="number" class="form-control" id="housesDamaged" min="0" value="0">
+                                        <input type="number" class="form-control" id="housesDamaged" name="houses_damaged" min="0" value="0">
                                     </div>
                                 </div>
                                 <div class="col-md-3">
                                     <div class="mb-3">
                                         <label for="housesDestroyed" class="form-label">Houses Destroyed</label>
-                                        <input type="number" class="form-control" id="housesDestroyed" min="0"
+                                        <input type="number" class="form-control" id="housesDestroyed" name="houses_destroyed" min="0"
                                             value="0">
                                     </div>
                                 </div>
@@ -894,7 +945,7 @@
                                     <div class="mb-3">
                                         <label for="publicBuildingDestruction" class="form-label">Public Buildings
                                             Destroyed</label>
-                                        <input type="number" class="form-control" id="publicBuildingDestruction" min="0"
+                                        <input type="number" class="form-control" id="publicBuildingDestruction" name="public_building_destruction" min="0"
                                             value="0">
                                     </div>
                                 </div>
@@ -902,7 +953,7 @@
                                     <div class="mb-3">
                                         <label for="publicBuildingDamage" class="form-label">Public Buildings
                                             Damaged</label>
-                                        <input type="number" class="form-control" id="publicBuildingDamage" min="0"
+                                        <input type="number" class="form-control" id="publicBuildingDamage" name="public_building_damage" min="0"
                                             value="0">
                                     </div>
                                 </div>
@@ -912,14 +963,14 @@
                                 <div class="col-md-3">
                                     <div class="mb-3">
                                         <label for="estimatedLoss" class="form-label">Estimated Loss (Rs.)</label>
-                                        <input type="number" class="form-control" id="estimatedLoss" min="0" value="0">
+                                        <input type="number" class="form-control" id="estimatedLoss" name="estimated_loss" min="0" value="0">
                                     </div>
                                 </div>
                                 <div class="col-md-6">
                                     <div class="mb-3">
                                         <label for="agricultureCropDamage" class="form-label">Agriculture Crop
                                             Damage</label>
-                                        <input type="text" class="form-control" id="agricultureCropDamage"
+                                        <input type="text" class="form-control" id="agricultureCropDamage" name="agriculture_crop_damage"
                                             placeholder="Brief description">
                                     </div>
                                 </div>
@@ -933,27 +984,88 @@
                             <h6 class="mb-0"><i class="bi bi-cow"></i> Livestock Impact</h6>
                         </div>
                         <div class="card-body">
-                            <div class="row">
-                                <div class="col-md-3">
-                                    <div class="mb-3">
-                                        <label for="livestockLost" class="form-label">Livestock Lost</label>
-                                        <input type="number" class="form-control" id="livestockLost" min="0" value="0">
+                            <div class="livestock-grid">
+                                <!-- Cattle -->
+                                <div class="livestock-type-card">
+                                    <h6><i class="bi bi-cow"></i> Cattle</h6>
+                                    <div class="row">
+                                        <div class="col-6">
+                                            <div class="mb-2">
+                                                <label for="cattleLost" class="form-label small">Lost</label>
+                                                <input type="number" class="form-control form-control-sm" id="cattleLost" name="cattle_lost" min="0" value="0">
+                                            </div>
+                                        </div>
+                                        <div class="col-6">
+                                            <div class="mb-2">
+                                                <label for="cattleInjured" class="form-label small">Injured</label>
+                                                <input type="number" class="form-control form-control-sm" id="cattleInjured" name="cattle_injured" min="0" value="0">
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
-                                <div class="col-md-3">
-                                    <div class="mb-3">
-                                        <label for="livestockInjured" class="form-label">Livestock Injured</label>
-                                        <input type="number" class="form-control" id="livestockInjured" min="0"
-                                            value="0">
+
+                                <!-- Poultry -->
+                                <div class="livestock-type-card">
+                                    <h6><i class="bi bi-egg"></i> Poultry</h6>
+                                    <div class="row">
+                                        <div class="col-6">
+                                            <div class="mb-2">
+                                                <label for="poultryLost" class="form-label small">Lost</label>
+                                                <input type="number" class="form-control form-control-sm" id="poultryLost" name="poultry_lost" min="0" value="0">
+                                            </div>
+                                        </div>
+                                        <div class="col-6">
+                                            <div class="mb-2">
+                                                <label for="poultryInjured" class="form-label small">Injured</label>
+                                                <input type="number" class="form-control form-control-sm" id="poultryInjured" name="poultry_injured" min="0" value="0">
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
-                                <div class="col-md-3">
-                                    <div class="mb-3">
-                                        <label for="livestockDeath" class="form-label">Livestock Death</label>
-                                        <input type="number" class="form-control" id="livestockDeath" min="0" value="0">
+
+                                <!-- Goats/Sheep -->
+                                <div class="livestock-type-card">
+                                    <h6><i class="bi bi-bug"></i> Goats/Sheep</h6>
+                                    <div class="row">
+                                        <div class="col-6">
+                                            <div class="mb-2">
+                                                <label for="goatsSheepLost" class="form-label small">Lost</label>
+                                                <input type="number" class="form-control form-control-sm" id="goatsSheepLost" name="goats_sheep_lost" min="0" value="0">
+                                            </div>
+                                        </div>
+                                        <div class="col-6">
+                                            <div class="mb-2">
+                                                <label for="goatsSheepInjured" class="form-label small">Injured</label>
+                                                <input type="number" class="form-control form-control-sm" id="goatsSheepInjured" name="goats_sheep_injured" min="0" value="0">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Others -->
+                                <div class="livestock-type-card">
+                                    <h6><i class="bi bi-question-circle"></i> Others</h6>
+                                    <div class="row">
+                                        <div class="col-6">
+                                            <div class="mb-2">
+                                                <label for="otherLivestockLost" class="form-label small">Lost</label>
+                                                <input type="number" class="form-control form-control-sm" id="otherLivestockLost" name="other_livestock_lost" min="0" value="0">
+                                            </div>
+                                        </div>
+                                        <div class="col-6">
+                                            <div class="mb-2">
+                                                <label for="otherLivestockInjured" class="form-label small">Injured</label>
+                                                <input type="number" class="form-control form-control-sm" id="otherLivestockInjured" name="other_livestock_injured" min="0" value="0">
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
+
+                            <!-- Legacy fields (hidden) for backward compatibility -->
+                            <input type="hidden" id="livestockLost" name="livestock_lost" value="0">
+                            <input type="hidden" id="livestockInjured" name="livestock_injured" value="0">
+                            <input type="hidden" id="livestockDeath" name="livestock_death" value="0">
                         </div>
                     </div>
 
@@ -966,27 +1078,27 @@
                             <div class="row">
                                 <div class="col-md-3">
                                     <div class="form-check mb-3">
-                                        <input type="checkbox" class="form-check-input" id="roadBlocked">
+                                        <input type="checkbox" class="form-check-input" id="roadBlocked" name="road_blocked_status">
                                         <label class="form-check-label" for="roadBlocked">Road Blocked</label>
                                     </div>
                                 </div>
                                 <div class="col-md-3">
                                     <div class="form-check mb-3">
-                                        <input type="checkbox" class="form-check-input" id="electricityBlocked">
+                                        <input type="checkbox" class="form-check-input" id="electricityBlocked" name="electricity_blocked_status">
                                         <label class="form-check-label" for="electricityBlocked">Electricity
                                             Blocked</label>
                                     </div>
                                 </div>
                                 <div class="col-md-3">
                                     <div class="form-check mb-3">
-                                        <input type="checkbox" class="form-check-input" id="communicationBlocked">
+                                        <input type="checkbox" class="form-check-input" id="communicationBlocked" name="communication_blocked_status">
                                         <label class="form-check-label" for="communicationBlocked">Communication
                                             Blocked</label>
                                     </div>
                                 </div>
                                 <div class="col-md-3">
                                     <div class="form-check mb-3">
-                                        <input type="checkbox" class="form-check-input" id="drinkingWaterDisrupted">
+                                        <input type="checkbox" class="form-check-input" id="drinkingWaterDisrupted" name="drinking_water_status">
                                         <label class="form-check-label" for="drinkingWaterDisrupted">Drinking Water
                                             Disrupted</label>
                                     </div>
@@ -1003,7 +1115,7 @@
                         <div class="card-body">
                             <div class="mb-3">
                                 <label for="rescueOperations" class="form-label">Rescue Operations</label>
-                                <textarea class="form-control" id="rescueOperations" rows="2"
+                                <textarea class="form-control" id="rescueOperations" name="rescue_operations" rows="2"
                                     placeholder="Describe rescue and relief operations conducted"></textarea>
                             </div>
                         </div>
@@ -1039,14 +1151,151 @@
     let damageAssessmentChart = null;
     let livestockDamageChart = null;
 
+    // Load disaster types from settings
+    async function loadDisasterTypes() {
+        const disasterTypeSelect = document.getElementById('disasterType');
+        
+        try {
+            const response = await fetch('/api/settings/disaster_types');
+            const data = await response.json();
+            
+            // Clear existing options except the first one
+            disasterTypeSelect.innerHTML = '<option value="">Select Disaster Type</option>';
+            
+            let disasterTypes = [];
+            
+            if (data.success && data.value && Array.isArray(data.value)) {
+                disasterTypes = data.value;
+            } else {
+                // Fallback to default disaster types
+                disasterTypes = [
+                    'Earthquake',
+                    'Flood',
+                    'Landslide',
+                    'Storm',
+                    'Fire',
+                    'Drought',
+                    'Avalanche',
+                    'Cold Wave',
+                    'Heat Wave',
+                    'Other'
+                ];
+            }
+            
+            // Populate dropdown
+            disasterTypes.forEach(type => {
+                const option = document.createElement('option');
+                option.value = type.toLowerCase().replace(/\s+/g, '_');
+                option.textContent = type;
+                disasterTypeSelect.appendChild(option);
+            });
+        } catch (error) {
+            console.error('Error loading disaster types:', error);
+            
+            // Fallback to default disaster types on error
+            disasterTypeSelect.innerHTML = '<option value="">Select Disaster Type</option>';
+            const defaultTypes = [
+                'Earthquake',
+                'Flood',
+                'Landslide',
+                'Storm',
+                'Fire',
+                'Drought',
+                'Avalanche',
+                'Cold Wave',
+                'Heat Wave',
+                'Other'
+            ];
+            
+            defaultTypes.forEach(type => {
+                const option = document.createElement('option');
+                option.value = type.toLowerCase().replace(/\s+/g, '_');
+                option.textContent = type;
+                disasterTypeSelect.appendChild(option);
+            });
+        }
+    }
+
+    // Parse coordinates from input
+    function parseCoordinates(coordString) {
+        if (!coordString || coordString.trim() === '') {
+            return { latitude: null, longitude: null };
+        }
+        
+        const parts = coordString.split(',').map(p => p.trim());
+        if (parts.length !== 2) {
+            return { latitude: null, longitude: null };
+        }
+        
+        const latitude = parseFloat(parts[0]);
+        const longitude = parseFloat(parts[1]);
+        
+        if (isNaN(latitude) || isNaN(longitude)) {
+            return { latitude: null, longitude: null };
+        }
+        
+        return { latitude, longitude };
+    }
+
+    // Validate affected people
+    function validateAffectedPeople() {
+        const affectedPeople = parseInt(document.getElementById('affectedPeople').value) || 0;
+        const affectedMale = parseInt(document.getElementById('affectedPeopleMale').value) || 0;
+        const affectedFemale = parseInt(document.getElementById('affectedPeopleFemale').value) || 0;
+        
+        const calculatedTotal = affectedMale + affectedFemale;
+        const calculatedTotalEl = document.getElementById('calculatedTotal');
+        const validationMessageEl = document.getElementById('validationMessage');
+        const affectedPeopleInput = document.getElementById('affectedPeople');
+        
+        calculatedTotalEl.textContent = calculatedTotal;
+        
+        if (calculatedTotal !== affectedPeople) {
+            calculatedTotalEl.classList.add('text-danger');
+            calculatedTotalEl.classList.remove('text-success');
+            validationMessageEl.textContent = `Warning: Should equal ${affectedPeople} (Affected People)`;
+            validationMessageEl.classList.add('text-danger');
+            affectedPeopleInput.classList.add('is-invalid');
+            return false;
+        } else {
+            calculatedTotalEl.classList.remove('text-danger');
+            calculatedTotalEl.classList.add('text-success');
+            validationMessageEl.textContent = '✓ Valid';
+            validationMessageEl.classList.remove('text-danger');
+            validationMessageEl.classList.add('text-success');
+            affectedPeopleInput.classList.remove('is-invalid');
+            return true;
+        }
+    }
+
+    // Calculate total livestock
+    function calculateTotalLivestock() {
+        const cattleLost = parseInt(document.getElementById('cattleLost').value) || 0;
+        const poultryLost = parseInt(document.getElementById('poultryLost').value) || 0;
+        const goatsSheepLost = parseInt(document.getElementById('goatsSheepLost').value) || 0;
+        const otherLost = parseInt(document.getElementById('otherLivestockLost').value) || 0;
+        
+        const cattleInjured = parseInt(document.getElementById('cattleInjured').value) || 0;
+        const poultryInjured = parseInt(document.getElementById('poultryInjured').value) || 0;
+        const goatsSheepInjured = parseInt(document.getElementById('goatsSheepInjured').value) || 0;
+        const otherInjured = parseInt(document.getElementById('otherLivestockInjured').value) || 0;
+        
+        const totalLost = cattleLost + poultryLost + goatsSheepLost + otherLost;
+        const totalInjured = cattleInjured + poultryInjured + goatsSheepInjured + otherInjured;
+        
+        // Update legacy hidden fields
+        document.getElementById('livestockLost').value = totalLost;
+        document.getElementById('livestockInjured').value = totalInjured;
+        document.getElementById('livestockDeath').value = totalLost;
+    }
+
     // Initialize the page when DOM is loaded
     document.addEventListener('DOMContentLoaded', function () {
         // Load data and initialize charts
         loadData();
 
-        // Set today's date as default in the form
-        const today = new Date().toISOString().split('T')[0];
-        document.getElementById('disasterDate').value = today;
+        // Load disaster types
+        loadDisasterTypes();
 
         // Set current time as default
         const now = new Date();
@@ -1066,7 +1315,230 @@
         document.getElementById('resetForm').addEventListener('click', resetForm);
         document.getElementById('resetPublicInfoForm').addEventListener('click', resetPublicInfoForm);
         document.getElementById('resetSituationReportForm').addEventListener('click', resetSituationReportForm);
+
+        // Setup affected people validation
+        document.getElementById('affectedPeople').addEventListener('input', validateAffectedPeople);
+        document.getElementById('affectedPeopleMale').addEventListener('input', validateAffectedPeople);
+        document.getElementById('affectedPeopleFemale').addEventListener('input', validateAffectedPeople);
+
+        // Setup livestock calculation
+        const livestockInputs = [
+            'cattleLost', 'cattleInjured',
+            'poultryLost', 'poultryInjured',
+            'goatsSheepLost', 'goatsSheepInjured',
+            'otherLivestockLost', 'otherLivestockInjured'
+        ];
+        
+        livestockInputs.forEach(id => {
+            document.getElementById(id).addEventListener('input', calculateTotalLivestock);
+        });
+
+        // Set today's date in BS format as default
+        setTodayBsDate();
+
+        // Initialize ward dropdown
+        initWardDropdown();
     });
+
+    // Initialize ward dropdown functionality
+    function initWardDropdown() {
+        const wardDropdownToggle = document.getElementById('wardDropdownToggle');
+        const wardDropdownMenu = document.getElementById('wardDropdownMenu');
+        const selectedWards = new Set();
+
+        // Toggle dropdown visibility
+        wardDropdownToggle.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            const isVisible = wardDropdownMenu.style.display === 'block';
+            wardDropdownMenu.style.display = isVisible ? 'none' : 'block';
+        });
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!wardDropdownToggle.contains(e.target) && !wardDropdownMenu.contains(e.target)) {
+                wardDropdownMenu.style.display = 'none';
+            }
+        });
+
+        // Handle ward selection
+        const dropdownItems = wardDropdownMenu.querySelectorAll('.dropdown-item');
+        dropdownItems.forEach(function(item) {
+            item.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                const wardValue = this.getAttribute('data-value');
+                const wardText = this.textContent;
+
+                if (selectedWards.has(wardValue)) {
+                    selectedWards.delete(wardValue);
+                    this.classList.remove('active');
+                } else {
+                    selectedWards.add(wardValue);
+                    this.classList.add('active');
+                }
+
+                updateSelectedWardsDisplay();
+            });
+        });
+
+        // Update the display of selected wards
+        function updateSelectedWardsDisplay() {
+            const selectedWardsContainer = document.getElementById('selectedWards');
+            const wardInput = document.getElementById('ward');
+            
+            selectedWardsContainer.innerHTML = '';
+            
+            if (selectedWards.size === 0) {
+                wardDropdownToggle.textContent = 'Select Ward(s)';
+                wardInput.value = '';
+            } else {
+                const wardArray = Array.from(selectedWards);
+                wardInput.value = wardArray.join(',');
+                
+                wardDropdownToggle.textContent = wardArray.length === 1 ?
+                    'Ward ' + wardArray[0] + ' selected' :
+                    wardArray.length + ' wards selected';
+                
+                // Show ward badges
+                wardArray.forEach(function(ward) {
+                    const badge = document.createElement('span');
+                    badge.className = 'badge bg-primary me-1';
+                    badge.textContent = 'Ward ' + ward;
+                    badge.style.cursor = 'pointer';
+                    badge.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        // Deselect this ward
+                        selectedWards.delete(ward);
+                        // Update dropdown item
+                        const dropdownItem = wardDropdownMenu.querySelector('[data-value="' + ward + '"]');
+                        if (dropdownItem) {
+                            dropdownItem.classList.remove('active');
+                        }
+                        updateSelectedWardsDisplay();
+                    });
+                    selectedWardsContainer.appendChild(badge);
+                });
+            }
+        }
+
+        // Make update function available globally for resetForm
+        window.updateSelectedWardsDisplay = updateSelectedWardsDisplay;
+        window.selectedWards = selectedWards;
+    }
+
+    // Show toast notification
+    function showToast(message, type) {
+        const toastPlaceholder = document.getElementById('toastPlaceholder');
+        
+        const toastEl = document.createElement('div');
+        toastEl.className = 'toast align-items-center text-white bg-' + type + ' border-0 show';
+        toastEl.setAttribute('role', 'alert');
+        toastEl.setAttribute('aria-live', 'assertive');
+        toastEl.setAttribute('aria-atomic', 'true');
+        toastEl.style.marginBottom = '0.5rem';
+        
+        toastEl.innerHTML = '<div class="d-flex"><div class="toast-body">' + message + '</div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button></div>';
+        
+        toastPlaceholder.appendChild(toastEl);
+        
+        // Auto remove after 4 seconds
+        setTimeout(function() {
+            toastEl.remove();
+        }, 4000);
+        
+        // Close button functionality
+        const closeBtn = toastEl.querySelector('.btn-close');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', function() {
+                toastEl.remove();
+            });
+        }
+    }
+
+    // Set today's date in BS format (simple approximation)
+    function setTodayBsDate() {
+        // Get today's AD date in local timezone
+        const today = new Date();
+        const adYear = today.getFullYear();
+        const adMonth = today.getMonth() + 1;
+        const adDay = today.getDate();
+        
+        // Simple conversion reference: 2025-02-01 AD = 2081-10-18 BS
+        // This is a rough approximation - users can adjust as needed
+        const conversionData = [
+            { ad: '2025-01-01', bs: '2081-09-17' },
+            { ad: '2025-02-01', bs: '2081-10-18' },
+            { ad: '2025-03-01', bs: '2081-11-17' },
+            { ad: '2025-04-01', bs: '2081-12-19' },
+            { ad: '2025-05-01', bs: '2082-01-18' },
+            { ad: '2025-06-01', bs: '2082-02-18' },
+            { ad: '2025-07-01', bs: '2082-03-17' },
+            { ad: '2025-08-01', bs: '2082-04-16' },
+            { ad: '2025-09-01', bs: '2082-05-17' },
+            { ad: '2025-10-01', bs: '2082-06-15' },
+            { ad: '2025-11-01', bs: '2082-07-16' },
+            { ad: '2025-12-01', bs: '2082-08-16' },
+            { ad: '2026-01-01', bs: '2082-09-17' },
+        ];
+        
+        // Find the closest reference point
+        const currentAd = `${adYear}-${String(adMonth).padStart(2, '0')}-${String(adDay).padStart(2, '0')}`;
+        let closestRef = conversionData[0];
+        let minDiff = Infinity;
+        
+        for (const ref of conversionData) {
+            const refDate = new Date(ref.ad);
+            const currentDate = new Date(currentAd);
+            const diff = Math.abs(currentDate - refDate);
+            if (diff < minDiff) {
+                minDiff = diff;
+                closestRef = ref;
+            }
+        }
+        
+        // Parse the closest BS reference
+        const bsParts = closestRef.bs.split('-');
+        let bsYear = parseInt(bsParts[0]);
+        let bsMonth = parseInt(bsParts[1]);
+        let bsDay = parseInt(bsParts[2]);
+        
+        // Calculate days difference
+        const refAdDate = new Date(closestRef.ad);
+        const currentAdDate = new Date(currentAd);
+        const daysDiff = Math.round((currentAdDate - refAdDate) / (1000 * 60 * 60 * 24));
+        
+        // Days in each BS month (approximate)
+        const daysInBsMonth = [31, 31, 31, 32, 31, 31, 30, 29, 30, 29, 30, 30];
+        
+        // Adjust BS date by days difference
+        let newBsDay = bsDay + daysDiff;
+        let newBsMonth = bsMonth;
+        let newBsYear = bsYear;
+        
+        // Adjust for month/year boundaries
+        while (newBsDay > daysInBsMonth[newBsMonth - 1]) {
+            newBsDay -= daysInBsMonth[newBsMonth - 1];
+            newBsMonth++;
+            if (newBsMonth > 12) {
+                newBsMonth = 1;
+                newBsYear++;
+            }
+        }
+        
+        while (newBsDay < 1) {
+            newBsMonth--;
+            if (newBsMonth < 1) {
+                newBsMonth = 12;
+                newBsYear--;
+            }
+            newBsDay += daysInBsMonth[newBsMonth - 1];
+        }
+        
+        const bsDateStr = `${newBsYear}-${String(newBsMonth).padStart(2, '0')}-${String(newBsDay).padStart(2, '0')}`;
+        document.getElementById('disasterDateBS').value = bsDateStr;
+    }
 
     // Load data from API
     async function loadData() {
@@ -1670,9 +2142,6 @@
             document.getElementById('detailed-report').innerHTML = '<p>Error loading detailed report.</p>';
         }
 
-        // Load event log data
-        loadEventLog();
-
         // Load public advisories
         loadPublicAdvisories();
     }
@@ -1683,25 +2152,30 @@
             const response = await fetch('/api/event-logs');
             const data = await response.json();
 
-            if (data.success && data.event_logs) {
-                const eventLogBody = document.getElementById('event-log-body');
-                eventLogBody.innerHTML = '';
+            const eventLogBody = document.getElementById('event-log-body');
+            eventLogBody.innerHTML = '';
 
+            if (data.success && data.event_logs && data.event_logs.length > 0) {
                 data.event_logs.forEach(log => {
                     const row = document.createElement('tr');
                     row.innerHTML = `
-                            <td>${log.timestamp}</td>
-                            <td>${log.event_type}</td>
-                            <td>${log.description}</td>
-                            <td>${log.location}</td>
-                            <td>${log.responsible_unit}</td>
-                            <td><span class="badge bg-${getStatusBadgeClass(log.status)}">${log.status}</span></td>
+                            <td>${log.timestamp || 'N/A'}</td>
+                            <td>${log.event_type || 'N/A'}</td>
+                            <td>${log.description || 'N/A'}</td>
+                            <td>${log.location || 'N/A'}</td>
+                            <td>${log.responsible_unit || 'N/A'}</td>
+                            <td><span class="badge bg-${getStatusBadgeClass(log.status || 'Active')}">${log.status || 'Active'}</span></td>
                         `;
                     eventLogBody.appendChild(row);
                 });
+            } else {
+                // Show message when no event logs exist
+                eventLogBody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No event logs available. Event logs are created automatically when incidents are reported.</td></tr>';
             }
         } catch (error) {
             console.error('Error loading event log:', error);
+            const eventLogBody = document.getElementById('event-log-body');
+            eventLogBody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Error loading event logs. Please try again.</td></tr>';
             showToast('Error loading event log. Please try again.', 'danger');
         }
     }
@@ -1778,15 +2252,27 @@
     async function submitDisasterReport(event) {
         event.preventDefault();
 
+        // Validate affected people
+        if (!validateAffectedPeople()) {
+            showToast('Error: Affected people count must equal the sum of affected males and females.', 'danger');
+            return;
+        }
+
+        // Parse coordinates
+        const coords = parseCoordinates(document.getElementById('coordinates').value);
+
+        // Calculate total livestock before submission
+        calculateTotalLivestock();
+
         // Get form values
         const formData = {
-            disaster_date: document.getElementById('disasterDate').value,
+            disaster_date_bs: document.getElementById('disasterDateBS').value,
             disaster_time: document.getElementById('disasterTime').value,
             disaster_type: document.getElementById('disasterType').value,
-            ward: document.getElementById('ward').value, // Value from hidden input
+            ward: document.getElementById('ward').value,
             tole: document.getElementById('location').value,
-            latitude: parseFloat(document.getElementById('latitude').value) || null,
-            longitude: parseFloat(document.getElementById('longitude').value) || null,
+            latitude: coords.latitude,
+            longitude: coords.longitude,
             description: document.getElementById('description').value,
             severity: document.getElementById('severity').value,
             affected_people: parseInt(document.getElementById('affectedPeople').value) || 0,
@@ -1827,6 +2313,11 @@
                 showToast('Disaster report submitted successfully!', 'success');
                 resetForm();
                 loadData(); // Refresh data
+                
+                // Switch to overview tab
+                const overviewTab = document.getElementById('overview-tab');
+                const tab = new bootstrap.Tab(overviewTab);
+                tab.show();
             } else {
                 showToast('Error submitting report: ' + result.message, 'danger');
             }
@@ -1840,9 +2331,24 @@
         event.preventDefault();
 
         // Get form values
+        const title = document.getElementById('publicInfoTitle').value.trim();
+        const content = document.getElementById('publicInfoContent').value.trim();
+
+        // Client-side validation
+        if (!title) {
+            showToast('Error: Title is required', 'danger');
+            document.getElementById('publicInfoTitle').focus();
+            return;
+        }
+        if (!content) {
+            showToast('Error: Content is required', 'danger');
+            document.getElementById('publicInfoContent').focus();
+            return;
+        }
+
         const publicInfoData = {
-            title: document.getElementById('publicInfoTitle').value || '',
-            content: document.getElementById('publicInfoContent').value || '',
+            title: title,
+            content: content,
             info_type: document.getElementById('publicInfoType').value || 'General',
             priority: document.getElementById('publicInfoPriority').value || 'Normal',
             is_active: document.getElementById('publicInfoActive').checked,
@@ -1859,28 +2365,18 @@
                 body: JSON.stringify(publicInfoData)
             });
 
-            // Check if response is OK before parsing JSON
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
             const result = await response.json();
 
-            if (result.success) {
+            if (response.ok && result.success) {
                 showToast('Public information added successfully!', 'success');
                 document.getElementById('publicInfoForm').reset();
                 document.getElementById('publicInfoActive').checked = true; // Reset checkbox to checked
                 loadPublicAdvisories(); // Refresh public info
             } else {
-                showToast('Error adding public info: ' + result.message, 'danger');
+                showToast('Error adding public info: ' + (result.message || 'Unknown error'), 'danger');
             }
         } catch (error) {
-            // Check if it's a JSON parsing error
-            if (error instanceof SyntaxError) {
-                showToast('Error: Server returned invalid response. Please try again.', 'danger');
-            } else {
-                showToast('Error adding public info: ' + error.message, 'danger');
-            }
+            showToast('Error adding public info: ' + error.message, 'danger');
             console.error('Error submitting public info:', error);
         }
     }
@@ -1949,9 +2445,8 @@
     function resetForm() {
         document.getElementById('disasterReportForm').reset();
 
-        // Reset to today's date and current time
-        const today = new Date().toISOString().split('T')[0];
-        document.getElementById('disasterDate').value = today;
+        // Reset to today's BS date and current time
+        setTodayBsDate();
 
         const now = new Date();
         const currentTime = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
@@ -1967,6 +2462,12 @@
         // Remove active classes from dropdown items
         const dropdownItems = document.querySelectorAll('#wardDropdownMenu .dropdown-item');
         dropdownItems.forEach(item => item.classList.remove('active'));
+
+        // Reset validation display
+        document.getElementById('calculatedTotal').textContent = '0';
+        document.getElementById('calculatedTotal').classList.remove('text-danger', 'text-success');
+        document.getElementById('validationMessage').textContent = '';
+        document.getElementById('affectedPeople').classList.remove('is-invalid');
     }
 
     // Set all fields to zero for "No Incidents Today"
@@ -1977,16 +2478,23 @@
         document.getElementById('casualtiesCount').value = 0;
         document.getElementById('housesDamaged').value = 0;
         document.getElementById('housesDestroyed').value = 0;
-        document.getElementById('livestockLost').value = 0;
-        document.getElementById('estimatedLoss').value = 0;
         document.getElementById('deaths').value = 0;
         document.getElementById('missingPersons').value = 0;
         document.getElementById('affectedPeopleMale').value = 0;
         document.getElementById('affectedPeopleFemale').value = 0;
-        document.getElementById('livestockInjured').value = 0;
-        document.getElementById('livestockDeath').value = 0;
+        document.getElementById('estimatedLoss').value = 0;
         document.getElementById('publicBuildingDestruction').value = 0;
         document.getElementById('publicBuildingDamage').value = 0;
+
+        // Reset livestock fields
+        document.getElementById('cattleLost').value = 0;
+        document.getElementById('cattleInjured').value = 0;
+        document.getElementById('poultryLost').value = 0;
+        document.getElementById('poultryInjured').value = 0;
+        document.getElementById('goatsSheepLost').value = 0;
+        document.getElementById('goatsSheepInjured').value = 0;
+        document.getElementById('otherLivestockLost').value = 0;
+        document.getElementById('otherLivestockInjured').value = 0;
 
         // Uncheck all checkboxes
         document.getElementById('roadBlocked').checked = false;
@@ -1997,6 +2505,7 @@
         // Clear text areas
         document.getElementById('agricultureCropDamage').value = '';
         document.getElementById('rescueOperations').value = '';
+        document.getElementById('coordinates').value = '';
 
         // Set disaster type to "No Incident" or similar
         const disasterTypeSelect = document.getElementById('disasterType');
@@ -2010,6 +2519,9 @@
 
         // Set location to "No Specific Location"
         document.getElementById('location').value = 'No incidents reported today';
+
+        // Update validation display
+        validateAffectedPeople();
 
         showToast('All fields set to zero for "No Incidents Today"', 'info');
     });
@@ -2056,138 +2568,19 @@
                 loadPublicAdvisories();
             });
         }
-    });
 
-    // Show toast notification
-    function showToast(message, type) {
-        const toastPlaceholder = document.getElementById('toastPlaceholder');
-        const toastId = 'toast-' + Date.now();
-
-        const toastDiv = document.createElement('div');
-        toastDiv.className = `toast align-items-center text-white bg-${type} border-0`;
-        toastDiv.id = toastId;
-        toastDiv.setAttribute('role', 'alert');
-        toastDiv.setAttribute('aria-live', 'assertive');
-        toastDiv.setAttribute('aria-atomic', 'true');
-
-        toastDiv.innerHTML = `
-                <div class="d-flex">
-                    <div class="toast-body">
-                        ${message}
-                    </div>
-                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
-                </div>
-            `;
-
-        toastPlaceholder.appendChild(toastDiv);
-
-        const toast = new bootstrap.Toast(toastDiv, { delay: 5000 });
-        toast.show();
-
-        // Remove toast after it's hidden
-        toastDiv.addEventListener('hidden.bs.toast', function () {
-            toastDiv.remove();
-        });
-    }
-
-    // Custom ward selection dropdown functionality
-    let selectedWards = new Set(); // Make global for reset function
-    document.addEventListener('DOMContentLoaded', function () {
-        const dropdownButton = document.getElementById('wardDropdownToggle');
-        const dropdownMenu = document.getElementById('wardDropdownMenu');
-        const selectedWardsContainer = document.getElementById('selectedWards');
-        const hiddenInput = document.getElementById('ward');
-
-        // Toggle dropdown visibility when button is clicked
-        dropdownButton.addEventListener('click', function (e) {
-            e.stopPropagation();
-            dropdownMenu.style.display = dropdownMenu.style.display === 'none' ? 'block' : 'none';
-        });
-
-        // Handle dropdown item clicks
-        dropdownMenu.addEventListener('click', function (e) {
-            if (e.target.classList.contains('dropdown-item')) {
-                e.preventDefault();
-                const value = e.target.getAttribute('data-value');
-
-                if (selectedWards.has(value)) {
-                    // Remove if already selected
-                    selectedWards.delete(value);
-                    e.target.classList.remove('active');
-                } else {
-                    // Add if not selected
-                    selectedWards.add(value);
-                    e.target.classList.add('active');
-                }
-
-                // Update the hidden input and display
-                window.updateSelectedWardsDisplay();
-            }
-        });
-
-        // Close dropdown when clicking elsewhere
-        document.addEventListener('click', function (e) {
-            if (!dropdownButton.contains(e.target) && !dropdownMenu.contains(e.target)) {
-                dropdownMenu.style.display = 'none';
-            }
-        });
-
-        window.updateSelectedWardsDisplay = function () {
-            // Clear the container
-            selectedWardsContainer.innerHTML = '';
-
-            // Update the hidden input
-            hiddenInput.value = Array.from(selectedWards).join(',');
-
-            // Update the button text
-            if (selectedWards.size === 0) {
-                dropdownButton.textContent = 'Select Ward(s)';
-            } else if (selectedWards.size === 1) {
-                dropdownButton.textContent = `Ward ${Array.from(selectedWards)[0]} selected`;
-            } else {
-                dropdownButton.textContent = `${selectedWards.size} wards selected`;
-            }
-
-            // Show selected wards as badges
-            selectedWards.forEach(ward => {
-                const badge = document.createElement('span');
-                badge.className = 'badge bg-primary me-1 mb-1';
-                badge.textContent = `Ward ${ward}`;
-
-                // Add remove functionality
-                const removeBtn = document.createElement('button');
-                removeBtn.className = 'btn-close btn-close-white btn-sm ms-1';
-                removeBtn.onclick = function () {
-                    selectedWards.delete(ward);
-                    updateSelectedWardsDisplay();
-
-                    // Remove active class from dropdown item
-                    const dropdownItem = document.querySelector(`[data-value="${ward}"]`);
-                    if (dropdownItem) {
-                        dropdownItem.classList.remove('active');
-                    }
-                };
-
-                badge.appendChild(removeBtn);
-                selectedWardsContainer.appendChild(badge);
+        // Load data when Event Log tab is shown
+        const eventLogTab = document.querySelector('#disasterTabs a[data-bs-target="#event-log"]');
+        if (eventLogTab) {
+            eventLogTab.addEventListener('shown.bs.tab', function () {
+                // Load event log data when tab is shown
+                loadEventLog();
             });
         }
-
-        // Form validation for ward selection
-        document.getElementById('disasterReportForm').addEventListener('submit', function (e) {
-            if (selectedWards.size === 0) {
-                e.preventDefault();
-                alert('Please select at least one ward.');
-                return false;
-            }
-        });
     });
+
+    //
 </script>
-
-
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
+</body>
+</html>
 {% endblock %}

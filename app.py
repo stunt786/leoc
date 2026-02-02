@@ -1,6 +1,6 @@
-from flask import Flask, render_template, request, jsonify, send_from_directory
+from flask import Flask, render_template, request, jsonify, send_from_directory, make_response
 from flask_sqlalchemy import SQLAlchemy
-from datetime import datetime
+from datetime import datetime, date
 import os
 import json
 import folium
@@ -10,6 +10,56 @@ import re
 from functools import wraps
 import time
 from dotenv import load_dotenv
+from io import BytesIO
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import mm, cm
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image, HRFlowable
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+import urllib.request
+import os
+
+# Try to register a font with Unicode support for Nepali/Devanagari
+def register_unicode_fonts():
+    """Register fonts that support Unicode/Devanagari characters."""
+    try:
+        # Try to use system fonts that support Devanagari
+        font_paths = [
+            # Linux system fonts
+            '/usr/share/fonts/truetype/noto/NotoSansDevanagari-Regular.ttf',
+            '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+            '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf',
+            # Windows fonts
+            'C:/Windows/Fonts/arial.ttf',
+            'C:/Windows/Fonts/segoeui.ttf',
+            # macOS fonts
+            '/System/Library/Fonts/Helvetica.ttc',
+            '/Library/Fonts/Arial.ttf',
+        ]
+        
+        registered_font = None
+        for font_path in font_paths:
+            if os.path.exists(font_path):
+                try:
+                    font_name = os.path.basename(font_path).replace('.ttf', '').replace('.ttc', '')
+                    pdfmetrics.registerFont(TTFont(font_name, font_path))
+                    registered_font = font_name
+                    print(f"Registered font: {font_name} from {font_path}")
+                    break
+                except Exception as e:
+                    print(f"Failed to register font {font_path}: {e}")
+                    continue
+        
+        return registered_font
+    except Exception as e:
+        print(f"Error registering fonts: {e}")
+        return None
+
+# Register fonts at module load
+UNICODE_FONT = register_unicode_fonts()
 
 # Load environment variables from .env file
 load_dotenv()
@@ -246,7 +296,8 @@ class ReliefDistribution(db.Model):
 class Disaster(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     disaster_type = db.Column(db.String(100), nullable=False, index=True)  # Added index
-    disaster_date = db.Column(db.Date, nullable=False, index=True)  # Added index
+    disaster_date = db.Column(db.Date, nullable=False, index=True)  # AD date (Gregorian calendar)
+    disaster_date_bs = db.Column(db.String(10), index=True)  # BS date (Bikram Sambat) stored as string YYYY-MM-DD
     ward = db.Column(db.Integer, nullable=False, index=True)  # Added index
     tole = db.Column(db.String(200), index=True)  # Added index
     latitude = db.Column(db.Float)
@@ -280,7 +331,8 @@ class Disaster(db.Model):
         return {
             'id': self.id,
             'disaster_type': self.disaster_type,
-            'disaster_date': self.disaster_date.strftime('%Y-%m-%d'),
+            'disaster_date': self.disaster_date.strftime('%Y-%m-%d') if self.disaster_date else None,
+            'disaster_date_bs': self.disaster_date_bs,
             'ward': self.ward,
             'tole': self.tole,
             'latitude': self.latitude,
@@ -1494,6 +1546,7 @@ def add_disaster():
         disaster = Disaster(
             disaster_type=data.get('disaster_type'),
             disaster_date=datetime.strptime(data.get('disaster_date'), '%Y-%m-%d').date(),
+            disaster_date_bs=data.get('disaster_date_bs'),  # BS date from frontend
             ward=int(data.get('ward')),
             tole=data.get('tole'),
             latitude=float(data.get('latitude', 0)) if data.get('latitude') else None,
@@ -1518,6 +1571,18 @@ def add_disaster():
         )
         db.session.add(disaster)
         db.session.commit()
+
+        # Create event log entry for the disaster
+        event_log = EventLog(
+            event_type='Incident Report',
+            description=f"{data.get('disaster_type', 'Unknown')} incident reported at {data.get('tole', 'Unknown location')}",
+            location=data.get('tole'),
+            responsible_unit='LEOC',
+            status='Active'
+        )
+        db.session.add(event_log)
+        db.session.commit()
+
         return jsonify({
             'success': True,
             'message': 'Disaster recorded successfully',
@@ -1544,6 +1609,7 @@ def add_disaster_report():
         disaster = Disaster(
             disaster_type=data.get('disaster_type'),
             disaster_date=datetime.strptime(data.get('disaster_date'), '%Y-%m-%d').date(),
+            disaster_date_bs=data.get('disaster_date_bs'),  # BS date from frontend
             ward=ward,
             tole=data.get('tole'),
             latitude=float(data.get('latitude')) if data.get('latitude') else None,
@@ -1566,6 +1632,17 @@ def add_disaster_report():
             affected_people_female=int(data.get('affected_people_female', 0))
         )
         db.session.add(disaster)
+        db.session.commit()
+
+        # Create event log entry for the disaster report
+        event_log = EventLog(
+            event_type='Incident Report',
+            description=f"{data.get('disaster_type', 'Unknown')} incident reported at {data.get('tole', 'Unknown location')}",
+            location=data.get('tole'),
+            responsible_unit='LEOC',
+            status='Active'
+        )
+        db.session.add(event_log)
         db.session.commit()
 
         return jsonify({
@@ -1632,6 +1709,7 @@ def edit_disaster(id):
         data = request.get_json()
         disaster.disaster_type = data.get('disaster_type', disaster.disaster_type)
         disaster.disaster_date = datetime.strptime(data.get('disaster_date'), '%Y-%m-%d').date()
+        disaster.disaster_date_bs = data.get('disaster_date_bs', disaster.disaster_date_bs)  # BS date from frontend
 
         # Handle multi-select ward field - if it's a comma-separated string, take the first value
         ward_value = data.get('ward', disaster.ward)
@@ -1881,14 +1959,48 @@ def add_public_information():
     try:
         data = request.get_json()
 
+        # Validation
+        if not data.get('title') or not data.get('title').strip():
+            return jsonify({'success': False, 'message': 'Title is required'}), 400
+        if not data.get('content') or not data.get('content').strip():
+            return jsonify({'success': False, 'message': 'Content is required'}), 400
+
+        # Parse is_active - handle both boolean and string values
+        is_active = data.get('is_active', True)
+        if isinstance(is_active, str):
+            is_active = is_active.lower() in ('true', '1', 'yes', 'on')
+
+        # Parse datetime fields with multiple format support
+        valid_from = None
+        valid_until = None
+
+        if data.get('valid_from'):
+            try:
+                # Try ISO format first (from datetime-local input)
+                valid_from = datetime.fromisoformat(data.get('valid_from').replace('Z', '+00:00').replace('+00:00', ''))
+            except ValueError:
+                try:
+                    valid_from = datetime.strptime(data.get('valid_from'), '%Y-%m-%d %H:%M')
+                except ValueError:
+                    pass
+
+        if data.get('valid_until'):
+            try:
+                valid_until = datetime.fromisoformat(data.get('valid_until').replace('Z', '+00:00').replace('+00:00', ''))
+            except ValueError:
+                try:
+                    valid_until = datetime.strptime(data.get('valid_until'), '%Y-%m-%d %H:%M')
+                except ValueError:
+                    pass
+
         info = PublicInformation(
-            title=data.get('title'),
-            content=data.get('content'),
+            title=data.get('title').strip(),
+            content=data.get('content').strip(),
             info_type=data.get('info_type', 'General'),
             priority=data.get('priority', 'Normal'),
-            is_active=data.get('is_active', True),
-            valid_from=datetime.strptime(data.get('valid_from'), '%Y-%m-%d %H:%M') if data.get('valid_from') else None,
-            valid_until=datetime.strptime(data.get('valid_until'), '%Y-%m-%d %H:%M') if data.get('valid_until') else None
+            is_active=is_active,
+            valid_from=valid_from,
+            valid_until=valid_until
         )
 
         db.session.add(info)
@@ -2159,6 +2271,11 @@ def init_db():
                 db.session.execute(text("ALTER TABLE disaster ADD COLUMN affected_people_female INTEGER DEFAULT 0"))
                 print("Added affected_people_female column to disaster table")
 
+            # Check and add disaster_date_bs column to disaster table
+            if 'disaster_date_bs' not in columns:
+                db.session.execute(text("ALTER TABLE disaster ADD COLUMN disaster_date_bs VARCHAR(10)"))
+                print("Added disaster_date_bs column to disaster table")
+
             # Commit the changes
             db.session.commit()
 
@@ -2180,6 +2297,467 @@ def init_db():
 
 # Run initialization
 init_db()
+
+# ============================================
+# Daily Report PDF Generation API
+# ============================================
+
+@app.route('/api/generate-daily-report', methods=['GET'])
+def generate_daily_report():
+    """
+    Generate a daily disaster report PDF.
+    Query params:
+    - date: YYYY-MM-DD format (default: today)
+    """
+    try:
+        # Get date parameter or use today
+        report_date_str = request.args.get('date')
+        if report_date_str:
+            try:
+                report_date = datetime.strptime(report_date_str, '%Y-%m-%d').date()
+            except ValueError:
+                return jsonify({'success': False, 'message': 'Invalid date format. Use YYYY-MM-DD'}), 400
+        else:
+            report_date = date.today()
+
+        # Fetch data for the report
+        report_data = fetch_daily_report_data(report_date)
+
+        # Generate PDF
+        pdf_buffer = generate_pdf_report(report_data, report_date)
+
+        # Create response
+        response = make_response(pdf_buffer.getvalue())
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = f'attachment; filename=daily_report_{report_date.strftime("%Y-%m-%d")}.pdf'
+
+        return response
+
+    except Exception as e:
+        print(f"Error generating daily report: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+def fetch_daily_report_data(report_date):
+    """Fetch all necessary data for the daily report."""
+    
+    # Get disasters for the date
+    disasters = Disaster.query.filter(
+        db.func.date(Disaster.created_at) == report_date
+    ).all()
+    
+    # Get all disasters for statistics (not just today's)
+    all_disasters = Disaster.query.all()
+    
+    # Get event logs for the date
+    event_logs = EventLog.query.filter(
+        db.func.date(EventLog.timestamp) == report_date
+    ).order_by(EventLog.timestamp.desc()).all()
+    
+    # Get latest situation report
+    situation_report = SituationReport.query.order_by(
+        SituationReport.report_date.desc()
+    ).first()
+    
+    # Get active public advisories
+    public_advisories = PublicInformation.query.filter(
+        PublicInformation.is_active == True
+    ).order_by(PublicInformation.created_at.desc()).limit(5).all()
+    
+    # Calculate ward-wise statistics
+    ward_stats = {}
+    for ward in range(1, 10):
+        ward_disasters = [d for d in disasters if d.ward == ward]
+        ward_stats[ward] = {
+            'total_incidents': len(ward_disasters),
+            'deaths': sum(d.deaths for d in ward_disasters),
+            'missing': sum(d.missing_persons for d in ward_disasters),
+            'injured': sum(d.livestock_injured for d in ward_disasters),  # Using as proxy
+            'estimated_loss': 0,  # Calculate if available
+            'road_blocked': any(d.road_blocked_status for d in ward_disasters),
+            'electricity_blocked': any(d.electricity_blocked_status for d in ward_disasters),
+            'communication_blocked': any(d.communication_blocked_status for d in ward_disasters),
+            'livestock_loss': sum(d.livestock_death for d in ward_disasters),
+            'agricultural_loss': len([d for d in ward_disasters if d.agriculture_crop_damage]),
+        }
+    
+    # Calculate disaster type statistics
+    disaster_types = ['Earthquake', 'Flood', 'Landslide', 'Storm', 'Fire', 'Thunder', 'Animal terror']
+    type_stats = {}
+    for dtype in disaster_types:
+        type_disasters = [d for d in all_disasters if dtype.lower() in d.disaster_type.lower()]
+        type_stats[dtype] = {
+            'total': len(type_disasters),
+            'deaths': sum(d.deaths for d in type_disasters),
+            'missing': sum(d.missing_persons for d in type_disasters),
+            'injured': sum(d.livestock_injured for d in type_disasters),
+            'affected_families': sum(d.affected_households for d in type_disasters),
+            'house_damaged': sum(d.public_building_damage for d in type_disasters),
+            'house_destroyed': sum(d.public_building_destruction for d in type_disasters),
+            'public_building_damaged': sum(d.public_building_damage for d in type_disasters),
+            'public_building_destroyed': sum(d.public_building_destruction for d in type_disasters),
+            'livestock_loss': sum(d.livestock_death for d in type_disasters),
+            'fund_male': sum(d.affected_people_male for d in type_disasters),
+            'fund_female': sum(d.affected_people_female for d in type_disasters),
+        }
+    
+    # Infrastructure status
+    infrastructure = {
+        'electricity': 'Normal' if not any(d.electricity_blocked_status for d in disasters) else 'Disrupted',
+        'road': 'Open' if not any(d.road_blocked_status for d in disasters) else 'Blocked',
+        'communication': 'Normal' if not any(d.communication_blocked_status for d in disasters) else 'Disrupted',
+        'drinking_water': 'Normal' if not any(d.drinking_water_status for d in disasters) else 'Interrupted',
+    }
+    
+    return {
+        'disasters': [d.to_dict() for d in disasters],
+        'ward_stats': ward_stats,
+        'disaster_type_stats': type_stats,
+        'event_logs': [e.to_dict() for e in event_logs],
+        'situation_report': situation_report.to_dict() if situation_report else None,
+        'public_advisories': [p.to_dict() for p in public_advisories],
+        'infrastructure': infrastructure,
+        'total_stats': {
+            'incidents': len(disasters),
+            'deaths': sum(d.deaths for d in disasters),
+            'missing': sum(d.missing_persons for d in disasters),
+            'affected_people': sum(d.affected_people for d in disasters),
+            'affected_households': sum(d.affected_households for d in disasters),
+            'livestock_death': sum(d.livestock_death for d in disasters),
+            'livestock_injured': sum(d.livestock_injured for d in disasters),
+        }
+    }
+
+
+def generate_pdf_report(data, report_date):
+    """Generate PDF report using ReportLab."""
+    buffer = BytesIO()
+    
+    # Create PDF document
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        rightMargin=15*mm,
+        leftMargin=15*mm,
+        topMargin=15*mm,
+        bottomMargin=15*mm
+    )
+    
+    # Container for elements
+    elements = []
+    
+    # Styles
+    styles = getSampleStyleSheet()
+    
+    # Determine font names based on availability
+    font_name = UNICODE_FONT if UNICODE_FONT else 'Helvetica'
+    font_name_bold = UNICODE_FONT if UNICODE_FONT else 'Helvetica-Bold'
+    
+    # Custom styles with Unicode support
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=16,
+        textColor=colors.HexColor('#1a472a'),
+        spaceAfter=6,
+        alignment=TA_CENTER,
+        fontName=font_name_bold
+    )
+    
+    subtitle_style = ParagraphStyle(
+        'CustomSubtitle',
+        parent=styles['Heading2'],
+        fontSize=12,
+        textColor=colors.HexColor('#2c5282'),
+        spaceAfter=6,
+        alignment=TA_CENTER,
+        fontName=font_name_bold
+    )
+    
+    header_style = ParagraphStyle(
+        'CustomHeader',
+        parent=styles['Heading3'],
+        fontSize=10,
+        textColor=colors.white,
+        alignment=TA_CENTER,
+        fontName=font_name_bold
+    )
+    
+    normal_style = ParagraphStyle(
+        'CustomNormal',
+        parent=styles['Normal'],
+        fontSize=8,
+        fontName=font_name
+    )
+    
+    small_style = ParagraphStyle(
+        'CustomSmall',
+        parent=styles['Normal'],
+        fontSize=7,
+        fontName=font_name
+    )
+    
+    # Header
+    elements.append(Paragraph("Thalara Rural Municipality", title_style))
+    elements.append(Paragraph("Local Emergency Operating Centre (LEOC)", subtitle_style))
+    elements.append(Paragraph("Daily Incident Reporting", subtitle_style))
+    elements.append(Spacer(1, 6))
+    
+    # Date and Weather
+    date_weather_data = [
+        [Paragraph(f"<b>Date:</b> {report_date.strftime('%Y-%m-%d')}", normal_style),
+         Paragraph(f"<b>Today's Weather:</b> {data['situation_report']['weather_conditions'] if data['situation_report'] else 'N/A'}", normal_style)]
+    ]
+    date_weather_table = Table(date_weather_data, colWidths=[80*mm, 80*mm])
+    date_weather_table.setStyle(TableStyle([
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+    ]))
+    elements.append(date_weather_table)
+    elements.append(Spacer(1, 6))
+    
+    # Ward-wise Incident Overview Table
+    elements.append(Paragraph("<b>Incident Overview by Ward</b>", normal_style))
+    elements.append(Spacer(1, 3))
+    
+    # Ward table header
+    ward_header = ['Ward', 'Total\nIncident', 'Death', 'Missing', 'Injured', 'Est.\nLoss', 'Road/\nElec/\nComm', 'Livestock', 'Agriculture']
+    ward_data = [ward_header]
+    
+    for ward in range(1, 10):
+        stats = data['ward_stats'][ward]
+        blocked_status = []
+        if stats['road_blocked']:
+            blocked_status.append('R')
+        if stats['electricity_blocked']:
+            blocked_status.append('E')
+        if stats['communication_blocked']:
+            blocked_status.append('C')
+        
+        ward_data.append([
+            str(ward),
+            str(stats['total_incidents']),
+            str(stats['deaths']),
+            str(stats['missing']),
+            str(stats['injured']),
+            str(stats['estimated_loss']),
+            '/'.join(blocked_status) if blocked_status else '-',
+            str(stats['livestock_loss']),
+            str(stats['agricultural_loss'])
+        ])
+    
+    # Add totals row
+    totals = data['total_stats']
+    ward_data.append([
+        'Total',
+        str(totals['incidents']),
+        str(totals['deaths']),
+        str(totals['missing']),
+        str(totals['livestock_injured']),
+        '0',
+        '-',
+        str(totals['livestock_death']),
+        '-'
+    ])
+    
+    ward_table = Table(ward_data, colWidths=[15*mm, 18*mm, 15*mm, 15*mm, 15*mm, 15*mm, 20*mm, 18*mm, 20*mm])
+    ward_table.setStyle(TableStyle([
+        # Header styling
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2c5282')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), font_name_bold),
+        ('FONTSIZE', (0, 0), (-1, 0), 7),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
+        
+        # Body styling
+        ('BACKGROUND', (0, 1), (-1, -2), colors.HexColor('#f7fafc')),
+        ('TEXTCOLOR', (0, 1), (-1, -2), colors.black),
+        ('ALIGN', (0, 1), (-1, -2), 'CENTER'),
+        ('FONTNAME', (0, 1), (-1, -2), font_name),
+        ('FONTSIZE', (0, 1), (-1, -2), 7),
+        ('BOTTOMPADDING', (0, 1), (-1, -2), 4),
+        ('TOPPADDING', (0, 1), (-1, -2), 4),
+        
+        # Total row styling
+        ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#e2e8f0')),
+        ('FONTNAME', (0, -1), (-1, -1), font_name_bold),
+        
+        # Grid
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+    ]))
+    elements.append(ward_table)
+    elements.append(Spacer(1, 8))
+    
+    # Disaster Type Summary Table
+    elements.append(Paragraph("<b>Disaster Type Summary</b>", normal_style))
+    elements.append(Spacer(1, 3))
+    
+    type_header = ['Disaster', 'Total', 'Death', 'Missing', 'Injured', 'Affected\nFamilies', 
+                   'House\nDamage', 'House\nDestroy', 'Public Bldg\nDamage', 'Public Bldg\nDestroy',
+                   'Livestock\nLoss', 'Fund\nMale', 'Fund\nFemale']
+    type_data = [type_header]
+    
+    for dtype, stats in data['disaster_type_stats'].items():
+        if stats['total'] > 0:  # Only show disaster types with incidents
+            type_data.append([
+                dtype,
+                str(stats['total']),
+                str(stats['deaths']),
+                str(stats['missing']),
+                str(stats['injured']),
+                str(stats['affected_families']),
+                str(stats['house_damaged']),
+                str(stats['house_destroyed']),
+                str(stats['public_building_damaged']),
+                str(stats['public_building_destroyed']),
+                str(stats['livestock_loss']),
+                str(stats['fund_male']),
+                str(stats['fund_female'])
+            ])
+    
+    # If no disasters, show empty row
+    if len(type_data) == 1:
+        type_data.append(['No incidents'] + ['-'] * 12)
+    
+    type_table = Table(type_data, colWidths=[18*mm, 12*mm, 12*mm, 12*mm, 12*mm, 18*mm, 
+                                              15*mm, 15*mm, 18*mm, 18*mm, 15*mm, 12*mm, 12*mm])
+    type_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#744210')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), font_name_bold),
+        ('FONTSIZE', (0, 0), (-1, 0), 6),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 4),
+        
+        ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#fffaf0')),
+        ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
+        ('ALIGN', (0, 1), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 1), (-1, -1), font_name),
+        ('FONTSIZE', (0, 1), (-1, -1), 6),
+        ('BOTTOMPADDING', (0, 1), (-1, -1), 3),
+        ('TOPPADDING', (0, 1), (-1, -1), 3),
+        
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+    ]))
+    elements.append(type_table)
+    elements.append(Spacer(1, 8))
+    
+    # Infrastructure Status
+    elements.append(Paragraph("<b>Infrastructure Status</b>", normal_style))
+    elements.append(Spacer(1, 3))
+    
+    infra_data = [
+        ['Electricity Status:', data['infrastructure']['electricity'],
+         'Road Status:', data['infrastructure']['road']],
+        ['Communication Status:', data['infrastructure']['communication'],
+         'Drinking Water:', data['infrastructure']['drinking_water']]
+    ]
+    
+    infra_table = Table(infra_data, colWidths=[35*mm, 45*mm, 35*mm, 45*mm])
+    infra_table.setStyle(TableStyle([
+        ('FONTNAME', (0, 0), (0, -1), font_name_bold),
+        ('FONTNAME', (2, 0), (2, -1), font_name_bold),
+        ('FONTSIZE', (0, 0), (-1, -1), 8),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+    ]))
+    elements.append(infra_table)
+    elements.append(Spacer(1, 8))
+    
+    # Recent Event Logs
+    if data['event_logs']:
+        elements.append(Paragraph("<b>Recent Events</b>", normal_style))
+        elements.append(Spacer(1, 3))
+        
+        event_data = [['Time', 'Type', 'Description', 'Location', 'Status']]
+        for event in data['event_logs'][:5]:  # Show last 5 events
+            event_data.append([
+                event['timestamp'].split()[1][:5] if ' ' in event['timestamp'] else event['timestamp'][:5],
+                event['event_type'][:15],
+                event['description'][:40] + '...' if len(event['description']) > 40 else event['description'],
+                event['location'][:15] if event['location'] else '-',
+                event['status']
+            ])
+        
+        event_table = Table(event_data, colWidths=[15*mm, 25*mm, 65*mm, 25*mm, 20*mm])
+        event_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#4a5568')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), font_name_bold),
+            ('FONTSIZE', (0, 0), (-1, 0), 7),
+            
+            ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#f7fafc')),
+            ('FONTSIZE', (0, 1), (-1, -1), 7),
+            ('ALIGN', (0, 1), (-1, -1), 'LEFT'),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ]))
+        elements.append(event_table)
+        elements.append(Spacer(1, 6))
+    
+    # Public Advisories
+    if data['public_advisories']:
+        elements.append(Paragraph("<b>Public Advisories</b>", normal_style))
+        elements.append(Spacer(1, 3))
+        
+        for advisory in data['public_advisories'][:3]:  # Show up to 3 advisories
+            advisory_text = f"• <b>{advisory['title']}</b> ({advisory['priority']}): {advisory['content'][:100]}"
+            if len(advisory['content']) > 100:
+                advisory_text += "..."
+            elements.append(Paragraph(advisory_text, small_style))
+        
+        elements.append(Spacer(1, 6))
+    
+    # Footer
+    elements.append(Spacer(1, 10))
+    elements.append(HRFlowable(width="100%", thickness=1, color=colors.grey))
+    elements.append(Spacer(1, 3))
+    footer_text = f"Report generated on {datetime.now().strftime('%Y-%m-%d %H:%M')} | LEOC Thalara Rural Municipality"
+    elements.append(Paragraph(f"<i>{footer_text}</i>", small_style))
+    
+    # Build PDF
+    doc.build(elements)
+    buffer.seek(0)
+    
+    return buffer
+
+
+@app.route('/daily-report-preview')
+def daily_report_preview():
+    """
+    Render a print-friendly HTML preview of the daily report.
+    Query params:
+    - date: YYYY-MM-DD format (default: today)
+    """
+    try:
+        # Get date parameter or use today
+        report_date_str = request.args.get('date')
+        if report_date_str:
+            try:
+                report_date = datetime.strptime(report_date_str, '%Y-%m-%d').date()
+            except ValueError:
+                report_date = date.today()
+        else:
+            report_date = date.today()
+
+        # Fetch data for the report
+        report_data = fetch_daily_report_data(report_date)
+
+        return render_template('daily_report_print.html', 
+                               data=report_data, 
+                               report_date=report_date,
+                               generated_at=datetime.now())
+
+    except Exception as e:
+        print(f"Error generating report preview: {str(e)}")
+        return f"Error: {str(e)}", 500
+
 
 if __name__ == '__main__':
     # When running directly, use debug mode
