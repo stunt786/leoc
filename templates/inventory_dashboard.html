@@ -1,0 +1,522 @@
+{% extends "base.html" %}
+
+{% block title %}जिन्सी व्यवस्थापन - LEOC{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <!-- Summary Cards -->
+    <!-- Summary Cards -->
+    <div class="row mb-4 g-2">
+        <div class="col-md">
+            <div class="card text-white bg-primary mb-3 h-100 text-center">
+                <div class="card-header py-2 fw-bold">जम्मा सामग्री</div>
+                <div class="card-body py-3">
+                    <h2 class="card-title mb-1 fw-bold">{{ total_items }}</h2>
+                    <p class="card-text mb-0">कुल सूची</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md">
+            <div class="card text-white bg-warning mb-3 h-100 text-center">
+                <div class="card-header py-2 fw-bold text-dark">न्यून मौज्दात</div>
+                <div class="card-body py-3">
+                    <h2 class="card-title mb-1 fw-bold text-dark">{{ low_stock }}</h2>
+                    <p class="card-text mb-0 text-dark">थप्नुपर्ने</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md">
+            <div class="card text-white bg-danger mb-3 h-100 text-center">
+                <div class="card-header py-2 fw-bold">सकिएको (OOS)</div>
+                <div class="card-body py-3">
+                    <h2 class="card-title mb-1 fw-bold">{{ out_of_stock }}</h2>
+                    <p class="card-text mb-0">व्यवस्थापन</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md">
+            <div class="card stat-card-info mb-3 text-white bg-info h-100 text-center shadow-sm"
+                style="cursor: pointer;" onclick="openFundModal()">
+                <div class="card-header py-2 fw-bold">
+                    <span>कोष मौज्दात</span>
+                </div>
+                <div class="card-body py-3">
+                    <h2 class="card-title mb-1 fw-bold" id="fund-balance">₹0</h2>
+                    <p class="card-text mb-0">थप विवरण <i class="bi bi-wallet2 ms-1"></i></p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md">
+            <div class="card bg-light border-0 mb-3 h-100 text-center shadow-sm">
+                <div class="card-header py-2 fw-bold bg-white">कार्यहरू</div>
+                <div class="card-body py-3">
+                    <div class="d-grid gap-2">
+                        <a href="/inventory/add" class="btn btn-success">
+                            <i class="bi bi-plus-circle"></i> नयाँ थप्नुहोस्
+                        </a>
+                        <a href="/inventory/report" target="_blank" class="btn btn-outline-secondary">
+                            <i class="bi bi-printer"></i> रिपोर्ट प्रिन्ट
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters and Search -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form id="filter-form" class="row g-3 align-items-end">
+                <div class="col-md-3">
+                    <label for="category-filter" class="form-label">कोटी (Category)</label>
+                    <select class="form-select" id="category-filter">
+                        <option value="">सबै</option>
+                        <option value="Relief Material">राहत सामग्री</option>
+                        <option value="Medical">औषधि तथा उपकरण</option>
+                        <option value="Search & Rescue">खोज तथा उद्धार</option>
+                        <option value="Logistics">बन्दोबस्ती</option>
+                        <option value="Vehicle">सवारी साधन</option>
+                        <option value="Other">अन्य</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="status-filter" class="form-label">अवस्था (Status)</label>
+                    <select class="form-select" id="status-filter">
+                        <option value="">सबै</option>
+                        <option value="Available">उपलब्ध (Available)</option>
+                        <option value="Low Stock">न्यून (Low Stock)</option>
+                        <option value="Out of Stock">सकिएको (Out of Stock)</option>
+                        <option value="Damaged">बिग्रिएको (Damaged)</option>
+                        <option value="Expired">म्याद नाघेको (Expired)</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label for="search-input" class="form-label">खोज्नुहोस्</label>
+                    <input type="text" class="form-control" id="search-input" placeholder="नाम वा कोड...">
+                </div>
+                <div class="col-md-2">
+                    <button type="button" class="btn btn-primary w-100" onclick="loadInventory()">
+                        <i class="bi bi-search"></i> खोज्नुहोस्
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Inventory List -->
+    <div class="card">
+        <div class="card-header bg-white">
+            <h5 class="mb-0">सामग्री सूची</h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Image</th>
+                            <th>नाम</th>
+                            <th>कोड</th>
+                            <th>कोटी</th>
+                            <th>परिमाण</th>
+                            <th>स्रोत</th>
+                            <th>अवस्था</th>
+                            <th>स्थान</th>
+                            <th>कार्य</th>
+                        </tr>
+                    </thead>
+                    <tbody id="inventory-list-body">
+                        <!-- Data will be loaded here via JS -->
+                    </tbody>
+                </table>
+            </div>
+            <!-- Pagination -->
+            <div class="d-flex justify-content-between align-items-center p-3 border-top" id="pagination-container">
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Fund Transaction Modal -->
+<div class="modal fade" id="fundModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title"><i class="bi bi-wallet2"></i> LEOC कोष व्यवस्थापन</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row mb-4 text-center">
+                    <div class="col-4 border-end">
+                        <small class="text-muted">जम्मा आम्दानी</small>
+                        <h4 class="text-success" id="modal-total-income">₹0</h4>
+                    </div>
+                    <div class="col-4 border-end">
+                        <small class="text-muted">जम्मा खर्च</small>
+                        <h4 class="text-danger" id="modal-total-expenditure">₹0</h4>
+                    </div>
+                    <div class="col-4">
+                        <small class="text-muted">वर्तमान मौज्दात</small>
+                        <h4 class="text-primary" id="modal-balance">₹0</h4>
+                    </div>
+                </div>
+
+                <hr>
+
+                <h6><i class="bi bi-plus-circle"></i> नयाँ कारोबार थप्नुहोस्</h6>
+                <form id="fundForm" class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label">प्रकार</label>
+                        <select class="form-select" id="fund_type" required>
+                            <option value="Income">आम्दानी (Income)</option>
+                            <option value="Expenditure">खर्च (Expenditure)</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">रकम रु.</label>
+                        <input type="number" class="form-control" id="fund_amount" step="0.01" required>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">मिति</label>
+                        <input type="date" class="form-control" id="fund_date" required>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">विवरण</label>
+                        <input type="text" class="form-control" id="fund_desc" placeholder="कारोबारको छोटो विवरण..."
+                            required>
+                    </div>
+                    <div class="col-12 d-flex justify-content-end">
+                        <button type="button" class="btn btn-primary" onclick="saveFundTransaction()">
+                            <i class="bi bi-save"></i> सुरक्षित गर्नुहोस्
+                        </button>
+                    </div>
+                </form>
+
+                <hr>
+
+                <h6><i class="bi bi-clock-history"></i> हालैका कारोबारहरू</h6>
+                <div class="table-responsive" style="max-height: 250px;">
+                    <table class="table table-sm table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th>मिति</th>
+                                <th>प्रकार</th>
+                                <th>विवरण</th>
+                                <th class="text-end">रकम रु.</th>
+                            </tr>
+                        </thead>
+                        <tbody id="fundHistoryBody">
+                            <tr>
+                                <td colspan="4" class="text-center">लोड हुँदैछ...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let currentPage = 1;
+    let currentFundBalance = 0;
+
+    document.addEventListener('DOMContentLoaded', () => {
+        loadInventory();
+        loadFundSummary();
+
+        // Add event listeners for filters
+        document.getElementById('category-filter').addEventListener('change', () => loadInventory(1));
+        document.getElementById('status-filter').addEventListener('change', () => loadInventory(1));
+        document.getElementById('search-input').addEventListener('input', debounce(() => loadInventory(1), 500));
+
+        // Periodically refresh data
+        setInterval(() => {
+            loadInventory(currentPage);
+            loadFundSummary();
+        }, 15000);
+    });
+
+    function debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    }
+
+    function loadInventory(page = 1) {
+        currentPage = page;
+        const category = document.getElementById('category-filter').value;
+        const status = document.getElementById('status-filter').value;
+        const search = document.getElementById('search-input').value;
+
+        // Update Report Link
+        const reportBtn = document.querySelector('a[href^="/inventory/report"]');
+        let reportUrl = '/inventory/report';
+        const params = new URLSearchParams();
+        if (category) params.append('category', category);
+        if (status) params.append('status', status);
+        if (params.toString()) reportUrl += '?' + params.toString();
+
+        if (reportBtn) reportBtn.href = reportUrl;
+
+        const apiParams = new URLSearchParams();
+        apiParams.append('page', page);
+        apiParams.append('per_page', 10);
+        if (category) apiParams.append('category', category);
+        if (status) apiParams.append('status', status);
+        if (search) apiParams.append('search', search);
+
+        let url = `/api/inventory?${apiParams.toString()}`;
+
+        fetch(url)
+            .then(response => response.json())
+            .then(data => {
+                renderTable(data.items);
+                renderPagination(data);
+            })
+            .catch(error => console.error('Error:', error));
+    }
+
+    function getStatusClass(status) {
+        switch (status) {
+            case 'Available': return 'success';
+            case 'Low Stock': return 'warning text-dark';
+            case 'Out of Stock': return 'danger';
+            case 'Damaged': return 'dark';
+            case 'Expired': return 'secondary';
+            default: return 'info';
+        }
+    }
+
+    function getStatusLabel(status) {
+        switch (status) {
+            case 'Available': return 'उपलब्ध';
+            case 'Low Stock': return 'न्यून';
+            case 'Out of Stock': return 'सकिएको';
+            case 'Damaged': return 'बिग्रिएको';
+            case 'Expired': return 'म्याद नाघेको';
+            default: return status;
+        }
+    }
+
+    function renderTable(items) {
+        const tbody = document.getElementById('inventory-list-body');
+        tbody.innerHTML = '';
+
+        if (items.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="9" class="text-center py-4">कुनै सामग्री भेटिएन।</td></tr>';
+            return;
+        }
+
+        items.forEach(item => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${item.image_filename ? `<img src="/static/uploads/${item.image_filename}" width="50" style="border-radius:2px;">` : '<i class="bi bi-box-seam text-secondary" style="font-size: 1.5rem;"></i>'}</td>
+                <td class="fw-bold">${item.name}</td>
+                <td><span class="badge bg-light text-dark">${item.item_code || '-'}</span></td>
+                <td>${item.category}</td>
+                <td>${item.quantity} ${item.unit}</td>
+                <td><small>${item.source || '-'}</small></td>
+                <td><span class="badge bg-${getStatusClass(item.status)}">${getStatusLabel(item.status)}</span></td>
+                <td><small>${item.warehouse_location || '-'}</small></td>
+                <td class="text-nowrap">
+                    <a href="/inventory/add?edit=${item.id}" class="btn btn-sm btn-outline-primary shadow-sm" title="Edit">
+                        <i class="bi bi-pencil"></i>
+                    </a>
+                    <button class="btn btn-sm btn-outline-danger shadow-sm" onclick="deleteItem(${item.id}, '${item.name}')" title="Delete">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    function renderPagination(data) {
+        const container = document.getElementById('pagination-container');
+        if (data.pages <= 1) {
+            container.innerHTML = '';
+            return;
+        }
+
+        let paginationHtml = `
+            <span>Showing ${(data.page - 1) * 10 + 1} to ${Math.min(data.page * 10, data.total)} of ${data.total} entries</span>
+            <nav>
+                <ul class="pagination mb-0">
+                    <li class="page-item ${data.page === 1 ? 'disabled' : ''}">
+                        <button class="page-link" onclick="loadInventory(${data.page - 1})">Previous</button>
+                    </li>
+        `;
+
+        // Simple pagination logic (showing 1, 2, ... current ... last)
+        // For simplicity, just prev/next and current page here for now
+        paginationHtml += `
+            <li class="page-item active"><span class="page-link">${data.page}</span></li>
+        `;
+
+        paginationHtml += `
+                    <li class="page-item ${data.page === data.pages ? 'disabled' : ''}">
+                        <button class="page-link" onclick="loadInventory(${data.page + 1})">Next</button>
+                    </li>
+                </ul>
+            </nav>
+        `;
+        container.innerHTML = paginationHtml;
+    }
+
+    function editItem(id) {
+        // We will use the add form page but pre-filled. 
+        // Best approach is generic form page.
+        // For now, let's redirect to edit page or use modal?
+        // App routes said /inventory/edit/<id> is GET json. 
+        // Ah, implementation plan said /inventory/edit/<id> for page. 
+        // Let's make the form page handle edit via query param or generic.
+        // Wait, app.py route:
+        // /inventory/add is form.
+        // /inventory/edit/<int:id> IS JSON. 
+        // So I should likely use a Modal on the dashboard OR a single form page.
+
+        // Let's create a form.html that usually is standalone.
+        // I'll make a JS redirection to "/inventory/form?id=" + id and let the form page handle fetching.
+        // Note: app.py doesn't have /inventory/form route, only /inventory/add.
+        // I should have added /inventory/edit page route. 
+        // I will use a simple hack: redirect to /inventory/add?id=... and make that page smart.
+        window.location.href = `/inventory/add?edit=${id}`;
+    }
+
+    function deleteItem(id, name) {
+        if (!confirm(`के तपाई '${name}' हटाउन निश्चित हुनुहुन्छ? (Are you sure you want to delete '${name}'?)`)) return;
+
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+        fetch(`/inventory/delete/${id}`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': csrfToken
+            }
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // alert('Item deleted successfully');
+                    loadInventory(currentPage);
+                } else {
+                    alert('Error: ' + data.message);
+                }
+            })
+            .catch(error => console.error('Error:', error));
+    }
+
+    // Fund Management Functions
+    function loadFundSummary() {
+        fetch('/api/funds/summary')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    currentFundBalance = data.balance;
+                    document.getElementById('fund-balance').innerText = `₹${data.balance.toLocaleString('en-IN')}`;
+                    document.getElementById('modal-total-income').innerText = `₹${data.total_income.toLocaleString('en-IN')}`;
+                    document.getElementById('modal-total-expenditure').innerText = `₹${data.total_expenditure.toLocaleString('en-IN')}`;
+                    document.getElementById('modal-balance').innerText = `₹${data.balance.toLocaleString('en-IN')}`;
+                }
+            })
+            .catch(error => console.error('Error loading fund summary:', error));
+    }
+
+    function openFundModal() {
+        // Use Bootstrap 5 way
+        const fundModalEl = document.getElementById('fundModal');
+        const fundModal = bootstrap.Modal.getOrCreateInstance(fundModalEl);
+        fundModal.show();
+        loadFundHistory();
+        loadFundSummary();
+        // Set current date for the form
+        document.getElementById('fund_date').valueAsDate = new Date();
+    }
+
+    function loadFundHistory() {
+        const tbody = document.getElementById('fundHistoryBody');
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center">लोड हुँदैछ...</td></tr>';
+
+        fetch('/api/funds/transactions')
+            .then(response => response.json())
+            .then(data => {
+                tbody.innerHTML = '';
+                if (data.success && data.transactions.length > 0) {
+                    data.transactions.forEach(transaction => {
+                        const tr = document.createElement('tr');
+                        const amountClass = transaction.transaction_type === 'Income' ? 'text-success' : 'text-danger';
+                        const sign = transaction.transaction_type === 'Income' ? '+' : '-';
+                        tr.innerHTML = `
+                            <td><small>${transaction.transaction_date}</small></td>
+                            <td><span class="badge ${transaction.transaction_type === 'Income' ? 'bg-success' : 'bg-danger'}">${transaction.transaction_type === 'Income' ? 'आम्दानी' : 'खर्च'}</span></td>
+                            <td><small>${transaction.description}</small></td>
+                            <td class="text-end fw-bold ${amountClass}">${sign} ₹${transaction.amount.toLocaleString('en-IN')}</td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">कुनै कारोबार फेला परेन।</td></tr>';
+                }
+            })
+            .catch(error => {
+                console.error('Error loading fund history:', error);
+                tbody.innerHTML = '<tr><td colspan="4" class="text-center text-danger">कारोबार लोड गर्न असफल भयो।</td></tr>';
+            });
+    }
+
+    function saveFundTransaction() {
+        const type = document.getElementById('fund_type').value;
+        const amount = parseFloat(document.getElementById('fund_amount').value);
+        const date = document.getElementById('fund_date').value;
+        const description = document.getElementById('fund_desc').value;
+
+        if (!amount || amount <= 0 || !date || !description) {
+            alert('कृपया सबै विवरणहरू भर्नुहोस्।');
+            return;
+        }
+
+        // Expenditure Validation: Cannot exceed income
+        if (type === 'Expenditure' && amount > currentFundBalance) {
+            alert(`अपर्याप्त मौज्दात! तपाईंसँग मात्र ₹${currentFundBalance.toLocaleString('en-IN')} मौज्दात छ। (Insufficient funds! You only have ₹${currentFundBalance.toLocaleString('en-IN')} available.)`);
+            return;
+        }
+
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+        fetch('/api/funds/transactions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                transaction_type: type,
+                amount: amount,
+                transaction_date: date,
+                description: description
+            })
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // alert('कारोबार सफलतापूर्वक सुरक्षित भयो!');
+                    document.getElementById('fundForm').reset();
+                    document.getElementById('fund_date').valueAsDate = new Date(); // Reset date
+                    loadFundSummary();
+                    loadFundHistory();
+                } else {
+                    alert('त्रुटि: ' + data.message);
+                }
+            })
+            .catch(error => console.error('Error saving fund transaction:', error));
+    }
+</script>
+{% endblock %}

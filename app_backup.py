@@ -241,10 +241,6 @@ class ReliefDistribution(db.Model):
     image_filename = db.Column(db.String(255))
     notes = db.Column(db.Text)
 
-    # Fund Management Link
-    fund_transaction_id = db.Column(db.Integer, db.ForeignKey('fund_transaction.id'), nullable=True)
-    fund_transaction = db.relationship('FundTransaction', backref=db.backref('distributions', lazy=True))
-
     # Metadata
     created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)  # Added index
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, index=True)  # Added index
@@ -591,62 +587,6 @@ class DailyReportLog(db.Model):
             'created_at': self.created_at.strftime('%Y-%m-%d %H:%M')
         }
 
-# Inventory Item Model
-class InventoryItem(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(200), nullable=False, index=True)
-    item_code = db.Column(db.String(50), unique=True, index=True) # Unique identifier/Label
-    category = db.Column(db.String(100), nullable=False, index=True) # Relief Material, Medical, Search & Rescue, Logistics, Vehicle, Other
-    quantity = db.Column(db.Integer, nullable=False, default=0)
-    unit = db.Column(db.String(50), nullable=False) # kg, pcs, box, set, liter, meter, etc.
-    source = db.Column(db.String(100)) # Purchase, Donation, Provincial Govt, Federal Govt, NGO/INGO
-    status = db.Column(db.String(50), default='Available', index=True) # Available, Low Stock, Out of Stock, Damaged, Expired
-    expiry_date = db.Column(db.Date)
-    warehouse_location = db.Column(db.String(200))
-    remarks = db.Column(db.Text)
-    image_filename = db.Column(db.String(255))
-    is_locked = db.Column(db.Boolean, default=False, index=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, index=True)
-
-    def to_dict(self):
-        return {
-            'id': self.id,
-            'name': self.name,
-            'item_code': self.item_code,
-            'category': self.category,
-            'quantity': self.quantity,
-            'unit': self.unit,
-            'source': self.source,
-            'status': self.status,
-            'expiry_date': self.expiry_date.strftime('%Y-%m-%d') if self.expiry_date else None,
-            'warehouse_location': self.warehouse_location,
-            'remarks': self.remarks,
-            'image_filename': self.image_filename,
-            'is_locked': self.is_locked,
-            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M'),
-            'updated_at': self.updated_at.strftime('%Y-%m-%d %H:%M')
-        }
-
-# Fund Transaction Model
-class FundTransaction(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    transaction_type = db.Column(db.String(50), nullable=False, index=True) # Income, Expenditure
-    amount = db.Column(db.Float, nullable=False, default=0.0)
-    description = db.Column(db.String(500), nullable=False)
-    transaction_date = db.Column(db.Date, nullable=False, default=date.today)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-    def to_dict(self):
-        return {
-            'id': self.id,
-            'transaction_type': self.transaction_type,
-            'amount': self.amount,
-            'description': self.description,
-            'transaction_date': self.transaction_date.strftime('%Y-%m-%d'),
-            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M')
-        }
-
 # Routes
 @app.template_filter('to_nepali_num')
 def to_nepali_num(value):
@@ -772,69 +712,6 @@ def get_distributions():
             'has_prev': pagination.has_prev
         }
     })
-
-# Fund Management API
-@csrf.exempt
-@app.route('/api/funds/summary', methods=['GET'])
-def get_funds_summary():
-    try:
-        # Get total income
-        total_income = db.session.query(db.func.sum(FundTransaction.amount)).filter(
-            FundTransaction.transaction_type == 'Income'
-        ).scalar() or 0.0
-        
-        # Get total expenditure
-        total_expenditure = db.session.query(db.func.sum(FundTransaction.amount)).filter(
-            FundTransaction.transaction_type == 'Expenditure'
-        ).scalar() or 0.0
-        
-        balance = total_income - total_expenditure
-        
-        return jsonify({
-            'success': True,
-            'total_income': total_income,
-            'total_expenditure': total_expenditure,
-            'balance': balance
-        })
-    except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 500
-
-@csrf.exempt
-@app.route('/api/funds/transactions', methods=['GET', 'POST'])
-def handle_fund_transactions():
-    if request.method == 'GET':
-        transactions = FundTransaction.query.order_by(FundTransaction.transaction_date.desc()).all()
-        return jsonify({
-            'success': True,
-            'transactions': [t.to_dict() for t in transactions]
-        })
-    
-    if request.method == 'POST':
-        try:
-            data = request.json
-            if not data:
-                data = request.form
-                
-            transaction = FundTransaction(
-                transaction_type=data.get('transaction_type'),
-                amount=float(data.get('amount', 0)),
-                description=data.get('description'),
-                transaction_date=datetime.strptime(data.get('transaction_date'), '%Y-%m-%d').date() if data.get('transaction_date') else date.today()
-            )
-            db.session.add(transaction)
-            db.session.commit()
-            
-            # Clear cache
-            clear_cache()
-            
-            return jsonify({
-                'success': True,
-                'message': 'Transaction recorded successfully',
-                'data': transaction.to_dict()
-            }), 201
-        except Exception as e:
-            db.session.rollback()
-            return jsonify({'success': False, 'message': str(e)}), 400
 
 @app.route('/api/distributions', methods=['POST'])
 def add_distribution():
@@ -998,20 +875,6 @@ def add_distribution():
                 'errors': errors
             }), 400
         
-        # Check fund balance if cash is distributed
-        cash_received = float(data.get('cash_received', 0)) or 0.0
-        if cash_received > 0:
-            total_income = db.session.query(db.func.sum(FundTransaction.amount)).filter_by(transaction_type='Income').scalar() or 0.0
-            total_expense = db.session.query(db.func.sum(FundTransaction.amount)).filter_by(transaction_type='Expenditure').scalar() or 0.0
-            available_balance = total_income - total_expense
-            
-            if cash_received > available_balance:
-                return jsonify({
-                    'success': False,
-                    'message': f'अपर्याप्त मौज्दात! तपाईंसँग मात्र रु {available_balance:,.2f} मौज्दात छ।',
-                    'errors': [f'Insufficient funds. Available: {available_balance}']
-                }), 400
-
         image_filename = None
         documents = []
         
@@ -1103,19 +966,6 @@ def add_distribution():
         distribution.set_documents(documents)
         
         db.session.add(distribution)
-        
-        # If cash is distributed, record a fund transaction and link it
-        if cash_received > 0:
-            transaction = FundTransaction(
-                transaction_type='Expenditure',
-                amount=cash_received,
-                description=f'राहात वितरण: {distribution.beneficiary_name} ({distribution.beneficiary_id})',
-                transaction_date=datetime.now().date()
-            )
-            db.session.add(transaction)
-            db.session.flush() # Get transaction ID
-            distribution.fund_transaction_id = transaction.id
-            
         db.session.commit()
 
         # Clear cache after modification
@@ -1228,38 +1078,9 @@ def edit_distribution(id):
         distribution.bank_name = data.get('bank_name', distribution.bank_name)
         
         # Update relief distribution
-        old_cash = distribution.cash_received
-        new_cash = float(data.get('cash_received', 0)) or 0.0
-        distribution.cash_received = new_cash
+        distribution.cash_received = float(data.get('cash_received', distribution.cash_received)) or 0.0
         distribution.status = data.get('status', distribution.status)
         distribution.notes = data.get('notes', distribution.notes)
-        
-        # Sync Fund Transaction
-        if new_cash != old_cash:
-            if new_cash > 0:
-                if distribution.fund_transaction_id:
-                    # Update existing transaction
-                    transaction = FundTransaction.query.get(distribution.fund_transaction_id)
-                    if transaction:
-                        transaction.amount = new_cash
-                        transaction.description = f'राहात वितरण (सम्पादित): {distribution.beneficiary_name} ({distribution.beneficiary_id})'
-                else:
-                    # Create new transaction
-                    transaction = FundTransaction(
-                        transaction_type='Expenditure',
-                        amount=new_cash,
-                        description=f'राहात वितरण: {distribution.beneficiary_name} ({distribution.beneficiary_id})',
-                        transaction_date=datetime.now().date()
-                    )
-                    db.session.add(transaction)
-                    db.session.flush()
-                    distribution.fund_transaction_id = transaction.id
-            elif distribution.fund_transaction_id:
-                # Cash became 0, delete linked transaction
-                transaction = FundTransaction.query.get(distribution.fund_transaction_id)
-                if transaction:
-                    db.session.delete(transaction)
-                distribution.fund_transaction_id = None
         
         # Parse JSON fields
         items_json = data.get('relief_items_json')
@@ -1561,14 +1382,8 @@ def delete_distribution(id):
         if distribution.is_locked:
             return jsonify({
                 'success': False,
-                'message': 'मेटाउन सकिँदैन: रेकर्ड लक गरिएको छ। कृपया पहिले अनलक गर्नुहोस्।'
+                'message': 'रेकर्ड हटाउन सकिँदैन: रेकर्ड लक गरिएको छ। कृपया पहिले अनलक गर्नुहोस्।'
             }), 403
-
-        # Delete associated fund transaction if it exists
-        if distribution.fund_transaction_id:
-            transaction = FundTransaction.query.get(distribution.fund_transaction_id)
-            if transaction:
-                db.session.delete(transaction)
 
         # Delete image if exists
         if distribution.image_filename:
@@ -3876,180 +3691,3 @@ if __name__ == '__main__':
     # Production-safe debug mode handling
     debug_mode = os.getenv('FLASK_DEBUG', 'False').lower() in ('true', '1', 'yes')
     app.run(debug=debug_mode, port=int(os.getenv('PORT', 5002)))
-
-# ============ INVENTORY ROUTES ============
-
-@app.route('/inventory')
-def inventory_dashboard():
-    # Helper to get stats
-    total_items = InventoryItem.query.count()
-    low_stock = InventoryItem.query.filter(InventoryItem.status == 'Low Stock').count()
-    out_of_stock = InventoryItem.query.filter(InventoryItem.status == 'Out of Stock').count()
-    
-    # Category breakdown
-    categories = db.session.query(InventoryItem.category, db.func.count(InventoryItem.id)).group_by(InventoryItem.category).all()
-    category_data = {c[0]: c[1] for c in categories}
-    
-    return render_template('inventory_dashboard.html', 
-                          total_items=total_items, 
-                          low_stock=low_stock, 
-                          out_of_stock=out_of_stock,
-                          category_data=category_data)
-
-@app.route('/inventory/add', methods=['GET', 'POST'])
-def add_inventory_item():
-    if request.method == 'POST':
-        try:
-            data = request.form
-            
-            # Validation
-            name = data.get('name', '').strip()
-            if not name:
-                # In a real app we would flash error, for now basic handling
-                return "Name is required", 400
-                
-            expiry_date_str = data.get('expiry_date', '').strip()
-            expiry_date = None
-            if expiry_date_str:
-                try:
-                    expiry_date = datetime.strptime(expiry_date_str, '%Y-%m-%d').date()
-                except ValueError:
-                    pass
-            
-            # Image Upload
-            image_filename = None
-            if 'image' in request.files:
-                file = request.files['image']
-                if file and file.filename:
-                    filename = secure_filename(file.filename)
-                    # Use a unique prefix to avoid collisions
-                    unique_filename = f"inv_{int(time.time())}_{filename}"
-                    file.save(os.path.join(app.config['UPLOAD_FOLDER'], unique_filename))
-                    image_filename = unique_filename
-
-            new_item = InventoryItem(
-                name=name,
-                item_code=data.get('item_code'),
-                category=data.get('category'),
-                quantity=int(data.get('quantity', 0)),
-                unit=data.get('unit'),
-                source=data.get('source'),
-                status=data.get('status', 'Available'),
-                expiry_date=expiry_date,
-                warehouse_location=data.get('warehouse_location'),
-                remarks=data.get('remarks'),
-                image_filename=image_filename
-            )
-            
-            db.session.add(new_item)
-            db.session.commit()
-            
-            return jsonify({'success': True, 'message': 'Item added successfully', 'id': new_item.id})
-            
-        except Exception as e:
-            db.session.rollback()
-            return jsonify({'success': False, 'message': str(e)}), 500
-            
-    return render_template('inventory_form.html')
-
-@app.route('/api/inventory', methods=['GET'])
-def get_inventory_items():
-    page = request.args.get('page', 1, type=int)
-    per_page = request.args.get('per_page', 20, type=int)
-    category = request.args.get('category')
-    status = request.args.get('status')
-    search = request.args.get('search')
-    
-    query = InventoryItem.query
-    
-    if category:
-        query = query.filter(InventoryItem.category == category)
-    if status:
-        query = query.filter(InventoryItem.status == status)
-    if search:
-        query = query.filter(InventoryItem.name.ilike(f'%{search}%'))
-        
-    pagination = query.order_by(InventoryItem.updated_at.desc()).paginate(page=page, per_page=per_page, error_out=False)
-    
-    return jsonify({
-        'items': [item.to_dict() for item in pagination.items],
-        'total': pagination.total,
-        'pages': pagination.pages,
-        'page': page
-    })
-
-@app.route('/inventory/edit/<int:id>', methods=['GET'])
-def get_inventory_item(id):
-    item = InventoryItem.query.get_or_404(id)
-    return jsonify(item.to_dict())
-
-@app.route('/inventory/update/<int:id>', methods=['POST'])
-def update_inventory_item(id):
-    item = InventoryItem.query.get_or_404(id)
-    try:
-        data = request.form
-        
-        item.name = data.get('name', item.name)
-        item.item_code = data.get('item_code', item.item_code)
-        item.category = data.get('category', item.category)
-        item.quantity = int(data.get('quantity', item.quantity))
-        item.unit = data.get('unit', item.unit)
-        item.source = data.get('source', item.source)
-        item.status = data.get('status', item.status)
-        item.warehouse_location = data.get('warehouse_location', item.warehouse_location)
-        item.remarks = data.get('remarks', item.remarks)
-        
-        expiry_date_str = data.get('expiry_date', '').strip()
-        if expiry_date_str:
-            try:
-                item.expiry_date = datetime.strptime(expiry_date_str, '%Y-%m-%d').date()
-            except ValueError:
-                pass
-        else:
-             # handle clearing logic if needed, or keep existing if empty string passed? 
-             # For now simpler: if passed as key but empty, maybe clear it? 
-             # Assume frontend sends value if set.
-             pass
-             
-        # Image Update
-        if 'image' in request.files:
-            file = request.files['image']
-            if file and file.filename:
-                filename = secure_filename(file.filename)
-                unique_filename = f"inv_{int(time.time())}_{filename}"
-                file.save(os.path.join(app.config['UPLOAD_FOLDER'], unique_filename))
-                item.image_filename = unique_filename
-        
-        db.session.commit()
-        return jsonify({'success': True, 'message': 'Item updated successfully'})
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 500
-
-@app.route('/inventory/delete/<int:id>', methods=['POST'])
-def delete_inventory_item(id):
-    item = InventoryItem.query.get_or_404(id)
-    try:
-        db.session.delete(item)
-        db.session.commit()
-        return jsonify({'success': True, 'message': 'Item deleted successfully'})
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 500
-
-@app.route('/inventory/report')
-def inventory_report_print():
-     # Get all items for report (maybe filtered via args)
-    category = request.args.get('category')
-    status = request.args.get('status')
-    
-    query = InventoryItem.query
-    if category:
-        query = query.filter(InventoryItem.category == category)
-    if status:
-        query = query.filter(InventoryItem.status == status)
-        
-    items = query.order_by(InventoryItem.category, InventoryItem.name).all()
-    
-    return render_template('inventory_report.html', items=items, now=datetime.now())
-

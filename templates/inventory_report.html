@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="ne">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inventory Report - LEOC</title>
+    <style>
+        body {
+            font-family: 'Times New Roman', serif;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #000;
+            padding-bottom: 10px;
+        }
+
+        .header h2,
+        .header h3 {
+            margin: 5px 0;
+        }
+
+        .meta-info {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+
+        th,
+        td {
+            border: 1px solid #000;
+            padding: 8px;
+            text-align: left;
+            font-size: 14px;
+        }
+
+        th {
+            background-color: #f2f2f2;
+        }
+
+        .footer {
+            margin-top: 50px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .signature-line {
+            width: 200px;
+            border-top: 1px solid #000;
+            text-align: center;
+            padding-top: 5px;
+        }
+
+        @media print {
+            .no-print {
+                display: none;
+            }
+
+            body {
+                padding: 0;
+            }
+        }
+
+        /* Thumbnail in report */
+        .report-thumb {
+            width: 30px;
+            height: 30px;
+            object-fit: cover;
+            vertical-align: middle;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="no-print" style="text-align: right; margin-bottom: 20px;">
+        <button onclick="window.print()" style="padding: 10px 20px; cursor: pointer;">Print Report</button>
+    </div>
+
+    <div class="header">
+        <h3>स्थानीय आपतकालीन कार्य सञ्चालन केन्द्र (LEOC)</h3>
+        <h2>थलारा गाउँपालिका</h2>
+        <h3>जिन्सी मौज्दात विवरण (Inventory Report)</h3>
+    </div>
+
+    <div class="meta-info">
+        <span><strong>रिपोर्ट मिति:</strong> {{ now.strftime('%Y-%m-%d') }}</span>
+        <span>
+            <strong>प्रकार:</strong>
+            {% if request.args.get('category') %} {{ request.args.get('category') }} {% else %} सबै (All) {% endif %}
+            |
+            <strong>अवस्था:</strong>
+            {% if request.args.get('status') %} {{ request.args.get('status') }} {% else %} सबै (All) {% endif %}
+        </span>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 50px;">सि.नं.</th>
+                <th style="width: 60px;">फोटो</th>
+                <th>सामग्रीको नाम</th>
+                <th>सामग्री कोड</th>
+                <th>कोटी</th>
+                <th>परिमाण</th>
+                <th>एकाइ</th>
+                <th>अवस्था</th>
+                <th>भण्डारण स्थान</th>
+                <th>कैफियत</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in items %}
+            <tr>
+                <td>{{ loop.index }}</td>
+                <td style="text-align: center;">
+                    {% if item.image_filename %}
+                    <img src="{{ url_for('static', filename='uploads/' + item.image_filename) }}" class="report-thumb"
+                        alt="img">
+                    {% else %}
+                    -
+                    {% endif %}
+                </td>
+                <td>{{ item.name }}</td>
+                <td>{{ item.item_code or '-' }}</td>
+                <td>{{ item.category }}</td>
+                <td>{{ item.quantity }}</td>
+                <td>{{ item.unit }}</td>
+                <td>{{ item.status }}</td>
+                <td>{{ item.warehouse_location or '' }}</td>
+                <td>{{ item.remarks or '' }}</td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="10" style="text-align: center;">कुनै तथ्याङ्क भेटिएन</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="footer">
+        <div>
+            <div class="signature-line">तयार गर्ने</div>
+            <div>नाम: __________________</div>
+            <div>पद: __________________</div>
+        </div>
+        <div>
+            <div class="signature-line">प्रमाणित गर्ने</div>
+            <div>नाम: __________________</div>
+            <div>पद: __________________</div>
+        </div>
+    </div>
+</body>
+
+</html>

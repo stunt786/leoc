@@ -17,7 +17,7 @@
                 </div>
                 <div class="card-body p-4">
                     <form id="distributionForm" enctype="multipart/form-data">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
                         <!-- BENEFICIARY INFORMATION -->
                         <div class="card border-primary mb-4">
                             <div class="card-header bg-light">
@@ -440,6 +440,8 @@
                             <div class="col-md-6 mb-3">
                                 <label for="cash_received" class="form-label">
                                     <i class="bi bi-cash-coin"></i> नगद प्राप्त रकम *
+                                    <span class="badge bg-secondary ms-2" id="availableFundBadge">मौज्दात लोड
+                                        हुँदैछ...</span>
                                 </label>
                                 <div class="input-group">
                                     <span class="input-group-text">रु</span>
@@ -447,7 +449,8 @@
                                         step="0.01" value="0.00" placeholder="0.00" min="0"
                                         oninput="validateField('cash_received')">
                                 </div>
-                                <small class="text-muted">प्राप्त भएको नगद रकम</small>
+                                <small class="text-muted">प्राप्त भएको नगद रकम (उपलब्ध मौज्दात भन्दा बढी हुन
+                                    नहुने)</small>
                                 <div id="cash_received_error" class="invalid-feedback d-block"></div>
                             </div>
 
@@ -530,6 +533,43 @@
 {% block extra_js %}
 <script>
     let reliefItemOptions = [];  // Will be loaded from API
+    let availableFundBalance = 0;
+
+    // ============ LOAD FUND BALANCE ============
+    async function loadFundBalance() {
+        try {
+            const response = await fetch('/api/funds/summary');
+            const data = await response.json();
+            if (data.success) {
+                // For editing, we should add back the current cash_received to the available balance
+                // but since the backend handles it and we want to show "how much more" or "total available",
+                // we'll just show the current account balance. 
+                // However, the user said "not more than available balance".
+                // If editing, the available balance on server is already (Total - Current).
+                // So the user can spend (Current + Available).
+
+                const urlParams = new URLSearchParams(window.location.search);
+                const editId = urlParams.get('edit');
+                let displayBalance = data.balance;
+
+                if (editId) {
+                    // Fetch the current distribution to see its cash
+                    const distResponse = await fetch(`/api/distributions/${editId}`);
+                    const distData = await distResponse.json();
+                    if (distData.success) {
+                        displayBalance += distData.data.cash_received;
+                    }
+                }
+
+                availableFundBalance = displayBalance;
+                document.getElementById('availableFundBadge').innerText = `उपलब्ध मौज्दात: रु ${displayBalance.toLocaleString('en-IN')}`;
+                document.getElementById('availableFundBadge').className = displayBalance > 0 ? 'badge bg-success ms-2' : 'badge bg-danger ms-2';
+            }
+        } catch (error) {
+            console.error('Error loading fund balance:', error);
+            document.getElementById('availableFundBadge').innerText = 'मौज्दात लोड गर्न सकिएन';
+        }
+    }
 
     // ============ LOAD SETTINGS FROM API ============
     async function loadFormSettings() {
@@ -570,6 +610,9 @@
         } catch (error) {
             console.error('Error loading fiscal years:', error);
         }
+
+        // Load fund balance
+        await loadFundBalance();
     }
 
     function populateDisasterTypeDropdown(types) {
@@ -1057,9 +1100,17 @@
                 field.classList.toggle('is-valid', !error && loc.length > 0);
                 break;
 
+            case 'cash_received':
+                const cashValue = parseFloat(field.value) || 0;
+                if (cashValue < 0) error = 'Amount cannot be negative';
+                else if (cashValue > availableFundBalance) error = `अपर्याप्त मौज्दात! मात्र रु ${availableFundBalance.toLocaleString('en-IN')} उपलब्ध छ। (Insufficient funds!)`;
+                field.classList.toggle('is-invalid', !!error);
+                field.classList.toggle('is-valid', !error && cashValue > 0);
+                break;
+
             case 'latitude':
-                const lat = parseFloat(field.value);
-                if (field.value && (isNaN(lat) || lat < -90 || lat > 90))
+                const latValue = parseFloat(field.value);
+                if (field.value && (isNaN(latValue) || latValue < -90 || latValue > 90))
                     error = 'Latitude must be between -90 and 90';
                 if (errorDiv) errorDiv.textContent = error;
                 field.classList.toggle('is-invalid', !!error);
@@ -1067,18 +1118,9 @@
                 break;
 
             case 'longitude':
-                const lon = parseFloat(field.value);
-                if (field.value && (isNaN(lon) || lon < -180 || lon > 180))
+                const lonValue = parseFloat(field.value);
+                if (field.value && (isNaN(lonValue) || lonValue < -180 || lonValue > 180))
                     error = 'Longitude must be between -180 and 180';
-                if (errorDiv) errorDiv.textContent = error;
-                field.classList.toggle('is-invalid', !!error);
-                field.classList.toggle('is-valid', !error && field.value.length > 0);
-                break;
-
-            case 'cash_received':
-                const cash = parseFloat(field.value);
-                if (field.value && (isNaN(cash) || cash < 0))
-                    error = 'Cash cannot be negative';
                 if (errorDiv) errorDiv.textContent = error;
                 field.classList.toggle('is-invalid', !!error);
                 field.classList.toggle('is-valid', !error && field.value.length > 0);

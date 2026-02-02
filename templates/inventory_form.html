@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+
+{% block title %}जिन्सी व्यवस्थापन - नयाँ थप्नुहोस् - LEOC{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-9">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0" id="form-title">नयाँ सामग्री थप्नुहोस् (Add New Item)</h5>
+                    <a href="/inventory" class="btn btn-sm btn-light">
+                        <i class="bi bi-arrow-left"></i> फिर्ता जानुहोस्
+                    </a>
+                </div>
+                <div class="card-body">
+                    <form id="inventory-form" enctype="multipart/form-data">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <!-- Basic Info -->
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <label for="name" class="form-label">सामग्रीको नाम (Item Name) <span
+                                        class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="name" name="name" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="item_code" class="form-label">सामग्री कोड (Label/Code)</label>
+                                <input type="text" class="form-control" id="item_code" name="item_code"
+                                    placeholder="e.g. RM-001">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="category" class="form-label">कोटी (Category) <span
+                                        class="text-danger">*</span></label>
+                                <select class="form-select" id="category" name="category" required>
+                                    <option value="" selected disabled>छान्नुहोस् (Select)</option>
+                                    <option value="Relief Material">राहत सामग्री (Relief Material)</option>
+                                    <option value="Medical">औषधि तथा उपकरण (Medical)</option>
+                                    <option value="Search & Rescue">खोज तथा उद्धार (Search & Rescue)</option>
+                                    <option value="Logistics">बन्दोबस्ती (Logistics)</option>
+                                    <option value="Vehicle">सवारी साधन (Vehicle)</option>
+                                    <option value="Other">अन्य (Other)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Quantity and Unit -->
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <label for="quantity" class="form-label">परिमाण (Quantity) <span
+                                        class="text-danger">*</span></label>
+                                <input type="number" class="form-control" id="quantity" name="quantity" min="0"
+                                    required>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="unit" class="form-label">एकाइ (Unit) <span
+                                        class="text-danger">*</span></label>
+                                <select class="form-select" id="unit" name="unit" required>
+                                    <option value="pcs">थान (pcs)</option>
+                                    <option value="kg">के.जी. (kg)</option>
+                                    <option value="liter">लिटर (liter)</option>
+                                    <option value="box">बाकस (box)</option>
+                                    <option value="set">सेट (set)</option>
+                                    <option value="meter">मिटर (meter)</option>
+                                    <option value="sack">बोरा (sack)</option>
+                                    <option value="pair">जोडी (pair)</option>
+                                    <option value="other">अन्य</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="status" class="form-label">अवस्था (Status)</label>
+                                <select class="form-select" id="status" name="status">
+                                    <option value="Available">उपलब्ध (Available)</option>
+                                    <option value="Low Stock">न्यून (Low Stock)</option>
+                                    <option value="Out of Stock">सकिएको (Out of Stock)</option>
+                                    <option value="Damaged">बिग्रिएको (Damaged)</option>
+                                    <option value="Expired">म्याद नाघेको (Expired)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Source and Location -->
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="source" class="form-label">स्रोत (Source)</label>
+                                <input type="text" class="form-control" id="source" name="source"
+                                    placeholder="Purchase, Donation, etc.">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="warehouse_location" class="form-label">भण्डारण स्थान (Warehouse
+                                    Location)</label>
+                                <input type="text" class="form-control" id="warehouse_location"
+                                    name="warehouse_location" placeholder="Room no, Rack no...">
+                            </div>
+                        </div>
+
+                        <!-- Expiry and Image -->
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="expiry_date" class="form-label">म्याद सकिने मिति (Expiry Date)</label>
+                                <input type="date" class="form-control" id="expiry_date" name="expiry_date">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="image" class="form-label">फोटो (Photo)</label>
+                                <input type="file" class="form-control" id="image" name="image" accept="image/*">
+                                <div id="current-image-preview" class="mt-2 d-none">
+                                    <small>Current Image:</small><br>
+                                    <img src="" alt="Current Item Image" style="height: 60px; border-radius: 4px;">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Remarks -->
+                        <div class="mb-3">
+                            <label for="remarks" class="form-label">कैफियत (Remarks)</label>
+                            <textarea class="form-control" id="remarks" name="remarks" rows="3"></textarea>
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <button type="submit" class="btn btn-primary px-4">
+                                <i class="bi bi-save"></i> सुरक्षित गर्नुहोस् (Save)
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // Check if editing
+        const urlParams = new URLSearchParams(window.location.search);
+        const editId = urlParams.get('edit');
+
+        if (editId) {
+            loadItemData(editId);
+        }
+
+        document.getElementById('inventory-form').addEventListener('submit', function (e) {
+            e.preventDefault();
+
+            const formData = new FormData(this);
+            let url = '/inventory/add';
+
+            // If editing, logic is slightly different (app.py uses /inventory/update/<id>)
+            // But form action handling:
+            if (editId) {
+                url = `/inventory/update/${editId}`;
+            }
+
+            fetch(url, {
+                method: 'POST',
+                body: formData
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('Items saved successfully!');
+                        window.location.href = '/inventory';
+                    } else {
+                        alert('Error: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('An error occurred while saving.');
+                });
+        });
+    });
+
+    function loadItemData(id) {
+        document.getElementById('form-title').innerText = 'सामग्री विवरण सच्याउनुहोस् (Edit Item)';
+
+        fetch(`/inventory/edit/${id}`)
+            .then(response => response.json())
+            .then(data => {
+                // Populate fields
+                document.getElementById('name').value = data.name;
+                document.getElementById('item_code').value = data.item_code || '';
+                document.getElementById('category').value = data.category;
+                document.getElementById('quantity').value = data.quantity;
+                document.getElementById('unit').value = data.unit;
+                document.getElementById('status').value = data.status;
+                document.getElementById('source').value = data.source || '';
+                document.getElementById('warehouse_location').value = data.warehouse_location || '';
+                document.getElementById('remarks').value = data.remarks || '';
+                document.getElementById('expiry_date').value = data.expiry_date || '';
+
+                if (data.image_filename) {
+                    const preview = document.getElementById('current-image-preview');
+                    preview.classList.remove('d-none');
+                    preview.querySelector('img').src = `/static/uploads/${data.image_filename}`;
+                }
+            })
+            .catch(error => console.error('Error loading item:', error));
+    }
+</script>
+{% endblock %}
