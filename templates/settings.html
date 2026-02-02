@@ -6,6 +6,14 @@
 <div class="container py-4">
     <div class="row">
         <div class="col-lg-10">
+            <!-- Header with Unlock Button -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h3 class="mb-0"><i class="bi bi-gear"></i> सेटिङ्हरू व्यवस्थापन</h3>
+                <button class="btn btn-warning" id="unlockSettingsBtn" onclick="unlockSettings()">
+                    <i class="bi bi-unlock-fill"></i> परिवर्तन गर्न अनलक गर्नुहोस्
+                </button>
+            </div>
+
             <!-- Relief Items Settings -->
             <div class="card shadow-lg mb-4">
                 <div class="card-header bg-gradient" style="background: linear-gradient(135deg, #007bff, #0062cc);">
@@ -419,6 +427,13 @@
             `;
             container.appendChild(div);
         });
+
+        // Check if we should lock these new items (if the unlock button is still visible)
+        const unlockBtn = document.getElementById('unlockSettingsBtn');
+        if (unlockBtn && unlockBtn.style.display !== 'none') {
+            const inputs = container.querySelectorAll('input, button');
+            inputs.forEach(el => el.disabled = true);
+        }
     }
 
     function removeItemFromUI(button, className) {
@@ -435,12 +450,67 @@
         }, 5000);
     }
 
+    // Lock settings initially
+    function lockSettings() {
+        // Disable all inputs and buttons in the main container
+        const container = document.querySelector('.col-lg-10');
+        const elements = container.querySelectorAll('input, button');
+
+        elements.forEach(el => {
+            // Keep the unlock button enabled
+            if (el.id !== 'unlockSettingsBtn') {
+                el.disabled = true;
+            }
+        });
+
+        showAlert('info', '<i class="bi bi-lock-fill"></i> सेटिङ्हरू लक गरिएको छ। परिवर्तन गर्न अनलक गर्नुहोस्।');
+    }
+
+    // Unlock settings
+    function unlockSettings() {
+        const password = prompt("Enter unlock key to enable editing:");
+        if (!password) return;
+
+        if (password === 'admin123') { // Simple default check
+            const container = document.querySelector('.col-lg-10');
+            const elements = container.querySelectorAll('input, button');
+
+            elements.forEach(el => el.disabled = false);
+
+            const btn = document.getElementById('unlockSettingsBtn');
+            if (btn) btn.style.display = 'none';
+
+            showAlert('success', '<i class="bi bi-unlock-fill"></i> सेटिङ्हरू अनलक गरियो।');
+        } else {
+            alert('Invalid unlock key');
+        }
+    }
+
     // Load all settings on page load
     document.addEventListener('DOMContentLoaded', () => {
         loadReliefItems();
         loadFiscalYears();
         loadSSFTypes();
         loadDisasterTypes();
+
+        // Lock forms after a slight delay to ensure dynamic elements might be caught
+        // but load functions are async.
+        // Actually, we should override the displayItems to lock new items too, 
+        // OR just lock the container inputs which catches future additions if we use a MutationObserver 
+        // or just re-lock on rendering.
+        // For simplicity, we lock what's there and the "Add" buttons are disabled so no new items appear.
+        // However, the `load*` functions are async and populate data. 
+        // We should wait for them? 
+        // Better strategy: The container inputs are created dynamically. 
+        // We need to ensure `displayItems` respects the lock state? 
+        // OR just run lockSettings immediately since the "Add" buttons (which are static) will be disabled,
+        // preventing new inputs. Existing inputs from load will be added into the container.
+        // Since `displayItems` creates new inputs, they will be enabled by default.
+        // We need to update `displayItems` to respect lock state OR re-run lock logic.
+        // Let's modify `displayItems` slightly or just rely on a broader check.
+
+        // Let's execute lockSettings immediately to disable the static buttons ("Add", "Save").
+        lockSettings();
     });
 </script>
 {% endblock %}

@@ -1172,3 +1172,4 @@ async function toggleLock(id, isCurrentlyLocked) {
         showNotification('danger', 'Error: ' + error.message);
     }
 }
+

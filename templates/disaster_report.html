@@ -557,8 +557,13 @@
 
                     <!-- Situation Report Form Section -->
                     <div class="card mt-3">
-                        <div class="card-header bg-success text-white">
+                        <div
+                            class="card-header bg-success text-white d-flex justify-content-between align-items-center">
                             <h5 class="mb-0"><i class="bi bi-plus-circle"></i> नयाँ स्थिति रिपोर्ट थप्नुहोस्</h5>
+                            <button class="btn btn-warning btn-sm" id="unlockSituationReportBtn"
+                                onclick="unlockDisasterForm('situationReportForm', 'unlockSituationReportBtn')">
+                                <i class="bi bi-unlock-fill"></i> अनलक
+                            </button>
                         </div>
                         <div class="card-body">
                             <form id="situationReportForm">
@@ -772,8 +777,13 @@
                 <!-- Public Info Tab -->
                 <div class="tab-pane fade" id="public-info" role="tabpanel">
                     <div class="card">
-                        <div class="card-header bg-success text-white">
+                        <div
+                            class="card-header bg-success text-white d-flex justify-content-between align-items-center">
                             <h5 class="mb-0"><i class="bi bi-megaphone"></i> सार्वजनिक जानकारी र निर्देशनहरू</h5>
+                            <button class="btn btn-warning btn-sm" id="unlockPublicInfoBtn"
+                                onclick="unlockDisasterForm('publicInfoForm', 'unlockPublicInfoBtn')">
+                                <i class="bi bi-unlock-fill"></i> अनलक
+                            </button>
                         </div>
                         <div class="card-body">
                             <form id="publicInfoForm">
@@ -866,8 +876,12 @@
 <!-- Input Form Tab -->
 <div class="tab-pane fade" id="input-form" role="tabpanel">
     <div class="card">
-        <div class="card-header bg-primary text-white">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
             <h5 class="mb-0"><i class="bi bi-clipboard-plus"></i> दैनिक विपद् डाटा प्रविष्टि विवरण</h5>
+            <button class="btn btn-warning btn-sm" id="unlockDisasterReportBtn"
+                onclick="unlockDisasterForm('disasterReportForm', 'unlockDisasterReportBtn')">
+                <i class="bi bi-unlock-fill"></i> विवरण भर्नका लागि अनलक गर्नुहोस्
+            </button>
         </div>
         <div class="card-body">
             <form id="disasterReportForm">
@@ -1887,12 +1901,17 @@
                     <td>${estimatedLoss}</td>
                     <td><span class="badge bg-${getSeverityClass(incident.description || '')}">${getSeverityLabel(incident.description || '')}</span></td>
                     <td>
-                        <button class="btn btn-sm btn-outline-primary me-1" onclick="viewIncidentDetails(${incident.id})" title="View Details">
-                            <i class="bi bi-eye"></i>
-                        </button>
-                        <button class="btn btn-sm btn-outline-danger" onclick="deleteIncident(${incident.id})" title="घटना हटाउनुहोस्">
-                            <i class="bi bi-trash"></i> हटाउनुहोस्
-                        </button>
+                        <div class="btn-group btn-group-sm">
+                            <button class="btn btn-outline-primary" onclick="viewIncidentDetails(${incident.id})" title="View Details">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                            <button class="btn ${incident.is_locked ? 'btn-warning' : 'btn-secondary'}" onclick="toggleLock(${incident.id}, ${incident.is_locked})" title="${incident.is_locked ? 'Unlock record' : 'Lock record'}">
+                                <i class="bi bi-${incident.is_locked ? 'unlock-fill' : 'lock'}"></i>
+                            </button>
+                            <button class="btn btn-outline-danger" onclick="deleteIncident(${incident.id}, ${incident.is_locked})" title="घटना हटाउनुहोस्" ${incident.is_locked ? 'disabled' : ''}>
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
                     </td>
                 `;
 
@@ -2856,8 +2875,45 @@
         }
     }
 
+    // Toggle lock status for an incident
+    async function toggleLock(id, isCurrentlyLocked) {
+        // Prompt for unlock key
+        const unlockKey = prompt(`Enter unlock key to ${isCurrentlyLocked ? 'unlock' : 'lock'} this record:`);
+
+        if (!unlockKey) {
+            return; // User cancelled
+        }
+
+        try {
+            const response = await fetch(`/api/disasters/${id}/lock`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ unlock_key: unlockKey })
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                showToast(`Record ${result.is_locked ? 'locked' : 'unlocked'} successfully`, 'success');
+                loadData(); // Refresh the data
+            } else {
+                showToast('Error: ' + result.message, 'danger');
+            }
+        } catch (error) {
+            console.error('Error toggling lock:', error);
+            showToast('Error toggling lock status', 'danger');
+        }
+    }
+
     // Delete incident
-    async function deleteIncident(id) {
+    async function deleteIncident(id, isLocked) {
+        if (isLocked) {
+            showToast('Record is locked and cannot be deleted.', 'warning');
+            return;
+        }
+
         if (!confirm('Are you sure you want to delete this incident? This action cannot be undone.')) {
             return;
         }
@@ -2866,22 +2922,64 @@
             const response = await fetch(`/api/disasters/${id}`, {
                 method: 'DELETE'
             });
+            const data = await response.json();
 
-            const result = await response.json();
-
-            if (result.success) {
-                showToast('Incident deleted successfully', 'success');
-                loadData(); // Refresh the data
+            if (data.success) {
+                showToast('घटना सफलतापूर्वक हटाइयो', 'success');
+                loadData();
             } else {
-                showToast('Error: ' + result.message, 'danger');
+                showToast('Failed to delete incident: ' + data.message, 'danger');
             }
         } catch (error) {
             console.error('Error deleting incident:', error);
-            showToast('Error deleting incident', 'danger');
+            showToast('Failed to delete incident', 'danger');
+        }
+    }
+
+    // Lock forms initially
+    function lockDisasterForms() {
+        const formsToLock = ['disasterReportForm', 'situationReportForm', 'publicInfoForm'];
+
+        formsToLock.forEach(formId => {
+            const form = document.getElementById(formId);
+            if (form) {
+                const elements = form.querySelectorAll('input, select, textarea, button');
+                elements.forEach(el => {
+                    // Don't disable submit/reset buttons completely if we want to show they exist, 
+                    // but standard practice is to disable everything until unlocked.
+                    // Exception: we don't disable the unlock buttons which are outside the form usually, 
+                    // but checking if any button inside needs to stay active? No.
+                    el.disabled = true;
+                });
+
+                // Show a small hint or just rely on the unlock button
+            }
+        });
+    }
+
+    // Unlock form
+    function unlockDisasterForm(formId, buttonId) {
+        const password = prompt("Enter unlock key to enable editing:");
+        if (!password) return;
+
+        if (password === 'admin123') { // Simple default check
+            const form = document.getElementById(formId);
+            if (form) {
+                const elements = form.querySelectorAll('input, select, textarea, button');
+                elements.forEach(el => el.disabled = false);
+            }
+
+            const btn = document.getElementById(buttonId);
+            if (btn) btn.style.display = 'none';
+
+            showToast('Form unlocked for data entry.', 'success');
+        } else {
+            alert('Invalid unlock key');
         }
     }
 
     document.addEventListener('DOMContentLoaded', function () {
+        lockDisasterForms();
         // Load data when Human Impact tab is shown
         const humanImpactTab = document.querySelector('#disasterTabs a[data-bs-target="#human-impact"]');
         if (humanImpactTab) {

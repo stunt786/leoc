@@ -926,7 +926,8 @@ def add_distribution():
             
             # Files
             image_filename=image_filename,
-            notes=data.get('notes')
+            notes=data.get('notes'),
+            is_locked=True
         )
         
         distribution.set_relief_items(relief_items)
@@ -1655,7 +1656,8 @@ def add_disaster():
             agriculture_crop_damage=data.get('agriculture_crop_damage'),
             affected_people_male=int(data.get('affected_people_male', 0)),
             affected_people_female=int(data.get('affected_people_female', 0)),
-            estimated_loss=float(data.get('estimated_loss', 0)) if data.get('estimated_loss') else 0.0
+            estimated_loss=float(data.get('estimated_loss', 0)) if data.get('estimated_loss') else 0.0,
+            is_locked=True
         )
         db.session.add(disaster)
         db.session.commit()
@@ -1980,7 +1982,8 @@ def add_event_log():
             description=data.get('description'),
             location=data.get('location'),
             responsible_unit=data.get('responsible_unit'),
-            status=data.get('status', 'Active')
+            status=data.get('status', 'Active'),
+            is_locked=True
         )
 
         db.session.add(event_log)
@@ -1991,6 +1994,118 @@ def add_event_log():
             'message': 'घटना लग सफलतापूर्वक थपियो',
             'data': event_log.to_dict()
         }), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+@app.route('/api/event-logs/<int:id>', methods=['GET'])
+def get_event_log(id):
+    try:
+        event_log = EventLog.query.get(id)
+        if not event_log:
+            return jsonify({'success': False, 'message': 'Event log not found'}), 404
+
+        return jsonify({
+            'success': True,
+            'data': event_log.to_dict()
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+@app.route('/api/event-logs/<int:id>', methods=['PUT'])
+def update_event_log(id):
+    try:
+        event_log = EventLog.query.get(id)
+        if not event_log:
+            return jsonify({'success': False, 'message': 'Event log not found'}), 404
+
+        # Check if the record is locked
+        if event_log.is_locked:
+            return jsonify({
+                'success': False,
+                'message': 'Cannot edit: Record is locked. Please unlock first.'
+            }), 403
+
+        data = request.get_json()
+
+        event_log.event_type = data.get('event_type', event_log.event_type)
+        event_log.description = data.get('description', event_log.description)
+        event_log.location = data.get('location', event_log.location)
+        event_log.responsible_unit = data.get('responsible_unit', event_log.responsible_unit)
+        event_log.status = data.get('status', event_log.status)
+
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'message': 'Event log updated successfully',
+            'data': event_log.to_dict()
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+@app.route('/api/event-logs/<int:id>', methods=['DELETE'])
+def delete_event_log(id):
+    try:
+        event_log = EventLog.query.get(id)
+        if not event_log:
+            return jsonify({'success': False, 'message': 'Event log not found'}), 404
+
+        # Check if the record is locked
+        if event_log.is_locked:
+            return jsonify({
+                'success': False,
+                'message': 'Cannot delete: Record is locked. Please unlock first.'
+            }), 403
+
+        db.session.delete(event_log)
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'message': 'Event log deleted successfully'
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+@app.route('/api/event-logs/<int:id>/lock', methods=['POST'])
+def toggle_lock_event_log(id):
+    try:
+        event_log = EventLog.query.get(id)
+        if not event_log:
+            return jsonify({'success': False, 'message': 'Event log not found'}), 404
+
+        # Get the unlock key from request
+        data = request.get_json()
+        unlock_key = data.get('unlock_key') if data else None
+
+        # Check if the key is correct (in a real app, this would be more secure)
+        # For now, we'll use a simple hardcoded key from environment variable
+        correct_unlock_key = os.getenv('UNLOCK_KEY', 'admin123')
+
+        if unlock_key == correct_unlock_key:
+            # Toggle the lock status
+            event_log.is_locked = not event_log.is_locked
+            db.session.commit()
+
+            # Clear cache after modification
+            global cache
+            cache.clear()
+
+            action = "unlocked" if not event_log.is_locked else "locked"
+            return jsonify({
+                'success': True,
+                'message': f'Record {action} successfully',
+                'is_locked': event_log.is_locked
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': 'Invalid unlock key'
+            }), 403
+
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 400
@@ -2048,7 +2163,8 @@ def add_situation_report():
             weather_conditions=data.get('weather_conditions'),
             detailed_report=data.get('detailed_report'),
             resources_deployed=data.get('resources_deployed'),
-            next_update_time=data.get('next_update_time')
+            next_update_time=data.get('next_update_time'),
+            is_locked=True
         )
 
         db.session.add(report)
@@ -2059,6 +2175,118 @@ def add_situation_report():
             'message': 'स्थिति रिपोर्ट सफलतापूर्वक थपियो',
             'data': report.to_dict()
         }), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+@app.route('/api/situation-reports/<int:id>', methods=['GET'])
+def get_situation_report(id):
+    try:
+        report = SituationReport.query.get(id)
+        if not report:
+            return jsonify({'success': False, 'message': 'Situation report not found'}), 404
+
+        return jsonify({
+            'success': True,
+            'data': report.to_dict()
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+@app.route('/api/situation-reports/<int:id>', methods=['PUT'])
+def update_situation_report(id):
+    try:
+        report = SituationReport.query.get(id)
+        if not report:
+            return jsonify({'success': False, 'message': 'Situation report not found'}), 404
+
+        # Check if the record is locked
+        if report.is_locked:
+            return jsonify({
+                'success': False,
+                'message': 'Cannot edit: Record is locked. Please unlock first.'
+            }), 403
+
+        data = request.get_json()
+
+        report.current_situation_summary = data.get('current_situation_summary', report.current_situation_summary)
+        report.weather_conditions = data.get('weather_conditions', report.weather_conditions)
+        report.detailed_report = data.get('detailed_report', report.detailed_report)
+        report.resources_deployed = data.get('resources_deployed', report.resources_deployed)
+        report.next_update_time = data.get('next_update_time', report.next_update_time)
+
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'message': 'Situation report updated successfully',
+            'data': report.to_dict()
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+@app.route('/api/situation-reports/<int:id>', methods=['DELETE'])
+def delete_situation_report(id):
+    try:
+        report = SituationReport.query.get(id)
+        if not report:
+            return jsonify({'success': False, 'message': 'Situation report not found'}), 404
+
+        # Check if the record is locked
+        if report.is_locked:
+            return jsonify({
+                'success': False,
+                'message': 'Cannot delete: Record is locked. Please unlock first.'
+            }), 403
+
+        db.session.delete(report)
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'message': 'Situation report deleted successfully'
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+@app.route('/api/situation-reports/<int:id>/lock', methods=['POST'])
+def toggle_lock_situation_report(id):
+    try:
+        report = SituationReport.query.get(id)
+        if not report:
+            return jsonify({'success': False, 'message': 'Situation report not found'}), 404
+
+        # Get the unlock key from request
+        data = request.get_json()
+        unlock_key = data.get('unlock_key') if data else None
+
+        # Check if the key is correct (in a real app, this would be more secure)
+        # For now, we'll use a simple hardcoded key from environment variable
+        correct_unlock_key = os.getenv('UNLOCK_KEY', 'admin123')
+
+        if unlock_key == correct_unlock_key:
+            # Toggle the lock status
+            report.is_locked = not report.is_locked
+            db.session.commit()
+
+            # Clear cache after modification
+            global cache
+            cache.clear()
+
+            action = "unlocked" if not report.is_locked else "locked"
+            return jsonify({
+                'success': True,
+                'message': f'Record {action} successfully',
+                'is_locked': report.is_locked
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': 'Invalid unlock key'
+            }), 403
+
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 400
@@ -2142,7 +2370,8 @@ def add_public_information():
             priority=data.get('priority', 'Normal'),
             is_active=is_active,
             valid_from=valid_from,
-            valid_until=valid_until
+            valid_until=valid_until,
+            is_locked=True
         )
 
         db.session.add(info)
@@ -2153,6 +2382,160 @@ def add_public_information():
             'message': 'सार्वजनिक सूचना सफलतापूर्वक थपियो',
             'data': info.to_dict()
         }), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+@app.route('/api/public-information/<int:id>', methods=['GET'])
+def get_public_information_by_id(id):
+    try:
+        info = PublicInformation.query.get(id)
+        if not info:
+            return jsonify({'success': False, 'message': 'Public information not found'}), 404
+
+        return jsonify({
+            'success': True,
+            'data': info.to_dict()
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+@app.route('/api/public-information/<int:id>', methods=['PUT'])
+def update_public_information(id):
+    try:
+        info = PublicInformation.query.get(id)
+        if not info:
+            return jsonify({'success': False, 'message': 'Public information not found'}), 404
+
+        # Check if the record is locked
+        if info.is_locked:
+            return jsonify({
+                'success': False,
+                'message': 'Cannot edit: Record is locked. Please unlock first.'
+            }), 403
+
+        data = request.get_json()
+
+        # Validation
+        if data.get('title') is not None and (not data.get('title').strip()):
+            return jsonify({'success': False, 'message': 'शीर्षक आवश्यक छ'}), 400
+
+        if data.get('content') is not None and (not data.get('content').strip()):
+            return jsonify({'success': False, 'message': 'विवरण आवश्यक छ'}), 400
+
+        # Update fields if provided
+        if data.get('title') is not None:
+            info.title = data.get('title').strip()
+        if data.get('content') is not None:
+            info.content = data.get('content').strip()
+        if data.get('info_type') is not None:
+            info.info_type = data.get('info_type')
+        if data.get('priority') is not None:
+            info.priority = data.get('priority')
+        if data.get('is_active') is not None:
+            is_active = data.get('is_active')
+            if isinstance(is_active, str):
+                is_active = is_active.lower() in ('true', '1', 'yes', 'on')
+            info.is_active = is_active
+
+        # Parse datetime fields with multiple format support
+        if data.get('valid_from') is not None:
+            if data.get('valid_from'):
+                try:
+                    # Try ISO format first (from datetime-local input)
+                    info.valid_from = datetime.fromisoformat(data.get('valid_from').replace('Z', '+00:00').replace('+00:00', ''))
+                except ValueError:
+                    try:
+                        info.valid_from = datetime.strptime(data.get('valid_from'), '%Y-%m-%d %H:%M')
+                    except ValueError:
+                        info.valid_from = None
+            else:
+                info.valid_from = None
+
+        if data.get('valid_until') is not None:
+            if data.get('valid_until'):
+                try:
+                    info.valid_until = datetime.fromisoformat(data.get('valid_until').replace('Z', '+00:00').replace('+00:00', ''))
+                except ValueError:
+                    try:
+                        info.valid_until = datetime.strptime(data.get('valid_until'), '%Y-%m-%d %H:%M')
+                    except ValueError:
+                        info.valid_until = None
+            else:
+                info.valid_until = None
+
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'message': 'Public information updated successfully',
+            'data': info.to_dict()
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+@app.route('/api/public-information/<int:id>', methods=['DELETE'])
+def delete_public_information(id):
+    try:
+        info = PublicInformation.query.get(id)
+        if not info:
+            return jsonify({'success': False, 'message': 'Public information not found'}), 404
+
+        # Check if the record is locked
+        if info.is_locked:
+            return jsonify({
+                'success': False,
+                'message': 'Cannot delete: Record is locked. Please unlock first.'
+            }), 403
+
+        db.session.delete(info)
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'message': 'Public information deleted successfully'
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+@app.route('/api/public-information/<int:id>/lock', methods=['POST'])
+def toggle_lock_public_information(id):
+    try:
+        info = PublicInformation.query.get(id)
+        if not info:
+            return jsonify({'success': False, 'message': 'Public information not found'}), 404
+
+        # Get the unlock key from request
+        data = request.get_json()
+        unlock_key = data.get('unlock_key') if data else None
+
+        # Check if the key is correct (in a real app, this would be more secure)
+        # For now, we'll use a simple hardcoded key from environment variable
+        correct_unlock_key = os.getenv('UNLOCK_KEY', 'admin123')
+
+        if unlock_key == correct_unlock_key:
+            # Toggle the lock status
+            info.is_locked = not info.is_locked
+            db.session.commit()
+
+            # Clear cache after modification
+            global cache
+            cache.clear()
+
+            action = "unlocked" if not info.is_locked else "locked"
+            return jsonify({
+                'success': True,
+                'message': f'Record {action} successfully',
+                'is_locked': info.is_locked
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': 'Invalid unlock key'
+            }), 403
+
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 400
@@ -2206,7 +2589,8 @@ def add_ssf_beneficiary():
             bank_account_holder_name=data.get('bank_account_holder_name'),
             bank_account_number=data.get('bank_account_number'),
             bank_name=data.get('bank_name'),
-            notes=data.get('notes')
+            notes=data.get('notes'),
+            is_locked=True
         )
         db.session.add(beneficiary)
         db.session.commit()
@@ -2434,6 +2818,27 @@ def init_db():
             if 'disaster_date_bs' not in columns:
                 db.session.execute(text("ALTER TABLE disaster ADD COLUMN disaster_date_bs VARCHAR(10)"))
                 print("Added disaster_date_bs column to disaster table")
+
+            # Check and add is_locked column to event_log table
+            result = db.session.execute(text("PRAGMA table_info(event_log)"))
+            columns = [row[1] for row in result.fetchall()]
+            if 'is_locked' not in columns:
+                db.session.execute(text("ALTER TABLE event_log ADD COLUMN is_locked BOOLEAN DEFAULT 0"))
+                print("Added is_locked column to event_log table")
+
+            # Check and add is_locked column to situation_report table
+            result = db.session.execute(text("PRAGMA table_info(situation_report)"))
+            columns = [row[1] for row in result.fetchall()]
+            if 'is_locked' not in columns:
+                db.session.execute(text("ALTER TABLE situation_report ADD COLUMN is_locked BOOLEAN DEFAULT 0"))
+                print("Added is_locked column to situation_report table")
+
+            # Check and add is_locked column to public_information table
+            result = db.session.execute(text("PRAGMA table_info(public_information)"))
+            columns = [row[1] for row in result.fetchall()]
+            if 'is_locked' not in columns:
+                db.session.execute(text("ALTER TABLE public_information ADD COLUMN is_locked BOOLEAN DEFAULT 0"))
+                print("Added is_locked column to public_information table")
 
             # Create DailyReportLog table if not exists
             inspector = inspect(db.engine)
