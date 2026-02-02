@@ -1,9 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Daily Disaster Report - {{ report_date.strftime('%Y-%m-%d') }}</title>
+    <title>Daily Disaster Report - {{ start_bs }}{% if start_bs != end_bs %} to {{ end_bs }}{% endif %}</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <style>
@@ -11,28 +12,28 @@
             size: A4;
             margin: 15mm;
         }
-        
+
         @media print {
             body {
                 -webkit-print-color-adjust: exact;
                 print-color-adjust: exact;
             }
-            
+
             .no-print {
                 display: none !important;
             }
-            
+
             .container {
                 width: 100%;
                 max-width: none;
                 padding: 0;
             }
-            
+
             .report-content {
                 page-break-inside: avoid;
             }
         }
-        
+
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             font-size: 10pt;
@@ -40,33 +41,33 @@
             color: #333;
             background: white;
         }
-        
+
         .report-header {
             text-align: center;
             border-bottom: 3px double #1a472a;
             padding-bottom: 15px;
             margin-bottom: 20px;
         }
-        
+
         .report-header h1 {
             color: #1a472a;
             font-size: 22pt;
             font-weight: bold;
             margin: 0;
         }
-        
+
         .report-header h2 {
             color: #2c5282;
             font-size: 14pt;
             margin: 5px 0;
         }
-        
+
         .report-header h3 {
             color: #2c5282;
             font-size: 12pt;
             margin: 5px 0;
         }
-        
+
         .report-meta {
             display: flex;
             justify-content: space-between;
@@ -75,7 +76,7 @@
             background-color: #f8f9fa;
             border-radius: 5px;
         }
-        
+
         .section-title {
             background-color: #2c5282;
             color: white;
@@ -85,22 +86,22 @@
             margin-bottom: 10px;
             border-radius: 4px;
         }
-        
+
         .section-title.brown {
             background-color: #744210;
         }
-        
+
         .section-title.gray {
             background-color: #4a5568;
         }
-        
+
         .data-table {
             width: 100%;
             border-collapse: collapse;
             font-size: 8pt;
             margin-bottom: 15px;
         }
-        
+
         .data-table th {
             background-color: #2c5282;
             color: white;
@@ -109,35 +110,35 @@
             font-weight: bold;
             border: 1px solid #1a365d;
         }
-        
+
         .data-table th.brown {
             background-color: #744210;
             border-color: #553c0d;
         }
-        
+
         .data-table td {
             padding: 5px 4px;
             text-align: center;
             border: 1px solid #cbd5e0;
             vertical-align: middle;
         }
-        
+
         .data-table tr:nth-child(even) {
             background-color: #f7fafc;
         }
-        
+
         .data-table tr.total-row {
             background-color: #e2e8f0;
             font-weight: bold;
         }
-        
+
         .infrastructure-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 10px;
             margin-bottom: 15px;
         }
-        
+
         .infrastructure-item {
             display: flex;
             align-items: center;
@@ -146,42 +147,42 @@
             border-radius: 4px;
             border-left: 4px solid #2c5282;
         }
-        
+
         .infrastructure-item i {
             margin-right: 10px;
             font-size: 14pt;
         }
-        
+
         .infrastructure-item .label {
             font-weight: bold;
             margin-right: 10px;
         }
-        
+
         .status-normal {
             color: #28a745;
         }
-        
+
         .status-disrupted {
             color: #dc3545;
         }
-        
+
         .advisory-item {
             padding: 8px;
             margin-bottom: 5px;
             border-left: 4px solid #ffc107;
             background-color: #fffaf0;
         }
-        
+
         .advisory-item.critical {
             border-left-color: #dc3545;
             background-color: #fff5f5;
         }
-        
+
         .advisory-item.high {
             border-left-color: #fd7e14;
             background-color: #fff7ed;
         }
-        
+
         .report-footer {
             margin-top: 30px;
             padding-top: 10px;
@@ -191,14 +192,14 @@
             color: #666;
             font-style: italic;
         }
-        
+
         .stats-cards {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
             gap: 10px;
             margin-bottom: 20px;
         }
-        
+
         .stat-card {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
@@ -206,31 +207,31 @@
             border-radius: 8px;
             text-align: center;
         }
-        
+
         .stat-card.danger {
             background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
         }
-        
+
         .stat-card.warning {
             background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
             color: #333;
         }
-        
+
         .stat-card.success {
             background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
         }
-        
+
         .stat-card .number {
             font-size: 24pt;
             font-weight: bold;
             display: block;
         }
-        
+
         .stat-card .label {
             font-size: 9pt;
             opacity: 0.9;
         }
-        
+
         .print-actions {
             position: fixed;
             top: 20px;
@@ -239,7 +240,7 @@
             display: flex;
             gap: 10px;
         }
-        
+
         .btn-print {
             background-color: #2c5282;
             color: white;
@@ -251,13 +252,13 @@
             display: flex;
             align-items: center;
             gap: 8px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
         }
-        
+
         .btn-print:hover {
             background-color: #1a365d;
         }
-        
+
         .btn-pdf {
             background-color: #dc3545;
             color: white;
@@ -270,74 +271,106 @@
             align-items: center;
             gap: 8px;
             text-decoration: none;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
         }
-        
+
         .btn-pdf:hover {
             background-color: #c82333;
             color: white;
         }
-        
+
         .date-selector {
             position: fixed;
             top: 20px;
             left: 20px;
             z-index: 1000;
             background: white;
-            padding: 10px;
-            border-radius: 5px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            width: 200px;
+            border: 1px solid #e2e8f0;
         }
-        
+
+        .date-selector .form-control {
+            margin-bottom: 10px;
+        }
+
+        .date-selector .btn-filter {
+            width: 100%;
+            background-color: #2c5282;
+            color: white;
+            border: none;
+            padding: 8px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+
+        .date-selector .btn-filter:hover {
+            background-color: #1a365d;
+        }
+
         .event-log-item {
             padding: 8px;
             border-bottom: 1px solid #e2e8f0;
             font-size: 9pt;
         }
-        
+
         .event-log-item:last-child {
             border-bottom: none;
         }
-        
+
         .badge-status {
             padding: 2px 8px;
             border-radius: 12px;
             font-size: 8pt;
         }
-        
+
         .badge-active {
             background-color: #17a2b8;
             color: white;
         }
-        
+
         .badge-completed {
             background-color: #28a745;
             color: white;
         }
-        
+
         .badge-pending {
             background-color: #ffc107;
             color: #333;
         }
     </style>
 </head>
+
 <body>
     <!-- Print Actions -->
     <div class="print-actions no-print">
         <button class="btn-print" onclick="window.print()">
             <i class="bi bi-printer"></i> Print Report
         </button>
-        <a href="/api/generate-daily-report?date={{ report_date.strftime('%Y-%m-%d') }}" class="btn-pdf">
+        <a href="/api/generate-daily-report?from_bs_date={{ start_bs }}&to_bs_date={{ end_bs }}" class="btn-pdf">
             <i class="bi bi-file-earmark-pdf"></i> Save as PDF
         </a>
     </div>
-    
+
     <!-- Date Selector -->
     <div class="date-selector no-print">
-        <label for="reportDate" class="form-label mb-1"><strong>Select Date:</strong></label>
-        <input type="date" id="reportDate" class="form-control form-control-sm" 
-               value="{{ report_date.strftime('%Y-%m-%d') }}" 
-               onchange="changeDate(this.value)">
+        <label class="form-label mb-1"><strong>Filter Date (BS):</strong></label>
+        <div class="mb-2">
+            <small class="text-muted d-block mb-1">From:</small>
+            <input type="text" id="fromDateBS" class="form-control form-control-sm" value="{{ start_bs }}"
+                placeholder="YYYY-MM-DD">
+        </div>
+        <div class="mb-3">
+            <small class="text-muted d-block mb-1">To:</small>
+            <input type="text" id="toDateBS" class="form-control form-control-sm" value="{{ end_bs }}"
+                placeholder="YYYY-MM-DD">
+        </div>
+        <button class="btn-filter" onclick="applyFilter()">
+            <i class="bi bi-filter"></i> Apply Filter
+        </button>
+        <small class="text-muted d-block mt-2" style="font-size: 8pt;">Format: YYYY-MM-DD</small>
     </div>
 
     <div class="container mt-5">
@@ -347,22 +380,22 @@
             <h2>Local Emergency Operating Centre (LEOC)</h2>
             <h3>Daily Incident Reporting</h3>
         </div>
-        
+
         <!-- Report Meta -->
         <div class="report-meta">
             <div>
-                <strong>Date:</strong> {{ report_date.strftime('%Y-%m-%d') }}
+                <strong>Date (BS):</strong> {{ start_bs }}{% if start_bs != end_bs %} to {{ end_bs }}{% endif %}
             </div>
             <div>
-                <strong>Today's Weather:</strong> 
+                <strong>Today's Weather:</strong>
                 {% if data.situation_report and data.situation_report.weather_conditions %}
-                    {{ data.situation_report.weather_conditions }}
+                {{ data.situation_report.weather_conditions }}
                 {% else %}
-                    N/A
+                N/A
                 {% endif %}
             </div>
         </div>
-        
+
         <!-- Summary Statistics -->
         <div class="stats-cards">
             <div class="stat-card">
@@ -382,7 +415,7 @@
                 <span class="label">Households Affected</span>
             </div>
         </div>
-        
+
         <!-- Incident Overview by Ward -->
         <div class="report-content">
             <div class="section-title">
@@ -396,10 +429,11 @@
                         <th>Death</th>
                         <th>Missing</th>
                         <th>Injured</th>
-                        <th>Est.<br>Loss</th>
-                        <th>Road/<br>Elec/<br>Comm</th>
+                        <th>Estimated<br>Loss</th>
+                        <th>Road</th>
+                        <th>Elec</th>
+                        <th>Comm</th>
                         <th>Livestock</th>
-                        <th>Agriculture</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -412,14 +446,27 @@
                         <td>{{ data.ward_stats[ward].injured }}</td>
                         <td>{{ data.ward_stats[ward].estimated_loss }}</td>
                         <td>
-                            {% set blocked = [] %}
-                            {% if data.ward_stats[ward].road_blocked %}{% set _ = blocked.append('R') %}{% endif %}
-                            {% if data.ward_stats[ward].electricity_blocked %}{% set _ = blocked.append('E') %}{% endif %}
-                            {% if data.ward_stats[ward].communication_blocked %}{% set _ = blocked.append('C') %}{% endif %}
-                            {{ blocked|join('/') if blocked else '-' }}
+                            {% if data.ward_stats[ward].road_blocked %}
+                            <span class="badge bg-danger"><i class="bi bi-signpost-split-fill"></i></span>
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if data.ward_stats[ward].electricity_blocked %}
+                            <span class="badge bg-danger"><i class="bi bi-lightning-charge-fill"></i></span>
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if data.ward_stats[ward].communication_blocked %}
+                            <span class="badge bg-danger"><i class="bi bi-wifi"></i></span>
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
                         </td>
                         <td>{{ data.ward_stats[ward].livestock_loss }}</td>
-                        <td>{{ data.ward_stats[ward].agricultural_loss }}</td>
                     </tr>
                     {% endfor %}
                     <tr class="total-row">
@@ -427,16 +474,17 @@
                         <td>{{ data.total_stats.incidents }}</td>
                         <td>{{ data.total_stats.deaths }}</td>
                         <td>{{ data.total_stats.missing }}</td>
-                        <td>{{ data.total_stats.livestock_injured }}</td>
-                        <td>0</td>
+                        <td>{{ data.total_stats.injured }}</td>
+                        <td>{{ data.total_stats.estimated_loss }}</td>
+                        <td>-</td>
+                        <td>-</td>
                         <td>-</td>
                         <td>{{ data.total_stats.livestock_death }}</td>
-                        <td>-</td>
                     </tr>
                 </tbody>
             </table>
         </div>
-        
+
         <!-- Disaster Type Summary -->
         <div class="report-content">
             <div class="section-title brown">
@@ -447,17 +495,18 @@
                     <tr>
                         <th class="brown">Disaster</th>
                         <th class="brown">Total</th>
-                        <th class="brown">Death</th>
+                        <th class="brown">Death<br>Male</th>
+                        <th class="brown">Death<br>Female</th>
                         <th class="brown">Missing</th>
-                        <th class="brown">Injured</th>
+                        <th class="brown">Injured<br>Male</th>
+                        <th class="brown">Injured<br>Female</th>
                         <th class="brown">Affected<br>Families</th>
-                        <th class="brown">House<br>Damage</th>
-                        <th class="brown">House<br>Destroy</th>
-                        <th class="brown">Public Bldg<br>Damage</th>
-                        <th class="brown">Public Bldg<br>Destroy</th>
-                        <th class="brown">Livestock<br>Loss</th>
-                        <th class="brown">Fund<br>Male</th>
-                        <th class="brown">Fund<br>Female</th>
+                        <th class="brown">House<br>Dmg</th>
+                        <th class="brown">House<br>Dest</th>
+                        <th class="brown">Pub.Bldg<br>Dmg</th>
+                        <th class="brown">Pub.Bldg<br>Dest</th>
+                        <th class="brown">Livestock</th>
+                        <th class="brown">Est.Loss</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -466,29 +515,30 @@
                     <tr>
                         <td><strong>{{ dtype }}</strong></td>
                         <td>{{ stats.total }}</td>
-                        <td>{{ stats.deaths }}</td>
+                        <td>{{ stats.male_death }}</td>
+                        <td>{{ stats.female_death }}</td>
                         <td>{{ stats.missing }}</td>
-                        <td>{{ stats.injured }}</td>
+                        <td>{{ stats.male_injured }}</td>
+                        <td>{{ stats.female_injured }}</td>
                         <td>{{ stats.affected_families }}</td>
                         <td>{{ stats.house_damaged }}</td>
                         <td>{{ stats.house_destroyed }}</td>
                         <td>{{ stats.public_building_damaged }}</td>
                         <td>{{ stats.public_building_destroyed }}</td>
                         <td>{{ stats.livestock_loss }}</td>
-                        <td>{{ stats.fund_male }}</td>
-                        <td>{{ stats.fund_female }}</td>
+                        <td>{{ stats.estimated_loss }}</td>
                     </tr>
                     {% endif %}
                     {% endfor %}
                     {% if not data.disaster_type_stats.values()|selectattr('total', 'gt', 0)|list %}
                     <tr>
-                        <td colspan="13" class="text-center text-muted">No incidents reported</td>
+                        <td colspan="14" class="text-center text-muted">No incidents reported</td>
                     </tr>
                     {% endif %}
                 </tbody>
             </table>
         </div>
-        
+
         <!-- Infrastructure Status -->
         <div class="report-content">
             <div class="section-title gray">
@@ -496,41 +546,49 @@
             </div>
             <div class="infrastructure-grid">
                 <div class="infrastructure-item">
-                    <i class="bi bi-lightning-charge-fill {% if data.infrastructure.electricity == 'Normal' %}status-normal{% else %}status-disrupted{% endif %}"></i>
+                    <i
+                        class="bi bi-lightning-charge-fill {% if data.infrastructure.electricity == 'Normal' %}status-normal{% else %}status-disrupted{% endif %}"></i>
                     <span class="label">Electricity:</span>
-                    <span class="{% if data.infrastructure.electricity == 'Normal' %}status-normal{% else %}status-disrupted{% endif %}">
+                    <span
+                        class="{% if data.infrastructure.electricity == 'Normal' %}status-normal{% else %}status-disrupted{% endif %}">
                         {{ data.infrastructure.electricity }}
                     </span>
                 </div>
                 <div class="infrastructure-item">
-                    <i class="bi bi-signpost-split-fill {% if data.infrastructure.road == 'Open' %}status-normal{% else %}status-disrupted{% endif %}"></i>
+                    <i
+                        class="bi bi-signpost-split-fill {% if data.infrastructure.road == 'Open' %}status-normal{% else %}status-disrupted{% endif %}"></i>
                     <span class="label">Road:</span>
-                    <span class="{% if data.infrastructure.road == 'Open' %}status-normal{% else %}status-disrupted{% endif %}">
+                    <span
+                        class="{% if data.infrastructure.road == 'Open' %}status-normal{% else %}status-disrupted{% endif %}">
                         {{ data.infrastructure.road }}
                     </span>
                 </div>
                 <div class="infrastructure-item">
-                    <i class="bi bi-wifi {% if data.infrastructure.communication == 'Normal' %}status-normal{% else %}status-disrupted{% endif %}"></i>
+                    <i
+                        class="bi bi-wifi {% if data.infrastructure.communication == 'Normal' %}status-normal{% else %}status-disrupted{% endif %}"></i>
                     <span class="label">Communication:</span>
-                    <span class="{% if data.infrastructure.communication == 'Normal' %}status-normal{% else %}status-disrupted{% endif %}">
+                    <span
+                        class="{% if data.infrastructure.communication == 'Normal' %}status-normal{% else %}status-disrupted{% endif %}">
                         {{ data.infrastructure.communication }}
                     </span>
                 </div>
                 <div class="infrastructure-item">
-                    <i class="bi bi-droplet-fill {% if data.infrastructure.drinking_water == 'Normal' %}status-normal{% else %}status-disrupted{% endif %}"></i>
+                    <i
+                        class="bi bi-droplet-fill {% if data.infrastructure.drinking_water == 'Normal' %}status-normal{% else %}status-disrupted{% endif %}"></i>
                     <span class="label">Drinking Water:</span>
-                    <span class="{% if data.infrastructure.drinking_water == 'Normal' %}status-normal{% else %}status-disrupted{% endif %}">
+                    <span
+                        class="{% if data.infrastructure.drinking_water == 'Normal' %}status-normal{% else %}status-disrupted{% endif %}">
                         {{ data.infrastructure.drinking_water }}
                     </span>
                 </div>
             </div>
         </div>
-        
+
         <!-- Recent Events -->
         {% if data.event_logs %}
         <div class="report-content">
             <div class="section-title gray">
-                <i class="bi bi-journal-text"></i> Recent Events
+                <i class="bi bi-journal-text"></i> Recent Events (Today's)
             </div>
             <table class="data-table">
                 <thead>
@@ -547,7 +605,8 @@
                     <tr>
                         <td>{{ event.timestamp.split()[1][:5] if ' ' in event.timestamp else event.timestamp[:5] }}</td>
                         <td>{{ event.event_type }}</td>
-                        <td style="text-align: left;">{{ event.description[:60] }}{% if event.description|length > 60 %}...{% endif %}</td>
+                        <td style="text-align: left;">{{ event.description[:60] }}{% if event.description|length > 60
+                            %}...{% endif %}</td>
                         <td>{{ event.location or '-' }}</td>
                         <td>
                             <span class="badge-status 
@@ -563,26 +622,27 @@
             </table>
         </div>
         {% endif %}
-        
+
         <!-- Public Advisories -->
         {% if data.public_advisories %}
         <div class="report-content">
             <div class="section-title" style="background-color: #d69e2e;">
-                <i class="bi bi-megaphone"></i> Public Advisories
+                <i class="bi bi-megaphone"></i> Public Advisory
             </div>
-            {% for advisory in data.public_advisories[:3] %}
-            <div class="advisory-item {% if advisory.priority == 'Critical' %}critical{% elif advisory.priority == 'High' %}high{% endif %}">
-                <strong>{{ advisory.title }}</strong> 
-                <span class="badge {% if advisory.priority == 'Critical' %}bg-danger{% elif advisory.priority == 'High' %}bg-warning{% else %}bg-info{% endif %}">
+            {% set advisory = data.public_advisories[0] %}
+            <div
+                class="advisory-item {% if advisory.priority == 'Critical' %}critical{% elif advisory.priority == 'High' %}high{% endif %}">
+                <strong>{{ advisory.title }}</strong>
+                <span
+                    class="badge {% if advisory.priority == 'Critical' %}bg-danger{% elif advisory.priority == 'High' %}bg-warning{% else %}bg-info{% endif %}">
                     {{ advisory.priority }}
                 </span>
                 <br>
-                <small>{{ advisory.content[:150] }}{% if advisory.content|length > 150 %}...{% endif %}</small>
+                <small>{{ advisory.content[:200] }}{% if advisory.content|length > 200 %}...{% endif %}</small>
             </div>
-            {% endfor %}
         </div>
         {% endif %}
-        
+
         <!-- Situation Report Summary -->
         {% if data.situation_report %}
         <div class="report-content">
@@ -590,7 +650,8 @@
                 <i class="bi bi-clipboard-data"></i> Situation Summary
             </div>
             <div style="padding: 10px; background-color: #f0fff4; border-radius: 4px; font-size: 9pt;">
-                <p><strong>Current Situation:</strong> {{ data.situation_report.current_situation_summary or 'N/A' }}</p>
+                <p><strong>Current Situation:</strong> {{ data.situation_report.current_situation_summary or 'N/A' }}
+                </p>
                 {% if data.situation_report.resources_deployed %}
                 <p><strong>Resources Deployed:</strong> {{ data.situation_report.resources_deployed }}</p>
                 {% endif %}
@@ -600,33 +661,44 @@
             </div>
         </div>
         {% endif %}
-        
+
         <!-- Report Footer -->
         <div class="report-footer">
-            <p>Report generated on {{ generated_at.strftime('%Y-%m-%d %H:%M') }} | LEOC Thalara Rural Municipality</p>
+            <p>Report generated on {{ generated_at.strftime('%Y-%m-%d %H:%M') }} | LEOC Thalara Rural Municipality
+            </p>
             <p style="font-size: 8pt; margin-top: 5px;">
-                This is an official document of the Local Emergency Operating Centre. 
+                This is an official document of the Local Emergency Operating Centre.
                 For emergencies, contact the LEOC operations room.
             </p>
         </div>
     </div>
-    
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        function changeDate(date) {
-            if (date) {
-                window.location.href = '/daily-report-preview?date=' + date;
+        function applyFilter() {
+            const fromDate = document.getElementById('fromDateBS').value;
+            const toDate = document.getElementById('toDateBS').value;
+
+            if (fromDate && toDate) {
+                if (fromDate === toDate) {
+                    window.location.href = '/daily-report-preview?bs_date=' + fromDate;
+                } else {
+                    window.location.href = '/daily-report-preview?from_bs_date=' + fromDate + '&to_bs_date=' + toDate;
+                }
+            } else {
+                alert('Please enter both From and To dates');
             }
         }
-        
+
         // Auto-print on load if requested
         if (window.location.search.includes('autoprint=1')) {
-            window.onload = function() {
-                setTimeout(function() {
+            window.onload = function () {
+                setTimeout(function () {
                     window.print();
                 }, 500);
             };
         }
     </script>
 </body>
+
 </html>

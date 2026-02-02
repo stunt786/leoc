@@ -1,6 +1,6 @@
 from flask import Flask, render_template, request, jsonify, send_from_directory, make_response
 from flask_sqlalchemy import SQLAlchemy
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 import os
 import json
 import folium
@@ -323,6 +323,7 @@ class Disaster(db.Model):
     agriculture_crop_damage = db.Column(db.Text)  # Description of crop damage
     affected_people_male = db.Column(db.Integer, default=0)
     affected_people_female = db.Column(db.Integer, default=0)
+    estimated_loss = db.Column(db.Float, default=0.0)  # Estimated financial loss in Rs.
 
     # Lock Status
     is_locked = db.Column(db.Boolean, default=False, index=True)  # Added index
@@ -354,6 +355,7 @@ class Disaster(db.Model):
             'agriculture_crop_damage': self.agriculture_crop_damage,
             'affected_people_male': self.affected_people_male,
             'affected_people_female': self.affected_people_female,
+            'estimated_loss': self.estimated_loss,
             'is_locked': self.is_locked,
             'created_at': self.created_at.strftime('%Y-%m-%d')
         }
@@ -1453,6 +1455,7 @@ def get_disaster_statistics():
         total_livestock_death = sum(d.livestock_death for d in filtered_disasters)
         total_affected_males = sum(d.affected_people_male for d in filtered_disasters)
         total_affected_females = sum(d.affected_people_female for d in filtered_disasters)
+        total_estimated_loss = sum(d.estimated_loss for d in filtered_disasters if hasattr(d, 'estimated_loss'))
 
         # Ward distribution - with proper filtering
         ward_base_query = db.session.query(
@@ -1512,6 +1515,7 @@ def get_disaster_statistics():
             'total_livestock_death': total_livestock_death,
             'total_affected_males': total_affected_males,
             'total_affected_females': total_affected_females,
+            'total_estimated_loss': total_estimated_loss,
             'ward_distribution': [
                 {'ward': ward, 'count': count}
                 for ward, count in ward_data if ward is not None  # Only include non-null wards
@@ -1535,6 +1539,7 @@ def get_disaster_statistics():
             'total_livestock_death': 0,
             'total_affected_males': 0,
             'total_affected_females': 0,
+            'total_estimated_loss': 0,
             'ward_distribution': [],
             'disaster_type_distribution': []
         })
@@ -1567,7 +1572,8 @@ def add_disaster():
             livestock_death=int(data.get('livestock_death', 0)),
             agriculture_crop_damage=data.get('agriculture_crop_damage'),
             affected_people_male=int(data.get('affected_people_male', 0)),
-            affected_people_female=int(data.get('affected_people_female', 0))
+            affected_people_female=int(data.get('affected_people_female', 0)),
+            estimated_loss=float(data.get('estimated_loss', 0)) if data.get('estimated_loss') else 0.0
         )
         db.session.add(disaster)
         db.session.commit()
@@ -1605,11 +1611,26 @@ def add_disaster_report():
         else:
             ward = int(ward_value) if ward_value else None
 
+        # Get BS date from frontend
+        disaster_date_bs = data.get('disaster_date_bs')
+        
+        # Convert BS date to AD date for storage using centralized function
+        disaster_date_ad = None
+        if disaster_date_bs:
+            try:
+                ad_date_str = bs_to_ad(disaster_date_bs)
+                disaster_date_ad = datetime.strptime(ad_date_str, '%Y-%m-%d').date()
+            except Exception as e:
+                print(f"Error converting BS to AD in add_disaster_report: {e}")
+                disaster_date_ad = date.today()
+        else:
+            disaster_date_ad = date.today()
+
         # Create disaster record
         disaster = Disaster(
             disaster_type=data.get('disaster_type'),
-            disaster_date=datetime.strptime(data.get('disaster_date'), '%Y-%m-%d').date(),
-            disaster_date_bs=data.get('disaster_date_bs'),  # BS date from frontend
+            disaster_date=disaster_date_ad,
+            disaster_date_bs=disaster_date_bs,  # BS date from frontend
             ward=ward,
             tole=data.get('tole'),
             latitude=float(data.get('latitude')) if data.get('latitude') else None,
@@ -1629,7 +1650,8 @@ def add_disaster_report():
             livestock_death=int(data.get('livestock_death', 0)),
             agriculture_crop_damage=data.get('agriculture_crop_damage'),
             affected_people_male=int(data.get('affected_people_male', 0)),
-            affected_people_female=int(data.get('affected_people_female', 0))
+            affected_people_female=int(data.get('affected_people_female', 0)),
+            estimated_loss=float(data.get('estimated_loss', 0)) if data.get('estimated_loss') else 0.0
         )
         db.session.add(disaster)
         db.session.commit()
@@ -1692,6 +1714,19 @@ def toggle_lock_disaster(id):
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 400
 
+@app.route('/api/disasters/<int:id>', methods=['GET'])
+def get_disaster(id):
+    try:
+        disaster = Disaster.query.get(id)
+        if not disaster:
+            return jsonify({'success': False, 'message': 'Disaster not found'}), 404
+        return jsonify({
+            'success': True,
+            'data': disaster.to_dict()
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 400
+
 @app.route('/api/disasters/<int:id>', methods=['PUT'])
 def edit_disaster(id):
     try:
@@ -1739,6 +1774,7 @@ def edit_disaster(id):
         disaster.agriculture_crop_damage = data.get('agriculture_crop_damage', disaster.agriculture_crop_damage)
         disaster.affected_people_male = int(data.get('affected_people_male', disaster.affected_people_male))
         disaster.affected_people_female = int(data.get('affected_people_female', disaster.affected_people_female))
+        disaster.estimated_loss = float(data.get('estimated_loss', disaster.estimated_loss)) if data.get('estimated_loss') else disaster.estimated_loss
 
         db.session.commit()
 
@@ -2271,6 +2307,11 @@ def init_db():
                 db.session.execute(text("ALTER TABLE disaster ADD COLUMN affected_people_female INTEGER DEFAULT 0"))
                 print("Added affected_people_female column to disaster table")
 
+            # Check and add estimated_loss column to disaster table
+            if 'estimated_loss' not in columns:
+                db.session.execute(text("ALTER TABLE disaster ADD COLUMN estimated_loss REAL DEFAULT 0.0"))
+                print("Added estimated_loss column to disaster table")
+
             # Check and add disaster_date_bs column to disaster table
             if 'disaster_date_bs' not in columns:
                 db.session.execute(text("ALTER TABLE disaster ADD COLUMN disaster_date_bs VARCHAR(10)"))
@@ -2307,29 +2348,64 @@ def generate_daily_report():
     """
     Generate a daily disaster report PDF.
     Query params:
-    - date: YYYY-MM-DD format (default: today)
+    - date: YYYY-MM-DD format (single date)
+    - bs_date: BS date (single date)
+    - from_date/to_date: AD date range
+    - from_bs_date/to_bs_date: BS date range
     """
     try:
-        # Get date parameter or use today
+        # Get parameters
+        bs_date_str = request.args.get('bs_date')
         report_date_str = request.args.get('date')
-        if report_date_str:
+        from_bs = request.args.get('from_bs_date')
+        to_bs = request.args.get('to_bs_date')
+        
+        start_date = None
+        end_date = None
+        start_bs = None
+        end_bs = None
+
+        if from_bs and to_bs:
+            start_date_str = bs_to_ad(from_bs)
+            end_date_str = bs_to_ad(to_bs)
+            start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+            end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+            start_bs = from_bs
+            end_bs = to_bs
+        elif bs_date_str:
+            report_date_ad_str = bs_to_ad(bs_date_str)
+            start_date = datetime.strptime(report_date_ad_str, '%Y-%m-%d').date()
+            end_date = start_date
+            start_bs = bs_date_str
+            end_bs = bs_date_str
+        elif report_date_str:
             try:
-                report_date = datetime.strptime(report_date_str, '%Y-%m-%d').date()
+                start_date = datetime.strptime(report_date_str, '%Y-%m-%d').date()
+                end_date = start_date
+                start_bs = ad_to_bs(start_date.year, start_date.month, start_date.day)
+                end_bs = start_bs
             except ValueError:
                 return jsonify({'success': False, 'message': 'Invalid date format. Use YYYY-MM-DD'}), 400
         else:
-            report_date = date.today()
+            start_date = date.today()
+            end_date = start_date
+            start_bs = ad_to_bs(start_date.year, start_date.month, start_date.day)
+            end_bs = start_bs
 
         # Fetch data for the report
-        report_data = fetch_daily_report_data(report_date)
+        report_data = fetch_daily_report_data(start_date, end_date, start_bs, end_bs)
 
         # Generate PDF
-        pdf_buffer = generate_pdf_report(report_data, report_date)
+        pdf_buffer = generate_pdf_report(report_data, start_date, end_date, start_bs, end_bs)
 
         # Create response
         response = make_response(pdf_buffer.getvalue())
         response.headers['Content-Type'] = 'application/pdf'
-        response.headers['Content-Disposition'] = f'attachment; filename=daily_report_{report_date.strftime("%Y-%m-%d")}.pdf'
+        
+        filename = f"daily_report_{start_bs}"
+        if start_bs != end_bs:
+            filename += f"_to_{end_bs}"
+        response.headers['Content-Disposition'] = f'attachment; filename={filename}.pdf'
 
         return response
 
@@ -2338,31 +2414,49 @@ def generate_daily_report():
         return jsonify({'success': False, 'message': str(e)}), 500
 
 
-def fetch_daily_report_data(report_date):
-    """Fetch all necessary data for the daily report."""
+def fetch_daily_report_data(start_date, end_date, start_bs=None, end_bs=None):
+    """Fetch all necessary data for the daily report range."""
     
-    # Get disasters for the date
-    disasters = Disaster.query.filter(
-        db.func.date(Disaster.created_at) == report_date
+    # Get disasters for the date range
+    if start_bs and end_bs:
+        disasters = Disaster.query.filter(
+            Disaster.disaster_date_bs >= start_bs,
+            Disaster.disaster_date_bs <= end_bs
+        ).all()
+    else:
+        disasters = Disaster.query.filter(
+            db.func.date(Disaster.disaster_date) >= start_date,
+            db.func.date(Disaster.disaster_date) <= end_date
+        ).all()
+    
+    # Also get disasters created in the range for event log purposes
+    all_disasters_today = Disaster.query.filter(
+        db.func.date(Disaster.created_at) >= start_date,
+        db.func.date(Disaster.created_at) <= end_date
     ).all()
     
-    # Get all disasters for statistics (not just today's)
-    all_disasters = Disaster.query.all()
-    
-    # Get event logs for the date
+    # Get event logs for the range
     event_logs = EventLog.query.filter(
-        db.func.date(EventLog.timestamp) == report_date
+        db.func.date(EventLog.timestamp) >= start_date,
+        db.func.date(EventLog.timestamp) <= end_date
     ).order_by(EventLog.timestamp.desc()).all()
     
-    # Get latest situation report
-    situation_report = SituationReport.query.order_by(
-        SituationReport.report_date.desc()
-    ).first()
+    # Get latest situation report for the end of the range
+    situation_report = SituationReport.query.filter(
+        SituationReport.report_date <= end_date
+    ).order_by(SituationReport.report_date.desc()).first()
     
-    # Get active public advisories
+    # Get public advisories valid in the range
+    report_start_datetime = datetime.combine(start_date, datetime.min.time())
+    report_end_datetime = datetime.combine(end_date, datetime.max.time())
+    
     public_advisories = PublicInformation.query.filter(
-        PublicInformation.is_active == True
-    ).order_by(PublicInformation.created_at.desc()).limit(5).all()
+        PublicInformation.valid_from <= report_end_datetime,
+        db.or_(
+            PublicInformation.valid_until == None,
+            PublicInformation.valid_until >= report_start_datetime
+        )
+    ).order_by(PublicInformation.priority.desc(), PublicInformation.created_at.desc()).limit(5).all()
     
     # Calculate ward-wise statistics
     ward_stats = {}
@@ -2372,8 +2466,8 @@ def fetch_daily_report_data(report_date):
             'total_incidents': len(ward_disasters),
             'deaths': sum(d.deaths for d in ward_disasters),
             'missing': sum(d.missing_persons for d in ward_disasters),
-            'injured': sum(d.livestock_injured for d in ward_disasters),  # Using as proxy
-            'estimated_loss': 0,  # Calculate if available
+            'injured': sum(d.livestock_injured for d in ward_disasters), # Using livestock injured as human injured placeholder if needed
+            'estimated_loss': sum(d.estimated_loss for d in ward_disasters if d.estimated_loss),
             'road_blocked': any(d.road_blocked_status for d in ward_disasters),
             'electricity_blocked': any(d.electricity_blocked_status for d in ward_disasters),
             'communication_blocked': any(d.communication_blocked_status for d in ward_disasters),
@@ -2382,26 +2476,36 @@ def fetch_daily_report_data(report_date):
         }
     
     # Calculate disaster type statistics
-    disaster_types = ['Earthquake', 'Flood', 'Landslide', 'Storm', 'Fire', 'Thunder', 'Animal terror']
+    disaster_types = set()
+    for d in disasters:
+        if d.disaster_type:
+            dtype_normalized = d.disaster_type.lower().replace('_', ' ').title()
+            disaster_types.add(dtype_normalized)
+    
+    disaster_types = list(disaster_types) if disaster_types else []
+    
     type_stats = {}
     for dtype in disaster_types:
-        type_disasters = [d for d in all_disasters if dtype.lower() in d.disaster_type.lower()]
+        type_disasters = [d for d in disasters if d.disaster_type and
+                         (dtype.lower() in d.disaster_type.lower() or
+                          d.disaster_type.lower() in dtype.lower())]
         type_stats[dtype] = {
             'total': len(type_disasters),
-            'deaths': sum(d.deaths for d in type_disasters),
+            'male_death': sum(d.deaths for d in type_disasters),
+            'female_death': 0,
             'missing': sum(d.missing_persons for d in type_disasters),
-            'injured': sum(d.livestock_injured for d in type_disasters),
+            'male_injured': sum(d.livestock_injured for d in type_disasters),
+            'female_injured': 0,
             'affected_families': sum(d.affected_households for d in type_disasters),
             'house_damaged': sum(d.public_building_damage for d in type_disasters),
             'house_destroyed': sum(d.public_building_destruction for d in type_disasters),
             'public_building_damaged': sum(d.public_building_damage for d in type_disasters),
             'public_building_destroyed': sum(d.public_building_destruction for d in type_disasters),
             'livestock_loss': sum(d.livestock_death for d in type_disasters),
-            'fund_male': sum(d.affected_people_male for d in type_disasters),
-            'fund_female': sum(d.affected_people_female for d in type_disasters),
+            'estimated_loss': sum(d.estimated_loss for d in type_disasters if d.estimated_loss),
         }
     
-    # Infrastructure status
+    # Infrastructure status (any disruption in range)
     infrastructure = {
         'electricity': 'Normal' if not any(d.electricity_blocked_status for d in disasters) else 'Disrupted',
         'road': 'Open' if not any(d.road_blocked_status for d in disasters) else 'Blocked',
@@ -2421,16 +2525,51 @@ def fetch_daily_report_data(report_date):
             'incidents': len(disasters),
             'deaths': sum(d.deaths for d in disasters),
             'missing': sum(d.missing_persons for d in disasters),
-            'affected_people': sum(d.affected_people for d in disasters),
+            'injured': sum(d.livestock_injured for d in disasters),
+            'affected_people': sum(d.affected_people_male + d.affected_people_female for d in disasters),
             'affected_households': sum(d.affected_households for d in disasters),
             'livestock_death': sum(d.livestock_death for d in disasters),
             'livestock_injured': sum(d.livestock_injured for d in disasters),
+            'estimated_loss': sum(d.estimated_loss for d in disasters if d.estimated_loss),
         }
     }
 
 
-def generate_pdf_report(data, report_date):
+@app.route('/print-disaster-report/<int:disaster_id>')
+def print_disaster_report(disaster_id):
+    """Render a print-friendly HTML page for a specific disaster report."""
+    try:
+        disaster = Disaster.query.get(disaster_id)
+        if not disaster:
+            return "Disaster not found", 404
+        
+        # Use the BS date if available, otherwise convert from AD
+        if disaster.disaster_date_bs:
+            report_date_bs = disaster.disaster_date_bs
+        elif disaster.disaster_date:
+            report_date_bs = ad_to_bs(disaster.disaster_date.year, disaster.disaster_date.month, disaster.disaster_date.day)
+        else:
+            report_date_bs = None
+        
+        return render_template('disaster_report_print.html',
+                               disaster=disaster,
+                               report_date=disaster.disaster_date,
+                               report_date_bs=report_date_bs,
+                               generated_at=datetime.now())
+    except Exception as e:
+        print(f"Error generating disaster report print: {str(e)}")
+        return f"Error: {str(e)}", 500
+
+
+def generate_pdf_report(data, start_date, end_date=None, start_bs=None, end_bs=None):
     """Generate PDF report using ReportLab."""
+    if not end_date:
+        end_date = start_date
+    if not start_bs:
+        start_bs = ad_to_bs(start_date.year, start_date.month, start_date.day)
+    if not end_bs:
+        end_bs = ad_to_bs(end_date.year, end_date.month, end_date.day)
+
     buffer = BytesIO()
     
     # Create PDF document
@@ -2504,8 +2643,9 @@ def generate_pdf_report(data, report_date):
     elements.append(Spacer(1, 6))
     
     # Date and Weather
+    date_display = f"{start_bs}" if start_bs == end_bs else f"{start_bs} to {end_bs}"
     date_weather_data = [
-        [Paragraph(f"<b>Date:</b> {report_date.strftime('%Y-%m-%d')}", normal_style),
+        [Paragraph(f"<b>Date (BS):</b> {date_display}", normal_style),
          Paragraph(f"<b>Today's Weather:</b> {data['situation_report']['weather_conditions'] if data['situation_report'] else 'N/A'}", normal_style)]
     ]
     date_weather_table = Table(date_weather_data, colWidths=[80*mm, 80*mm])
@@ -2554,8 +2694,8 @@ def generate_pdf_report(data, report_date):
         str(totals['incidents']),
         str(totals['deaths']),
         str(totals['missing']),
-        str(totals['livestock_injured']),
-        '0',
+        str(totals['injured']),
+        str(totals['estimated_loss']),
         '-',
         str(totals['livestock_death']),
         '-'
@@ -2605,17 +2745,17 @@ def generate_pdf_report(data, report_date):
             type_data.append([
                 dtype,
                 str(stats['total']),
-                str(stats['deaths']),
-                str(stats['missing']),
-                str(stats['injured']),
-                str(stats['affected_families']),
-                str(stats['house_damaged']),
-                str(stats['house_destroyed']),
-                str(stats['public_building_damaged']),
-                str(stats['public_building_destroyed']),
-                str(stats['livestock_loss']),
-                str(stats['fund_male']),
-                str(stats['fund_female'])
+                str(stats.get('male_death', 0) + stats.get('female_death', 0)),  # Total deaths
+                str(stats.get('missing', 0)),
+                str(stats.get('male_injured', 0) + stats.get('female_injured', 0)),  # Total injured
+                str(stats.get('affected_families', 0)),
+                str(stats.get('house_damaged', 0)),
+                str(stats.get('house_destroyed', 0)),
+                str(stats.get('public_building_damaged', 0)),
+                str(stats.get('public_building_destroyed', 0)),
+                str(stats.get('livestock_loss', 0)),
+                str(stats.get('estimated_loss', 0)),  # Using estimated_loss instead of fund fields
+                '-'  # Placeholder for additional column
             ])
     
     # If no disasters, show empty row
@@ -2728,30 +2868,215 @@ def generate_pdf_report(data, report_date):
     return buffer
 
 
+# AD to BS date conversion function
+def ad_to_bs(ad_year, ad_month, ad_day):
+    """
+    Convert AD (Gregorian) date to BS (Bikram Sambat) date.
+    Uses accurate conversion data for years 2015-2030.
+    """
+    # BS to AD mapping for the start of each BS year (month 1, day 1)
+    # Format: (ad_year, ad_month, ad_day) for BS year start
+    bs_year_start = {
+        2072: (2015, 4, 14),
+        2073: (2016, 4, 13),
+        2074: (2017, 4, 14),
+        2075: (2018, 4, 14),
+        2076: (2019, 4, 14),
+        2077: (2020, 4, 13),
+        2078: (2021, 4, 14),
+        2079: (2022, 4, 14),
+        2080: (2023, 4, 14),
+        2081: (2024, 4, 13),
+        2082: (2025, 4, 14),
+        2083: (2026, 4, 14),
+        2084: (2027, 4, 14),
+        2085: (2028, 4, 13),
+        2086: (2029, 4, 14),
+        2087: (2030, 4, 14),
+        2088: (2031, 4, 14),
+        2089: (2032, 4, 13),
+        2090: (2033, 4, 14),
+    }
+    
+    # Days in each BS month (approximate - varies slightly by year)
+    bs_months_days = {
+        1: 31,   # Baisakh
+        2: 31,   # Jestha
+        3: 31,   # Ashad
+        4: 32,   # Shrawan
+        5: 31,   # Bhadra
+        6: 31,   # Ashwin
+        7: 30,   # Kartik
+        8: 30,   # Mangsir
+        9: 29,   # Poush
+        10: 29,  # Magh
+        11: 30,  # Falgun
+        12: 30,  # Chaitra
+    }
+    
+    from datetime import datetime, timedelta
+    
+    # Create AD date object
+    ad_date = datetime(ad_year, ad_month, ad_day)
+    
+    # Find the corresponding BS year
+    bs_year = None
+    for year in sorted(bs_year_start.keys()):
+        start = datetime(*bs_year_start[year])
+        if ad_date >= start:
+            bs_year = year
+        else:
+            break
+    
+    if bs_year is None:
+        bs_year = 2082  # Default fallback
+    
+    # Calculate days since BS year start
+    bs_start = datetime(*bs_year_start[bs_year])
+    days_diff = (ad_date - bs_start).days
+    
+    # Calculate BS month and day
+    bs_month = 1
+    bs_day = 1
+    
+    remaining_days = days_diff
+    for month in range(1, 13):
+        days_in_month = bs_months_days.get(month, 30)
+        if remaining_days < days_in_month:
+            bs_month = month
+            bs_day = remaining_days + 1
+            break
+        remaining_days -= days_in_month
+    else:
+        # If we exceed the year, go to next year
+        bs_year += 1
+        bs_month = 1
+        bs_day = remaining_days + 1
+    
+    return f"{bs_year}-{bs_month:02d}-{bs_day:02d}"
+
+
+def bs_to_ad(bs_date_str):
+    """
+    Convert BS (Bikram Sambat) date to AD (Gregorian) date.
+    Inverse of ad_to_bs, using corresponding logic.
+    """
+    # BS to AD mapping for the start of each BS year (month 1, day 1)
+    bs_year_start = {
+        2072: (2015, 4, 14),
+        2073: (2016, 4, 13),
+        2074: (2017, 4, 14),
+        2075: (2018, 4, 14),
+        2076: (2019, 4, 14),
+        2077: (2020, 4, 13),
+        2078: (2021, 4, 14),
+        2079: (2022, 4, 14),
+        2080: (2023, 4, 14),
+        2081: (2024, 4, 13),
+        2082: (2025, 4, 14),
+        2083: (2026, 4, 14),
+        2084: (2027, 4, 14),
+        2085: (2028, 4, 13),
+        2086: (2029, 4, 14),
+        2087: (2030, 4, 14),
+        2088: (2031, 4, 14),
+        2089: (2032, 4, 13),
+        2090: (2033, 4, 14),
+    }
+    
+    bs_months_days = {
+        1: 31, 2: 31, 3: 31, 4: 32, 5: 31, 6: 31,
+        7: 30, 8: 30, 9: 29, 10: 29, 11: 30, 12: 30,
+    }
+    
+    try:
+        parts = bs_date_str.split('-')
+        bs_year = int(parts[0])
+        bs_month = int(parts[1])
+        bs_day = int(parts[2])
+        
+        if bs_year not in bs_year_start:
+            return datetime.now().strftime('%Y-%m-%d')
+            
+        # Get AD start date for this BS year
+        ad_start_tuple = bs_year_start[bs_year]
+        ad_date = datetime(*ad_start_tuple)
+        
+        # Add days for months
+        days_to_add = 0
+        for m in range(1, bs_month):
+            days_to_add += bs_months_days.get(m, 30)
+        
+        # Add days for day of month (minus 1 because month start is already day 1)
+        days_to_add += (bs_day - 1)
+        
+        ad_date = ad_date + timedelta(days=days_to_add)
+        return ad_date.strftime('%Y-%m-%d')
+    except Exception as e:
+        print(f"Error in bs_to_ad: {e}")
+        return datetime.now().strftime('%Y-%m-%d')
+
+
 @app.route('/daily-report-preview')
 def daily_report_preview():
     """
     Render a print-friendly HTML preview of the daily report.
     Query params:
-    - date: YYYY-MM-DD format (default: today)
+    - date: YYYY-MM-DD (AD) format
+    - bs_date: YYYY-MM-DD (BS) format (takes precedence)
+    - from_bs_date/to_bs_date: BS date range
     """
     try:
-        # Get date parameter or use today
+        # Get parameters
+        bs_date_str = request.args.get('bs_date')
         report_date_str = request.args.get('date')
-        if report_date_str:
+        from_bs = request.args.get('from_bs_date')
+        to_bs = request.args.get('to_bs_date')
+        
+        start_date = None
+        end_date = None
+        start_bs = None
+        end_bs = None
+
+        if from_bs and to_bs:
+            start_date_str = bs_to_ad(from_bs)
+            end_date_str = bs_to_ad(to_bs)
+            start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+            end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+            start_bs = from_bs
+            end_bs = to_bs
+        elif bs_date_str:
+            report_date_ad_str = bs_to_ad(bs_date_str)
+            start_date = datetime.strptime(report_date_ad_str, '%Y-%m-%d').date()
+            end_date = start_date
+            start_bs = bs_date_str
+            end_bs = bs_date_str
+        elif report_date_str:
             try:
-                report_date = datetime.strptime(report_date_str, '%Y-%m-%d').date()
+                start_date = datetime.strptime(report_date_str, '%Y-%m-%d').date()
+                end_date = start_date
+                start_bs = ad_to_bs(start_date.year, start_date.month, start_date.day)
+                end_bs = start_bs
             except ValueError:
-                report_date = date.today()
+                start_date = date.today()
+                end_date = start_date
+                start_bs = ad_to_bs(start_date.year, start_date.month, start_date.day)
+                end_bs = start_bs
         else:
-            report_date = date.today()
+            start_date = date.today()
+            end_date = start_date
+            start_bs = ad_to_bs(start_date.year, start_date.month, start_date.day)
+            end_bs = start_bs
 
         # Fetch data for the report
-        report_data = fetch_daily_report_data(report_date)
-
-        return render_template('daily_report_print.html', 
-                               data=report_data, 
-                               report_date=report_date,
+        report_data = fetch_daily_report_data(start_date, end_date, start_bs, end_bs)
+        
+        return render_template('daily_report_print.html',
+                               data=report_data,
+                               start_date=start_date,
+                               end_date=end_date,
+                               start_bs=start_bs,
+                               end_bs=end_bs,
                                generated_at=datetime.now())
 
     except Exception as e:
