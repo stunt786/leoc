@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}New Distribution - LEOC{% endblock %}
+{% block title %}नयाँ राहात वितरण - LEOC{% endblock %}
 
 {% block content %}
 <div class="container py-4">
@@ -27,10 +27,9 @@
                                             <i class="bi bi-person"></i> लाभग्राहि नाम थर *
                                         </label>
                                         <input type="text" class="form-control" id="beneficiary_name"
-                                            name="beneficiary_name" required placeholder="Enter beneficiary name"
+                                            name="beneficiary_name" required placeholder="नाम थर लेख्नुहोस्"
                                             minlength="3" oninput="validateField('beneficiary_name')">
-                                        <small class="text-muted">Full name of the beneficiary (minimum 3
-                                            characters)</small>
+                                        <small class="text-muted">लाभग्राहिको पूरा नाम (कम्तिमा ३ अक्षर)</small>
                                         <div id="beneficiary_name_error" class="invalid-feedback d-block"></div>
                                     </div>
 
@@ -40,10 +39,10 @@
                                             <i class="bi bi-card-list"></i> लाभग्राहि ना.प्र.प्र नं *
                                         </label>
                                         <input type="text" class="form-control" id="beneficiary_id"
-                                            name="beneficiary_id" required placeholder="e.g., BEN-001" minlength="2"
+                                            name="beneficiary_id" required placeholder="उदा: BEN-001" minlength="2"
                                             oninput="validateField('beneficiary_id')">
-                                        <small class="text-muted">Unique identifier for beneficiary (minimum 2
-                                            characters)</small>
+                                        <small class="text-muted">लाभग्राहिको विशिष्ट पहिचान नम्बर (कम्तिमा २
+                                            अक्षर)</small>
                                         <div id="beneficiary_id_error" class="invalid-feedback d-block"></div>
                                     </div>
                                 </div>
@@ -55,8 +54,8 @@
                                             <i class="bi bi-person-fill"></i> बुवाको नाम थर
                                         </label>
                                         <input type="text" class="form-control" id="father_name" name="father_name"
-                                            placeholder="Enter father's name">
-                                        <small class="text-muted">Father's name for identification</small>
+                                            placeholder="बुवाको नाम थर लेख्नुहोस्">
+                                        <small class="text-muted">पहिचानका लागि बुवाको नाम थर</small>
                                     </div>
 
                                     <!-- Phone -->
@@ -65,9 +64,8 @@
                                             <i class="bi bi-telephone"></i> फोन नम्बर *
                                         </label>
                                         <input type="tel" class="form-control" id="phone" name="phone"
-                                            placeholder="9841000000" minlength="7" oninput="validateField('phone')">
-                                        <small class="text-muted">Contact number of beneficiary (minimum 10
-                                            digits)</small>
+                                            placeholder="९८४१००००००" minlength="7" oninput="validateField('phone')">
+                                        <small class="text-muted">लाभग्राहिको सम्पर्क नम्बर (कम्तिमा १० अंक)</small>
                                         <div id="phone_error" class="invalid-feedback d-block"></div>
                                     </div>
                                 </div>
@@ -88,10 +86,10 @@
                                             <i class="bi bi-calendar"></i> घटना घट्टेको मिति (BS) *
                                         </label>
                                         <input type="text" class="form-control" id="disaster_date" name="disaster_date"
-                                            required placeholder="YYYY-MM-DD (e.g., 2080-10-15)"
-                                            pattern="\d{4}-\d{2}-\d{2}" oninput="validateField('disaster_date')">
-                                        <small class="text-muted">Nepali date in format YYYY-MM-DD (e.g.,
-                                            2080-10-15)</small>
+                                            required placeholder="२०८०-१०-१५" pattern="\d{4}-\d{2}-\d{2}"
+                                            oninput="validateField('disaster_date')">
+                                        <small class="text-muted">नेपाली मिति ढाँचा: वर्ष-महिना-गते (उदा:
+                                            २०८०-१०-१५)</small>
                                         <div id="disaster_date_error" class="invalid-feedback d-block"></div>
                                         <div id="nepaliDateHelper" class="mt-2">
                                             <a href="#" onclick="openNepaliCalendar(); return false;"
@@ -110,7 +108,7 @@
                                             onchange="validateField('disaster_type')">
                                             <option value="">-- Loading --</option>
                                         </select>
-                                        <small class="text-muted">Type of disaster</small>
+                                        <small class="text-muted">विपद्को मुख्य प्रकार</small>
                                     </div>
                                 </div>
 
@@ -123,7 +121,7 @@
                                         <select class="form-control" id="fiscal_year" name="fiscal_year">
                                             <option value="">-- Loading --</option>
                                         </select>
-                                        <small class="text-muted">Fiscal year (e.g., 2080/81)</small>
+                                        <small class="text-muted">चालु आर्थिक वर्ष (उदा: २०८०/८१)</small>
                                     </div>
 
                                     <!-- Ward -->
@@ -132,7 +130,7 @@
                                             <i class="bi bi-map"></i> वडा नं *
                                         </label>
                                         <select class="form-control" id="ward" name="ward" required>
-                                            <option value="">-- Select Ward --</option>
+                                            <option value="">-- वडा छान्नुहोस् --</option>
                                             <option value="1">वडा नं १</option>
                                             <option value="2">वडा नं २</option>
                                             <option value="3">वडा नं ३</option>
@@ -143,7 +141,7 @@
                                             <option value="8">वडा नं ८</option>
                                             <option value="9">वडा नं ९</option>
                                         </select>
-                                        <small class="text-muted">Administrative ward (1-9)</small>
+                                        <small class="text-muted">प्रशासकीय वडा नम्बर (१-९)</small>
                                     </div>
 
                                     <!-- Tole -->
@@ -152,8 +150,8 @@
                                             <i class="bi bi-signpost"></i> टोल
                                         </label>
                                         <input type="text" class="form-control" id="tole" name="tole"
-                                            placeholder="Tole name">
-                                        <small class="text-muted">Neighborhood/tole name</small>
+                                            placeholder="टोलको नाम">
+                                        <small class="text-muted">गाउँ वा टोलको नाम</small>
                                     </div>
                                 </div>
 
@@ -164,10 +162,9 @@
                                             <i class="bi bi-building"></i> स्थायी बसोबास ठेगाना *
                                         </label>
                                         <input type="text" class="form-control" id="location" name="location" required
-                                            placeholder="e.g., Downtown Shelter / House #123" minlength="3"
+                                            placeholder="उदा: थलारा-१, पिठाकोट" minlength="3"
                                             oninput="validateField('location')">
-                                        <small class="text-muted">Specific building or location name (minimum 3
-                                            characters)</small>
+                                        <small class="text-muted">स्थायी ठेगाना वा घर नम्बर (कम्तिमा ३ अक्षर)</small>
                                         <div id="location_error" class="invalid-feedback d-block"></div>
                                     </div>
 
@@ -177,9 +174,8 @@
                                             <i class="bi bi-house"></i> हाल बसोबास स्थान
                                         </label>
                                         <input type="text" class="form-control" id="current_shelter_location"
-                                            name="current_shelter_location"
-                                            placeholder="Where are they currently sheltering?">
-                                        <small class="text-muted">Current shelter location if displaced</small>
+                                            name="current_shelter_location" placeholder="अहिले कहाँ बसिरहनुभएको छ?">
+                                        <small class="text-muted">विस्थापित भएको भए हालको बसाइ स्थान</small>
                                     </div>
                                 </div>
 
@@ -190,9 +186,9 @@
                                             <i class="bi bi-geo-alt"></i> आक्षांश (Latitude)
                                         </label>
                                         <input type="number" class="form-control" id="latitude" name="latitude"
-                                            step="0.000001" placeholder="e.g., 27.717245" min="-90" max="90"
+                                            step="0.000001" placeholder="उदा: २७.७१७२४५" min="-90" max="90"
                                             oninput="validateField('latitude')">
-                                        <small class="text-muted">Geographic latitude (-90 to 90)</small>
+                                        <small class="text-muted">भौगोलिक आक्षांश (-९० देखि ९० सम्म)</small>
                                         <div id="latitude_error" class="invalid-feedback d-block"></div>
                                     </div>
 
@@ -202,9 +198,9 @@
                                             <i class="bi bi-geo-alt"></i> देशान्तर (Longitude)
                                         </label>
                                         <input type="number" class="form-control" id="longitude" name="longitude"
-                                            step="0.000001" placeholder="e.g., 85.324021" min="-180" max="180"
+                                            step="0.000001" placeholder="उदा: ८५.३२४०२१" min="-180" max="180"
                                             oninput="validateField('longitude')">
-                                        <small class="text-muted">Geographic longitude (-180 to 180)</small>
+                                        <small class="text-muted">भौगोलिक देशान्तर (-१८० देखि १८० सम्म)</small>
                                         <div id="longitude_error" class="invalid-feedback d-block"></div>
                                     </div>
                                 </div>
@@ -225,7 +221,7 @@
                                         </label>
                                         <input type="number" class="form-control" id="male_count" name="male_count"
                                             min="0" value="0">
-                                        <small class="text-muted">Number of males in family</small>
+                                        <small class="text-muted">परिवारमा रहेका पुरुषको संख्या</small>
                                     </div>
 
                                     <!-- Female Count -->
@@ -235,7 +231,7 @@
                                         </label>
                                         <input type="number" class="form-control" id="female_count" name="female_count"
                                             min="0" value="0">
-                                        <small class="text-muted">Number of females in family</small>
+                                        <small class="text-muted">परिवारमा रहेका महिलाको संख्या</small>
                                     </div>
 
                                     <!-- Children Count -->
@@ -245,7 +241,7 @@
                                         </label>
                                         <input type="number" class="form-control" id="children_count"
                                             name="children_count" min="0" value="0">
-                                        <small class="text-muted">Number of children (&lt;18 yrs)</small>
+                                        <small class="text-muted">१८ वर्ष मुनिका बालबालिका संख्या</small>
                                     </div>
 
                                     <!-- Deaths -->
@@ -255,7 +251,7 @@
                                         </label>
                                         <input type="number" class="form-control" id="deaths_during_disaster"
                                             name="deaths_during_disaster" min="0" value="0">
-                                        <small class="text-muted">Deaths in family during disaster</small>
+                                        <small class="text-muted">विपद्का कारण ज्यान गुमाउनेको संख्या</small>
                                     </div>
                                 </div>
 
@@ -267,7 +263,7 @@
                                         </label>
                                         <input type="number" class="form-control" id="pregnant_mother_count"
                                             name="pregnant_mother_count" min="0" value="0">
-                                        <small class="text-muted">Number of pregnant mothers</small>
+                                        <small class="text-muted">परिवारमा रहेका गर्भवती वा सुत्केरीको संख्या</small>
                                     </div>
 
                                     <!-- Mother with Under 2 Baby -->
@@ -277,7 +273,7 @@
                                         </label>
                                         <input type="number" class="form-control" id="mother_under_2_baby"
                                             name="mother_under_2_baby" min="0" value="0">
-                                        <small class="text-muted">Mothers with children under 2 years old</small>
+                                        <small class="text-muted">२ वर्ष मुनिका बच्चा भएका आमाहरूको संख्या</small>
                                     </div>
                                 </div>
 
@@ -307,17 +303,18 @@
                                             <input class="form-check-input" type="checkbox" id="in_social_security_fund"
                                                 name="in_social_security_fund">
                                             <label class="form-check-label" for="in_social_security_fund">
-                                                In Social Security Fund
+                                                सामाजिक सुरक्षा कोषमा आबद्ध छ/छैन
                                             </label>
                                         </div>
-                                        <small class="text-muted">Is beneficiary in social security scheme?</small>
+                                        <small class="text-muted">के लाभग्राहि सामाजिक सुरक्षा योजनामा
+                                            हुनुहुन्छ?</small>
                                     </div>
 
                                     <!-- SSF Type -->
                                     <div class="col-md-4 mb-3" id="ssf_type_div" style="display:none;">
                                         <label for="ssf_type" class="form-label">सा.सु प्रकार</label>
                                         <select class="form-control" id="ssf_type" name="ssf_type">
-                                            <option value="">-- Select --</option>
+                                            <option value="">-- छान्नुहोस् --</option>
                                             <!-- Options will be populated dynamically -->
                                         </select>
                                         <script>
@@ -355,7 +352,7 @@
                                                 गरिब परिचयपत्र छ/छैन
                                             </label>
                                         </div>
-                                        <small class="text-muted">Does beneficiary have poverty card?</small>
+                                        <small class="text-muted">के लाभग्राहिसँग गरिब परिचयपत्र छ?</small>
                                     </div>
                                 </div>
                             </div>
@@ -389,8 +386,8 @@
                                             <i class="bi bi-person"></i> खाताबालाको नाम अङ्रेजिमा
                                         </label>
                                         <input type="text" class="form-control" id="bank_account_holder_name"
-                                            name="bank_account_holder_name" placeholder="Name on bank account">
-                                        <small class="text-muted">Name as it appears on bank account</small>
+                                            placeholder="बैंक खातामा भएको नाम (English मा)">
+                                        <small class="text-muted">बैंक खातामा उल्लेखित नाम</small>
                                     </div>
 
                                     <!-- Account Number -->
@@ -399,8 +396,8 @@
                                             <i class="bi bi-credit-card"></i> खाता नंम्बर
                                         </label>
                                         <input type="text" class="form-control" id="bank_account_number"
-                                            name="bank_account_number" placeholder="Bank account number">
-                                        <small class="text-muted">Account number (masked for security)</small>
+                                            name="bank_account_number" placeholder="बैंक खाता नम्बर लेख्नुहोस्">
+                                        <small class="text-muted">बैंकको खाता नम्बर</small>
                                     </div>
                                 </div>
 
@@ -411,8 +408,8 @@
                                             <i class="bi bi-bank2"></i> बैंकको नाम
                                         </label>
                                         <input type="text" class="form-control" id="bank_name" name="bank_name"
-                                            placeholder="e.g., Nepal Bank Limited">
-                                        <small class="text-muted">Name of the bank</small>
+                                            placeholder="उदा: राष्ट्रिय वाणिज्य बैंक लिमिटेड">
+                                        <small class="text-muted">बैंकको पूरा नाम</small>
                                     </div>
                                 </div>
                             </div>
@@ -428,7 +425,7 @@
                             <div class="card-body">
                                 <div id="itemsContainer"></div>
                                 <button type="button" class="btn btn-success btn-sm mt-2" onclick="addItemRow()">
-                                    <i class="bi bi-plus-circle"></i> Add More Items
+                                    <i class="bi bi-plus-circle"></i> थप सामाग्री थप्नुहोस्
                                 </button>
                                 <input type="hidden" id="relief_items_json" name="relief_items_json" value="[]">
                             </div>
@@ -441,12 +438,12 @@
                                     <i class="bi bi-cash-coin"></i> नगद प्राप्त रकम *
                                 </label>
                                 <div class="input-group">
-                                    <span class="input-group-text">₹</span>
+                                    <span class="input-group-text">रु</span>
                                     <input type="number" class="form-control" id="cash_received" name="cash_received"
                                         step="0.01" value="0.00" placeholder="0.00" min="0"
                                         oninput="validateField('cash_received')">
                                 </div>
-                                <small class="text-muted">Amount of cash received (minimum 0)</small>
+                                <small class="text-muted">प्राप्त भएको नगद रकम</small>
                                 <div id="cash_received_error" class="invalid-feedback d-block"></div>
                             </div>
 
@@ -461,7 +458,7 @@
                                     <option value="In Progress">वितरण प्रक्रियामा रहेको</option>
                                     <option value="Cancel">वितरण नभएको</option>
                                 </select>
-                                <small class="text-muted">Distribution status</small>
+                                <small class="text-muted">वितरणको अवस्था</small>
                             </div>
                         </div>
 
@@ -472,7 +469,7 @@
                                     <i class="bi bi-image"></i> प्रमाण फोटो
                                 </label>
                                 <input type="file" class="form-control" id="image" name="image" accept="image/*">
-                                <small class="text-muted">Evidence photo (optional)</small>
+                                <small class="text-muted">प्रमाण स्वरूप फोटो (ऐच्छिक)</small>
                             </div>
 
                             <!-- Documents Upload -->
@@ -482,7 +479,7 @@
                                 </label>
                                 <input type="file" class="form-control" id="documents" name="documents" multiple
                                     accept=".pdf,.doc,.docx,.jpg,.png">
-                                <small class="text-muted">Receipts, certificates, etc.</small>
+                                <small class="text-muted">भरपाई, नागरिकता, फोटो आदि</small>
                             </div>
                         </div>
 
@@ -498,22 +495,22 @@
                                 <i class="bi bi-pencil-square"></i> विपद् घटना सम्बन्धी थप विवरण
                             </label>
                             <textarea class="form-control" id="notes" name="notes" rows="3"
-                                placeholder="Any additional information about this distribution..."></textarea>
-                            <small class="text-muted">Additional details or comments</small>
+                                placeholder="यो वितरण सम्बन्धी केही भन्नु पर्ने भए यहाँ लेख्नुहोस्..."></textarea>
+                            <small class="text-muted">थप विवरण वा टिप्पणीहरू</small>
                         </div>
 
                         <!-- Form Actions -->
                         <div class="d-flex gap-2">
                             <button type="submit" class="btn btn-primary btn-lg flex-grow-1">
-                                <i class="bi bi-check-lg"></i> SAVE RECORD
+                                <i class="bi bi-check-lg"></i> रेकर्ड सुरक्षित गर्नुहोस्
                             </button>
                             <button type="reset" class="btn btn-secondary btn-lg" onclick="resetForm()">
-                                <i class="bi bi-arrow-clockwise"></i> Reset
+                                <i class="bi bi-arrow-clockwise"></i> रिसेट
                             </button>
                         </div>
 
                         <a href="/" class="btn btn-link mt-3">
-                            <i class="bi bi-arrow-left"></i> Back to Dashboard
+                            <i class="bi bi-arrow-left"></i> ड्यासबोर्डमा फिर्ता जानुहोस्
                         </a>
                     </form>
                 </div>
@@ -573,7 +570,7 @@
 
     function populateDisasterTypeDropdown(types) {
         const select = document.getElementById('disaster_type');
-        select.innerHTML = '<option value="">-- Select Disaster Type --</option>';
+        select.innerHTML = '<option value="">-- विपद्को प्रकार छान्नुहोस् --</option>';
         types.forEach(type => {
             const option = document.createElement('option');
             option.value = type;
@@ -584,7 +581,7 @@
 
     function populateFiscalYearDropdown(years) {
         const select = document.getElementById('fiscal_year');
-        select.innerHTML = '<option value="">-- Select Fiscal Year --</option>';
+        select.innerHTML = '<option value="">-- आर्थिक वर्ष छान्नुहोस् --</option>';
         years.forEach(year => {
             const option = document.createElement('option');
             option.value = year;
@@ -693,7 +690,7 @@
                 document.querySelector('.card-header h2, .card-header h3, .card h2, .card h3')?.parentElement.querySelector('h2, h3');
                 const titleEl = document.querySelector('.card-header h2') || document.querySelector('.card-header h3');
                 if (titleEl) {
-                    titleEl.innerHTML = '<i class="bi bi-pencil-square"></i> Edit Distribution Record';
+                    titleEl.innerHTML = '<i class="bi bi-pencil-square"></i> विवरण सम्पादन गर्नुहोस्';
                 }
 
                 // Store edit ID for submission
@@ -722,7 +719,7 @@
                 <div class="col-md-5">
                     <label class="form-label">राहात सामाग्री</label>
                     <select class="form-control item-select" data-id="${rowId}">
-                        <option value="">-- Select Item --</option>
+                        <option value="">-- सामाग्री छान्नुहोस् --</option>
                         ${reliefItemOptions.map(opt => `<option value="${opt}" ${item === opt ? 'selected' : ''}>${opt}</option>`).join('')}
                     </select>
                 </div>
@@ -732,7 +729,7 @@
                 </div>
                 <div class="col-md-4">
                     <label class="form-label">एकाइ</label>
-                    <input type="text" class="form-control item-unit" data-id="${rowId}" value="${unit || ''}" placeholder="e.g., kg, liters, packets">
+                    <input type="text" class="form-control item-unit" data-id="${rowId}" value="${unit || ''}" placeholder="उदा: केजी, प्याकेट">
                 </div>
             </div>
             <button type="button" class="btn btn-sm btn-danger mt-2" onclick="removeItemRow('${rowId}')">
@@ -762,12 +759,12 @@
             <div class="row">
                 <div class="col-md-4">
                     <label class="form-label">नाम थर</label>
-                    <input type="text" class="form-control family-name" data-id="${rowId}" value="${name}" placeholder="Family member name">
+                    <input type="text" class="form-control family-name" data-id="${rowId}" value="${name}" placeholder="सदस्यको नाम थर">
                 </div>
                 <div class="col-md-2">
                     <label class="form-label">सम्बन्ध</label>
                     <select class="form-control family-relation" data-id="${rowId}">
-                        <option value="">Select</option>
+                        <option value="">छान्नुहोस्</option>
                         <option value="Father" ${relation === 'Father' ? 'selected' : ''}>बुबा (Father)</option>
                         <option value="Mother" ${relation === 'Mother' ? 'selected' : ''}>आमा (Mother)</option>
                         <option value="Spouse" ${relation === 'Spouse' ? 'selected' : ''}>पति/पत्नी (Spouse)</option>
@@ -784,20 +781,20 @@
                 </div>
                 <div class="col-md-2">
                     <label class="form-label">उमेर</label>
-                    <input type="number" class="form-control family-age" data-id="${rowId}" value="${age}" min="0" placeholder="Age">
+                    <input type="number" class="form-control family-age" data-id="${rowId}" value="${age}" min="0" placeholder="उमेर">
                 </div>
                 <div class="col-md-2">
                     <label class="form-label">लिङ्ग</label>
                     <select class="form-control family-gender" data-id="${rowId}">
-                        <option value="">Select</option>
-                        <option value="M" ${gender === 'M' ? 'selected' : ''}>Male</option>
-                        <option value="F" ${gender === 'F' ? 'selected' : ''}>Female</option>
-                        <option value="O" ${gender === 'O' ? 'selected' : ''}>Other</option>
+                        <option value="">छान्नुहोस्</option>
+                        <option value="M" ${gender === 'M' ? 'selected' : ''}>पुरुष</option>
+                        <option value="F" ${gender === 'F' ? 'selected' : ''}>महिला</option>
+                        <option value="O" ${gender === 'O' ? 'selected' : ''}>अन्य</option>
                     </select>
                 </div>
                 <div class="col-md-2">
                     <button type="button" class="btn btn-sm btn-danger mt-4" onclick="removeFamilyMember('${rowId}')">
-                        <i class="bi bi-trash"></i> Remove
+                        <i class="bi bi-trash"></i> हटाउनुहोस्
                     </button>
                 </div>
             </div>

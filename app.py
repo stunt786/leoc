@@ -320,6 +320,16 @@ class Disaster(db.Model):
     public_building_damage = db.Column(db.Integer, default=0)  # Number of buildings damaged
     livestock_injured = db.Column(db.Integer, default=0)
     livestock_death = db.Column(db.Integer, default=0)
+    
+    # Livestock breakdown
+    cattle_lost = db.Column(db.Integer, default=0)
+    cattle_injured = db.Column(db.Integer, default=0)
+    poultry_lost = db.Column(db.Integer, default=0)
+    poultry_injured = db.Column(db.Integer, default=0)
+    goats_sheep_lost = db.Column(db.Integer, default=0)
+    goats_sheep_injured = db.Column(db.Integer, default=0)
+    other_livestock_lost = db.Column(db.Integer, default=0)
+    other_livestock_injured = db.Column(db.Integer, default=0)
     agriculture_crop_damage = db.Column(db.Text)  # Description of crop damage
     affected_people_male = db.Column(db.Integer, default=0)
     affected_people_female = db.Column(db.Integer, default=0)
@@ -352,6 +362,14 @@ class Disaster(db.Model):
             'public_building_damage': self.public_building_damage,
             'livestock_injured': self.livestock_injured,
             'livestock_death': self.livestock_death,
+            'cattle_lost': self.cattle_lost,
+            'cattle_injured': self.cattle_injured,
+            'poultry_lost': self.poultry_lost,
+            'poultry_injured': self.poultry_injured,
+            'goats_sheep_lost': self.goats_sheep_lost,
+            'goats_sheep_injured': self.goats_sheep_injured,
+            'other_livestock_lost': self.other_livestock_lost,
+            'other_livestock_injured': self.other_livestock_injured,
             'agriculture_crop_damage': self.agriculture_crop_damage,
             'affected_people_male': self.affected_people_male,
             'affected_people_female': self.affected_people_female,
@@ -528,7 +546,45 @@ class PublicInformation(db.Model):
             'updated_at': self.updated_at.strftime('%Y-%m-%d %H:%M')
         }
 
+# Daily Report Log Model
+class DailyReportLog(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    report_date_bs = db.Column(db.String(10), unique=True, nullable=False, index=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'report_date_bs': self.report_date_bs,
+            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M')
+        }
+
 # Routes
+@app.template_filter('to_nepali_num')
+def to_nepali_num(value):
+    """Convert English numbers to Nepali Devanagari numbers."""
+    if value is None:
+        return ""
+    
+    # Check if value is float and has decimal part .0
+    if isinstance(value, float) and value.is_integer():
+        value = int(value)
+        
+    str_val = str(value)
+    english_to_nepali = {
+        '0': '०', '1': '१', '2': '२', '3': '३', '4': '४',
+        '5': '५', '6': '६', '7': '७', '8': '८', '9': '९'
+    }
+    
+    result = ""
+    for char in str_val:
+        if char in english_to_nepali:
+            result += english_to_nepali[char]
+        else:
+            result += char
+            
+    return result
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -785,7 +841,7 @@ def add_distribution():
         if errors:
             return jsonify({
                 'success': False,
-                'message': 'Validation failed',
+                'message': 'सत्यापन असफल भयो',
                 'errors': errors
             }), 400
         
@@ -901,7 +957,7 @@ def get_distribution(id):
     try:
         distribution = ReliefDistribution.query.get(id)
         if not distribution:
-            return jsonify({'success': False, 'message': 'Distribution not found'}), 404
+            return jsonify({'success': False, 'message': 'वितरण रेकर्ड फेला परेन'}), 404
         return jsonify({
             'success': True,
             'data': distribution.to_dict()
@@ -914,13 +970,13 @@ def edit_distribution(id):
     try:
         distribution = ReliefDistribution.query.get(id)
         if not distribution:
-            return jsonify({'success': False, 'message': 'Distribution not found'}), 404
+            return jsonify({'success': False, 'message': 'वितरण रेकर्ड फेला परेन'}), 404
 
         # Check if the record is locked
         if distribution.is_locked:
             return jsonify({
                 'success': False,
-                'message': 'Cannot edit: Record is locked. Please unlock first.'
+                'message': 'सम्पादन गर्न सकिँदैन: रेकर्ड लक गरिएको छ। कृपया पहिले अनलक गर्नुहोस्।'
             }), 403
 
         data = request.form
@@ -1021,7 +1077,7 @@ def edit_distribution(id):
 
         return jsonify({
             'success': True,
-            'message': 'Relief distribution updated successfully',
+            'message': 'वितरण रेकर्ड सफलतापूर्वक सुरक्षित गरियो',
             'data': distribution.to_dict()
         })
     except Exception as e:
@@ -1250,7 +1306,7 @@ def toggle_lock_distribution(id):
     try:
         distribution = ReliefDistribution.query.get(id)
         if not distribution:
-            return jsonify({'success': False, 'message': 'Distribution not found'}), 404
+            return jsonify({'success': False, 'message': 'वितरण रेकर्ड फेला परेन'}), 404
 
         # Get the unlock key from request
         data = request.get_json()
@@ -1277,7 +1333,7 @@ def toggle_lock_distribution(id):
         else:
             return jsonify({
                 'success': False,
-                'message': 'Invalid unlock key'
+                'message': 'अमान्य अनलक कुञ्जी'
             }), 403
 
     except Exception as e:
@@ -1289,13 +1345,13 @@ def delete_distribution(id):
     try:
         distribution = ReliefDistribution.query.get(id)
         if not distribution:
-            return jsonify({'success': False, 'message': 'Distribution not found'}), 404
+            return jsonify({'success': False, 'message': 'वितरण रेकर्ड फेला परेन'}), 404
 
         # Check if the record is locked
         if distribution.is_locked:
             return jsonify({
                 'success': False,
-                'message': 'Cannot delete: Record is locked. Please unlock first.'
+                'message': 'रेकर्ड हटाउन सकिँदैन: रेकर्ड लक गरिएको छ। कृपया पहिले अनलक गर्नुहोस्।'
             }), 403
 
         # Delete image if exists
@@ -1316,7 +1372,7 @@ def delete_distribution(id):
         # Clear cache after modification
         clear_cache()
 
-        return jsonify({'success': True, 'message': 'Distribution deleted successfully'})
+        return jsonify({'success': True, 'message': 'वितरण रेकर्ड सफलतापूर्वक हटाइयो'})
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 400
@@ -1453,6 +1509,16 @@ def get_disaster_statistics():
         total_public_buildings_damaged = sum(d.public_building_damage for d in filtered_disasters)
         total_livestock_injured = sum(d.livestock_injured for d in filtered_disasters)
         total_livestock_death = sum(d.livestock_death for d in filtered_disasters)
+        
+        # Livestock breakdown totals
+        total_cattle_lost = sum(d.cattle_lost or 0 for d in filtered_disasters)
+        total_cattle_injured = sum(d.cattle_injured or 0 for d in filtered_disasters)
+        total_poultry_lost = sum(d.poultry_lost or 0 for d in filtered_disasters)
+        total_poultry_injured = sum(d.poultry_injured or 0 for d in filtered_disasters)
+        total_goats_sheep_lost = sum(d.goats_sheep_lost or 0 for d in filtered_disasters)
+        total_goats_sheep_injured = sum(d.goats_sheep_injured or 0 for d in filtered_disasters)
+        total_other_livestock_lost = sum(d.other_livestock_lost or 0 for d in filtered_disasters)
+        total_other_livestock_injured = sum(d.other_livestock_injured or 0 for d in filtered_disasters)
         total_affected_males = sum(d.affected_people_male for d in filtered_disasters)
         total_affected_females = sum(d.affected_people_female for d in filtered_disasters)
         total_estimated_loss = sum(d.estimated_loss for d in filtered_disasters if hasattr(d, 'estimated_loss'))
@@ -1513,6 +1579,14 @@ def get_disaster_statistics():
             'total_public_buildings_damaged': total_public_buildings_damaged,
             'total_livestock_injured': total_livestock_injured,
             'total_livestock_death': total_livestock_death,
+            'total_cattle_lost': total_cattle_lost,
+            'total_cattle_injured': total_cattle_injured,
+            'total_poultry_lost': total_poultry_lost,
+            'total_poultry_injured': total_poultry_injured,
+            'total_goats_sheep_lost': total_goats_sheep_lost,
+            'total_goats_sheep_injured': total_goats_sheep_injured,
+            'total_other_livestock_lost': total_other_livestock_lost,
+            'total_other_livestock_injured': total_other_livestock_injured,
             'total_affected_males': total_affected_males,
             'total_affected_females': total_affected_females,
             'total_estimated_loss': total_estimated_loss,
@@ -1570,6 +1644,14 @@ def add_disaster():
             public_building_damage=int(data.get('public_building_damage', 0)),
             livestock_injured=int(data.get('livestock_injured', 0)),
             livestock_death=int(data.get('livestock_death', 0)),
+            cattle_lost=int(data.get('cattle_lost', 0)),
+            cattle_injured=int(data.get('cattle_injured', 0)),
+            poultry_lost=int(data.get('poultry_lost', 0)),
+            poultry_injured=int(data.get('poultry_injured', 0)),
+            goats_sheep_lost=int(data.get('goats_sheep_lost', 0)),
+            goats_sheep_injured=int(data.get('goats_sheep_injured', 0)),
+            other_livestock_lost=int(data.get('other_livestock_lost', 0)),
+            other_livestock_injured=int(data.get('other_livestock_injured', 0)),
             agriculture_crop_damage=data.get('agriculture_crop_damage'),
             affected_people_male=int(data.get('affected_people_male', 0)),
             affected_people_female=int(data.get('affected_people_female', 0)),
@@ -1591,7 +1673,7 @@ def add_disaster():
 
         return jsonify({
             'success': True,
-            'message': 'Disaster recorded successfully',
+            'message': 'विपद् घटना रेकर्ड सफलतापूर्वक सुरक्षित गरियो',
             'data': disaster.to_dict()
         }), 201
     except Exception as e:
@@ -1648,6 +1730,14 @@ def add_disaster_report():
             public_building_damage=int(data.get('public_building_damage', 0)),
             livestock_injured=int(data.get('livestock_injured', 0)),
             livestock_death=int(data.get('livestock_death', 0)),
+            cattle_lost=int(data.get('cattle_lost', 0)),
+            cattle_injured=int(data.get('cattle_injured', 0)),
+            poultry_lost=int(data.get('poultry_lost', 0)),
+            poultry_injured=int(data.get('poultry_injured', 0)),
+            goats_sheep_lost=int(data.get('goats_sheep_lost', 0)),
+            goats_sheep_injured=int(data.get('goats_sheep_injured', 0)),
+            other_livestock_lost=int(data.get('other_livestock_lost', 0)),
+            other_livestock_injured=int(data.get('other_livestock_injured', 0)),
             agriculture_crop_damage=data.get('agriculture_crop_damage'),
             affected_people_male=int(data.get('affected_people_male', 0)),
             affected_people_female=int(data.get('affected_people_female', 0)),
@@ -1669,7 +1759,7 @@ def add_disaster_report():
 
         return jsonify({
             'success': True,
-            'message': 'Disaster report submitted successfully',
+            'message': 'विपद् रिपोर्ट सफलतापूर्वक पेश गरियो',
             'data': disaster.to_dict()
         }), 201
     except Exception as e:
@@ -1681,7 +1771,7 @@ def toggle_lock_disaster(id):
     try:
         disaster = Disaster.query.get(id)
         if not disaster:
-            return jsonify({'success': False, 'message': 'Disaster not found'}), 404
+            return jsonify({'success': False, 'message': 'विपद् घटना रेकर्ड फेला परेन'}), 404
 
         # Get the unlock key from request
         data = request.get_json()
@@ -1707,7 +1797,7 @@ def toggle_lock_disaster(id):
         else:
             return jsonify({
                 'success': False,
-                'message': 'Invalid unlock key'
+                'message': 'अमान्य अनलक कुञ्जी'
             }), 403
 
     except Exception as e:
@@ -1719,7 +1809,7 @@ def get_disaster(id):
     try:
         disaster = Disaster.query.get(id)
         if not disaster:
-            return jsonify({'success': False, 'message': 'Disaster not found'}), 404
+            return jsonify({'success': False, 'message': 'विपद् घटना रेकर्ड फेला परेन'}), 404
         return jsonify({
             'success': True,
             'data': disaster.to_dict()
@@ -1732,13 +1822,13 @@ def edit_disaster(id):
     try:
         disaster = Disaster.query.get(id)
         if not disaster:
-            return jsonify({'success': False, 'message': 'Disaster not found'}), 404
+            return jsonify({'success': False, 'message': 'विपद् घटना रेकर्ड फेला परेन'}), 404
 
         # Check if the record is locked
         if disaster.is_locked:
             return jsonify({
                 'success': False,
-                'message': 'Cannot edit: Record is locked. Please unlock first.'
+                'message': 'सम्पादन गर्न सकिँदैन: रेकर्ड लक गरिएको छ। कृपया पहिले अनलक गर्नुहोस्।'
             }), 403
 
         data = request.get_json()
@@ -1771,6 +1861,22 @@ def edit_disaster(id):
         disaster.public_building_damage = int(data.get('public_building_damage', disaster.public_building_damage))
         disaster.livestock_injured = int(data.get('livestock_injured', disaster.livestock_injured))
         disaster.livestock_death = int(data.get('livestock_death', disaster.livestock_death))
+        disaster.cattle_lost = int(data.get('cattle_lost', disaster.cattle_lost))
+        disaster.cattle_injured = int(data.get('cattle_injured', disaster.cattle_injured))
+        disaster.poultry_lost = int(data.get('poultry_lost', disaster.poultry_lost))
+        disaster.poultry_injured = int(data.get('poultry_injured', disaster.poultry_injured))
+        disaster.goats_sheep_lost = int(data.get('goats_sheep_lost', disaster.goats_sheep_lost))
+        disaster.goats_sheep_injured = int(data.get('goats_sheep_injured', disaster.goats_sheep_injured))
+        disaster.other_livestock_lost = int(data.get('other_livestock_lost', disaster.other_livestock_lost))
+        disaster.other_livestock_injured = int(data.get('other_livestock_injured', disaster.other_livestock_injured))
+        disaster.cattle_lost = int(data.get('cattle_lost', disaster.cattle_lost))
+        disaster.cattle_injured = int(data.get('cattle_injured', disaster.cattle_injured))
+        disaster.poultry_lost = int(data.get('poultry_lost', disaster.poultry_lost))
+        disaster.poultry_injured = int(data.get('poultry_injured', disaster.poultry_injured))
+        disaster.goats_sheep_lost = int(data.get('goats_sheep_lost', disaster.goats_sheep_lost))
+        disaster.goats_sheep_injured = int(data.get('goats_sheep_injured', disaster.goats_sheep_injured))
+        disaster.other_livestock_lost = int(data.get('other_livestock_lost', disaster.other_livestock_lost))
+        disaster.other_livestock_injured = int(data.get('other_livestock_injured', disaster.other_livestock_injured))
         disaster.agriculture_crop_damage = data.get('agriculture_crop_damage', disaster.agriculture_crop_damage)
         disaster.affected_people_male = int(data.get('affected_people_male', disaster.affected_people_male))
         disaster.affected_people_female = int(data.get('affected_people_female', disaster.affected_people_female))
@@ -1783,7 +1889,7 @@ def edit_disaster(id):
 
         return jsonify({
             'success': True,
-            'message': 'Disaster updated successfully',
+            'message': 'विपद् रेकर्ड सफलतापूर्वक अपडेट गरियो',
             'data': disaster.to_dict()
         })
     except Exception as e:
@@ -1795,13 +1901,13 @@ def delete_disaster(id):
     try:
         disaster = Disaster.query.get(id)
         if not disaster:
-            return jsonify({'success': False, 'message': 'Disaster not found'}), 404
+            return jsonify({'success': False, 'message': 'विपद् घटना रेकर्ड फेला परेन'}), 404
 
         # Check if the record is locked
         if disaster.is_locked:
             return jsonify({
                 'success': False,
-                'message': 'Cannot delete: Record is locked. Please unlock first.'
+                'message': 'रेकर्ड हटाउन सकिँदैन: रेकर्ड लक गरिएको छ। कृपया पहिले अनलक गर्नुहोस्।'
             }), 403
 
         db.session.delete(disaster)
@@ -1810,7 +1916,7 @@ def delete_disaster(id):
         # Clear cache after modification
         clear_cache()
 
-        return jsonify({'success': True, 'message': 'Disaster deleted successfully'})
+        return jsonify({'success': True, 'message': 'विपद् घटना रेकर्ड सफलतापूर्वक हटाइयो'})
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 400
@@ -1882,7 +1988,7 @@ def add_event_log():
 
         return jsonify({
             'success': True,
-            'message': 'Event log added successfully',
+            'message': 'घटना लग सफलतापूर्वक थपियो',
             'data': event_log.to_dict()
         }), 201
     except Exception as e:
@@ -1950,7 +2056,7 @@ def add_situation_report():
 
         return jsonify({
             'success': True,
-            'message': 'Situation report added successfully',
+            'message': 'स्थिति रिपोर्ट सफलतापूर्वक थपियो',
             'data': report.to_dict()
         }), 201
     except Exception as e:
@@ -1997,9 +2103,9 @@ def add_public_information():
 
         # Validation
         if not data.get('title') or not data.get('title').strip():
-            return jsonify({'success': False, 'message': 'Title is required'}), 400
+            return jsonify({'success': False, 'message': 'शीर्षक आवश्यक छ'}), 400
         if not data.get('content') or not data.get('content').strip():
-            return jsonify({'success': False, 'message': 'Content is required'}), 400
+            return jsonify({'success': False, 'message': 'विवरण आवश्यक छ'}), 400
 
         # Parse is_active - handle both boolean and string values
         is_active = data.get('is_active', True)
@@ -2044,7 +2150,7 @@ def add_public_information():
 
         return jsonify({
             'success': True,
-            'message': 'Public information added successfully',
+            'message': 'सार्वजनिक सूचना सफलतापूर्वक थपियो',
             'data': info.to_dict()
         }), 201
     except Exception as e:
@@ -2106,7 +2212,7 @@ def add_ssf_beneficiary():
         db.session.commit()
         return jsonify({
             'success': True,
-            'message': 'SSF Beneficiary added successfully',
+            'message': 'सामाजिक सुरक्षा लाभग्राही सफलतापूर्वक थपियो',
             'data': beneficiary.to_dict()
         }), 201
     except Exception as e:
@@ -2118,7 +2224,7 @@ def toggle_lock_ssf_beneficiary(id):
     try:
         beneficiary = SocialSecurityBeneficiary.query.get(id)
         if not beneficiary:
-            return jsonify({'success': False, 'message': 'SSF Beneficiary not found'}), 404
+            return jsonify({'success': False, 'message': 'सामाजिक सुरक्षा लाभग्राही फेला परेन'}), 404
 
         # Get the unlock key from request
         data = request.get_json()
@@ -2144,7 +2250,7 @@ def toggle_lock_ssf_beneficiary(id):
         else:
             return jsonify({
                 'success': False,
-                'message': 'Invalid unlock key'
+                'message': 'अमान्य अनलक कुञ्जी'
             }), 403
 
     except Exception as e:
@@ -2156,13 +2262,13 @@ def edit_ssf_beneficiary(id):
     try:
         beneficiary = SocialSecurityBeneficiary.query.get(id)
         if not beneficiary:
-            return jsonify({'success': False, 'message': 'SSF Beneficiary not found'}), 404
+            return jsonify({'success': False, 'message': 'सामाजिक सुरक्षा लाभग्राही फेला परेन'}), 404
 
         # Check if the record is locked
         if beneficiary.is_locked:
             return jsonify({
                 'success': False,
-                'message': 'Cannot edit: Record is locked. Please unlock first.'
+                'message': 'सम्पादन गर्न सकिँदैन: रेकर्ड लक गरिएको छ। कृपया पहिले अनलक गर्नुहोस्।'
             }), 403
 
         data = request.get_json()
@@ -2188,7 +2294,7 @@ def edit_ssf_beneficiary(id):
 
         return jsonify({
             'success': True,
-            'message': 'SSF Beneficiary updated successfully',
+            'message': 'सामाजिक सुरक्षा लाभग्राही सफलतापूर्वक अपडेट गरियो',
             'data': beneficiary.to_dict()
         })
     except Exception as e:
@@ -2200,13 +2306,13 @@ def delete_ssf_beneficiary(id):
     try:
         beneficiary = SocialSecurityBeneficiary.query.get(id)
         if not beneficiary:
-            return jsonify({'success': False, 'message': 'SSF Beneficiary not found'}), 404
+            return jsonify({'success': False, 'message': 'सामाजिक सुरक्षा लाभग्राही फेला परेन'}), 404
 
         # Check if the record is locked
         if beneficiary.is_locked:
             return jsonify({
                 'success': False,
-                'message': 'Cannot delete: Record is locked. Please unlock first.'
+                'message': 'रेकर्ड हटाउन सकिँदैन: रेकर्ड लक गरिएको छ। कृपया पहिले अनलक गर्नुहोस्।'
             }), 403
 
         db.session.delete(beneficiary)
@@ -2215,7 +2321,7 @@ def delete_ssf_beneficiary(id):
         # Clear cache after modification
         clear_cache()
 
-        return jsonify({'success': True, 'message': 'SSF Beneficiary deleted successfully'})
+        return jsonify({'success': True, 'message': 'सामाजिक सुरक्षा लाभग्राही सफलतापूर्वक हटाइयो'})
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 400
@@ -2295,6 +2401,18 @@ def init_db():
                 db.session.execute(text("ALTER TABLE disaster ADD COLUMN livestock_death INTEGER DEFAULT 0"))
                 print("Added livestock_death column to disaster table")
 
+            # Livestock breakdown columns
+            new_livestock_cols = [
+                'cattle_lost', 'cattle_injured',
+                'poultry_lost', 'poultry_injured',
+                'goats_sheep_lost', 'goats_sheep_injured',
+                'other_livestock_lost', 'other_livestock_injured'
+            ]
+            for col in new_livestock_cols:
+                if col not in columns:
+                    db.session.execute(text(f"ALTER TABLE disaster ADD COLUMN {col} INTEGER DEFAULT 0"))
+                    print(f"Added {col} column to disaster table")
+
             if 'agriculture_crop_damage' not in columns:
                 db.session.execute(text("ALTER TABLE disaster ADD COLUMN agriculture_crop_damage TEXT"))
                 print("Added agriculture_crop_damage column to disaster table")
@@ -2316,6 +2434,12 @@ def init_db():
             if 'disaster_date_bs' not in columns:
                 db.session.execute(text("ALTER TABLE disaster ADD COLUMN disaster_date_bs VARCHAR(10)"))
                 print("Added disaster_date_bs column to disaster table")
+
+            # Create DailyReportLog table if not exists
+            inspector = inspect(db.engine)
+            if 'daily_report_log' not in inspector.get_table_names():
+                DailyReportLog.__table__.create(db.engine)
+                print("Created daily_report_log table")
 
             # Commit the changes
             db.session.commit()
@@ -2385,7 +2509,7 @@ def generate_daily_report():
                 start_bs = ad_to_bs(start_date.year, start_date.month, start_date.day)
                 end_bs = start_bs
             except ValueError:
-                return jsonify({'success': False, 'message': 'Invalid date format. Use YYYY-MM-DD'}), 400
+                return jsonify({'success': False, 'message': 'अमान्य मिति ढाँचा। कृपया YYYY-MM-DD प्रयोग गर्नुहोस्'}), 400
         else:
             start_date = date.today()
             end_date = start_date
@@ -2471,7 +2595,17 @@ def fetch_daily_report_data(start_date, end_date, start_bs=None, end_bs=None):
             'road_blocked': any(d.road_blocked_status for d in ward_disasters),
             'electricity_blocked': any(d.electricity_blocked_status for d in ward_disasters),
             'communication_blocked': any(d.communication_blocked_status for d in ward_disasters),
+            'drinking_water_status': any(d.drinking_water_status for d in ward_disasters), # Added drinking_water_status
             'livestock_loss': sum(d.livestock_death for d in ward_disasters),
+            'livestock_injured': sum(d.livestock_injured for d in ward_disasters), # Added livestock_injured
+            'cattle_lost': sum(d.cattle_lost for d in ward_disasters), # Added cattle_lost
+            'cattle_injured': sum(d.cattle_injured for d in ward_disasters), # Added cattle_injured
+            'poultry_lost': sum(d.poultry_lost for d in ward_disasters), # Added poultry_lost
+            'poultry_injured': sum(d.poultry_injured for d in ward_disasters), # Added poultry_injured
+            'goats_sheep_lost': sum(d.goats_sheep_lost for d in ward_disasters), # Added goats_sheep_lost
+            'goats_sheep_injured': sum(d.goats_sheep_injured for d in ward_disasters), # Added goats_sheep_injured
+            'other_livestock_lost': sum(d.other_livestock_lost for d in ward_disasters), # Added other_livestock_lost
+            'other_livestock_injured': sum(d.other_livestock_injured for d in ward_disasters), # Added other_livestock_injured
             'agricultural_loss': len([d for d in ward_disasters if d.agriculture_crop_damage]),
         }
     
@@ -2483,6 +2617,25 @@ def fetch_daily_report_data(start_date, end_date, start_bs=None, end_bs=None):
             disaster_types.add(dtype_normalized)
     
     disaster_types = list(disaster_types) if disaster_types else []
+
+    # Get or create Sit Rep count (only for daily reports, not ranges)
+    sit_rep_no = "N/A"
+    if start_bs and start_bs == end_bs:
+        try:
+            # Check if log exists for this date
+            log = DailyReportLog.query.filter_by(report_date_bs=start_bs).first()
+            if not log:
+                log = DailyReportLog(report_date_bs=start_bs)
+                db.session.add(log)
+                db.session.commit()
+            
+            # Sit Rep No is the ID
+            sit_rep_no = log.id
+        except Exception as e:
+            print(f"Error logging daily report: {e}")
+
+        except Exception as e:
+            print(f"Error logging daily report: {e}")
     
     type_stats = {}
     for dtype in disaster_types:
@@ -2514,6 +2667,21 @@ def fetch_daily_report_data(start_date, end_date, start_bs=None, end_bs=None):
     }
     
     return {
+        'sit_rep_no': sit_rep_no,
+        'municipality_name': AppSettings.get_setting('municipality_name', 'स्थलरा गाउँपालिका'),
+        'office_name': AppSettings.get_setting('office_name', 'गाउँकार्यपालिकाको कार्यालय'),
+        'office_location': AppSettings.get_setting('office_location', 'खोली, बझाङ'),
+        'leoc_name': AppSettings.get_setting('leoc_name', 'स्थानीय आपतकालिन कार्य संचालन केन्द्र (LEOC)'),
+        'report_title': 'दैनिक विपद् बुलेटीन',
+        'total_stats': {
+            'incidents': len(disasters),
+            'deaths': sum(d.deaths for d in disasters),
+            'missing': sum(d.missing_persons for d in disasters),
+            'injured': sum(d.livestock_injured for d in disasters),
+            'affected_households': sum(d.affected_households for d in disasters),
+            'affected_people': sum(d.affected_people for d in disasters),
+            'estimated_loss': sum(d.estimated_loss for d in disasters if d.estimated_loss)
+        },
         'disasters': [d.to_dict() for d in disasters],
         'ward_stats': ward_stats,
         'disaster_type_stats': type_stats,
@@ -2637,16 +2805,16 @@ def generate_pdf_report(data, start_date, end_date=None, start_bs=None, end_bs=N
     )
     
     # Header
-    elements.append(Paragraph("Thalara Rural Municipality", title_style))
-    elements.append(Paragraph("Local Emergency Operating Centre (LEOC)", subtitle_style))
-    elements.append(Paragraph("Daily Incident Reporting", subtitle_style))
+    elements.append(Paragraph("थलारा गाउँपालिका", title_style))
+    elements.append(Paragraph("स्थानीय आपतकालीन कार्य केन्द्र (LEOC)", subtitle_style))
+    elements.append(Paragraph("दैनिक घटना प्रतिवेदन", subtitle_style))
     elements.append(Spacer(1, 6))
     
     # Date and Weather
-    date_display = f"{start_bs}" if start_bs == end_bs else f"{start_bs} to {end_bs}"
+    date_display = f"{start_bs}" if start_bs == end_bs else f"{start_bs} देखि {end_bs}"
     date_weather_data = [
-        [Paragraph(f"<b>Date (BS):</b> {date_display}", normal_style),
-         Paragraph(f"<b>Today's Weather:</b> {data['situation_report']['weather_conditions'] if data['situation_report'] else 'N/A'}", normal_style)]
+        [Paragraph(f"<b>मिति (BS):</b> {date_display}", normal_style),
+         Paragraph(f"<b>आजको मौसम:</b> {data['situation_report']['weather_conditions'] if data['situation_report'] else 'खुलेको छैन'}", normal_style)]
     ]
     date_weather_table = Table(date_weather_data, colWidths=[80*mm, 80*mm])
     date_weather_table.setStyle(TableStyle([
@@ -2658,11 +2826,11 @@ def generate_pdf_report(data, start_date, end_date=None, start_bs=None, end_bs=N
     elements.append(Spacer(1, 6))
     
     # Ward-wise Incident Overview Table
-    elements.append(Paragraph("<b>Incident Overview by Ward</b>", normal_style))
+    elements.append(Paragraph("<b>वडा अनुसार घटना विबरण</b>", normal_style))
     elements.append(Spacer(1, 3))
     
     # Ward table header
-    ward_header = ['Ward', 'Total\nIncident', 'Death', 'Missing', 'Injured', 'Est.\nLoss', 'Road/\nElec/\nComm', 'Livestock', 'Agriculture']
+    ward_header = ['वडा', 'जम्मा\nघटना', 'मृतक', 'बेपत्ता', 'घाइते', 'अनुमानित\nक्षति', 'सडक/\nविद्युत/\nसंचार', 'पशु', 'कृषि']
     ward_data = [ward_header]
     
     for ward in range(1, 10):
@@ -2690,7 +2858,7 @@ def generate_pdf_report(data, start_date, end_date=None, start_bs=None, end_bs=N
     # Add totals row
     totals = data['total_stats']
     ward_data.append([
-        'Total',
+        'जम्मा',
         str(totals['incidents']),
         str(totals['deaths']),
         str(totals['missing']),
@@ -2732,12 +2900,12 @@ def generate_pdf_report(data, start_date, end_date=None, start_bs=None, end_bs=N
     elements.append(Spacer(1, 8))
     
     # Disaster Type Summary Table
-    elements.append(Paragraph("<b>Disaster Type Summary</b>", normal_style))
+    elements.append(Paragraph("<b>विपद् प्रकार अनुसार विवरण</b>", normal_style))
     elements.append(Spacer(1, 3))
     
-    type_header = ['Disaster', 'Total', 'Death', 'Missing', 'Injured', 'Affected\nFamilies', 
-                   'House\nDamage', 'House\nDestroy', 'Public Bldg\nDamage', 'Public Bldg\nDestroy',
-                   'Livestock\nLoss', 'Fund\nMale', 'Fund\nFemale']
+    type_header = ['विपद्', 'जम्मा', 'मृतक', 'बेपत्ता', 'घाइते', 'प्रभावित\nपरिवार', 
+                   'घर\nक्षति', 'घर\nनष्ट', 'सा.भवन\nक्षति', 'सा.भवन\nनष्ट',
+                   'पशु\nक्षति', 'अ.क्षति\nपु.', 'अ.क्षति\nम.']
     type_data = [type_header]
     
     for dtype, stats in data['disaster_type_stats'].items():
@@ -2760,7 +2928,7 @@ def generate_pdf_report(data, start_date, end_date=None, start_bs=None, end_bs=N
     
     # If no disasters, show empty row
     if len(type_data) == 1:
-        type_data.append(['No incidents'] + ['-'] * 12)
+        type_data.append(['कुनै घटना छैन'] + ['-'] * 12)
     
     type_table = Table(type_data, colWidths=[18*mm, 12*mm, 12*mm, 12*mm, 12*mm, 18*mm, 
                                               15*mm, 15*mm, 18*mm, 18*mm, 15*mm, 12*mm, 12*mm])
@@ -2787,14 +2955,14 @@ def generate_pdf_report(data, start_date, end_date=None, start_bs=None, end_bs=N
     elements.append(Spacer(1, 8))
     
     # Infrastructure Status
-    elements.append(Paragraph("<b>Infrastructure Status</b>", normal_style))
+    elements.append(Paragraph("<b>पूर्वाधारको स्थिति</b>", normal_style))
     elements.append(Spacer(1, 3))
     
     infra_data = [
-        ['Electricity Status:', data['infrastructure']['electricity'],
-         'Road Status:', data['infrastructure']['road']],
-        ['Communication Status:', data['infrastructure']['communication'],
-         'Drinking Water:', data['infrastructure']['drinking_water']]
+        ['विद्युत स्थिति:', data['infrastructure']['electricity'],
+         'सडक स्थिति:', data['infrastructure']['road']],
+        ['संचार स्थिति:', data['infrastructure']['communication'],
+         'खानेपानी स्थिति:', data['infrastructure']['drinking_water']]
     ]
     
     infra_table = Table(infra_data, colWidths=[35*mm, 45*mm, 35*mm, 45*mm])

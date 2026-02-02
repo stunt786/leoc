@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block title %}Daily Disaster Incidents Reporting - LEOC{% endblock %}
+{% block title %}दैनिक विपद् घटना रिपोर्टिङ - LEOC{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -340,15 +340,14 @@
     <div class="row">
         <div class="col-12">
             <div class="d-flex justify-content-between align-items-center mb-4">
-                <h2 class="mb-0"><i class="bi bi-exclamation-triangle text-danger"></i> Daily Disaster Incidents
-                    Reporting
+                <h2 class="mb-0"><i class="bi bi-exclamation-triangle text-danger"></i> दैनिक विपद् घटना रिपोर्टिङ
                 </h2>
                 <div class="btn-group">
                     <a href="/daily-report-preview" target="_blank" class="btn btn-outline-primary">
-                        <i class="bi bi-printer"></i> Print Preview
+                        <i class="bi bi-printer"></i> प्रिन्ट प्रिभ्यू
                     </a>
                     <a href="/api/generate-daily-report" class="btn btn-outline-danger">
-                        <i class="bi bi-file-earmark-pdf"></i> Download PDF
+                        <i class="bi bi-file-earmark-pdf"></i> PDF डाउनलोड
                     </a>
                 </div>
             </div>
@@ -357,38 +356,38 @@
             <ul class="nav nav-tabs mb-4" id="disasterTabs" role="tablist">
                 <li class="nav-item" role="presentation">
                     <button class="nav-link active" id="overview-tab" data-bs-toggle="tab" data-bs-target="#overview"
-                        type="button" role="tab"><i class="bi bi-grid-1x2"></i> Overview</button>
+                        type="button" role="tab"><i class="bi bi-grid-1x2"></i> सारांश (Overview)</button>
                 </li>
                 <li class="nav-item" role="presentation">
                     <button class="nav-link" id="event-log-tab" data-bs-toggle="tab" data-bs-target="#event-log"
-                        type="button" role="tab"><i class="bi bi-journal-text"></i> Event Action Log</button>
+                        type="button" role="tab"><i class="bi bi-journal-text"></i> घटना लग (Event Log)</button>
                 </li>
                 <li class="nav-item" role="presentation">
                     <button class="nav-link" id="situation-report-tab" data-bs-toggle="tab"
                         data-bs-target="#situation-report" type="button" role="tab"><i class="bi bi-clipboard-data"></i>
-                        Situation Report</button>
+                        स्थिति रिपोर्ट (SitRep)</button>
                 </li>
                 <li class="nav-item" role="presentation">
                     <button class="nav-link" id="human-impact-tab" data-bs-toggle="tab" data-bs-target="#human-impact"
-                        type="button" role="tab"><i class="bi bi-people"></i> Human Impact</button>
+                        type="button" role="tab"><i class="bi bi-people"></i> मानवीय प्रभाव</button>
                 </li>
                 <li class="nav-item" role="presentation">
                     <button class="nav-link" id="damage-assessment-tab" data-bs-toggle="tab"
                         data-bs-target="#damage-assessment" type="button" role="tab"><i
-                            class="bi bi-house-exclamation"></i> Damage Assessment</button>
+                            class="bi bi-house-exclamation"></i> क्षति मूल्याङ्कन</button>
                 </li>
                 <li class="nav-item" role="presentation">
                     <button class="nav-link" id="livestock-damage-tab" data-bs-toggle="tab"
-                        data-bs-target="#livestock-damage" type="button" role="tab"><i class="bi bi-bug"></i> Livestock
-                        Damage</button>
+                        data-bs-target="#livestock-damage" type="button" role="tab"><i class="bi bi-bug"></i> पशुचौपाया
+                        क्षति</button>
                 </li>
                 <li class="nav-item" role="presentation">
                     <button class="nav-link" id="public-info-tab" data-bs-toggle="tab" data-bs-target="#public-info"
-                        type="button" role="tab"><i class="bi bi-megaphone"></i> Public Info</button>
+                        type="button" role="tab"><i class="bi bi-megaphone"></i> सार्वजनिक जानकारी</button>
                 </li>
                 <li class="nav-item" role="presentation">
                     <button class="nav-link" id="input-form-tab" data-bs-toggle="tab" data-bs-target="#input-form"
-                        type="button" role="tab"><i class="bi bi-clipboard-plus"></i> Input Data</button>
+                        type="button" role="tab"><i class="bi bi-clipboard-plus"></i> डाटा प्रविष्टि</button>
                 </li>
             </ul>
 
@@ -402,8 +401,8 @@
                                 <div class="icon">
                                     <i class="bi bi-exclamation-circle-fill"></i>
                                 </div>
-                                <div class="number" id="total-incidents">0</div>
-                                <div class="label">Total Incidents</div>
+                                <div class="number" id="total-incidents">०</div>
+                                <div class="label">जम्मा घटनाहरू</div>
                             </div>
                         </div>
                         <div class="col-md-3 mb-3">
@@ -411,8 +410,8 @@
                                 <div class="icon">
                                     <i class="bi bi-people-fill"></i>
                                 </div>
-                                <div class="number" id="affected-people">0</div>
-                                <div class="label">People Affected</div>
+                                <div class="number" id="affected-people">०</div>
+                                <div class="label">प्रभावित व्यक्तिहरू</div>
                             </div>
                         </div>
                         <div class="col-md-3 mb-3">
@@ -420,8 +419,8 @@
                                 <div class="icon">
                                     <i class="bi bi-house-door-fill"></i>
                                 </div>
-                                <div class="number" id="damaged-houses">0</div>
-                                <div class="label">Houses Damaged</div>
+                                <div class="number" id="damaged-houses">०</div>
+                                <div class="label">क्षतिग्रस्त घरहरू</div>
                             </div>
                         </div>
                         <div class="col-md-3 mb-3">
@@ -429,8 +428,8 @@
                                 <div class="icon">
                                     <i class="bi bi-shield-check"></i>
                                 </div>
-                                <div class="number" id="relief-actions">0</div>
-                                <div class="label">Relief Actions</div>
+                                <div class="number" id="relief-actions">०</div>
+                                <div class="label">राहात कार्यहरू</div>
                             </div>
                         </div>
                     </div>
@@ -439,7 +438,7 @@
                         <div class="col-md-8 mb-4">
                             <div class="card h-100">
                                 <div class="card-header bg-primary text-white">
-                                    <h5 class="mb-0"><i class="bi bi-graph-up"></i> Incidents by Type</h5>
+                                    <h5 class="mb-0"><i class="bi bi-graph-up"></i> प्रकार अनुसार घटनाहरू</h5>
                                 </div>
                                 <div class="card-body">
                                     <div class="chart-container">
@@ -451,7 +450,7 @@
                         <div class="col-md-4 mb-4">
                             <div class="card h-100">
                                 <div class="card-header bg-primary text-white">
-                                    <h5 class="mb-0"><i class="bi bi-geo-alt"></i> Incidents by Ward</h5>
+                                    <h5 class="mb-0"><i class="bi bi-geo-alt"></i> वडा अनुसार घटनाहरू</h5>
                                 </div>
                                 <div class="card-body">
                                     <div class="chart-container">
@@ -464,21 +463,21 @@
 
                     <div class="card">
                         <div class="card-header bg-primary text-white">
-                            <h5 class="mb-0"><i class="bi bi-list-ul"></i> Recent Incidents</h5>
+                            <h5 class="mb-0"><i class="bi bi-list-ul"></i> हालैका घटनाहरू</h5>
                         </div>
                         <div class="card-body">
                             <div class="table-responsive">
                                 <table class="table table-hover incident-table">
                                     <thead>
                                         <tr>
-                                            <th>Date</th>
-                                            <th>Time</th>
-                                            <th>Disaster Type</th>
-                                            <th>Ward</th>
-                                            <th>Location</th>
-                                            <th>Est. Loss</th>
-                                            <th>Severity</th>
-                                            <th>Actions</th>
+                                            <th>मिति</th>
+                                            <th>समय</th>
+                                            <th>विपद्को प्रकार</th>
+                                            <th>वडा नम्बर</th>
+                                            <th>स्थान</th>
+                                            <th>अनुमानित क्षति</th>
+                                            <th>गम्भीरता</th>
+                                            <th>कार्य</th>
                                         </tr>
                                     </thead>
                                     <tbody id="recent-incidents-body">
@@ -494,19 +493,19 @@
                 <div class="tab-pane fade" id="event-log" role="tabpanel">
                     <div class="card">
                         <div class="card-header bg-primary text-white">
-                            <h5 class="mb-0"><i class="bi bi-journal-text"></i> Event Action Log</h5>
+                            <h5 class="mb-0"><i class="bi bi-journal-text"></i> घटना सूचना लग</h5>
                         </div>
                         <div class="card-body">
                             <div class="table-responsive">
                                 <table class="table table-hover incident-table">
                                     <thead>
                                         <tr>
-                                            <th>Timestamp</th>
-                                            <th>Event Type</th>
-                                            <th>Description</th>
-                                            <th>Location</th>
-                                            <th>Responsible Unit</th>
-                                            <th>Status</th>
+                                            <th>समय</th>
+                                            <th>घटनाको प्रकार</th>
+                                            <th>विवरण</th>
+                                            <th>स्थान</th>
+                                            <th>जिम्मेवार इकाई</th>
+                                            <th>स्थिति</th>
                                         </tr>
                                     </thead>
                                     <tbody id="event-log-body">
@@ -522,23 +521,23 @@
                 <div class="tab-pane fade" id="situation-report" role="tabpanel">
                     <div class="card">
                         <div class="card-header bg-primary text-white">
-                            <h5 class="mb-0"><i class="bi bi-clipboard-data"></i> Situation Report</h5>
+                            <h5 class="mb-0"><i class="bi bi-clipboard-plus"></i> नयाँ घटना विवरण प्रविष्टि</h5>
                         </div>
                         <div class="card-body">
                             <div class="row">
                                 <div class="col-md-6">
                                     <div class="card mb-3">
                                         <div class="card-body">
-                                            <h6 class="card-title">Current Situation Summary</h6>
-                                            <p id="situation-summary">No current situation reported.</p>
+                                            <h6 class="card-title">वर्तमान स्थितिको सारांश</h6>
+                                            <p id="situation-summary">हालसम्म कुनै रिपोर्ट प्राप्त भएको छैन।</p>
                                         </div>
                                     </div>
                                 </div>
                                 <div class="col-md-6">
                                     <div class="card mb-3">
                                         <div class="card-body">
-                                            <h6 class="card-title">Weather Conditions</h6>
-                                            <p id="weather-conditions">Weather data not available.</p>
+                                            <h6 class="card-title">मौसमको अवस्था</h6>
+                                            <p id="weather-conditions">मौसम विवरण उपलब्ध छैन।</p>
                                         </div>
                                     </div>
                                 </div>
@@ -547,8 +546,8 @@
                                 <div class="col-md-12">
                                     <div class="card">
                                         <div class="card-body">
-                                            <h6 class="card-title">Detailed Report</h6>
-                                            <div id="detailed-report">No detailed report available.</div>
+                                            <h6 class="card-title">विस्तृत रिपोर्ट</h6>
+                                            <div id="detailed-report">विस्तृत रिपोर्ट उपलब्ध छैन।</div>
                                         </div>
                                     </div>
                                 </div>
@@ -559,51 +558,52 @@
                     <!-- Situation Report Form Section -->
                     <div class="card mt-3">
                         <div class="card-header bg-success text-white">
-                            <h5 class="mb-0"><i class="bi bi-plus-circle"></i> Add New Situation Report</h5>
+                            <h5 class="mb-0"><i class="bi bi-plus-circle"></i> नयाँ स्थिति रिपोर्ट थप्नुहोस्</h5>
                         </div>
                         <div class="card-body">
                             <form id="situationReportForm">
                                 <div class="row">
                                     <div class="col-md-6">
                                         <div class="mb-3">
-                                            <label for="situationSummary" class="form-label">Current Situation
-                                                Summary</label>
+                                            <label for="situationSummary" class="form-label">वर्तमान स्थितिको
+                                                सारांश</label>
                                             <textarea class="form-control" id="situationSummary" rows="2"
                                                 required></textarea>
                                         </div>
                                     </div>
                                     <div class="col-md-6">
                                         <div class="mb-3">
-                                            <label for="weatherConditions" class="form-label">Weather Conditions</label>
+                                            <label for="weatherConditions" class="form-label">मौसमको अवस्था</label>
                                             <textarea class="form-control" id="weatherConditions" rows="2"
                                                 required></textarea>
                                         </div>
                                     </div>
                                 </div>
                                 <div class="mb-3">
-                                    <label for="detailedReport" class="form-label">Detailed Report</label>
+                                    <label for="detailedReport" class="form-label">विस्तृत रिपोर्ट</label>
                                     <textarea class="form-control" id="detailedReport" rows="3" required></textarea>
                                 </div>
                                 <div class="row">
                                     <div class="col-md-6">
                                         <div class="mb-3">
-                                            <label for="resourcesDeployed" class="form-label">Resources Deployed</label>
+                                            <label for="resourcesDeployed" class="form-label">परिचालन गरिएका
+                                                जनशक्ति/श्रोत</label>
                                             <input type="text" class="form-control" id="resourcesDeployed"
-                                                placeholder="e.g., 3 emergency teams, 2 ambulances">
+                                                placeholder="उदा: ३ आपतकालीन टोली, २ एम्बुलेन्स">
                                         </div>
                                     </div>
                                     <div class="col-md-6">
                                         <div class="mb-3">
-                                            <label for="nextUpdateTime" class="form-label">Next Update Time</label>
+                                            <label for="nextUpdateTime" class="form-label">अर्को अपडेट समय</label>
                                             <input type="text" class="form-control" id="nextUpdateTime"
-                                                placeholder="e.g., 18:00 hrs">
+                                                placeholder="उदा: १८:०० बजे">
                                         </div>
                                     </div>
                                 </div>
                                 <div class="d-grid gap-2 d-md-flex justify-content-md-end">
                                     <button type="button" class="btn btn-secondary me-md-2"
-                                        id="resetSituationReportForm">Reset</button>
-                                    <button type="submit" class="btn btn-success">Add Situation Report</button>
+                                        id="resetSituationReportForm">रिसेट</button>
+                                    <button type="submit" class="btn btn-success">रिपोर्ट थप्नुहोस्</button>
                                 </div>
                             </form>
                         </div>
@@ -618,8 +618,8 @@
                                 <div class="icon">
                                     <i class="bi bi-emoji-frown-fill"></i>
                                 </div>
-                                <div class="number" id="casualties">0</div>
-                                <div class="label">Casualties</div>
+                                <div class="number" id="casualties">०</div>
+                                <div class="label">मृतक</div>
                             </div>
                         </div>
                         <div class="col-md-3 mb-3">
@@ -627,8 +627,8 @@
                                 <div class="icon">
                                     <i class="bi bi-person-fill-exclamation"></i>
                                 </div>
-                                <div class="number" id="injured">0</div>
-                                <div class="label">Injured</div>
+                                <div class="number" id="injured">०</div>
+                                <div class="label">घाइते</div>
                             </div>
                         </div>
                         <div class="col-md-3 mb-3">
@@ -636,8 +636,8 @@
                                 <div class="icon">
                                     <i class="bi bi-people-fill"></i>
                                 </div>
-                                <div class="number" id="displaced">0</div>
-                                <div class="label">Displaced</div>
+                                <div class="number" id="displaced">०</div>
+                                <div class="label">विस्थापित</div>
                             </div>
                         </div>
                         <div class="col-md-3 mb-3">
@@ -645,15 +645,15 @@
                                 <div class="icon">
                                     <i class="bi bi-heart-pulse-fill"></i>
                                 </div>
-                                <div class="number" id="rescued">0</div>
-                                <div class="label">Rescued</div>
+                                <div class="number" id="rescued">०</div>
+                                <div class="label">उद्धार गरिएको</div>
                             </div>
                         </div>
                     </div>
 
                     <div class="card">
                         <div class="card-header bg-primary text-white">
-                            <h5 class="mb-0"><i class="bi bi-people"></i> Human Impact by Demographics</h5>
+                            <h5 class="mb-0"><i class="bi bi-people"></i> जनसांख्यिकीय विवरण अनुसार मानवीय प्रभाव</h5>
                         </div>
                         <div class="card-body">
                             <div class="chart-container">
@@ -671,8 +671,8 @@
                                 <div class="icon">
                                     <i class="bi bi-house-dash-fill"></i>
                                 </div>
-                                <div class="number" id="destroyed-houses">0</div>
-                                <div class="label">Houses Destroyed</div>
+                                <div class="number" id="destroyed-houses">०</div>
+                                <div class="label">पूर्ण क्षति (घर)</div>
                             </div>
                         </div>
                         <div class="col-md-3 mb-3">
@@ -680,8 +680,8 @@
                                 <div class="icon">
                                     <i class="bi bi-building-fill-dash"></i>
                                 </div>
-                                <div class="number" id="damaged-buildings">0</div>
-                                <div class="label">Buildings Damaged</div>
+                                <div class="number" id="damaged-buildings">०</div>
+                                <div class="label">आंशिक क्षति (भवन)</div>
                             </div>
                         </div>
                         <div class="col-md-3 mb-3">
@@ -689,8 +689,8 @@
                                 <div class="icon">
                                     <i class="bi bi-cone-striped"></i>
                                 </div>
-                                <div class="number" id="infrastructure-damage">0</div>
-                                <div class="label">Infrastructure</div>
+                                <div class="number" id="infrastructure-damage">०</div>
+                                <div class="label">पूर्वाधार क्षति</div>
                             </div>
                         </div>
                         <div class="col-md-3 mb-3">
@@ -698,15 +698,15 @@
                                 <div class="icon">
                                     <i class="bi bi-cash-stack"></i>
                                 </div>
-                                <div class="number" id="estimated-loss">0</div>
-                                <div class="label">Estimated Loss (Rs.)</div>
+                                <div class="number" id="estimated-loss">०</div>
+                                <div class="label">अनुमानित क्षति (रु.)</div>
                             </div>
                         </div>
                     </div>
 
                     <div class="card">
                         <div class="card-header bg-primary text-white">
-                            <h5 class="mb-0"><i class="bi bi-bar-chart"></i> Damage Assessment by Category</h5>
+                            <h5 class="mb-0"><i class="bi bi-bar-chart"></i> विधा अनुसार क्षति मूल्याङ्कन</h5>
                         </div>
                         <div class="card-body">
                             <div class="chart-container">
@@ -724,8 +724,8 @@
                                 <div class="icon">
                                     <i class="bi bi-activity"></i>
                                 </div>
-                                <div class="number" id="cattle-lost">0</div>
-                                <div class="label">Cattle Lost</div>
+                                <div class="number" id="cattle-lost">०</div>
+                                <div class="label">ठूला पशुचौपाया क्षति</div>
                             </div>
                         </div>
                         <div class="col-md-3 mb-3">
@@ -733,8 +733,8 @@
                                 <div class="icon">
                                     <i class="bi bi-bug-fill"></i>
                                 </div>
-                                <div class="number" id="small-livestock-lost">0</div>
-                                <div class="label">Small Livestock Lost</div>
+                                <div class="number" id="small-livestock-lost">०</div>
+                                <div class="label">साधारण पशुचौपाया क्षति</div>
                             </div>
                         </div>
                         <div class="col-md-3 mb-3">
@@ -742,24 +742,24 @@
                                 <div class="icon">
                                     <i class="bi bi-egg-fill"></i>
                                 </div>
-                                <div class="number" id="poultry-lost">0</div>
-                                <div class="label">Poultry Lost</div>
+                                <div class="number" id="poultry-lost">०</div>
+                                <div class="label">पशुपन्छी क्षति</div>
                             </div>
                         </div>
                         <div class="col-md-3 mb-3">
                             <div class="card stat-card bg-gradient-purple">
                                 <div class="icon">
-                                    <i class="bi bi-cash-stack"></i>
+                                    <i class="bi bi-grid-3x3-gap-fill"></i>
                                 </div>
-                                <div class="number" id="livestock-loss">0</div>
-                                <div class="label">Loss (Rs.)</div>
+                                <div class="number" id="livestock-loss">०</div>
+                                <div class="label">अन्य</div>
                             </div>
                         </div>
                     </div>
 
                     <div class="card chart-card">
                         <div class="card-header">
-                            <h5 class="mb-0"><i class="bi bi-pie-chart-fill"></i> Livestock Damage Insights</h5>
+                            <h5 class="mb-0"><i class="bi bi-pie-chart-fill"></i> पशुचौपाया क्षति विवरण</h5>
                         </div>
                         <div class="card-body">
                             <div class="chart-container" style="height: 300px;">
@@ -773,25 +773,25 @@
                 <div class="tab-pane fade" id="public-info" role="tabpanel">
                     <div class="card">
                         <div class="card-header bg-success text-white">
-                            <h5 class="mb-0"><i class="bi bi-megaphone"></i> Public Information & Advisories</h5>
+                            <h5 class="mb-0"><i class="bi bi-megaphone"></i> सार्वजनिक जानकारी र निर्देशनहरू</h5>
                         </div>
                         <div class="card-body">
                             <form id="publicInfoForm">
                                 <div class="row">
                                     <div class="col-md-6">
                                         <div class="mb-3">
-                                            <label for="publicInfoTitle" class="form-label">Title</label>
+                                            <label for="publicInfoTitle" class="form-label">शीर्षक</label>
                                             <input type="text" class="form-control" id="publicInfoTitle" required>
                                         </div>
                                     </div>
                                     <div class="col-md-6">
                                         <div class="mb-3">
-                                            <label for="publicInfoType" class="form-label">Type</label>
+                                            <label for="publicInfoType" class="form-label">प्रकार</label>
                                             <select class="form-control" id="publicInfoType">
-                                                <option value="General">General</option>
-                                                <option value="Weather Advisory">Weather Advisory</option>
-                                                <option value="Emergency Contact">Emergency Contact</option>
-                                                <option value="Safety Instruction">Safety Instruction</option>
+                                                <option value="General">सामान्य</option>
+                                                <option value="Weather Advisory">मौसम सल्लाहकार</option>
+                                                <option value="Emergency Contact">आपतकालीन सम्पर्क</option>
+                                                <option value="Safety Instruction">सुरक्षा निर्देशन</option>
                                             </select>
                                         </div>
                                     </div>
@@ -799,12 +799,12 @@
                                 <div class="row">
                                     <div class="col-md-6">
                                         <div class="mb-3">
-                                            <label for="publicInfoPriority" class="form-label">Priority</label>
+                                            <label for="publicInfoPriority" class="form-label">प्राथमिकता</label>
                                             <select class="form-control" id="publicInfoPriority">
-                                                <option value="Low">Low</option>
-                                                <option value="Normal">Normal</option>
-                                                <option value="High">High</option>
-                                                <option value="Critical">Critical</option>
+                                                <option value="Low">न्यून (Low)</option>
+                                                <option value="Normal">सामान्य (Normal)</option>
+                                                <option value="High">उच्च (High)</option>
+                                                <option value="Critical">अत्यन्त जरुरी (Critical)</option>
                                             </select>
                                         </div>
                                     </div>
@@ -817,13 +817,13 @@
                                     </div>
                                 </div>
                                 <div class="mb-3">
-                                    <label for="publicInfoContent" class="form-label">Content</label>
+                                    <label for="publicInfoContent" class="form-label">सन्देश विवरण</label>
                                     <textarea class="form-control" id="publicInfoContent" rows="3" required></textarea>
                                 </div>
                                 <div class="row">
                                     <div class="col-md-6">
                                         <div class="mb-3">
-                                            <label for="publicInfoValidFromBS" class="form-label">Valid From
+                                            <label for="publicInfoValidFromBS" class="form-label">मान्य मिति देखि
                                                 (BS)</label>
                                             <input type="text" class="form-control" id="publicInfoValidFromBS"
                                                 placeholder="YYYY-MM-DD (e.g., 2081-10-18)" pattern="\d{4}-\d{2}-\d{2}">
@@ -833,7 +833,7 @@
                                     </div>
                                     <div class="col-md-6">
                                         <div class="mb-3">
-                                            <label for="publicInfoValidUntilBS" class="form-label">Valid Until
+                                            <label for="publicInfoValidUntilBS" class="form-label">मान्य मिति सम्म
                                                 (BS)</label>
                                             <input type="text" class="form-control" id="publicInfoValidUntilBS"
                                                 placeholder="YYYY-MM-DD (e.g., 2081-10-18)" pattern="\d{4}-\d{2}-\d{2}">
@@ -844,13 +844,13 @@
                                 </div>
                                 <div class="d-grid gap-2 d-md-flex justify-content-md-end">
                                     <button type="button" class="btn btn-secondary me-md-2"
-                                        id="resetPublicInfoForm">Reset</button>
-                                    <button type="submit" class="btn btn-success">Add Public Information</button>
+                                        id="resetPublicInfoForm">रिसेट</button>
+                                    <button type="submit" class="btn btn-success">सन्देश जारी गर्नुहोस्</button>
                                 </div>
                             </form>
 
                             <hr class="my-4">
-                            <h6><i class="bi bi-info-circle"></i> Current Active Advisories</h6>
+                            <h6><i class="bi bi-info-circle"></i> हालका सक्रिय सल्लाहहरू</h6>
                             <div id="advisories-list" class="mt-3">
                                 <p class="text-muted">Loading advisories...</p>
                             </div>
@@ -867,30 +867,31 @@
 <div class="tab-pane fade" id="input-form" role="tabpanel">
     <div class="card">
         <div class="card-header bg-primary text-white">
-            <h5 class="mb-0"><i class="bi bi-clipboard-plus"></i> Daily Disaster Data Entry Form</h5>
+            <h5 class="mb-0"><i class="bi bi-clipboard-plus"></i> दैनिक विपद् डाटा प्रविष्टि विवरण</h5>
         </div>
         <div class="card-body">
             <form id="disasterReportForm">
                 <!-- Basic Incident Information -->
                 <div class="card mb-3 form-section-card">
                     <div class="card-header bg-light">
-                        <h6 class="mb-0"><i class="bi bi-info-circle"></i> Basic Incident Information</h6>
+                        <h6 class="mb-0"><i class="bi bi-info-circle"></i> आधारभूत घटना विवरण</h6>
                     </div>
                     <div class="card-body">
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="mb-3">
-                                    <label for="disasterDateBS" class="form-label">Date (BS - Bikram Sambat) <span
+                                    <label for="disasterDateBS" class="form-label">मिति (वि.सं.) <span
                                             class="text-danger">*</span></label>
                                     <input type="text" class="form-control" id="disasterDateBS" name="disaster_date_bs"
-                                        required placeholder="YYYY-MM-DD (e.g., 2081-10-18)"
+                                        required placeholder="YYYY-MM-DD (e.g., २०८१-१०-१८)"
                                         pattern="\d{4}-\d{2}-\d{2}">
-                                    <div class="form-text">Enter date in YYYY-MM-DD format (e.g., 2081-10-18)</div>
+                                    <div class="form-text">YYYY-MM-DD ढाँचामा मिति प्रविष्ट गर्नुहोस् (उदा: २०८१-१०-१८)
+                                    </div>
                                 </div>
                             </div>
                             <div class="col-md-6">
                                 <div class="mb-3">
-                                    <label for="disasterTime" class="form-label">Time <span
+                                    <label for="disasterTime" class="form-label">समय <span
                                             class="text-danger">*</span></label>
                                     <input type="time" class="form-control" id="disasterTime" name="disaster_time"
                                         required>
@@ -901,41 +902,41 @@
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="mb-3">
-                                    <label for="disasterType" class="form-label">Disaster Type <span
+                                    <label for="disasterType" class="form-label">विपद्को प्रकार <span
                                             class="text-danger">*</span></label>
                                     <select class="form-control" id="disasterType" name="disaster_type" required>
-                                        <option value="">Select Disaster Type</option>
+                                        <option value="">विपद्को प्रकार छान्नुहोस्</option>
                                         <!-- Options will be populated dynamically from settings -->
                                     </select>
                                 </div>
                             </div>
                             <div class="col-md-6">
                                 <div class="mb-3">
-                                    <label class="form-label">Ward <span class="text-danger">*</span></label>
+                                    <label class="form-label">वडा <span class="text-danger">*</span></label>
                                     <div class="position-relative">
                                         <button class="btn btn-outline-secondary w-100 text-start" type="button"
                                             id="wardDropdownToggle">
-                                            Select Ward(s)
+                                            वडा छान्नुहोस्
                                         </button>
                                         <div class="position-absolute w-100 bg-white border rounded shadow"
                                             id="wardDropdownMenu"
                                             style="display: none; z-index: 1000; max-height: 200px; overflow-y: auto;">
-                                            <a class="dropdown-item p-2" href="#" data-value="1">Ward 1</a>
-                                            <a class="dropdown-item p-2" href="#" data-value="2">Ward 2</a>
-                                            <a class="dropdown-item p-2" href="#" data-value="3">Ward 3</a>
-                                            <a class="dropdown-item p-2" href="#" data-value="4">Ward 4</a>
-                                            <a class="dropdown-item p-2" href="#" data-value="5">Ward 5</a>
-                                            <a class="dropdown-item p-2" href="#" data-value="6">Ward 6</a>
-                                            <a class="dropdown-item p-2" href="#" data-value="7">Ward 7</a>
-                                            <a class="dropdown-item p-2" href="#" data-value="8">Ward 8</a>
-                                            <a class="dropdown-item p-2" href="#" data-value="9">Ward 9</a>
+                                            <a class="dropdown-item p-2" href="#" data-value="1">वडा १</a>
+                                            <a class="dropdown-item p-2" href="#" data-value="2">वडा २</a>
+                                            <a class="dropdown-item p-2" href="#" data-value="3">वडा ३</a>
+                                            <a class="dropdown-item p-2" href="#" data-value="4">वडा ४</a>
+                                            <a class="dropdown-item p-2" href="#" data-value="5">वडा ५</a>
+                                            <a class="dropdown-item p-2" href="#" data-value="6">वडा ६</a>
+                                            <a class="dropdown-item p-2" href="#" data-value="7">वडा ७</a>
+                                            <a class="dropdown-item p-2" href="#" data-value="8">वडा ८</a>
+                                            <a class="dropdown-item p-2" href="#" data-value="9">वडा ९</a>
                                         </div>
                                         <input type="hidden" id="ward" name="ward" required>
                                     </div>
                                     <div class="mt-2">
                                         <div id="selectedWards" class="d-flex flex-wrap gap-1"></div>
                                     </div>
-                                    <small class="form-text text-muted">Click to select multiple wards</small>
+                                    <small class="form-text text-muted">धेरै वडाहरू छान्न क्लिक गर्नुहोस्</small>
                                 </div>
                             </div>
                         </div>
@@ -943,46 +944,46 @@
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="mb-3">
-                                    <label for="coordinates" class="form-label">Coordinates (latitude,
-                                        longitude)</label>
+                                    <label for="coordinates" class="form-label">निर्देशांक (अक्षांश,
+                                        देशान्तर)</label>
                                     <input type="text" class="form-control" id="coordinates" name="coordinates"
                                         placeholder="e.g., 27.7172, 85.3240"
                                         pattern="^\s*-?\d+\.?\d*\s*,\s*-?\d+\.?\d*\s*$">
-                                    <small class="form-text text-muted">Format: latitude, longitude (e.g., 27.7172,
+                                    <small class="form-text text-muted">ढाँचा: latitude, longitude (e.g., 27.7172,
                                         85.3240)</small>
                                 </div>
                             </div>
                             <div class="col-md-6">
                                 <div class="mb-3">
-                                    <label for="location" class="form-label">Location/Tole <span
+                                    <label for="location" class="form-label">स्थान/टोल <span
                                             class="text-danger">*</span></label>
                                     <input type="text" class="form-control" id="location" name="tole"
-                                        placeholder="Enter specific location" required>
+                                        placeholder="निर्दिष्ट स्थान प्रविष्ट गर्नुहोस्" required>
                                 </div>
                             </div>
                         </div>
 
                         <div class="mb-3">
-                            <label for="description" class="form-label">Description</label>
+                            <label for="description" class="form-label">विवरण</label>
                             <textarea class="form-control" id="description" name="description" rows="3"
-                                placeholder="Describe the incident in detail"></textarea>
+                                placeholder="घटनाको विस्तृत विवरण दिनुहोस्"></textarea>
                         </div>
 
                         <div class="row">
                             <div class="col-md-3">
                                 <div class="mb-3">
-                                    <label for="severity" class="form-label">Severity</label>
+                                    <label for="severity" class="form-label">गम्भीरता</label>
                                     <select class="form-control" id="severity" name="severity">
-                                        <option value="low">Low</option>
-                                        <option value="medium" selected>Medium</option>
-                                        <option value="high">High</option>
-                                        <option value="critical">Critical</option>
+                                        <option value="low">कम (Low)</option>
+                                        <option value="medium" selected>मध्यम (Medium)</option>
+                                        <option value="high">उच्च (High)</option>
+                                        <option value="critical">अति गम्भीर (Critical)</option>
                                     </select>
                                 </div>
                             </div>
                             <div class="col-md-3">
                                 <div class="mb-3">
-                                    <label for="weatherStatus" class="form-label">Weather Status</label>
+                                    <label for="weatherStatus" class="form-label">मौसमको अवस्था</label>
                                     <input type="text" class="form-control" id="weatherStatus" name="weather_status"
                                         placeholder="e.g., Heavy Rain, Storm">
                                 </div>
@@ -994,13 +995,13 @@
                 <!-- Human Impact -->
                 <div class="card mb-3 form-section-card">
                     <div class="card-header bg-light">
-                        <h6 class="mb-0"><i class="bi bi-people"></i> Human Impact</h6>
+                        <h6 class="mb-0"><i class="bi bi-people"></i> मानवीय प्रभाव</h6>
                     </div>
                     <div class="card-body">
                         <div class="row">
                             <div class="col-md-3">
                                 <div class="mb-3">
-                                    <label for="affectedPeople" class="form-label">Affected People <span
+                                    <label for="affectedPeople" class="form-label">प्रभावित व्यक्तिहरू <span
                                             class="text-danger">*</span></label>
                                     <input type="number" class="form-control" id="affectedPeople" name="affected_people"
                                         min="0" value="0" required>
@@ -1009,21 +1010,21 @@
                             </div>
                             <div class="col-md-3">
                                 <div class="mb-3">
-                                    <label for="injuredCount" class="form-label">Injured</label>
+                                    <label for="injuredCount" class="form-label">घाइते</label>
                                     <input type="number" class="form-control" id="injuredCount" name="injured" min="0"
                                         value="0">
                                 </div>
                             </div>
                             <div class="col-md-3">
                                 <div class="mb-3">
-                                    <label for="casualtiesCount" class="form-label">Casualties</label>
+                                    <label for="casualtiesCount" class="form-label">हताहत</label>
                                     <input type="number" class="form-control" id="casualtiesCount" name="casualties"
                                         min="0" value="0">
                                 </div>
                             </div>
                             <div class="col-md-3">
                                 <div class="mb-3">
-                                    <label for="deaths" class="form-label">Deaths</label>
+                                    <label for="deaths" class="form-label">मृतक</label>
                                     <input type="number" class="form-control" id="deaths" name="deaths" min="0"
                                         value="0">
                                 </div>
@@ -1033,14 +1034,14 @@
                         <div class="row">
                             <div class="col-md-3">
                                 <div class="mb-3">
-                                    <label for="missingPersons" class="form-label">Missing Persons</label>
+                                    <label for="missingPersons" class="form-label">बेपत्ता व्यक्तिहरू</label>
                                     <input type="number" class="form-control" id="missingPersons" name="missing_persons"
                                         min="0" value="0">
                                 </div>
                             </div>
                             <div class="col-md-3">
                                 <div class="mb-3">
-                                    <label for="affectedPeopleMale" class="form-label">Affected Males <span
+                                    <label for="affectedPeopleMale" class="form-label">प्रभावित पुरुष <span
                                             class="text-danger">*</span></label>
                                     <input type="number" class="form-control" id="affectedPeopleMale"
                                         name="affected_people_male" min="0" value="0" required>
@@ -1048,7 +1049,7 @@
                             </div>
                             <div class="col-md-3">
                                 <div class="mb-3">
-                                    <label for="affectedPeopleFemale" class="form-label">Affected Females <span
+                                    <label for="affectedPeopleFemale" class="form-label">प्रभावित महिला <span
                                             class="text-danger">*</span></label>
                                     <input type="number" class="form-control" id="affectedPeopleFemale"
                                         name="affected_people_female" min="0" value="0" required>
@@ -1056,7 +1057,7 @@
                             </div>
                             <div class="col-md-3">
                                 <div class="mb-3">
-                                    <label class="form-label">Calculated Total</label>
+                                    <label class="form-label">गणना गरिएको कुल</label>
                                     <div class="form-control bg-light" id="calculatedTotal">0</div>
                                     <small class="form-text" id="validationMessage"></small>
                                 </div>
@@ -1068,36 +1069,36 @@
                 <!-- Property Damage -->
                 <div class="card mb-3 form-section-card">
                     <div class="card-header bg-light">
-                        <h6 class="mb-0"><i class="bi bi-house"></i> Property Damage</h6>
+                        <h6 class="mb-0"><i class="bi bi-house"></i> भौतिक क्षति</h6>
                     </div>
                     <div class="card-body">
                         <div class="row">
                             <div class="col-md-3">
                                 <div class="mb-3">
-                                    <label for="housesDamaged" class="form-label">Houses Damaged</label>
+                                    <label for="housesDamaged" class="form-label">आंशिक क्षति (घर)</label>
                                     <input type="number" class="form-control" id="housesDamaged" name="houses_damaged"
                                         min="0" value="0">
                                 </div>
                             </div>
                             <div class="col-md-3">
                                 <div class="mb-3">
-                                    <label for="housesDestroyed" class="form-label">Houses Destroyed</label>
+                                    <label for="housesDestroyed" class="form-label">पूर्ण क्षति (घर)</label>
                                     <input type="number" class="form-control" id="housesDestroyed"
                                         name="houses_destroyed" min="0" value="0">
                                 </div>
                             </div>
                             <div class="col-md-3">
                                 <div class="mb-3">
-                                    <label for="publicBuildingDestruction" class="form-label">Public Buildings
-                                        Destroyed</label>
+                                    <label for="publicBuildingDestruction" class="form-label">पूर्ण क्षति (सार्वजनिक
+                                        भवन)</label>
                                     <input type="number" class="form-control" id="publicBuildingDestruction"
                                         name="public_building_destruction" min="0" value="0">
                                 </div>
                             </div>
                             <div class="col-md-3">
                                 <div class="mb-3">
-                                    <label for="publicBuildingDamage" class="form-label">Public Buildings
-                                        Damaged</label>
+                                    <label for="publicBuildingDamage" class="form-label">आंशिक क्षति (सार्वजनिक
+                                        भवन)</label>
                                     <input type="number" class="form-control" id="publicBuildingDamage"
                                         name="public_building_damage" min="0" value="0">
                                 </div>
@@ -1107,17 +1108,17 @@
                         <div class="row">
                             <div class="col-md-3">
                                 <div class="mb-3">
-                                    <label for="estimatedLoss" class="form-label">Estimated Loss (Rs.)</label>
+                                    <label for="estimatedLoss" class="form-label">अनुमानित नोक्सानी (रु.)</label>
                                     <input type="number" class="form-control" id="estimatedLoss" name="estimated_loss"
                                         min="0" value="0">
                                 </div>
                             </div>
                             <div class="col-md-6">
                                 <div class="mb-3">
-                                    <label for="agricultureCropDamage" class="form-label">Agriculture Crop
-                                        Damage</label>
+                                    <label for="agricultureCropDamage" class="form-label">कृषि बाली
+                                        क्षति</label>
                                     <input type="text" class="form-control" id="agricultureCropDamage"
-                                        name="agriculture_crop_damage" placeholder="Brief description">
+                                        name="agriculture_crop_damage" placeholder="संक्षिप्त विवरण">
                                 </div>
                             </div>
                         </div>
@@ -1127,24 +1128,24 @@
                 <!-- Livestock Impact -->
                 <div class="card mb-3 form-section-card">
                     <div class="card-header bg-light">
-                        <h6 class="mb-0"><i class="bi bi-cow"></i> Livestock Impact</h6>
+                        <h6 class="mb-0"><i class="bi bi-cow"></i> पशुचौपाया क्षति</h6>
                     </div>
                     <div class="card-body">
                         <div class="livestock-grid">
                             <!-- Cattle -->
                             <div class="livestock-type-card">
-                                <h6><i class="bi bi-cow"></i> Cattle</h6>
+                                <h6><i class="bi bi-cow"></i> गाईवस्तु (ठूला)</h6>
                                 <div class="row">
                                     <div class="col-6">
                                         <div class="mb-2">
-                                            <label for="cattleLost" class="form-label small">Lost</label>
+                                            <label for="cattleLost" class="form-label small">नोक्सानी</label>
                                             <input type="number" class="form-control form-control-sm" id="cattleLost"
                                                 name="cattle_lost" min="0" value="0">
                                         </div>
                                     </div>
                                     <div class="col-6">
                                         <div class="mb-2">
-                                            <label for="cattleInjured" class="form-label small">Injured</label>
+                                            <label for="cattleInjured" class="form-label small">घाइते</label>
                                             <input type="number" class="form-control form-control-sm" id="cattleInjured"
                                                 name="cattle_injured" min="0" value="0">
                                         </div>
@@ -1154,18 +1155,18 @@
 
                             <!-- Poultry -->
                             <div class="livestock-type-card">
-                                <h6><i class="bi bi-egg"></i> Poultry</h6>
+                                <h6><i class="bi bi-egg"></i> पशुपन्छी</h6>
                                 <div class="row">
                                     <div class="col-6">
                                         <div class="mb-2">
-                                            <label for="poultryLost" class="form-label small">Lost</label>
+                                            <label for="poultryLost" class="form-label small">नोक्सानी</label>
                                             <input type="number" class="form-control form-control-sm" id="poultryLost"
                                                 name="poultry_lost" min="0" value="0">
                                         </div>
                                     </div>
                                     <div class="col-6">
                                         <div class="mb-2">
-                                            <label for="poultryInjured" class="form-label small">Injured</label>
+                                            <label for="poultryInjured" class="form-label small">घाइते</label>
                                             <input type="number" class="form-control form-control-sm"
                                                 id="poultryInjured" name="poultry_injured" min="0" value="0">
                                         </div>
@@ -1175,18 +1176,18 @@
 
                             <!-- Goats/Sheep -->
                             <div class="livestock-type-card">
-                                <h6><i class="bi bi-bug"></i> Goats/Sheep</h6>
+                                <h6><i class="bi bi-bug"></i> बाख्रा/भेडा</h6>
                                 <div class="row">
                                     <div class="col-6">
                                         <div class="mb-2">
-                                            <label for="goatsSheepLost" class="form-label small">Lost</label>
+                                            <label for="goatsSheepLost" class="form-label small">नोक्सानी</label>
                                             <input type="number" class="form-control form-control-sm"
                                                 id="goatsSheepLost" name="goats_sheep_lost" min="0" value="0">
                                         </div>
                                     </div>
                                     <div class="col-6">
                                         <div class="mb-2">
-                                            <label for="goatsSheepInjured" class="form-label small">Injured</label>
+                                            <label for="goatsSheepInjured" class="form-label small">घाइते</label>
                                             <input type="number" class="form-control form-control-sm"
                                                 id="goatsSheepInjured" name="goats_sheep_injured" min="0" value="0">
                                         </div>
@@ -1196,18 +1197,18 @@
 
                             <!-- Others -->
                             <div class="livestock-type-card">
-                                <h6><i class="bi bi-question-circle"></i> Others</h6>
+                                <h6><i class="bi bi-question-circle"></i> अन्य</h6>
                                 <div class="row">
                                     <div class="col-6">
                                         <div class="mb-2">
-                                            <label for="otherLivestockLost" class="form-label small">Lost</label>
+                                            <label for="otherLivestockLost" class="form-label small">नोक्सानी</label>
                                             <input type="number" class="form-control form-control-sm"
                                                 id="otherLivestockLost" name="other_livestock_lost" min="0" value="0">
                                         </div>
                                     </div>
                                     <div class="col-6">
                                         <div class="mb-2">
-                                            <label for="otherLivestockInjured" class="form-label small">Injured</label>
+                                            <label for="otherLivestockInjured" class="form-label small">घाइते</label>
                                             <input type="number" class="form-control form-control-sm"
                                                 id="otherLivestockInjured" name="other_livestock_injured" min="0"
                                                 value="0">
@@ -1227,7 +1228,8 @@
                 <!-- Infrastructure Impact -->
                 <div class="card mb-3 form-section-card">
                     <div class="card-header bg-light">
-                        <h6 class="mb-0"><i class="bi bi-signpost-split"></i> Infrastructure Impact</h6>
+                        <h6 class="mb-0"><i class="bi bi-signpost-split"></i> पूर्वाधार क्षति (Infrastructure Impact)
+                        </h6>
                     </div>
                     <div class="card-body">
                         <div class="row">
@@ -1235,31 +1237,34 @@
                                 <div class="form-check mb-3">
                                     <input type="checkbox" class="form-check-input" id="roadBlocked"
                                         name="road_blocked_status">
-                                    <label class="form-check-label" for="roadBlocked">Road Blocked</label>
+                                    <label class="form-check-label" for="roadBlocked">सडक अवरुद्ध (Road Blocked)</label>
                                 </div>
                             </div>
                             <div class="col-md-3">
                                 <div class="form-check mb-3">
                                     <input type="checkbox" class="form-check-input" id="electricityBlocked"
                                         name="electricity_blocked_status">
-                                    <label class="form-check-label" for="electricityBlocked">Electricity
-                                        Blocked</label>
+                                    <label class="form-check-label" for="electricityBlocked">विद्युत अवरुद्ध
+                                        (Electricity
+                                        Blocked)</label>
                                 </div>
                             </div>
                             <div class="col-md-3">
                                 <div class="form-check mb-3">
                                     <input type="checkbox" class="form-check-input" id="communicationBlocked"
                                         name="communication_blocked_status">
-                                    <label class="form-check-label" for="communicationBlocked">Communication
-                                        Blocked</label>
+                                    <label class="form-check-label" for="communicationBlocked">सञ्चार अवरुद्ध
+                                        (Communication
+                                        Blocked)</label>
                                 </div>
                             </div>
                             <div class="col-md-3">
                                 <div class="form-check mb-3">
                                     <input type="checkbox" class="form-check-input" id="drinkingWaterDisrupted"
                                         name="drinking_water_status">
-                                    <label class="form-check-label" for="drinkingWaterDisrupted">Drinking Water
-                                        Disrupted</label>
+                                    <label class="form-check-label" for="drinkingWaterDisrupted">खानेपानी अवरुद्ध
+                                        (Drinking Water
+                                        Disrupted)</label>
                                 </div>
                             </div>
                         </div>
@@ -1269,22 +1274,22 @@
                 <!-- Additional Information -->
                 <div class="card mb-3 form-section-card">
                     <div class="card-header bg-light">
-                        <h6 class="mb-0"><i class="bi bi-clipboard"></i> Additional Information</h6>
+                        <h6 class="mb-0"><i class="bi bi-clipboard"></i> थप जानकारी (Additional Information)</h6>
                     </div>
                     <div class="card-body">
                         <div class="mb-3">
-                            <label for="rescueOperations" class="form-label">Rescue Operations</label>
+                            <label for="rescueOperations" class="form-label">उद्धार कार्यहरू (Rescue Operations)</label>
                             <textarea class="form-control" id="rescueOperations" name="rescue_operations" rows="2"
-                                placeholder="Describe rescue and relief operations conducted"></textarea>
+                                placeholder="गरिएका उद्धार तथा राहत कार्यहरूको विवरण दिनुहोस्"></textarea>
                         </div>
                     </div>
                 </div>
 
                 <div class="d-grid gap-2 d-md-flex justify-content-md-end">
-                    <button type="button" class="btn btn-secondary me-md-2" id="resetForm">Reset</button>
+                    <button type="button" class="btn btn-secondary me-md-2" id="resetForm">रिसेट (Reset)</button>
                     <button type="button" class="btn btn-warning me-md-2" id="noIncidentsBtn">No Incidents
                         Today</button>
-                    <button type="submit" class="btn btn-primary">Submit Report</button>
+                    <button type="submit" class="btn btn-primary">पेश गर्नुहोस् (Submit Report)</button>
                 </div>
             </form>
         </div>
@@ -1807,16 +1812,16 @@
 
         // Livestock Damage Stats
         const cattleLostEl = document.getElementById('cattle-lost');
-        if (cattleLostEl) cattleLostEl.textContent = statsData.total_livestock_death || 0;
+        if (cattleLostEl) cattleLostEl.textContent = (statsData.total_cattle_lost || 0) + ' (Inj: ' + (statsData.total_cattle_injured || 0) + ')';
 
         const smallLivestockLostEl = document.getElementById('small-livestock-lost');
-        if (smallLivestockLostEl) smallLivestockLostEl.textContent = statsData.total_livestock_injured || 0;
+        if (smallLivestockLostEl) smallLivestockLostEl.textContent = (statsData.total_goats_sheep_lost || 0) + ' (Inj: ' + (statsData.total_goats_sheep_injured || 0) + ')';
 
         const poultryLostEl = document.getElementById('poultry-lost');
-        if (poultryLostEl) poultryLostEl.textContent = '0';
+        if (poultryLostEl) poultryLostEl.textContent = (statsData.total_poultry_lost || 0) + ' (Inj: ' + (statsData.total_poultry_injured || 0) + ')';
 
         const livestockLossEl = document.getElementById('livestock-loss');
-        if (livestockLossEl) livestockLossEl.textContent = statsData.total_livestock_death || 0;
+        if (livestockLossEl) livestockLossEl.textContent = (statsData.total_other_livestock_lost || 0) + ' (Inj: ' + (statsData.total_other_livestock_injured || 0) + ')';
     }
 
 
@@ -1885,8 +1890,8 @@
                         <button class="btn btn-sm btn-outline-primary me-1" onclick="viewIncidentDetails(${incident.id})" title="View Details">
                             <i class="bi bi-eye"></i>
                         </button>
-                        <button class="btn btn-sm btn-outline-danger" onclick="deleteIncident(${incident.id})" title="Delete Incident">
-                            <i class="bi bi-trash"></i>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteIncident(${incident.id})" title="घटना हटाउनुहोस्">
+                            <i class="bi bi-trash"></i> हटाउनुहोस्
                         </button>
                     </td>
                 `;
@@ -2515,6 +2520,14 @@
             affected_people_female: parseInt(document.getElementById('affectedPeopleFemale').value) || 0,
             livestock_injured: parseInt(document.getElementById('livestockInjured').value) || 0,
             livestock_death: parseInt(document.getElementById('livestockDeath').value) || 0,
+            cattle_lost: parseInt(document.getElementById('cattleLost').value) || 0,
+            cattle_injured: parseInt(document.getElementById('cattleInjured').value) || 0,
+            poultry_lost: parseInt(document.getElementById('poultryLost').value) || 0,
+            poultry_injured: parseInt(document.getElementById('poultryInjured').value) || 0,
+            goats_sheep_lost: parseInt(document.getElementById('goatsSheepLost').value) || 0,
+            goats_sheep_injured: parseInt(document.getElementById('goatsSheepInjured').value) || 0,
+            other_livestock_lost: parseInt(document.getElementById('otherLivestockLost').value) || 0,
+            other_livestock_injured: parseInt(document.getElementById('otherLivestockInjured').value) || 0,
             public_building_destruction: parseInt(document.getElementById('publicBuildingDestruction').value) || 0,
             public_building_damage: parseInt(document.getElementById('publicBuildingDamage').value) || 0,
             road_blocked_status: document.getElementById('roadBlocked').checked,
@@ -2798,14 +2811,18 @@
                             </table>
                         </div>
                         <div class="col-md-6">
-                            <h6 class="text-primary">Livestock & Infrastructure</h6>
+                            <h6 class="text-primary">Livestock Breakdown</h6>
                             <table class="table table-sm table-borderless">
-                                <tr><td><strong>Livestock Injured:</strong></td><td>${incident.livestock_injured || 0}</td></tr>
-                                <tr><td><strong>Livestock Death:</strong></td><td>${incident.livestock_death || 0}</td></tr>
+                                <tr><td><strong>Cattle:</strong></td><td>Lost: ${incident.cattle_lost || 0}, Injured: ${incident.cattle_injured || 0}</td></tr>
+                                <tr><td><strong>Poultry:</strong></td><td>Lost: ${incident.poultry_lost || 0}, Injured: ${incident.poultry_injured || 0}</td></tr>
+                                <tr><td><strong>Goats/Sheep:</strong></td><td>Lost: ${incident.goats_sheep_lost || 0}, Injured: ${incident.goats_sheep_injured || 0}</td></tr>
+                                <tr><td><strong>Others:</strong></td><td>Lost: ${incident.other_livestock_lost || 0}, Injured: ${incident.other_livestock_injured || 0}</td></tr>
+                                <tr><td colspan="2"><hr class="my-1"></td></tr>
+                                <tr><td><strong>Infrastructure:</strong></td><td></td></tr>
                                 <tr><td><strong>Road Blocked:</strong></td><td>${incident.road_blocked_status ? '<span class="badge bg-danger">Yes</span>' : '<span class="badge bg-success">No</span>'}</td></tr>
                                 <tr><td><strong>Electricity Blocked:</strong></td><td>${incident.electricity_blocked_status ? '<span class="badge bg-danger">Yes</span>' : '<span class="badge bg-success">No</span>'}</td></tr>
-                                <tr><td><strong>Communication Blocked:</strong></td><td>${incident.communication_blocked_status ? '<span class="badge bg-danger">Yes</span>' : '<span class="badge bg-success">No</span>'}</td></tr>
-                                <tr><td><strong>Water Disrupted:</strong></td><td>${incident.drinking_water_status ? '<span class="badge bg-danger">Yes</span>' : '<span class="badge bg-success">No</span>'}</td></tr>
+                                <tr><td><strong>Communication:</strong></td><td>${incident.communication_blocked_status ? '<span class="badge bg-danger">Blocked</span>' : '<span class="badge bg-success">Clear</span>'}</td></tr>
+                                <tr><td><strong>Water:</strong></td><td>${incident.drinking_water_status ? '<span class="badge bg-danger">Disrupted</span>' : '<span class="badge bg-success">Normal</span>'}</td></tr>
                             </table>
                         </div>
                     </div>

@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Dashboard - LEOC{% endblock %}
+{% block title %}ड्यासबोर्ड - LEOC{% endblock %}
 
 {% block content %}
 <div class="container-fluid py-4">
@@ -101,14 +101,14 @@
         <div class="col-12">
             <div class="card shadow-sm">
                 <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0"><i class="bi bi-geo-alt"></i> Disaster & Relief GIS Map</h5>
+                    <h5 class="mb-0"><i class="bi bi-geo-alt"></i> विपद् र राहात GIS नक्सा</h5>
                     <div class="btn-group">
                         <button class="btn btn-sm btn-outline-light"
                             onclick="document.getElementById('map-iframe').src = '/map'">
-                            <i class="bi bi-arrow-clockwise"></i> Refresh
+                            <i class="bi bi-arrow-clockwise"></i> रिफ्रेस
                         </button>
                         <a href="/map" target="_blank" class="btn btn-sm btn-outline-info">
-                            <i class="bi bi-arrows-fullscreen"></i> View Full Map
+                            <i class="bi bi-arrows-fullscreen"></i> नक्सा ठूलो पार्नुहोस्
                         </a>
                     </div>
                 </div>
@@ -132,17 +132,17 @@
                         <div class="dropdown">
                             <button class="btn btn-sm btn-success dropdown-toggle" type="button" id="exportDropdown"
                                 data-bs-toggle="dropdown" aria-expanded="false">
-                                <i class="bi bi-download"></i> Export
+                                <i class="bi bi-download"></i> निर्यात गर्नुहोस्
                             </button>
                             <ul class="dropdown-menu" aria-labelledby="exportDropdown">
                                 <li><a class="dropdown-item" href="#" onclick="exportFilteredData('xlsx')"><i
-                                            class="bi bi-file-spreadsheet"></i> Export as XLSX</a></li>
+                                            class="bi bi-file-spreadsheet"></i> Excel (XLSX) मा</a></li>
                                 <li><a class="dropdown-item" href="#" onclick="exportFilteredData('pdf')"><i
-                                            class="bi bi-file-pdf"></i> Export as PDF</a></li>
+                                            class="bi bi-file-pdf"></i> PDF मा</a></li>
                             </ul>
                         </div>
                         <a href="/form" class="btn btn-sm btn-light">
-                            <i class="bi bi-plus-circle"></i> Add New
+                            <i class="bi bi-plus-circle"></i> नयाँ थप्नुहोस्
                         </a>
                     </div>
                 </div>
@@ -151,31 +151,31 @@
                 <div class="card-header bg-light py-2">
                     <div class="row g-2">
                         <div class="col-md-4">
-                            <label class="form-label text-muted small mb-1">Fiscal Year</label>
+                            <label class="form-label text-muted small mb-1">आर्थिक वर्ष</label>
                             <select id="fiscalYearFilter" class="form-select form-select-sm">
-                                <option value="">All Fiscal Years</option>
+                                <option value="">सबै आर्थिक वर्ष</option>
                             </select>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label text-muted small mb-1">Disaster Type</label>
+                            <label class="form-label text-muted small mb-1">विपद्को प्रकार</label>
                             <select id="disasterTypeFilter" class="form-select form-select-sm">
-                                <option value="">All Disaster Types</option>
+                                <option value="">सबै प्रकार</option>
                             </select>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label text-muted small mb-1">Ward</label>
+                            <label class="form-label text-muted small mb-1">वडा</label>
                             <select id="wardFilter" class="form-select form-select-sm">
-                                <option value="">All Wards</option>
+                                <option value="">सबै वडाहरू</option>
                             </select>
                         </div>
                     </div>
                     <div class="row mt-2">
                         <div class="col-md-12">
                             <button id="applyFiltersBtn" class="btn btn-sm btn-primary me-2">
-                                <i class="bi bi-funnel"></i> Apply Filters
+                                <i class="bi bi-funnel"></i> फिल्टर लागू गर्नुहोस्
                             </button>
                             <button id="resetFiltersBtn" class="btn btn-sm btn-outline-secondary">
-                                <i class="bi bi-x-circle"></i> Reset
+                                <i class="bi bi-x-circle"></i> रिसेट
                             </button>
                         </div>
                     </div>
@@ -184,16 +184,16 @@
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <div class="d-flex align-items-center gap-2">
-                            <label class="form-label text-muted small mb-0">Show</label>
+                            <label class="form-label text-muted small mb-0">देखाउनुहोस्</label>
                             <select id="perPageSelector" class="form-select form-select-sm" style="width: auto;">
                                 <option value="10" selected>10</option>
                                 <option value="25">25</option>
                                 <option value="50">50</option>
                             </select>
-                            <label class="form-label text-muted small mb-0">records</label>
+                            <label class="form-label text-muted small mb-0">रेकर्डहरू</label>
                         </div>
                         <div id="tableInfo" class="text-muted small">
-                            Showing 0 - 0 of 0 records
+                            देखाउँदै: ० - ० को जम्मा ० रेकर्डहरू
                         </div>
                     </div>
                     <div class="table-responsive">
@@ -206,15 +206,15 @@
                                     <th>राहात सामाग्री</th>
                                     <th>रकम रु</th>
                                     <th>मिति</th>
-                                    <th>Status</th>
-                                    <th>Actions</th>
+                                    <th>स्थिति</th>
+                                    <th>कार्य</th>
                                 </tr>
                             </thead>
                             <tbody id="tableBody">
                                 <tr class="text-center" id="emptyRow">
                                     <td colspan="8" class="py-4">
-                                        <p class="text-muted mb-0">No distributions recorded yet. <a href="/form">Add
-                                                one now</a></p>
+                                        <p class="text-muted mb-0">हालसम्म कुनै रेकर्ड फेला परेन। <a href="/form">नयाँ
+                                                थप्नुहोस्</a></p>
                                     </td>
                                 </tr>
                             </tbody>
@@ -238,7 +238,7 @@
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title"><i class="bi bi-pencil-square"></i> Edit Distribution</h5>
+                <h5 class="modal-title"><i class="bi bi-pencil-square"></i> विवरण सम्पादन गर्नुहोस्</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
@@ -246,53 +246,55 @@
                     <input type="hidden" id="edit_id" name="edit_id">
                     <div class="row">
                         <div class="col-md-6 mb-3">
-                            <label class="form-label"><i class="bi bi-person"></i> Beneficiary Name</label>
-                            <input type="text" class="form-control" id="edit_beneficiary_name" required>
+                            <label class="form-label"><i class="bi bi-person"></i> लाभग्राहिको नाम थर</label>
+                            <input type="text" class="form-control" id="edit_beneficiary_name"
+                                placeholder="लाभग्राहिको नाम लेख्नुहोस्" required>
                         </div>
                         <div class="col-md-6 mb-3">
-                            <label class="form-label"><i class="bi bi-telephone"></i> Phone</label>
+                            <label class="form-label"><i class="bi bi-telephone"></i> फोन नम्बर</label>
                             <input type="tel" class="form-control" id="edit_phone">
                         </div>
                     </div>
                     <div class="row">
                         <div class="col-md-6 mb-3">
-                            <label class="form-label"><i class="bi bi-geo-alt"></i> Location</label>
-                            <input type="text" class="form-control" id="edit_location" required>
+                            <label class="form-label"><i class="bi bi-geo-alt"></i> ठेगाना/स्थान</label>
+                            <input type="text" class="form-control" id="edit_location" placeholder="स्थान लेख्नुहोस्"
+                                required>
                         </div>
                         <div class="col-md-6 mb-3">
-                            <label class="form-label"><i class="bi bi-cash-coin"></i> Cash Received</label>
+                            <label class="form-label"><i class="bi bi-cash-coin"></i> प्राप्त नगद रकम</label>
                             <input type="number" class="form-control" id="edit_cash_received" step="0.01">
                         </div>
                     </div>
                     <div class="card border-info mb-3">
                         <div class="card-header bg-info text-white">
-                            <h6 class="mb-0"><i class="bi bi-bag"></i> Relief Items</h6>
+                            <h6 class="mb-0"><i class="bi bi-bag"></i> राहात सामाग्री विवरण</h6>
                         </div>
                         <div class="card-body">
                             <div id="editItemsContainer"></div>
                             <button type="button" class="btn btn-sm btn-success mt-2" onclick="addEditItemRow()">
-                                <i class="bi bi-plus-circle"></i> Add Item
+                                <i class="bi bi-plus-circle"></i> सामाग्री थप्नुहोस्
                             </button>
                         </div>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label"><i class="bi bi-check-circle"></i> Status</label>
+                        <label class="form-label"><i class="bi bi-check-circle"></i> स्थिति (Status)</label>
                         <select class="form-control" id="edit_status">
-                            <option value="Distributed">Distributed</option>
-                            <option value="Pending">Pending</option>
-                            <option value="In Progress">In Progress</option>
-                            <option value="Delivered">Delivered</option>
+                            <option value="Distributed">वितरण गरियो</option>
+                            <option value="Pending">बाँकी</option>
+                            <option value="In Progress">प्रक्रियामा</option>
+                            <option value="Delivered">पुर्याइयो</option>
                         </select>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label"><i class="bi bi-pencil-square"></i> Notes</label>
+                        <label class="form-label"><i class="bi bi-pencil-square"></i> थप टिप्पणी (Notes)</label>
                         <textarea class="form-control" id="edit_notes" rows="3"></textarea>
                     </div>
                 </form>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" onclick="saveEdit()">Save Changes</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">रद्द गर्नुहोस्</button>
+                <button type="button" class="btn btn-primary" onclick="saveEdit()">परिवर्तन सुरक्षित गर्नुहोस्</button>
             </div>
         </div>
     </div>

@@ -4,13 +4,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Daily Disaster Report - {{ start_bs }}{% if start_bs != end_bs %} to {{ end_bs }}{% endif %}</title>
+    <title>दैनिक विपद् प्रतिवेदन - {{ start_bs|to_nepali_num }}{% if start_bs != end_bs %} देखि {{ end_bs|to_nepali_num
+        }}{% endif %}</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <style>
         @page {
             size: A4;
-            margin: 15mm;
+            margin: 5mm;
         }
 
         @media print {
@@ -36,55 +37,84 @@
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            font-size: 10pt;
-            line-height: 1.4;
+            font-size: 9pt;
+            line-height: 1.3;
             color: #333;
             background: white;
         }
 
         .report-header {
+            position: relative;
             text-align: center;
-            border-bottom: 3px double #1a472a;
-            padding-bottom: 15px;
-            margin-bottom: 20px;
+            border-bottom: 2px double #1a472a;
+            padding-bottom: 5px;
+            margin-bottom: 10px;
+            min-height: 80px;
+        }
+
+        .report-header img {
+            position: absolute;
+            left: 5px;
+            top: 0;
+            height: 70px;
+            width: auto;
         }
 
         .report-header h1 {
-            color: #1a472a;
-            font-size: 22pt;
+            color: #d32f2f;
+            font-size: 18pt;
             font-weight: bold;
             margin: 0;
+            line-height: 1.1;
         }
 
         .report-header h2 {
-            color: #2c5282;
-            font-size: 14pt;
-            margin: 5px 0;
+            color: #1a472a;
+            font-size: 12pt;
+            margin: 2px 0;
+            font-weight: bold;
         }
 
         .report-header h3 {
+            color: #1a472a;
+            font-size: 11pt;
+            margin: 1px 0;
+            font-weight: 500;
+        }
+
+        .report-header h4 {
+            color: #2c5282;
+            font-size: 10pt;
+            margin: 2px 0;
+            font-weight: bold;
+        }
+
+        .report-header h5 {
             color: #2c5282;
             font-size: 12pt;
-            margin: 5px 0;
+            margin-top: 5px;
+            text-decoration: underline;
+            font-weight: bold;
         }
 
         .report-meta {
             display: flex;
             justify-content: space-between;
-            margin-bottom: 20px;
-            padding: 10px;
+            margin-bottom: 10px;
+            padding: 5px 10px;
             background-color: #f8f9fa;
             border-radius: 5px;
+            font-size: 9pt;
         }
 
         .section-title {
             background-color: #2c5282;
             color: white;
-            padding: 8px 12px;
+            padding: 4px 8px;
             font-weight: bold;
-            font-size: 11pt;
-            margin-bottom: 10px;
-            border-radius: 4px;
+            font-size: 10pt;
+            margin-bottom: 5px;
+            border-radius: 3px;
         }
 
         .section-title.brown {
@@ -99,16 +129,17 @@
             width: 100%;
             border-collapse: collapse;
             font-size: 8pt;
-            margin-bottom: 15px;
+            margin-bottom: 10px;
         }
 
         .data-table th {
             background-color: #2c5282;
             color: white;
-            padding: 6px 4px;
+            padding: 4px 3px;
             text-align: center;
             font-weight: bold;
             border: 1px solid #1a365d;
+            font-size: 8pt;
         }
 
         .data-table th.brown {
@@ -117,10 +148,11 @@
         }
 
         .data-table td {
-            padding: 5px 4px;
+            padding: 3px 3px;
             text-align: center;
             border: 1px solid #cbd5e0;
             vertical-align: middle;
+            font-size: 8pt;
         }
 
         .data-table tr:nth-child(even) {
@@ -142,10 +174,11 @@
         .infrastructure-item {
             display: flex;
             align-items: center;
-            padding: 8px;
+            padding: 5px;
             background-color: #f7fafc;
             border-radius: 4px;
-            border-left: 4px solid #2c5282;
+            border-left: 3px solid #2c5282;
+            font-size: 8pt;
         }
 
         .infrastructure-item i {
@@ -167,10 +200,11 @@
         }
 
         .advisory-item {
-            padding: 8px;
-            margin-bottom: 5px;
-            border-left: 4px solid #ffc107;
+            padding: 5px;
+            margin-bottom: 3px;
+            border-left: 3px solid #ffc107;
             background-color: #fffaf0;
+            font-size: 8pt;
         }
 
         .advisory-item.critical {
@@ -184,28 +218,44 @@
         }
 
         .report-footer {
-            margin-top: 30px;
-            padding-top: 10px;
+            margin-top: 10px;
+            padding-top: 5px;
             border-top: 1px solid #cbd5e0;
             text-align: center;
-            font-size: 9pt;
+            font-size: 8pt;
             color: #666;
             font-style: italic;
         }
 
+
+
+        .sit-rep-box {
+            position: absolute;
+            top: 0;
+            right: 0;
+            border: 1px solid #2c5282;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            color: #2c5282;
+            background: rgba(255, 255, 255, 0.9);
+            font-size: 8pt;
+        }
+
         .stats-cards {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 10px;
-            margin-bottom: 20px;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 5px;
+            margin-bottom: 10px;
         }
 
         .stat-card {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            padding: 15px;
-            border-radius: 8px;
+            padding: 5px 2px;
+            border-radius: 5px;
             text-align: center;
+            overflow: hidden;
         }
 
         .stat-card.danger {
@@ -221,15 +271,36 @@
             background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
         }
 
+        .stat-card.info {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        }
+
+        .stat-card.dark {
+            background: linear-gradient(135deg, #434343 0%, #000000 100%);
+        }
+
+        .stat-card i {
+            font-size: 12pt;
+            margin-bottom: 1px;
+            display: block;
+            opacity: 0.9;
+        }
+
         .stat-card .number {
-            font-size: 24pt;
+            font-size: 12pt;
             font-weight: bold;
             display: block;
+            line-height: 1.1;
         }
 
         .stat-card .label {
-            font-size: 9pt;
+            font-size: 7pt;
             opacity: 0.9;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: block;
+            padding: 0 1px;
         }
 
         .print-actions {
@@ -347,28 +418,28 @@
     <!-- Print Actions -->
     <div class="print-actions no-print">
         <button class="btn-print" onclick="window.print()">
-            <i class="bi bi-printer"></i> Print Report
+            <i class="bi bi-printer"></i> प्रतिवेदन प्रिन्ट गर्नुहोस्
         </button>
         <a href="/api/generate-daily-report?from_bs_date={{ start_bs }}&to_bs_date={{ end_bs }}" class="btn-pdf">
-            <i class="bi bi-file-earmark-pdf"></i> Save as PDF
+            <i class="bi bi-file-earmark-pdf"></i> PDF मा सुरक्षित गर्नुहोस्
         </a>
     </div>
 
     <!-- Date Selector -->
     <div class="date-selector no-print">
-        <label class="form-label mb-1"><strong>Filter Date (BS):</strong></label>
+        <label class="form-label mb-1"><strong>मिति फिल्टर (BS):</strong></label>
         <div class="mb-2">
-            <small class="text-muted d-block mb-1">From:</small>
+            <small class="text-muted d-block mb-1">देखि:</small>
             <input type="text" id="fromDateBS" class="form-control form-control-sm" value="{{ start_bs }}"
                 placeholder="YYYY-MM-DD">
         </div>
         <div class="mb-3">
-            <small class="text-muted d-block mb-1">To:</small>
+            <small class="text-muted d-block mb-1">सम्म:</small>
             <input type="text" id="toDateBS" class="form-control form-control-sm" value="{{ end_bs }}"
                 placeholder="YYYY-MM-DD">
         </div>
         <button class="btn-filter" onclick="applyFilter()">
-            <i class="bi bi-filter"></i> Apply Filter
+            <i class="bi bi-filter"></i> फिल्टर लागू गर्नुहोस्
         </button>
         <small class="text-muted d-block mt-2" style="font-size: 8pt;">Format: YYYY-MM-DD</small>
     </div>
@@ -376,75 +447,113 @@
     <div class="container mt-5">
         <!-- Report Header -->
         <div class="report-header">
-            <h1>Thalara Rural Municipality</h1>
-            <h2>Local Emergency Operating Centre (LEOC)</h2>
-            <h3>Daily Incident Reporting</h3>
+            {% if data.sit_rep_no != 'N/A' %}
+            <div class="sit-rep-box">
+                Sit Rep No: {{ data.sit_rep_no }}
+            </div>
+            {% endif %}
+            <img src="{{ url_for('static', filename='Emblem_of_Nepal.png') }}" alt="Logo">
+            <h1>थलारा गाउँपालिका</h1>
+            <h2>गाउँकार्यपालिकाको कार्यालय</h2>
+            <h3>खोली, बझाङ</h3>
+            <h4>स्थानीय आपतकालिन कार्य संचालन केन्द्र (LEOC)</h4>
+            <h5>दैनिक विपद् बुलेटीन</h5>
         </div>
 
         <!-- Report Meta -->
         <div class="report-meta">
             <div>
-                <strong>Date (BS):</strong> {{ start_bs }}{% if start_bs != end_bs %} to {{ end_bs }}{% endif %}
+                <strong>मिति (BS):</strong> {{ start_bs|to_nepali_num }}{% if start_bs != end_bs %} देखि {{
+                end_bs|to_nepali_num }}{% endif %}
             </div>
             <div>
-                <strong>Today's Weather:</strong>
+                <strong>आजको मौसम:</strong>
                 {% if data.situation_report and data.situation_report.weather_conditions %}
                 {{ data.situation_report.weather_conditions }}
                 {% else %}
-                N/A
+                खुलेको छैन
                 {% endif %}
             </div>
         </div>
 
         <!-- Summary Statistics -->
         <div class="stats-cards">
+            <!-- Total Incidents -->
             <div class="stat-card">
-                <span class="number">{{ data.total_stats.incidents }}</span>
-                <span class="label">Total Incidents</span>
+                <i class="bi bi-exclamation-triangle"></i>
+                <span class="number">{{ data.total_stats.incidents|to_nepali_num }}</span>
+                <span class="label">जम्मा घटनाहरू</span>
             </div>
+
+            <!-- Deaths -->
             <div class="stat-card danger">
-                <span class="number">{{ data.total_stats.deaths }}</span>
-                <span class="label">Deaths</span>
+                <i class="bi bi-person-x-fill"></i>
+                <span class="number">{{ data.total_stats.deaths|to_nepali_num }}</span>
+                <span class="label">मृतक संख्या</span>
             </div>
+
+            <!-- Missing -->
             <div class="stat-card warning">
-                <span class="number">{{ data.total_stats.affected_people }}</span>
-                <span class="label">People Affected</span>
+                <i class="bi bi-person-dash-fill"></i>
+                <span class="number">{{ data.total_stats.missing|to_nepali_num }}</span>
+                <span class="label">बेपत्ता</span>
             </div>
-            <div class="stat-card success">
-                <span class="number">{{ data.total_stats.affected_households }}</span>
-                <span class="label">Households Affected</span>
+
+            <!-- Injured -->
+            <div class="stat-card info">
+                <i class="bi bi-bandaid-fill"></i>
+                <span class="number">{{ data.total_stats.injured|to_nepali_num }}</span>
+                <span class="label">घाइते</span>
+            </div>
+
+            <!-- Estimated Loss -->
+            <div class="stat-card dark">
+                <i class="bi bi-cash-stack"></i>
+                <span class="number">{{ data.total_stats.estimated_loss|to_nepali_num }}</span>
+                <span class="label">अनुमानित क्षति (रु.)</span>
+            </div>
+
+            <!-- Electricity Status -->
+            <div
+                class="stat-card {% if data.infrastructure.electricity == 'Normal' %}success{% else %}danger{% endif %}">
+                <i class="bi bi-lightning-charge-fill"></i>
+                <span class="number" style="font-size: 12pt; margin-top: 2px;">
+                    {{ 'नियमित' if data.infrastructure.electricity == 'Normal' else 'अवरुद्ध' if
+                    data.infrastructure.electricity == 'Disrupted' else data.infrastructure.electricity }}
+                </span>
+                <span class="label">विद्युत सेवा</span>
             </div>
         </div>
 
         <!-- Incident Overview by Ward -->
         <div class="report-content">
             <div class="section-title">
-                <i class="bi bi-table"></i> Incident Overview by Ward
+                <i class="bi bi-table"></i> वडा अनुसार घटना विबरण
             </div>
             <table class="data-table">
                 <thead>
                     <tr>
-                        <th>Ward</th>
-                        <th>Total<br>Incident</th>
-                        <th>Death</th>
-                        <th>Missing</th>
-                        <th>Injured</th>
-                        <th>Estimated<br>Loss</th>
-                        <th>Road</th>
-                        <th>Elec</th>
-                        <th>Comm</th>
-                        <th>Livestock</th>
+                        <th>वडा</th>
+                        <th>जम्मा<br>घटना</th>
+                        <th>मृत्यु</th>
+                        <th>बेपत्ता</th>
+                        <th>घाइते</th>
+                        <th>अनुमानित<br>क्षति</th>
+                        <th>सडक</th>
+                        <th>विद्युत</th>
+                        <th>संचार</th>
+                        <th>पशुचौपाया</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for ward in range(1, 10) %}
                     <tr>
-                        <td><strong>{{ ward }}</strong></td>
-                        <td>{{ data.ward_stats[ward].total_incidents }}</td>
-                        <td>{{ data.ward_stats[ward].deaths }}</td>
-                        <td>{{ data.ward_stats[ward].missing }}</td>
-                        <td>{{ data.ward_stats[ward].injured }}</td>
-                        <td>{{ data.ward_stats[ward].estimated_loss }}</td>
+                        <td><strong>{{ ward|to_nepali_num }}</strong></td>
+                        <td>{{ data.ward_stats[ward].total_incidents|to_nepali_num }}</td>
+                        <td>{{ data.ward_stats[ward].deaths|to_nepali_num }}</td>
+                        <td>{{ data.ward_stats[ward].missing|to_nepali_num }}</td>
+                        <td>{{ data.ward_stats[ward].injured|to_nepali_num }}</td>
+                        <td>{{ data.ward_stats[ward].estimated_loss|to_nepali_num }}</td>
                         <td>
                             {% if data.ward_stats[ward].road_blocked %}
                             <span class="badge bg-danger"><i class="bi bi-signpost-split-fill"></i></span>
@@ -466,20 +575,20 @@
                             <span class="text-muted">-</span>
                             {% endif %}
                         </td>
-                        <td>{{ data.ward_stats[ward].livestock_loss }}</td>
+                        <td>{{ data.ward_stats[ward].livestock_loss|to_nepali_num }}</td>
                     </tr>
                     {% endfor %}
                     <tr class="total-row">
-                        <td>Total</td>
-                        <td>{{ data.total_stats.incidents }}</td>
-                        <td>{{ data.total_stats.deaths }}</td>
-                        <td>{{ data.total_stats.missing }}</td>
-                        <td>{{ data.total_stats.injured }}</td>
-                        <td>{{ data.total_stats.estimated_loss }}</td>
+                        <td>जम्मा</td>
+                        <td>{{ data.total_stats.incidents|to_nepali_num }}</td>
+                        <td>{{ data.total_stats.deaths|to_nepali_num }}</td>
+                        <td>{{ data.total_stats.missing|to_nepali_num }}</td>
+                        <td>{{ data.total_stats.injured|to_nepali_num }}</td>
+                        <td>{{ data.total_stats.estimated_loss|to_nepali_num }}</td>
                         <td>-</td>
                         <td>-</td>
                         <td>-</td>
-                        <td>{{ data.total_stats.livestock_death }}</td>
+                        <td>{{ data.total_stats.livestock_death|to_nepali_num }}</td>
                     </tr>
                 </tbody>
             </table>
@@ -488,25 +597,25 @@
         <!-- Disaster Type Summary -->
         <div class="report-content">
             <div class="section-title brown">
-                <i class="bi bi-graph-up"></i> Disaster Type Summary
+                <i class="bi bi-graph-up"></i> विपद् प्रकार अनुसार विवरण
             </div>
             <table class="data-table">
                 <thead>
                     <tr>
-                        <th class="brown">Disaster</th>
-                        <th class="brown">Total</th>
-                        <th class="brown">Death<br>Male</th>
-                        <th class="brown">Death<br>Female</th>
-                        <th class="brown">Missing</th>
-                        <th class="brown">Injured<br>Male</th>
-                        <th class="brown">Injured<br>Female</th>
-                        <th class="brown">Affected<br>Families</th>
-                        <th class="brown">House<br>Dmg</th>
-                        <th class="brown">House<br>Dest</th>
-                        <th class="brown">Pub.Bldg<br>Dmg</th>
-                        <th class="brown">Pub.Bldg<br>Dest</th>
-                        <th class="brown">Livestock</th>
-                        <th class="brown">Est.Loss</th>
+                        <th class="brown">विपद्</th>
+                        <th class="brown">जम्मा</th>
+                        <th class="brown">मृत्यु<br>पुरुष</th>
+                        <th class="brown">मृत्यु<br>महिला</th>
+                        <th class="brown">बेपत्ता</th>
+                        <th class="brown">घाइते<br>पुरुष</th>
+                        <th class="brown">घाइते<br>महिला</th>
+                        <th class="brown">प्रभावित<br>परिवार</th>
+                        <th class="brown">घर<br>आं.क्षति</th>
+                        <th class="brown">घर<br>पूर्ण.क्षति</th>
+                        <th class="brown">सा.भवन<br>आं.क्षति</th>
+                        <th class="brown">सा.भवन<br>पुर्ण.क्षति</th>
+                        <th class="brown">पशु</th>
+                        <th class="brown">अ.क्षति</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -514,25 +623,25 @@
                     {% if stats.total > 0 %}
                     <tr>
                         <td><strong>{{ dtype }}</strong></td>
-                        <td>{{ stats.total }}</td>
-                        <td>{{ stats.male_death }}</td>
-                        <td>{{ stats.female_death }}</td>
-                        <td>{{ stats.missing }}</td>
-                        <td>{{ stats.male_injured }}</td>
-                        <td>{{ stats.female_injured }}</td>
-                        <td>{{ stats.affected_families }}</td>
-                        <td>{{ stats.house_damaged }}</td>
-                        <td>{{ stats.house_destroyed }}</td>
-                        <td>{{ stats.public_building_damaged }}</td>
-                        <td>{{ stats.public_building_destroyed }}</td>
-                        <td>{{ stats.livestock_loss }}</td>
-                        <td>{{ stats.estimated_loss }}</td>
+                        <td>{{ stats.total|to_nepali_num }}</td>
+                        <td>{{ stats.male_death|to_nepali_num }}</td>
+                        <td>{{ stats.female_death|to_nepali_num }}</td>
+                        <td>{{ stats.missing|to_nepali_num }}</td>
+                        <td>{{ stats.male_injured|to_nepali_num }}</td>
+                        <td>{{ stats.female_injured|to_nepali_num }}</td>
+                        <td>{{ stats.affected_families|to_nepali_num }}</td>
+                        <td>{{ stats.house_damaged|to_nepali_num }}</td>
+                        <td>{{ stats.house_destroyed|to_nepali_num }}</td>
+                        <td>{{ stats.public_building_damaged|to_nepali_num }}</td>
+                        <td>{{ stats.public_building_destroyed|to_nepali_num }}</td>
+                        <td>{{ stats.livestock_loss|to_nepali_num }}</td>
+                        <td>{{ stats.estimated_loss|to_nepali_num }}</td>
                     </tr>
                     {% endif %}
                     {% endfor %}
                     {% if not data.disaster_type_stats.values()|selectattr('total', 'gt', 0)|list %}
                     <tr>
-                        <td colspan="14" class="text-center text-muted">No incidents reported</td>
+                        <td colspan="14" class="text-center text-muted">कुनै घटना रिपोर्ट गरिएको छैन</td>
                     </tr>
                     {% endif %}
                 </tbody>
@@ -542,43 +651,47 @@
         <!-- Infrastructure Status -->
         <div class="report-content">
             <div class="section-title gray">
-                <i class="bi bi-hdd-network"></i> Infrastructure Status
+                <i class="bi bi-hdd-network"></i> पूर्वाधारको स्थिति
             </div>
             <div class="infrastructure-grid">
                 <div class="infrastructure-item">
                     <i
                         class="bi bi-lightning-charge-fill {% if data.infrastructure.electricity == 'Normal' %}status-normal{% else %}status-disrupted{% endif %}"></i>
-                    <span class="label">Electricity:</span>
+                    <span class="label">विद्युत:</span>
                     <span
                         class="{% if data.infrastructure.electricity == 'Normal' %}status-normal{% else %}status-disrupted{% endif %}">
-                        {{ data.infrastructure.electricity }}
+                        {{ 'सामान्य' if data.infrastructure.electricity == 'Normal' else 'अवरुद्ध' if
+                        data.infrastructure.electricity == 'Disrupted' else data.infrastructure.electricity }}
                     </span>
                 </div>
                 <div class="infrastructure-item">
                     <i
                         class="bi bi-signpost-split-fill {% if data.infrastructure.road == 'Open' %}status-normal{% else %}status-disrupted{% endif %}"></i>
-                    <span class="label">Road:</span>
+                    <span class="label">सडक:</span>
                     <span
                         class="{% if data.infrastructure.road == 'Open' %}status-normal{% else %}status-disrupted{% endif %}">
-                        {{ data.infrastructure.road }}
+                        {{ 'सामान्य' if data.infrastructure.road == 'Open' else 'अवरुद्ध' if data.infrastructure.road ==
+                        'Blocked' else data.infrastructure.road }}
                     </span>
                 </div>
                 <div class="infrastructure-item">
                     <i
                         class="bi bi-wifi {% if data.infrastructure.communication == 'Normal' %}status-normal{% else %}status-disrupted{% endif %}"></i>
-                    <span class="label">Communication:</span>
+                    <span class="label">संचार:</span>
                     <span
                         class="{% if data.infrastructure.communication == 'Normal' %}status-normal{% else %}status-disrupted{% endif %}">
-                        {{ data.infrastructure.communication }}
+                        {{ 'सामान्य' if data.infrastructure.communication == 'Normal' else 'अवरुद्ध' if
+                        data.infrastructure.communication == 'Disrupted' else data.infrastructure.communication }}
                     </span>
                 </div>
                 <div class="infrastructure-item">
                     <i
                         class="bi bi-droplet-fill {% if data.infrastructure.drinking_water == 'Normal' %}status-normal{% else %}status-disrupted{% endif %}"></i>
-                    <span class="label">Drinking Water:</span>
+                    <span class="label">खानेपानी:</span>
                     <span
                         class="{% if data.infrastructure.drinking_water == 'Normal' %}status-normal{% else %}status-disrupted{% endif %}">
-                        {{ data.infrastructure.drinking_water }}
+                        {{ 'सामान्य' if data.infrastructure.drinking_water == 'Normal' else 'अवरुद्ध' if
+                        data.infrastructure.drinking_water == 'Disrupted' else data.infrastructure.drinking_water }}
                     </span>
                 </div>
             </div>
@@ -586,24 +699,25 @@
 
         <!-- Recent Events -->
         {% if data.event_logs %}
-        <div class="report-content">
+        <div class="report-content" style="margin-bottom: 5px;">
             <div class="section-title gray">
-                <i class="bi bi-journal-text"></i> Recent Events (Today's)
+                <i class="bi bi-journal-text"></i> हालका घटनाहरू
             </div>
             <table class="data-table">
                 <thead>
                     <tr>
-                        <th class="gray">Time</th>
-                        <th class="gray">Type</th>
-                        <th class="gray">Description</th>
-                        <th class="gray">Location</th>
-                        <th class="gray">Status</th>
+                        <th class="gray">समय</th>
+                        <th class="gray">प्रकार</th>
+                        <th class="gray">विवरण</th>
+                        <th class="gray">स्थान</th>
+                        <th class="gray">स्थिति</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for event in data.event_logs[:5] %}
                     <tr>
-                        <td>{{ event.timestamp.split()[1][:5] if ' ' in event.timestamp else event.timestamp[:5] }}</td>
+                        <td>{{ (event.timestamp.split()[1][:5] if ' ' in event.timestamp else
+                            event.timestamp[:5])|to_nepali_num }}</td>
                         <td>{{ event.event_type }}</td>
                         <td style="text-align: left;">{{ event.description[:60] }}{% if event.description|length > 60
                             %}...{% endif %}</td>
@@ -613,7 +727,9 @@
                                 {% if event.status == 'Active' %}badge-active
                                 {% elif event.status == 'Completed' %}badge-completed
                                 {% else %}badge-pending{% endif %}">
-                                {{ event.status }}
+                                {% if event.status == 'Active' %}सक्रिय
+                                {% elif event.status == 'Completed' %}सम्पन्न
+                                {% else %}बाँकी{% endif %}
                             </span>
                         </td>
                     </tr>
@@ -627,7 +743,7 @@
         {% if data.public_advisories %}
         <div class="report-content">
             <div class="section-title" style="background-color: #d69e2e;">
-                <i class="bi bi-megaphone"></i> Public Advisory
+                <i class="bi bi-megaphone"></i> सार्वजनिक सूचना/सल्लाह
             </div>
             {% set advisory = data.public_advisories[0] %}
             <div
@@ -635,7 +751,8 @@
                 <strong>{{ advisory.title }}</strong>
                 <span
                     class="badge {% if advisory.priority == 'Critical' %}bg-danger{% elif advisory.priority == 'High' %}bg-warning{% else %}bg-info{% endif %}">
-                    {{ advisory.priority }}
+                    {{ 'अत्यन्त जरुरी' if advisory.priority == 'Critical' else 'उच्च' if advisory.priority == 'High'
+                    else 'सामान्य' if advisory.priority == 'Normal' else advisory.priority }}
                 </span>
                 <br>
                 <small>{{ advisory.content[:200] }}{% if advisory.content|length > 200 %}...{% endif %}</small>
@@ -645,18 +762,19 @@
 
         <!-- Situation Report Summary -->
         {% if data.situation_report %}
-        <div class="report-content">
+        <div class="report-content" style="margin-bottom: 5px;">
             <div class="section-title" style="background-color: #38a169;">
-                <i class="bi bi-clipboard-data"></i> Situation Summary
+                <i class="bi bi-clipboard-data"></i> स्थितिको सारांश
             </div>
             <div style="padding: 10px; background-color: #f0fff4; border-radius: 4px; font-size: 9pt;">
-                <p><strong>Current Situation:</strong> {{ data.situation_report.current_situation_summary or 'N/A' }}
+                <p><strong>वर्तमान अवस्था:</strong> {{ data.situation_report.current_situation_summary or 'खुलेको छैन'
+                    }}
                 </p>
                 {% if data.situation_report.resources_deployed %}
-                <p><strong>Resources Deployed:</strong> {{ data.situation_report.resources_deployed }}</p>
+                <p><strong>परिचालित स्रोतहरू:</strong> {{ data.situation_report.resources_deployed }}</p>
                 {% endif %}
                 {% if data.situation_report.next_update_time %}
-                <p><strong>Next Update:</strong> {{ data.situation_report.next_update_time }}</p>
+                <p><strong>अर्को अपडेट:</strong> {{ data.situation_report.next_update_time|to_nepali_num }}</p>
                 {% endif %}
             </div>
         </div>
@@ -664,11 +782,12 @@
 
         <!-- Report Footer -->
         <div class="report-footer">
-            <p>Report generated on {{ generated_at.strftime('%Y-%m-%d %H:%M') }} | LEOC Thalara Rural Municipality
+            <p>प्रतिवेदन तयार गरिएको मिति: {{ generated_at.strftime('%Y-%m-%d %H:%M')|to_nepali_num }} | LEOC थलारा
+                गाउँपालिका
             </p>
             <p style="font-size: 8pt; margin-top: 5px;">
-                This is an official document of the Local Emergency Operating Centre.
-                For emergencies, contact the LEOC operations room.
+                यो स्थानीय आपतकालीन कार्य केन्द्रको आधिकारिक कागजात हो।
+                आपतकालीन अवस्थाका लागि LEOC सञ्चालन कक्षमा सम्पर्क गर्नुहोस्।
             </p>
         </div>
     </div>
