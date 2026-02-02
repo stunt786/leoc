@@ -33,7 +33,20 @@ body {
 }
 
 /* Ensure proper rendering of Devanagari text in all elements */
-h1, h2, h3, h4, h5, h6, p, span, div, td, th, label, .card-title, .stat-label {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p,
+span,
+div,
+td,
+th,
+label,
+.card-title,
+.stat-label {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif, 'Noto Sans Devanagari', 'Arial Unicode MS';
 }
 
@@ -50,26 +63,30 @@ h1, h2, h3, h4, h5, h6, p, span, div, td, th, label, .card-title, .stat-label {
     font-size: 1.8rem;
     letter-spacing: 1px;
     font-weight: 700;
+    color: #ffffff !important;
 }
 
 .navbar-brand i {
     margin-right: 0.5rem;
+    color: #ffffff !important;
 }
 
 .nav-link {
     margin-left: 1rem;
     font-weight: 500;
+    color: #ffffff !important;
     transition: var(--transition);
     position: relative;
 }
 
-.nav-link:hover {
-    color: #fff !important;
-    transform: translateY(-2px);
-}
-
 .nav-link i {
     margin-right: 0.5rem;
+    color: #ffffff !important;
+}
+
+.nav-link:hover {
+    color: #ffffff !important;
+    transform: translateY(-2px);
 }
 
 /* ============================================
@@ -478,6 +495,7 @@ footer p {
         opacity: 0;
         transform: translateY(10px);
     }
+
     to {
         opacity: 1;
         transform: translateY(0);
@@ -529,8 +547,10 @@ html {
    ============================================ */
 
 #map-iframe {
-    height: 500px !important; /* Fixed height that works well with dashboard layout */
-    min-height: 400px; /* Maintain minimum height */
+    height: 500px !important;
+    /* Fixed height that works well with dashboard layout */
+    min-height: 400px;
+    /* Maintain minimum height */
     border: none;
     width: 100%;
 }
@@ -575,12 +595,18 @@ html {
 
 /* Ensure map borders are visible */
 #map-iframe {
-    border: 2px solid #dee2e6; /* Slightly thicker border to ensure visibility */
-    border-radius: 4px; /* Slight rounding to match card style */
-    box-sizing: border-box; /* Include border in element's total width/height */
-    display: block; /* Ensure proper block display */
-    margin: 0; /* Remove any default margins */
-    padding: 0; /* Remove any default padding */
+    border: 2px solid #dee2e6;
+    /* Slightly thicker border to ensure visibility */
+    border-radius: 4px;
+    /* Slight rounding to match card style */
+    box-sizing: border-box;
+    /* Include border in element's total width/height */
+    display: block;
+    /* Ensure proper block display */
+    margin: 0;
+    /* Remove any default margins */
+    padding: 0;
+    /* Remove any default padding */
 }
 
 .badge-primary {

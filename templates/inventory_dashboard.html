@@ -121,6 +121,7 @@
                             <th>स्रोत</th>
                             <th>अवस्था</th>
                             <th>स्थान</th>
+                            <th>Lock</th>
                             <th>कार्य</th>
                         </tr>
                     </thead>
@@ -164,28 +165,37 @@
 
                 <h6><i class="bi bi-plus-circle"></i> नयाँ कारोबार थप्नुहोस्</h6>
                 <form id="fundForm" class="row g-3">
+                    <div class="col-12 d-flex justify-content-between align-items-center mb-1">
+                        <span class="badge bg-warning text-dark" id="fundFormLockStatus"><i class="bi bi-lock-fill"></i>
+                            Locked</span>
+                        <button type="button" class="btn btn-warning btn-sm" id="unlockFundFormBtn"
+                            onclick="unlockFundForm()">
+                            <i class="bi bi-unlock-fill"></i> Unlocked to Enter
+                        </button>
+                    </div>
                     <div class="col-md-4">
                         <label class="form-label">प्रकार</label>
-                        <select class="form-select" id="fund_type" required>
+                        <select class="form-select" id="fund_type" required disabled>
                             <option value="Income">आम्दानी (Income)</option>
                             <option value="Expenditure">खर्च (Expenditure)</option>
                         </select>
                     </div>
                     <div class="col-md-4">
                         <label class="form-label">रकम रु.</label>
-                        <input type="number" class="form-control" id="fund_amount" step="0.01" required>
+                        <input type="number" class="form-control" id="fund_amount" step="0.01" required disabled>
                     </div>
                     <div class="col-md-4">
                         <label class="form-label">मिति</label>
-                        <input type="date" class="form-control" id="fund_date" required>
+                        <input type="date" class="form-control" id="fund_date" required disabled>
                     </div>
                     <div class="col-12">
                         <label class="form-label">विवरण</label>
                         <input type="text" class="form-control" id="fund_desc" placeholder="कारोबारको छोटो विवरण..."
-                            required>
+                            required disabled>
                     </div>
                     <div class="col-12 d-flex justify-content-end">
-                        <button type="button" class="btn btn-primary" onclick="saveFundTransaction()">
+                        <button type="button" class="btn btn-primary" id="saveFundBtn" onclick="saveFundTransaction()"
+                            disabled>
                             <i class="bi bi-save"></i> सुरक्षित गर्नुहोस्
                         </button>
                     </div>
@@ -201,7 +211,7 @@
                                 <th>मिति</th>
                                 <th>प्रकार</th>
                                 <th>विवरण</th>
-                                <th class="text-end">रकम रु.</th>
+                                <th class="text-end">रकम</th>
                             </tr>
                         </thead>
                         <tbody id="fundHistoryBody">
@@ -312,7 +322,7 @@
         tbody.innerHTML = '';
 
         if (items.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="9" class="text-center py-4">कुनै सामग्री भेटिएन।</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="10" class="text-center py-4">कुनै सामग्री भेटिएन।</td></tr>';
             return;
         }
 
@@ -327,11 +337,16 @@
                 <td><small>${item.source || '-'}</small></td>
                 <td><span class="badge bg-${getStatusClass(item.status)}">${getStatusLabel(item.status)}</span></td>
                 <td><small>${item.warehouse_location || '-'}</small></td>
+                <td>
+                    <button class="btn btn-sm btn-link p-0 text-${item.is_locked ? 'danger' : 'success'}" onclick="toggleLockItem(${item.id}, ${item.is_locked})">
+                        <i class="bi bi-${item.is_locked ? 'lock-fill' : 'unlock'}"></i>
+                    </button>
+                </td>
                 <td class="text-nowrap">
-                    <a href="/inventory/add?edit=${item.id}" class="btn btn-sm btn-outline-primary shadow-sm" title="Edit">
+                    <a href="/inventory/add?edit=${item.id}" class="btn btn-sm btn-outline-primary shadow-sm ${item.is_locked ? 'disabled' : ''}" title="${item.is_locked ? 'Locked' : 'Edit'}">
                         <i class="bi bi-pencil"></i>
                     </a>
-                    <button class="btn btn-sm btn-outline-danger shadow-sm" onclick="deleteItem(${item.id}, '${item.name}')" title="Delete">
+                    <button class="btn btn-sm btn-outline-danger shadow-sm" onclick="deleteItem(${item.id}, '${item.name}')" ${item.is_locked ? 'disabled' : ''} title="${item.is_locked ? 'Locked' : 'Delete'}">
                         <i class="bi bi-trash"></i>
                     </button>
                 </td>
@@ -517,6 +532,92 @@
                 }
             })
             .catch(error => console.error('Error saving fund transaction:', error));
+    }
+
+    function toggleLockItem(id, currentlyLocked) {
+        const unlockKey = prompt(currentlyLocked ? "अनलक गर्न पासवर्ड हाल्नुहोस् (Enter password to unlock):" : "रेकर्ड लक गर्न पासवर्ड हाल्नुहोस् (Enter password to lock):");
+        if (!unlockKey) return;
+
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+        fetch(`/api/inventory/${id}/lock`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
+            },
+            body: JSON.stringify({ unlock_key: unlockKey })
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    loadInventory(currentPage);
+                } else {
+                    alert('Error: ' + data.message);
+                }
+            })
+            .catch(error => console.error('Error toggling lock:', error));
+    }
+
+    function toggleLockFund(id, currentlyLocked) {
+        const unlockKey = prompt(currentlyLocked ? "अनलक गर्न पासवर्ड हाल्नुहोस् (Enter password to unlock):" : "रेकर्ड लक गर्न पासवर्ड हाल्नुहोस् (Enter password to lock):");
+        if (!unlockKey) return;
+
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+        fetch(`/api/funds/transactions/${id}/lock`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
+            },
+            body: JSON.stringify({ unlock_key: unlockKey })
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    loadFundHistory();
+                    loadFundSummary();
+                } else {
+                    alert('Error: ' + data.message);
+                }
+            })
+            .catch(error => console.error('Error toggling lock:', error));
+    }
+
+    function deleteFundTransaction(id) {
+        if (!confirm('के तपाईं यो कारोबार हटाउन चाहनुहुन्छ?')) return;
+
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+        fetch(`/api/funds/transactions/${id}`, {
+            method: 'DELETE',
+            headers: {
+                'X-CSRFToken': csrfToken
+            }
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    loadFundHistory();
+                    loadFundSummary();
+                } else {
+                    alert('Error: ' + data.message);
+                }
+            })
+            .catch(error => console.error('Error deleting transaction:', error));
+    }
+
+    function unlockFundForm() {
+        const password = prompt("अनलक गर्न पासवर्ड हाल्नुहोस् (Enter password to unlock form):");
+        if (password === 'admin123') {
+            document.querySelectorAll('#fundForm input, #fundForm select, #fundForm button').forEach(el => el.disabled = false);
+            document.getElementById('unlockFundFormBtn').classList.add('d-none');
+            document.getElementById('fundFormLockStatus').classList.replace('bg-warning', 'bg-success');
+            document.getElementById('fundFormLockStatus').innerHTML = '<i class="bi bi-unlock-fill"></i> Unlocked';
+        } else {
+            alert('अमान्य पासवर्ड।');
+        }
     }
 </script>
 {% endblock %}

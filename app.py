@@ -635,6 +635,8 @@ class FundTransaction(db.Model):
     amount = db.Column(db.Float, nullable=False, default=0.0)
     description = db.Column(db.String(500), nullable=False)
     transaction_date = db.Column(db.Date, nullable=False, default=date.today)
+    is_locked = db.Column(db.Boolean, default=False, index=True)
+    is_system = db.Column(db.Boolean, default=False) # True for system generated (from distributions)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     def to_dict(self):
@@ -644,6 +646,8 @@ class FundTransaction(db.Model):
             'amount': self.amount,
             'description': self.description,
             'transaction_date': self.transaction_date.strftime('%Y-%m-%d'),
+            'is_locked': self.is_locked,
+            'is_system': self.is_system,
             'created_at': self.created_at.strftime('%Y-%m-%d %H:%M')
         }
 
@@ -819,7 +823,8 @@ def handle_fund_transactions():
                 transaction_type=data.get('transaction_type'),
                 amount=float(data.get('amount', 0)),
                 description=data.get('description'),
-                transaction_date=datetime.strptime(data.get('transaction_date'), '%Y-%m-%d').date() if data.get('transaction_date') else date.today()
+                transaction_date=datetime.strptime(data.get('transaction_date'), '%Y-%m-%d').date() if data.get('transaction_date') else date.today(),
+                is_locked=True 
             )
             db.session.add(transaction)
             db.session.commit()
@@ -1110,7 +1115,9 @@ def add_distribution():
                 transaction_type='Expenditure',
                 amount=cash_received,
                 description=f'राहात वितरण: {distribution.beneficiary_name} ({distribution.beneficiary_id})',
-                transaction_date=datetime.now().date()
+                transaction_date=datetime.now().date(),
+                is_locked=True,
+                is_system=True
             )
             db.session.add(transaction)
             db.session.flush() # Get transaction ID
@@ -1249,7 +1256,9 @@ def edit_distribution(id):
                         transaction_type='Expenditure',
                         amount=new_cash,
                         description=f'राहात वितरण: {distribution.beneficiary_name} ({distribution.beneficiary_id})',
-                        transaction_date=datetime.now().date()
+                        transaction_date=datetime.now().date(),
+                        is_locked=True,
+                        is_system=True
                     )
                     db.session.add(transaction)
                     db.session.flush()
@@ -3938,7 +3947,8 @@ def add_inventory_item():
                 expiry_date=expiry_date,
                 warehouse_location=data.get('warehouse_location'),
                 remarks=data.get('remarks'),
-                image_filename=image_filename
+                image_filename=image_filename,
+                is_locked=True
             )
             
             db.session.add(new_item)
@@ -3986,6 +3996,8 @@ def get_inventory_item(id):
 @app.route('/inventory/update/<int:id>', methods=['POST'])
 def update_inventory_item(id):
     item = InventoryItem.query.get_or_404(id)
+    if item.is_locked:
+        return jsonify({'success': False, 'message': 'मेटाउन सकिँदैन: रेकर्ड लक गरिएको छ। कृपया पहिले अनलक गर्नुहोस्।'}), 403
     try:
         data = request.form
         
@@ -4029,6 +4041,8 @@ def update_inventory_item(id):
 @app.route('/inventory/delete/<int:id>', methods=['POST'])
 def delete_inventory_item(id):
     item = InventoryItem.query.get_or_404(id)
+    if item.is_locked:
+        return jsonify({'success': False, 'message': 'मेटाउन सकिँदैन: रेकर्ड लक गरिएको छ। कृपया पहिले अनलक गर्नुहोस्।'}), 403
     try:
         db.session.delete(item)
         db.session.commit()
@@ -4053,3 +4067,65 @@ def inventory_report_print():
     
     return render_template('inventory_report.html', items=items, now=datetime.now())
 
+
+@app.route('/api/inventory/<int:id>/lock', methods=['POST'])
+def toggle_lock_inventory(id):
+    try:
+        item = InventoryItem.query.get(id)
+        if not item:
+            return jsonify({'success': False, 'message': 'सामग्री फेला परेन'}), 404
+        data = request.get_json()
+        unlock_key = data.get('unlock_key')
+        correct_unlock_key = os.getenv('UNLOCK_KEY', 'admin123')
+        if unlock_key == correct_unlock_key:
+            item.is_locked = not item.is_locked
+            db.session.commit()
+            clear_cache()
+            action = "Unlocked" if not item.is_locked else "Locked"
+            return jsonify({'success': True, 'is_locked': item.is_locked, 'message': f'Item {action} successfully'})
+        return jsonify({'success': False, 'message': 'अमान्य अनलक कुञ्जी'}), 401
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/funds/transactions/<int:id>/lock', methods=['POST'])
+def toggle_lock_fund(id):
+    try:
+        transaction = FundTransaction.query.get(id)
+        if not transaction:
+            return jsonify({'success': False, 'message': 'लेनदेन फेला परेन'}), 404
+        data = request.get_json()
+        unlock_key = data.get('unlock_key')
+        correct_unlock_key = os.getenv('UNLOCK_KEY', 'admin123')
+        if unlock_key == correct_unlock_key:
+            transaction.is_locked = not transaction.is_locked
+            db.session.commit()
+            clear_cache()
+            action = "Unlocked" if not transaction.is_locked else "Locked"
+            return jsonify({'success': True, 'is_locked': transaction.is_locked, 'message': f'Transaction {action} successfully'})
+        return jsonify({'success': False, 'message': 'अमान्य अनलक कुञ्जी'}), 401
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/funds/transactions/<int:id>', methods=['PUT', 'DELETE'])
+def manage_fund_transaction(id):
+    transaction = FundTransaction.query.get_or_404(id)
+    if transaction.is_locked:
+        return jsonify({'success': False, 'message': 'रेकर्ड लक गरिएको छ। कृपया पहिले अनलक गर्नुहोस्।'}), 403
+    try:
+        if request.method == 'DELETE':
+            db.session.delete(transaction)
+            db.session.commit()
+            clear_cache()
+            return jsonify({'success': True, 'message': 'Transaction deleted'})
+        
+        data = request.json
+        transaction.amount = float(data.get('amount', transaction.amount))
+        transaction.description = data.get('description', transaction.description)
+        if data.get('transaction_date'):
+            transaction.transaction_date = datetime.strptime(data.get('transaction_date'), '%Y-%m-%d').date()
+        db.session.commit()
+        clear_cache()
+        return jsonify({'success': True, 'message': 'Transaction updated'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500

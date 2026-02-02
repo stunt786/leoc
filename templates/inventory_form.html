@@ -7,8 +7,13 @@
     <div class="row justify-content-center">
         <div class="col-md-9">
             <div class="card shadow">
-                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0" id="form-title">नयाँ सामग्री थप्नुहोस् (Add New Item)</h5>
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center py-2">
+                    <div class="d-flex align-items-center">
+                        <h5 class="mb-0 me-3" id="form-title">नयाँ सामग्री थप्नुहोस् (Add New Item)</h5>
+                        <button class="btn btn-warning btn-sm d-none" id="unlockFormBtn" onclick="unlockForm()">
+                            <i class="bi bi-unlock-fill"></i> अनलक गर्नुहोस्
+                        </button>
+                    </div>
                     <a href="/inventory" class="btn btn-sm btn-light">
                         <i class="bi bi-arrow-left"></i> फिर्ता जानुहोस्
                     </a>
@@ -138,6 +143,11 @@
 
         if (editId) {
             loadItemData(editId);
+        } else {
+            // For new records, show unlock button initially if desired
+            // In other pages, they are locked initially
+            lockForm();
+            document.getElementById('unlockFormBtn').classList.remove('d-none');
         }
 
         document.getElementById('inventory-form').addEventListener('submit', function (e) {
@@ -195,8 +205,79 @@
                     preview.classList.remove('d-none');
                     preview.querySelector('img').src = `/static/uploads/${data.image_filename}`;
                 }
+
+                if (data.is_locked) {
+                    lockForm();
+                    document.getElementById('unlockFormBtn').classList.remove('d-none');
+                }
             })
             .catch(error => console.error('Error loading item:', error));
+    }
+
+    let globalEditId = null;
+
+    function lockForm() {
+        const form = document.getElementById('inventory-form');
+        const elements = form.querySelectorAll('input, select, textarea, button[type="submit"]');
+        elements.forEach(el => el.disabled = true);
+
+        // Show alert if editing
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('edit')) {
+            const alertDiv = document.createElement('div');
+            alertDiv.id = 'lock-alert';
+            alertDiv.className = 'alert alert-info py-2 mb-3';
+            alertDiv.innerHTML = '<i class="bi bi-lock-fill"></i> This record is locked. Please click Unlock to edit.';
+            form.prepend(alertDiv);
+        }
+    }
+
+    function unlockForm() {
+        const password = prompt("अनलक गर्न पासवर्ड हाल्नुहोस् (Enter unlock key to enable editing):");
+        if (!password) return;
+
+        // If it's a new record, we just unlock UI (verify with default key for consistency)
+        const urlParams = new URLSearchParams(window.location.search);
+        const editId = urlParams.get('edit');
+
+        if (!editId) {
+            if (password === 'admin123') { // Simple client-side check for NEW records UI only
+                performFullUnlock();
+            } else {
+                alert('गलत पासवर्ड।');
+            }
+            return;
+        }
+
+        // For existing records, verify with server
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+        fetch(`/api/inventory/${editId}/lock`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
+            },
+            body: JSON.stringify({ unlock_key: password })
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    performFullUnlock();
+                } else {
+                    alert('गलत पासवर्ड वा त्रुटि: ' + data.message);
+                }
+            })
+            .catch(error => console.error('Error unlocking:', error));
+    }
+
+    function performFullUnlock() {
+        const form = document.getElementById('inventory-form');
+        const elements = form.querySelectorAll('input, select, textarea, button[type="submit"]');
+        elements.forEach(el => el.disabled = false);
+        document.getElementById('unlockFormBtn').classList.add('d-none');
+        const alert = document.getElementById('lock-alert');
+        if (alert) alert.remove();
     }
 </script>
 {% endblock %}
