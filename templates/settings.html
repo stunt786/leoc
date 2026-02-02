@@ -159,7 +159,10 @@
         try {
             const response = await fetch('/api/settings/relief_items', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                },
                 body: JSON.stringify({ value: items })
             });
             const data = await response.json();
@@ -237,7 +240,10 @@
         try {
             const response = await fetch('/api/settings/fiscal_years', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                },
                 body: JSON.stringify({ value: years })
             });
             const data = await response.json();
@@ -315,7 +321,10 @@
         try {
             const response = await fetch('/api/settings/ssf_types', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                },
                 body: JSON.stringify({ value: types })
             });
             const data = await response.json();
@@ -393,7 +402,10 @@
         try {
             const response = await fetch('/api/settings/disaster_types', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                },
                 body: JSON.stringify({ value: types })
             });
             const data = await response.json();

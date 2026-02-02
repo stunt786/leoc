@@ -1,10 +1,5 @@
-Python App for Local Emergency Operating Centre (LEOC)
-1. relief distribution with items, benefaciry details, reliefs items, images, fields. Create a form to input these and show in dashboard in chart.
-2. Add fields for disaster date, disaster type, tole, ward, location as latitude and longitude, family members (male, female, children with names, age and relation with), also add details for any pregnent or mother with under 2 years baby, if engaged in social security fund, any harms of members during disaster, add any pregnent also add fields deaths, poverty card, current shelter location, bank account with details(name, account number, bank name)
-3. Add settings for adding relief items that dynamically matches to relif form dropdown list
-4. Add dropdown for ward 1-9 in form
-5. Add setting for adding fiscal year
-6. Add GIS(follium-osm) map for showing disasters locations from the information entered and on hover show popup details for relief distribution
-7. Add new tab menu for disasters that shows all disasters data and add form (disaster type, ward, fiscal year, disaster date, tole, location-longitude, latitude,) house hold data (name, id no, father, mobile)
-8. Add new tab for social security beneficiries with beneficiries names, ss type, age, geo location, ward, tole, mobile. Add GIS map from the data with locations of beneficiries
-
+थलारा गाउँपालिका
+गाउँकार्यपालिकाको कार्यालय
+खोली, बझाङ
+स्थानीय आपतकालिन कार्य संचालन केन्द्र (LEOC)
+दैनिक विपद् बुलेटीन

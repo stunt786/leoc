@@ -2561,7 +2561,8 @@
             const response = await fetch('/api/disaster-reports', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
                 },
                 body: JSON.stringify(formData)
             });
@@ -2619,7 +2620,8 @@
             const response = await fetch('/api/public-information', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
                 },
                 body: JSON.stringify(publicInfoData)
             });
@@ -2664,7 +2666,8 @@
             const response = await fetch('/api/situation-reports', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
                 },
                 body: JSON.stringify(situationReportData)
             });
@@ -2888,7 +2891,8 @@
             const response = await fetch(`/api/disasters/${id}/lock`, {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
                 },
                 body: JSON.stringify({ unlock_key: unlockKey })
             });
@@ -2920,7 +2924,10 @@
 
         try {
             const response = await fetch(`/api/disasters/${id}`, {
-                method: 'DELETE'
+                method: 'DELETE',
+                headers: {
+                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                }
             });
             const data = await response.json();
 

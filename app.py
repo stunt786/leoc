@@ -1,8 +1,10 @@
 from flask import Flask, render_template, request, jsonify, send_from_directory, make_response
 from flask_sqlalchemy import SQLAlchemy
+from flask_wtf.csrf import CSRFProtect
 from datetime import datetime, date, timedelta
 import os
 import json
+import logging
 import folium
 from folium import plugins
 from werkzeug.utils import secure_filename
@@ -94,7 +96,33 @@ def cached(timeout=CACHE_TIMEOUT):
     return decorator
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-key-please-change-in-production')
+
+# Validate and set SECRET_KEY
+secret_key = os.getenv('SECRET_KEY')
+if not secret_key or secret_key == 'dev-key-please-change-in-production' or secret_key == 'your-super-secret-key-here-change-me':
+    if os.getenv('FLASK_ENV') == 'production':
+        raise ValueError(
+            "ERROR: SECRET_KEY environment variable must be set to a strong, random value in production. "
+            "Generate one with: python -c 'import secrets; print(secrets.token_hex(32))'"
+        )
+    secret_key = 'dev-key-change-in-production'
+app.config['SECRET_KEY'] = secret_key
+
+# Initialize CSRF protection
+csrf = CSRFProtect(app)
+
+# Configure logging for production
+if not app.debug:
+    os.makedirs('logs', exist_ok=True)
+    from logging.handlers import RotatingFileHandler
+    file_handler = RotatingFileHandler('logs/app.log', maxBytes=10240000, backupCount=10)
+    file_handler.setFormatter(logging.Formatter(
+        '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
+    ))
+    app.logger.addHandler(file_handler)
+    app.logger.setLevel(logging.INFO)
+    app.logger.info('LEOC Application started')
+
 # Create instance directory if it doesn't exist
 os.makedirs('instance', exist_ok=True)
 db_path = os.path.abspath('./instance/leoc.db')
@@ -220,7 +248,7 @@ class ReliefDistribution(db.Model):
     def get_relief_items(self):
         try:
             return json.loads(self.relief_items_json) if self.relief_items_json else []
-        except:
+        except (json.JSONDecodeError, TypeError):
             return []
 
     def set_relief_items(self, items):
@@ -229,7 +257,7 @@ class ReliefDistribution(db.Model):
     def get_family_members(self):
         try:
             return json.loads(self.family_members_json) if self.family_members_json else []
-        except:
+        except (json.JSONDecodeError, TypeError):
             return []
 
     def set_family_members(self, members):
@@ -238,7 +266,7 @@ class ReliefDistribution(db.Model):
     def get_harms(self):
         try:
             return json.loads(self.harms_json) if self.harms_json else []
-        except:
+        except (json.JSONDecodeError, TypeError):
             return []
 
     def set_harms(self, harms):
@@ -436,7 +464,7 @@ class AppSettings(db.Model):
         if setting:
             try:
                 return json.loads(setting.setting_value)
-            except:
+            except (json.JSONDecodeError, TypeError):
                 return setting.setting_value
         return default
 
@@ -640,6 +668,8 @@ def view_distribution(id):
 def settings():
     return render_template('settings.html')
 
+# Exempt API endpoints from CSRF protection (they should use API tokens)
+@csrf.exempt
 @app.route('/api/distributions', methods=['GET'])
 def get_distributions():
     # Get pagination parameters
@@ -1400,7 +1430,7 @@ def get_setting(key):
         if setting:
             try:
                 value = json.loads(setting.setting_value)
-            except:
+            except (json.JSONDecodeError, TypeError):
                 value = setting.setting_value
         else:
             value = None
@@ -3658,5 +3688,6 @@ def daily_report_preview():
 
 
 if __name__ == '__main__':
-    # When running directly, use debug mode
-    app.run(debug=True, port=int(os.getenv('PORT', 5002)))
+    # Production-safe debug mode handling
+    debug_mode = os.getenv('FLASK_DEBUG', 'False').lower() in ('true', '1', 'yes')
+    app.run(debug=debug_mode, port=int(os.getenv('PORT', 5002)))

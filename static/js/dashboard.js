@@ -637,7 +637,10 @@ async function deleteDistribution(id) {
 
     try {
         const response = await fetch(`/api/distributions/${id}`, {
-            method: 'DELETE'
+            method: 'DELETE',
+            headers: {
+                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            }
         });
 
         const data = await response.json();
@@ -712,7 +715,9 @@ function showNotification(type, message) {
 // Open distribution in edit form with all fields
 async function openEditModal(id) {
     // Redirect to form page with edit ID to load and edit with full form
-    window.location.href = `/form?edit=${id}`;
+    // For LAN deployments, use HTTP explicitly (no HTTPS)
+    const host = window.location.host;
+    window.location.href = `http://${host}/form?edit=${id}`;
 }
 
 function addEditItemRow(item = null, quantity = null, unit = null) {
@@ -794,7 +799,10 @@ async function saveEdit() {
     try {
         const response = await fetch(`/api/distributions/${id}`, {
             method: 'PUT',
-            body: formData
+            body: formData,
+            headers: {
+                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            }
         });
 
         const data = await response.json();
@@ -1137,7 +1145,15 @@ function loadJsPDF(callback) {
 
 // View distribution details
 function viewDistribution(id) {
-    window.location.href = `/view/${id}`;
+    // For LAN deployments, use HTTP. If already on HTTPS, try HTTP first for LAN compatibility
+    const currentProtocol = window.location.protocol;
+    const host = window.location.host;
+
+    // Use HTTP by default for LAN (internal network without SSL)
+    // If on HTTPS, redirect to HTTP for better LAN compatibility
+    const protocol = 'http:';
+
+    window.location.href = `${protocol}//${host}/view/${id}`;
 }
 
 // Toggle lock status for a distribution record
@@ -1153,7 +1169,8 @@ async function toggleLock(id, isCurrentlyLocked) {
         const response = await fetch(`/api/distributions/${id}/lock`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
             },
             body: JSON.stringify({ unlock_key: unlockKey })
         });

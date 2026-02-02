@@ -17,6 +17,7 @@
                 </div>
                 <div class="card-body p-4">
                     <form id="distributionForm" enctype="multipart/form-data">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <!-- BENEFICIARY INFORMATION -->
                         <div class="card border-primary mb-4">
                             <div class="card-header bg-light">
@@ -1278,10 +1279,24 @@
             const url = editId ? `/api/distributions/${editId}` : '/api/distributions';
             const method = editId ? 'PUT' : 'POST';
 
+            // Get CSRF token from meta tag
+            const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
             const response = await fetch(url, {
                 method: method,
-                body: formData
+                body: formData,
+                headers: {
+                    'X-CSRFToken': csrfToken
+                }
             });
+
+            // Check if response is JSON or HTML
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+                // Response is not JSON, likely an error page
+                const htmlText = await response.text();
+                throw new Error('Server returned an error page instead of JSON. Status: ' + response.status + '. Check server logs for details.');
+            }
 
             const data = await response.json();
 
