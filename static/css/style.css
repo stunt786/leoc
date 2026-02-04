@@ -71,22 +71,62 @@ label,
     color: #ffffff !important;
 }
 
-.nav-link {
-    margin-left: 1rem;
-    font-weight: 500;
+#dashboard-link,
+#disaster-report-link,
+#inventory-link,
+#settings-link {
     color: #ffffff !important;
-    transition: var(--transition);
-    position: relative;
+    border-radius: 10px;
+    padding: 0.6rem 1.25rem !important;
+    margin-left: 1rem;
+    display: flex;
+    align-items: center;
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    font-weight: 600;
+}
+
+#dashboard-link {
+    background: linear-gradient(135deg, #00d2ff 0%, #3a7bd5 100%);
+    box-shadow: 0 4px 15px rgba(58, 123, 213, 0.3);
+}
+
+#disaster-report-link {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    box-shadow: 0 4px 15px rgba(245, 87, 108, 0.4);
+}
+
+#inventory-link {
+    background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+    box-shadow: 0 4px 15px rgba(67, 233, 123, 0.3);
+    color: #004d40 !important;
+    /* Darker text for readability on light green */
+}
+
+#inventory-link i {
+    color: #004d40 !important;
+}
+
+#settings-link {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+}
+
+#dashboard-link:hover,
+#disaster-report-link:hover,
+#inventory-link:hover,
+#settings-link:hover {
+    transform: translateY(-3px) scale(1.05);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+    color: #ffffff !important;
+}
+
+#inventory-link:hover {
+    color: #004d40 !important;
 }
 
 .nav-link i {
-    margin-right: 0.5rem;
-    color: #ffffff !important;
-}
-
-.nav-link:hover {
-    color: #ffffff !important;
-    transform: translateY(-2px);
+    font-size: 1.1rem;
+    margin-right: 0.6rem;
 }
 
 /* ============================================
@@ -624,4 +664,50 @@ html {
 
 .badge-danger {
     background-color: #dc3545;
+}
+
+/* Premium Nav Tabs Styling (Applied globally) */
+.nav-tabs {
+    border: none !important;
+    gap: 10px;
+    padding: 0.5rem;
+    background: rgba(0, 0, 0, 0.03);
+    border-radius: 15px;
+    margin-bottom: 2rem;
+}
+
+.nav-tabs .nav-link {
+    border: none !important;
+    border-radius: 12px !important;
+    padding: 0.8rem 1.2rem;
+    color: rgba(255, 255, 255, 0.85);
+    font-weight: 500;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+    background: #5a67d8 !important;
+    /* Distinct purple background for inactive tabs */
+}
+
+.nav-tabs .nav-link i {
+    font-size: 1.1rem;
+    transition: transform 0.3s ease;
+}
+
+.nav-tabs .nav-link:hover {
+    background: rgba(90, 103, 216, 0.85) !important;
+    color: white !important;
+    transform: translateY(-2px);
+}
+
+.nav-tabs .nav-link:hover i {
+    transform: scale(1.2);
+}
+
+/* Active Tab Shadows */
+.nav-tabs .nav-link.active {
+    color: white !important;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
 }

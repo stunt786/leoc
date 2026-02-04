@@ -6,55 +6,57 @@
 <div class="container-fluid mt-4">
     <!-- Summary Cards -->
     <!-- Summary Cards -->
-    <div class="row mb-4 g-2">
+    <div class="row mb-4 g-3">
         <div class="col-md">
-            <div class="card text-white bg-primary mb-3 h-100 text-center">
-                <div class="card-header py-2 fw-bold">जम्मा सामग्री</div>
-                <div class="card-body py-3">
-                    <h2 class="card-title mb-1 fw-bold">{{ total_items }}</h2>
-                    <p class="card-text mb-0">कुल सूची</p>
+            <div class="card stat-card shadow-sm h-100"
+                style="background: linear-gradient(135deg, #00d2ff 0%, #3a7bd5 100%); color: white;">
+                <div class="card-body text-center py-4">
+                    <i class="bi bi-box-seam mb-2" style="font-size: 2rem;"></i>
+                    <h2 class="display-6 fw-bold mb-0">{{ total_items }}</h2>
+                    <p class="mb-0 opacity-75">कुल सामग्री (Total)</p>
                 </div>
             </div>
         </div>
         <div class="col-md">
-            <div class="card text-white bg-warning mb-3 h-100 text-center">
-                <div class="card-header py-2 fw-bold text-dark">न्यून मौज्दात</div>
-                <div class="card-body py-3">
-                    <h2 class="card-title mb-1 fw-bold text-dark">{{ low_stock }}</h2>
-                    <p class="card-text mb-0 text-dark">थप्नुपर्ने</p>
+            <div class="card stat-card shadow-sm h-100"
+                style="background: linear-gradient(135deg, #f6d365 0%, #fda085 100%); color: #4a5568;">
+                <div class="card-body text-center py-4">
+                    <i class="bi bi-exclamation-circle mb-2" style="font-size: 2rem;"></i>
+                    <h2 class="display-6 fw-bold mb-0">{{ low_stock }}</h2>
+                    <p class="mb-0 opacity-75">न्यून मौज्दात (Low)</p>
                 </div>
             </div>
         </div>
         <div class="col-md">
-            <div class="card text-white bg-danger mb-3 h-100 text-center">
-                <div class="card-header py-2 fw-bold">सकिएको (OOS)</div>
-                <div class="card-body py-3">
-                    <h2 class="card-title mb-1 fw-bold">{{ out_of_stock }}</h2>
-                    <p class="card-text mb-0">व्यवस्थापन</p>
+            <div class="card stat-card shadow-sm h-100"
+                style="background: linear-gradient(135deg, #ff0844 0%, #ffb199 100%); color: white;">
+                <div class="card-body text-center py-4">
+                    <i class="bi bi-x-circle mb-2" style="font-size: 2rem;"></i>
+                    <h2 class="display-6 fw-bold mb-0">{{ out_of_stock }}</h2>
+                    <p class="mb-0 opacity-75">सकिएको (OOS)</p>
                 </div>
             </div>
         </div>
         <div class="col-md">
-            <div class="card stat-card-info mb-3 text-white bg-info h-100 text-center shadow-sm"
-                style="cursor: pointer;" onclick="openFundModal()">
-                <div class="card-header py-2 fw-bold">
-                    <span>कोष मौज्दात</span>
-                </div>
-                <div class="card-body py-3">
-                    <h2 class="card-title mb-1 fw-bold" id="fund-balance">₹0</h2>
-                    <p class="card-text mb-0">थप विवरण <i class="bi bi-wallet2 ms-1"></i></p>
+            <div class="card stat-card shadow-sm h-100"
+                style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; cursor: pointer;"
+                onclick="openFundModal()">
+                <div class="card-body text-center py-4">
+                    <i class="bi bi-wallet2 mb-2" style="font-size: 2rem;"></i>
+                    <h2 class="display-6 fw-bold mb-0" id="fund-balance">₹0</h2>
+                    <p class="mb-0 opacity-75">कोष मौज्दात (Funds)</p>
                 </div>
             </div>
         </div>
         <div class="col-md">
-            <div class="card bg-light border-0 mb-3 h-100 text-center shadow-sm">
-                <div class="card-header py-2 fw-bold bg-white">कार्यहरू</div>
-                <div class="card-body py-3">
+            <div class="card border-0 shadow-sm h-100"
+                style="background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(10px);">
+                <div class="card-body text-center py-3 d-flex flex-column justify-content-center">
                     <div class="d-grid gap-2">
-                        <a href="/inventory/add" class="btn btn-success">
+                        <a href="/inventory/add" class="btn btn-success py-2 fw-bold">
                             <i class="bi bi-plus-circle"></i> नयाँ थप्नुहोस्
                         </a>
-                        <a href="/inventory/report" target="_blank" class="btn btn-outline-secondary">
+                        <a href="/inventory/report" target="_blank" class="btn btn-outline-dark py-2">
                             <i class="bi bi-printer"></i> रिपोर्ट प्रिन्ट
                         </a>
                     </div>

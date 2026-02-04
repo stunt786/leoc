@@ -15,48 +15,44 @@
     </div>
 
     <!-- Statistics Cards -->
-    <div class="row mb-4">
+    <div class="row mb-4 g-3">
         <div class="col-md-6 col-lg-3 mb-3">
-            <div class="stat-card stat-card-primary">
-                <div class="stat-icon">
-                    <i class="bi bi-box-seam"></i>
-                </div>
-                <div class="stat-content">
-                    <h5 class="stat-label">जम्मा वितरण</h5>
-                    <h2 class="stat-value" id="total-distributions">0</h2>
+            <div class="card stat-card shadow-sm h-100"
+                style="background: linear-gradient(135deg, #00d2ff 0%, #3a7bd5 100%); color: white;">
+                <div class="card-body text-center py-4">
+                    <i class="bi bi-box-seam mb-2" style="font-size: 2rem;"></i>
+                    <h2 class="display-6 fw-bold mb-0" id="total-distributions">0</h2>
+                    <p class="mb-0 opacity-75">जम्मा वितरण (Total)</p>
                 </div>
             </div>
         </div>
         <div class="col-md-6 col-lg-3 mb-3">
-            <div class="stat-card stat-card-success">
-                <div class="stat-icon">
-                    <i class="bi bi-bag-check"></i>
-                </div>
-                <div class="stat-content">
-                    <h5 class="stat-label">जम्मा वस्तु</h5>
-                    <h2 class="stat-value" id="total-items">0</h2>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-6 col-lg-3 mb-3">
-            <div class="stat-card stat-card-warning">
-                <div class="stat-icon">
-                    <i class="bi bi-cash-coin"></i>
-                </div>
-                <div class="stat-content">
-                    <h5 class="stat-label">जम्मा रकम</h5>
-                    <h2 class="stat-value" id="total-cash">₹0</h2>
+            <div class="card stat-card shadow-sm h-100"
+                style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); color: #004d40;">
+                <div class="card-body text-center py-4">
+                    <i class="bi bi-bag-check mb-2" style="font-size: 2rem;"></i>
+                    <h2 class="display-6 fw-bold mb-0" id="total-items">0</h2>
+                    <p class="mb-0 opacity-75">जम्मा वस्तु (Items)</p>
                 </div>
             </div>
         </div>
         <div class="col-md-6 col-lg-3 mb-3">
-            <div class="stat-card stat-card-danger">
-                <div class="stat-icon">
-                    <i class="bi bi-people"></i>
+            <div class="card stat-card shadow-sm h-100"
+                style="background: linear-gradient(135deg, #f6d365 0%, #fda085 100%); color: #4a5568;">
+                <div class="card-body text-center py-4">
+                    <i class="bi bi-cash-coin mb-2" style="font-size: 2rem;"></i>
+                    <h2 class="display-6 fw-bold mb-0" id="total-cash">₹0</h2>
+                    <p class="mb-0 opacity-75">जम्मा रकम (Cash)</p>
                 </div>
-                <div class="stat-content">
-                    <h5 class="stat-label">लाभग्राहि</h5>
-                    <h2 class="stat-value" id="total-beneficiaries">0</h2>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-3 mb-3">
+            <div class="card stat-card shadow-sm h-100"
+                style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white;">
+                <div class="card-body text-center py-4">
+                    <i class="bi bi-people mb-2" style="font-size: 2rem;"></i>
+                    <h2 class="display-6 fw-bold mb-0" id="total-beneficiaries">0</h2>
+                    <p class="mb-0 opacity-75">लाभग्राहि (Users)</p>
                 </div>
             </div>
         </div>

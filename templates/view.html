@@ -1,22 +1,70 @@
 {% extends "base.html" %}
 
-{% block title %}View Distribution - LEOC{% endblock %}
+{% block title %}विवरण हेर्नुहोस् - LEOC{% endblock %}
 
 {% block content %}
+<script>
+// Convert Arabic numerals to Nepali Devanagari numerals for display only
+function convertToNepaliNumerals(text) {
+    const nepaliNumerals = ['०', '१', '२', '३', '४', '५', '६', '७', '८', '९'];
+    return text.toString().replace(/[0-9]/g, function(match) {
+        return nepaliNumerals[parseInt(match)];
+    });
+}
+
+// Apply Nepali numerals to all numeric content after page loads
+document.addEventListener('DOMContentLoaded', function() {
+    // Select all elements containing numbers (excluding inputs and code elements)
+    const numericElements = document.querySelectorAll('p, span, td, th, label, li, h1, h2, h3, h4, h5, h6, .badge');
+    
+    numericElements.forEach(function(el) {
+        // Skip if element contains input or code
+        if (el.querySelector('input, code') || el.tagName === 'CODE') return;
+        
+        // Skip badge elements with status
+        if (el.classList.contains('badge') && el.textContent.match(/^(पुर्याइयो|प्रक्रियामा|बाँकी|Distributed|Pending|In Progress|Delivered)$/)) return;
+        
+        // Convert text content to Nepali numerals
+        const originalText = el.textContent;
+        const convertedText = convertToNepaliNumerals(originalText);
+        
+        // Only update if text contains numbers
+        if (/[0-9]/.test(originalText)) {
+            el.textContent = convertedText;
+        }
+    });
+    
+    // Handle table cells specifically
+    const tableCells = document.querySelectorAll('#printContent td, #printContent th');
+    tableCells.forEach(function(cell) {
+        const originalText = cell.textContent;
+        const convertedText = convertToNepaliNumerals(originalText);
+        if (/[0-9]/.test(originalText)) {
+            cell.textContent = convertedText;
+        }
+    });
+    
+    // Handle record ID specifically
+    const recordId = document.querySelector('code');
+    if (recordId && /[0-9]/.test(recordId.textContent)) {
+        recordId.textContent = convertToNepaliNumerals(recordId.textContent);
+    }
+});
+</script>
 <div class="container py-4">
     <div class="row justify-content-center">
         <div class="col-lg-11">
             <!-- Header with Print/Back Buttons -->
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h2 class="mb-0">
-                    <i class="bi bi-file-text"></i> Relief Distribution Record
+                    <i class="bi bi-file-text"></i> राहात वितरण रेकर्ड
                 </h2>
                 <div class="btn-group">
                     <button class="btn btn-primary" onclick="window.print()">
-                        <i class="bi bi-printer"></i> Print
+                        <i class="bi bi-printer"></i> छाप्नुहोस्
                     </button>
                     <a href="/" class="btn btn-secondary">
-                        <i class="bi bi-arrow-left"></i> Back
+                        <i class="bi bi-arrow-left"></i> पछाडि जानुहोस्
                     </a>
                 </div>
             </div>
@@ -27,12 +75,12 @@
                 <div class="card-header bg-primary text-white">
                     <div class="row align-items-center">
                         <div class="col-md-8">
-                            <h5 class="mb-2">Local Emergency Operating Centre (LEOC)</h5>
-                            <p class="mb-0 text-light">Relief Distribution Record</p>
+                            <h5 class="mb-2">स्थानीय आपातकालीन सञ्चालन केन्द्र (LEOC)</h5>
+                            <p class="mb-0 text-light">राहात वितरण रेकर्ड</p>
                         </div>
                         <div class="col-md-4 text-end">
-                            <h6 class="mb-1">Record ID: <code>{{ distribution.id }}</code></h6>
-                            <small>Date: {{ distribution.created_at.strftime('%Y-%m-%d') }}</small>
+                            <h6 class="mb-1">रेकर्ड आइडी: <code>{{ distribution.id }}</code></h6>
+                            <small>मिति: {{ distribution.created_at.strftime('%Y-%m-%d') }}</small>
                         </div>
                     </div>
                 </div>
@@ -41,26 +89,26 @@
                     <!-- BENEFICIARY INFORMATION -->
                     <div class="section-break mb-4">
                         <h5 class="border-bottom pb-2 mb-3">
-                            <i class="bi bi-person-vcard"></i> Beneficiary Information
+                            <i class="bi bi-person-vcard"></i> लाभग्राही विवरण
                         </h5>
                         <div class="row">
                             <div class="col-md-6 mb-3">
-                                <label class="fw-bold text-muted">Beneficiary Name:</label>
+                                <label class="fw-bold text-muted">लाभग्राहीको नाम:</label>
                                 <p class="fs-5">{{ distribution.beneficiary_name }}</p>
                             </div>
                             <div class="col-md-6 mb-3">
-                                <label class="fw-bold text-muted">Beneficiary ID:</label>
+                                <label class="fw-bold text-muted">लाभग्राही आइडी:</label>
                                 <p class="fs-5"><code>{{ distribution.beneficiary_id }}</code></p>
                             </div>
                         </div>
                         <div class="row">
                             <div class="col-md-6 mb-3">
-                                <label class="fw-bold text-muted">Father's Name:</label>
-                                <p>{{ distribution.father_name or 'N/A' }}</p>
+                                <label class="fw-bold text-muted">बुवाको नाम:</label>
+                                <p>{{ distribution.father_name or 'उपलब्ध छैन' }}</p>
                             </div>
                             <div class="col-md-6 mb-3">
-                                <label class="fw-bold text-muted">Phone Number:</label>
-                                <p>{{ distribution.phone or 'N/A' }}</p>
+                                <label class="fw-bold text-muted">फोन नम्बर:</label>
+                                <p>{{ distribution.phone or 'उपलब्ध छैन' }}</p>
                             </div>
                         </div>
                     </div>
@@ -68,51 +116,51 @@
                     <!-- DISASTER INFORMATION -->
                     <div class="section-break mb-4">
                         <h5 class="border-bottom pb-2 mb-3">
-                            <i class="bi bi-exclamation-triangle"></i> Disaster Information
+                            <i class="bi bi-exclamation-triangle"></i> विपद् विवरण
                         </h5>
                         <div class="row">
                             <div class="col-md-6 mb-3">
-                                <label class="fw-bold text-muted">Disaster Date:</label>
-                                <p>{{ distribution.disaster_date or 'N/A' }}</p>
+                                <label class="fw-bold text-muted">विपद्को मिति:</label>
+                                <p>{{ distribution.disaster_date or 'उपलब्ध छैन' }}</p>
                             </div>
                             <div class="col-md-6 mb-3">
-                                <label class="fw-bold text-muted">Disaster Type:</label>
-                                <p>{{ distribution.disaster_type or 'N/A' }}</p>
+                                <label class="fw-bold text-muted">विपद्को प्रकार:</label>
+                                <p>{{ distribution.disaster_type or 'उपलब्ध छैन' }}</p>
                             </div>
                         </div>
                         <div class="row">
                             <div class="col-md-4 mb-3">
-                                <label class="fw-bold text-muted">Fiscal Year:</label>
-                                <p>{{ distribution.fiscal_year or 'N/A' }}</p>
+                                <label class="fw-bold text-muted">आर्थिक वर्ष:</label>
+                                <p>{{ distribution.fiscal_year or 'उपलब्ध छैन' }}</p>
                             </div>
                             <div class="col-md-4 mb-3">
-                                <label class="fw-bold text-muted">Ward:</label>
-                                <p>{{ distribution.ward or 'N/A' }}</p>
+                                <label class="fw-bold text-muted">वडा:</label>
+                                <p>{{ distribution.ward or 'उपलब्ध छैन' }}</p>
                             </div>
                             <div class="col-md-4 mb-3">
-                                <label class="fw-bold text-muted">Tole:</label>
-                                <p>{{ distribution.tole or 'N/A' }}</p>
+                                <label class="fw-bold text-muted">टोल:</label>
+                                <p>{{ distribution.tole or 'उपलब्ध छैन' }}</p>
                             </div>
                         </div>
                         <div class="row">
                             <div class="col-md-6 mb-3">
-                                <label class="fw-bold text-muted">Location:</label>
-                                <p>{{ distribution.location or 'N/A' }}</p>
+                                <label class="fw-bold text-muted">स्थान:</label>
+                                <p>{{ distribution.location or 'उपलब्ध छैन' }}</p>
                             </div>
                             <div class="col-md-6 mb-3">
-                                <label class="fw-bold text-muted">Current Shelter Location:</label>
-                                <p>{{ distribution.current_shelter_location or 'N/A' }}</p>
+                                <label class="fw-bold text-muted">हालको आश्रय स्थान:</label>
+                                <p>{{ distribution.current_shelter_location or 'उपलब्ध छैन' }}</p>
                             </div>
                         </div>
                         {% if distribution.latitude or distribution.longitude %}
                         <div class="row">
                             <div class="col-md-6 mb-3">
-                                <label class="fw-bold text-muted">Latitude:</label>
-                                <p>{{ "%.6f"|format(distribution.latitude) if distribution.latitude else 'N/A' }}</p>
+                                <label class="fw-bold text-muted">अक्षांश:</label>
+                                <p>{{ "%.6f"|format(distribution.latitude) if distribution.latitude else 'उपलब्ध छैन' }}</p>
                             </div>
                             <div class="col-md-6 mb-3">
-                                <label class="fw-bold text-muted">Longitude:</label>
-                                <p>{{ "%.6f"|format(distribution.longitude) if distribution.longitude else 'N/A' }}</p>
+                                <label class="fw-bold text-muted">देशांश:</label>
+                                <p>{{ "%.6f"|format(distribution.longitude) if distribution.longitude else 'उपलब्ध छैन' }}</p>
                             </div>
                         </div>
                         {% endif %}
@@ -121,33 +169,33 @@
                     <!-- FAMILY DETAILS -->
                     <div class="section-break mb-4">
                         <h5 class="border-bottom pb-2 mb-3">
-                            <i class="bi bi-people"></i> Family Details
+                            <i class="bi bi-people"></i> परिवार विवरण
                         </h5>
                         <div class="row">
                             <div class="col-md-3 mb-3">
-                                <label class="fw-bold text-muted">Male Count:</label>
+                                <label class="fw-bold text-muted">पुरुष संख्या:</label>
                                 <p class="badge bg-primary fs-6">{{ distribution.male_count or 0 }}</p>
                             </div>
                             <div class="col-md-3 mb-3">
-                                <label class="fw-bold text-muted">Female Count:</label>
+                                <label class="fw-bold text-muted">महिला संख्या:</label>
                                 <p class="badge bg-danger fs-6">{{ distribution.female_count or 0 }}</p>
                             </div>
                             <div class="col-md-3 mb-3">
-                                <label class="fw-bold text-muted">Children Count:</label>
+                                <label class="fw-bold text-muted">बालबालिका संख्या:</label>
                                 <p class="badge bg-warning fs-6">{{ distribution.children_count or 0 }}</p>
                             </div>
                             <div class="col-md-3 mb-3">
-                                <label class="fw-bold text-muted">Deaths:</label>
+                                <label class="fw-bold text-muted">मृत्यु:</label>
                                 <p class="badge bg-dark fs-6">{{ distribution.deaths_during_disaster or 0 }}</p>
                             </div>
                         </div>
                         <div class="row">
                             <div class="col-md-6 mb-3">
-                                <label class="fw-bold text-muted">Pregnant Mothers:</label>
+                                <label class="fw-bold text-muted">गर्भवती महिला:</label>
                                 <p>{{ distribution.pregnant_mother_count or 0 }}</p>
                             </div>
                             <div class="col-md-6 mb-3">
-                                <label class="fw-bold text-muted">Mothers with Baby &lt;2 Years:</label>
+                                <label class="fw-bold text-muted">२ वर्षभन्दा कमका बच्चा भएकी आमा:</label>
                                 <p>{{ distribution.mother_under_2_baby or 0 }}</p>
                             </div>
                         </div>
@@ -155,14 +203,14 @@
                         <!-- Family Members Table -->
                         {% if distribution.family_members_json %}
                         <div class="mt-3">
-                            <label class="fw-bold text-muted">Family Members:</label>
+                            <label class="fw-bold text-muted">परिवारका सदस्यहरू:</label>
                             <table class="table table-bordered table-sm mt-2">
                                 <thead class="table-light">
                                     <tr>
-                                        <th>Name</th>
-                                        <th>Relation</th>
-                                        <th>Age</th>
-                                        <th>Gender</th>
+                                        <th>नाम</th>
+                                        <th>नाता</th>
+                                        <th>उमेर</th>
+                                        <th>लिंग</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -183,30 +231,30 @@
                     <!-- SOCIAL SECURITY & STATUS -->
                     <div class="section-break mb-4">
                         <h5 class="border-bottom pb-2 mb-3">
-                            <i class="bi bi-shield-check"></i> Social Security & Status
+                            <i class="bi bi-shield-check"></i> सामाजिक सुरक्षा र स्थिति
                         </h5>
                         <div class="row">
                             <div class="col-md-4 mb-3">
-                                <label class="fw-bold text-muted">In Social Security Fund:</label>
+                                <label class="fw-bold text-muted">सामाजिक सुरक्षा कोषमा:</label>
                                 <p>
                                     {% if distribution.in_social_security_fund %}
-                                    <span class="badge bg-success">Yes</span>
+                                    <span class="badge bg-success">छ</span>
                                     {% else %}
-                                    <span class="badge bg-secondary">No</span>
+                                    <span class="badge bg-secondary">छैन</span>
                                     {% endif %}
                                 </p>
                             </div>
                             <div class="col-md-4 mb-3">
-                                <label class="fw-bold text-muted">SSF Type:</label>
-                                <p>{{ distribution.ssf_type or 'N/A' }}</p>
+                                <label class="fw-bold text-muted">सामाजिक सुरक्षा प्रकार:</label>
+                                <p>{{ distribution.ssf_type or 'उपलब्ध छैन' }}</p>
                             </div>
                             <div class="col-md-4 mb-3">
-                                <label class="fw-bold text-muted">Poverty Card Holder:</label>
+                                <label class="fw-bold text-muted">गरिबी कार्डधारी:</label>
                                 <p>
                                     {% if distribution.poverty_card_holder %}
-                                    <span class="badge bg-success">Yes</span>
+                                    <span class="badge bg-success">छ</span>
                                     {% else %}
-                                    <span class="badge bg-secondary">No</span>
+                                    <span class="badge bg-secondary">छैन</span>
                                     {% endif %}
                                 </p>
                             </div>
@@ -217,14 +265,14 @@
                     {% if distribution.harms_json %}
                     <div class="section-break mb-4">
                         <h5 class="border-bottom pb-2 mb-3">
-                            <i class="bi bi-bandaid"></i> Harms & Damages
+                            <i class="bi bi-bandaid"></i> क्षति र हानि
                         </h5>
                         <table class="table table-bordered table-sm">
                             <thead class="table-light">
                                 <tr>
-                                    <th>Family Member</th>
-                                    <th>Type of Harm</th>
-                                    <th>Severity</th>
+                                    <th>परिवार सदस्य</th>
+                                    <th>क्षतिको प्रकार</th>
+                                    <th>गंभीरता</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -249,22 +297,22 @@
                     {% if distribution.bank_account_holder_name or distribution.bank_name %}
                     <div class="section-break mb-4">
                         <h5 class="border-bottom pb-2 mb-3">
-                            <i class="bi bi-bank"></i> Bank Account Details
+                            <i class="bi bi-bank"></i> बैंक खाता विवरण
                         </h5>
                         <div class="row">
                             <div class="col-md-6 mb-3">
-                                <label class="fw-bold text-muted">Account Holder:</label>
-                                <p>{{ distribution.bank_account_holder_name or 'N/A' }}</p>
+                                <label class="fw-bold text-muted">खाताधारक:</label>
+                                <p>{{ distribution.bank_account_holder_name or 'उपलब्ध छैन' }}</p>
                             </div>
                             <div class="col-md-6 mb-3">
-                                <label class="fw-bold text-muted">Account Number:</label>
-                                <p><code>{{ distribution.bank_account_number or 'N/A' }}</code></p>
+                                <label class="fw-bold text-muted">खाता नम्बर:</label>
+                                <p><code>{{ distribution.bank_account_number or 'उपलब्ध छैन' }}</code></p>
                             </div>
                         </div>
                         <div class="row">
                             <div class="col-md-6 mb-3">
-                                <label class="fw-bold text-muted">Bank Name:</label>
-                                <p>{{ distribution.bank_name or 'N/A' }}</p>
+                                <label class="fw-bold text-muted">बैंकको नाम:</label>
+                                <p>{{ distribution.bank_name or 'उपलब्ध छैन' }}</p>
                             </div>
                         </div>
                     </div>
@@ -273,16 +321,16 @@
                     <!-- RELIEF ITEMS -->
                     <div class="section-break mb-4">
                         <h5 class="border-bottom pb-2 mb-3">
-                            <i class="bi bi-bag"></i> Relief Items Distribution
+                            <i class="bi bi-bag"></i> राहात सामाग्री वितरण
                         </h5>
                         {% if distribution.relief_items %}
                         <table class="table table-bordered table-striped">
                             <thead class="table-primary">
                                 <tr>
                                     <th>#</th>
-                                    <th>Item Name</th>
-                                    <th class="text-center">Quantity</th>
-                                    <th class="text-center">Unit</th>
+                                    <th>सामाग्रीको नाम</th>
+                                    <th class="text-center">परिमाण</th>
+                                    <th class="text-center">इकाई</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -291,39 +339,39 @@
                                     <td>{{ loop.index }}</td>
                                     <td>{{ item.item }}</td>
                                     <td class="text-center"><strong>{{ item.quantity }}</strong></td>
-                                    <td class="text-center">{{ item.unit or 'units' }}</td>
+                                    <td class="text-center">{{ item.unit or 'इकाई' }}</td>
                                 </tr>
                                 {% endfor %}
                                 <tr class="table-light">
-                                    <td colspan="3" class="fw-bold text-end">Total Items:</td>
+                                    <td colspan="3" class="fw-bold text-end">जम्मा सामाग्री:</td>
                                     <td class="text-center fw-bold">{{ distribution.relief_items|length }}</td>
                                 </tr>
                             </tbody>
                         </table>
                         {% else %}
-                        <p class="text-muted">No relief items recorded</p>
+                        <p class="text-muted">कुनै राहात सामाग्री रेकर्ड गरिएको छैन</p>
                         {% endif %}
                     </div>
 
                     <!-- CASH & STATUS -->
                     <div class="section-break mb-4">
                         <h5 class="border-bottom pb-2 mb-3">
-                            <i class="bi bi-cash-coin"></i> Cash & Status
+                            <i class="bi bi-cash-coin"></i> नगद र स्थिति
                         </h5>
                         <div class="row">
                             <div class="col-md-6 mb-3">
-                                <label class="fw-bold text-muted">Cash Received:</label>
+                                <label class="fw-bold text-muted">प्राप्त नगद:</label>
                                 <p class="h5 text-success">₹{{ "%.2f"|format(distribution.cash_received) }}</p>
                             </div>
                             <div class="col-md-6 mb-3">
-                                <label class="fw-bold text-muted">Status:</label>
+                                <label class="fw-bold text-muted">स्थिति:</label>
                                 <p>
                                     {% if distribution.status == 'Delivered' %}
-                                    <span class="badge bg-success">{{ distribution.status }}</span>
+                                    <span class="badge bg-success">पुर्याइयो</span>
                                     {% elif distribution.status == 'In Progress' %}
-                                    <span class="badge bg-warning">{{ distribution.status }}</span>
+                                    <span class="badge bg-warning">प्रक्रियामा</span>
                                     {% elif distribution.status == 'Pending' %}
-                                    <span class="badge bg-danger">{{ distribution.status }}</span>
+                                    <span class="badge bg-danger">बाँकी</span>
                                     {% else %}
                                     <span class="badge bg-primary">{{ distribution.status }}</span>
                                     {% endif %}
@@ -336,7 +384,7 @@
                     {% if distribution.notes %}
                     <div class="section-break mb-4">
                         <h5 class="border-bottom pb-2 mb-3">
-                            <i class="bi bi-pencil-square"></i> Additional Notes
+                            <i class="bi bi-pencil-square"></i> थप टिप्पणी
                         </h5>
                         <div class="alert alert-info">
                             <p>{{ distribution.notes }}</p>
@@ -348,12 +396,12 @@
                     {% if distribution.image_filename %}
                     <div class="section-break mb-4">
                         <h5 class="border-bottom pb-2 mb-3">
-                            <i class="bi bi-image"></i> Evidence Photo
+                            <i class="bi bi-image"></i> प्रमाण फोटो
                         </h5>
                         <div class="text-center">
                             <img src="/static/uploads/{{ distribution.image_filename }}" alt="Evidence Photo"
                                 class="img-fluid rounded shadow-sm" style="max-width: 500px; max-height: 500px;">
-                            <p class="text-muted mt-2 small">File: {{ distribution.image_filename }}</p>
+                            <p class="text-muted mt-2 small">फाइल: {{ distribution.image_filename }}</p>
                         </div>
                     </div>
                     {% endif %}
@@ -362,15 +410,15 @@
                     {% if distribution.documents %}
                     <div class="section-break mb-4">
                         <h5 class="border-bottom pb-2 mb-3">
-                            <i class="bi bi-file-earmark-pdf"></i> Supporting Documents
+                            <i class="bi bi-file-earmark-pdf"></i> सहायक कागजात
                         </h5>
                         <div class="table-responsive">
                             <table class="table table-bordered table-hover">
                                 <thead class="table-light">
                                     <tr>
                                         <th>#</th>
-                                        <th>Document Name</th>
-                                        <th class="text-center">Action</th>
+                                        <th>कागजातको नाम</th>
+                                        <th class="text-center">कार्य</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -384,7 +432,7 @@
                                         <td class="text-center">
                                             <a href="/static/uploads/{{ doc }}" target="_blank"
                                                 class="btn btn-sm btn-outline-primary">
-                                                <i class="bi bi-download"></i> View/Download
+                                                <i class="bi bi-download"></i> हेर्नुहोस्/डाउनलोड गर्नुहोस्
                                             </a>
                                         </td>
                                     </tr>
@@ -399,12 +447,12 @@
                     <div class="section-break mt-4 pt-3 border-top">
                         <div class="row text-muted small">
                             <div class="col-md-6">
-                                <p><strong>Created:</strong> {{ distribution.created_at.strftime('%Y-%m-%d %H:%M:%S') }}
+                                <p><strong>सिर्जना मिति:</strong> {{ distribution.created_at.strftime('%Y-%m-%d %H:%M:%S') }}
                                 </p>
                             </div>
                             <div class="col-md-6 text-end">
-                                <p><strong>Last Updated:</strong> {{ distribution.updated_at.strftime('%Y-%m-%d
-                                    %H:%M:%S') if distribution.updated_at else 'N/A' }}</p>
+                                <p><strong>अन्तिम अपडेट:</strong> {{ distribution.updated_at.strftime('%Y-%m-%d
+                                    %H:%M:%S') if distribution.updated_at else 'उपलब्ध छैन' }}</p>
                             </div>
                         </div>
                     </div>
@@ -416,29 +464,257 @@
 
 <!-- Print Styles -->
 <style media="print">
+    @page {
+        size: A4 portrait;
+        margin: 0.2cm;
+    }
+    
     @media print {
         body {
             padding: 0;
             margin: 0;
+            font-size: 9pt;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
         }
 
         .navbar,
         .btn-group,
-        footer {
+        footer,
+        .d-flex.justify-content-between.align-items-center.mb-4 {
             display: none !important;
+        }
+
+        .container {
+            max-width: 100%;
+            width: 100%;
+            padding: 0;
+            margin: 0;
+        }
+
+        .row.justify-content-center {
+            margin: 0;
+        }
+
+        .col-lg-11 {
+            padding: 0;
+            margin: 0;
+            max-width: 100%;
+            flex: 0 0 100%;
+            width: 100%;
         }
 
         #printContent {
             box-shadow: none !important;
-            border: 1px solid #ccc;
+            border: 1px solid #333;
+            margin: 0;
+            padding: 0;
+            width: 100%;
+        }
+
+        .card {
+            border: none !important;
+            margin: 0;
+            padding: 0;
+        }
+
+        .card-header {
+            background-color: #0d6efd !important;
+            color: white !important;
+            padding: 2px 5px !important;
+            border-bottom: 1px solid #0d6efd;
+            margin-bottom: 1px;
+        }
+
+        .card-header h5 {
+            font-size: 10pt;
+            margin: 0;
+        }
+
+        .card-header h6 {
+            font-size: 8pt;
+            margin: 0;
+        }
+
+        .card-body {
+            padding: 2px 5px !important;
         }
 
         .section-break {
             page-break-inside: avoid;
+            margin-bottom: 2px;
         }
 
-        table {
-            page-break-inside: avoid;
+        h5 {
+            font-size: 10pt;
+            margin-bottom: 2px;
+        }
+
+        .mb-3, .mb-4 {
+            margin-bottom: 2px !important;
+        }
+
+        .mb-2 {
+            margin-bottom: 1px !important;
+        }
+
+        .mt-2, .mt-3 {
+            margin-top: 2px !important;
+        }
+
+        .mt-4 {
+            margin-top: 3px !important;
+        }
+
+        .row {
+            margin-bottom: 1px;
+            display: flex;
+            flex-wrap: wrap;
+        }
+
+        .row.g-2 {
+            margin-bottom: 0;
+        }
+
+        .row.g-2 > * {
+            padding: 0px;
+        }
+
+        .col-md-6 {
+            flex: 0 0 50%;
+            max-width: 50%;
+            padding: 0px 2px;
+        }
+
+        .col-md-4 {
+            flex: 0 0 33.333%;
+            max-width: 33.333%;
+            padding: 0px 2px;
+        }
+
+        .col-md-3 {
+            flex: 0 0 25%;
+            max-width: 25%;
+            padding: 0px 2px;
+        }
+
+        .col-md-12 {
+            flex: 0 0 100%;
+            max-width: 100%;
+            padding: 0px 2px;
+        }
+
+        .table {
+            font-size: 7pt;
+            margin-bottom: 1px;
+            width: 100%;
+            table-layout: fixed;
+            border-collapse: collapse;
+        }
+
+        .table th, .table td {
+            padding: 0px 2px;
+            white-space: nowrap;
+            line-height: 1.0;
+            height: auto;
+            min-height: 0;
+        }
+
+        .table tbody tr {
+            height: auto;
+        }
+
+        .table thead tr {
+            height: auto;
+        }
+
+        .badge {
+            font-size: 7pt;
+            padding: 1px 3px;
+        }
+
+        .alert {
+            padding: 3px 5px;
+            margin-bottom: 2px;
+        }
+
+        img {
+            max-width: 150px !important;
+            max-height: 150px !important;
+        }
+
+        .text-muted {
+            font-size: 7pt;
+        }
+
+        .small, small {
+            font-size: 6pt;
+        }
+
+        .fs-5 {
+            font-size: 9pt;
+        }
+
+        .fs-6 {
+            font-size: 8pt;
+        }
+
+        h2 {
+            font-size: 12pt;
+        }
+
+        h6 {
+            font-size: 8pt;
+        }
+
+        code {
+            padding: 0 2px;
+            font-size: 7pt;
+        }
+
+        p {
+            margin-bottom: 1px;
+            display: inline;
+        }
+
+        label.fw-bold {
+            display: inline;
+            margin-right: 3px;
+        }
+
+        /* Ensure background colors print */
+        .table-primary {
+            background-color: #cfe2ff !important;
+        }
+
+        .table-light {
+            background-color: #f8f9fa !important;
+        }
+
+        /* Better table spacing */
+        .table-bordered {
+            border: 1px solid #333;
+        }
+
+        .table-bordered th,
+        .table-bordered td {
+            border: 1px solid #333;
+        }
+
+        /* Remove table top spacing */
+        .table-responsive {
+            margin-top: 0;
+            overflow-x: auto;
+        }
+
+        /* Compact lists */
+        ul, ol {
+            margin-bottom: 1px;
+            padding-left: 10px;
+        }
+
+        li {
+            margin-bottom: 0;
         }
     }
 </style>

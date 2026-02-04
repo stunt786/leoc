@@ -1528,8 +1528,11 @@ def toggle_lock_distribution(id):
             return jsonify({'success': False, 'message': 'वितरण रेकर्ड फेला परेन'}), 404
 
         # Get the unlock key from request
-        data = request.get_json()
+        data = request.get_json(silent=True)
         unlock_key = data.get('unlock_key') if data else None
+        
+        if not unlock_key:
+            return jsonify({'success': False, 'message': 'अनलक कुञ्जी आवश्यक छ'}), 400
 
         # Check if the key is correct (in a real app, this would be more secure)
         # For now, we'll use a simple hardcoded key from environment variable
@@ -1662,6 +1665,24 @@ def set_setting(key):
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 400
+
+@app.route('/api/verify-unlock-key', methods=['POST'])
+@csrf.exempt
+def verify_unlock_key():
+    try:
+        data = request.get_json(silent=True)
+        if not data:
+            return jsonify({'success': False, 'message': 'No data provided'}), 400
+        
+        provided_key = data.get('unlock_key')
+        correct_key = os.getenv('UNLOCK_KEY', 'admin123')
+        
+        if provided_key == correct_key:
+            return jsonify({'success': True, 'message': 'पासवर्ड प्रमाणित भयो'})
+        else:
+            return jsonify({'success': False, 'message': 'गलत पासवर्ड'}), 401
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 # ============================================
 # Disaster APIs
@@ -2000,8 +2021,11 @@ def toggle_lock_disaster(id):
             return jsonify({'success': False, 'message': 'विपद् घटना रेकर्ड फेला परेन'}), 404
 
         # Get the unlock key from request
-        data = request.get_json()
+        data = request.get_json(silent=True)
         unlock_key = data.get('unlock_key') if data else None
+        
+        if not unlock_key:
+            return jsonify({'success': False, 'message': 'अनलक कुञ्जी आवश्यक छ'}), 400
 
         # Check if the key is correct
         correct_unlock_key = os.getenv('UNLOCK_KEY', 'admin123')
@@ -2302,8 +2326,11 @@ def toggle_lock_event_log(id):
             return jsonify({'success': False, 'message': 'Event log not found'}), 404
 
         # Get the unlock key from request
-        data = request.get_json()
+        data = request.get_json(silent=True)
         unlock_key = data.get('unlock_key') if data else None
+        
+        if not unlock_key:
+            return jsonify({'success': False, 'message': 'अनलक कुञ्जी आवश्यक छ'}), 400
 
         # Check if the key is correct (in a real app, this would be more secure)
         # For now, we'll use a simple hardcoded key from environment variable
@@ -2483,8 +2510,11 @@ def toggle_lock_situation_report(id):
             return jsonify({'success': False, 'message': 'Situation report not found'}), 404
 
         # Get the unlock key from request
-        data = request.get_json()
+        data = request.get_json(silent=True)
         unlock_key = data.get('unlock_key') if data else None
+        
+        if not unlock_key:
+            return jsonify({'success': False, 'message': 'अनलक कुञ्जी आवश्यक छ'}), 400
 
         # Check if the key is correct (in a real app, this would be more secure)
         # For now, we'll use a simple hardcoded key from environment variable
@@ -2732,8 +2762,11 @@ def toggle_lock_public_information(id):
             return jsonify({'success': False, 'message': 'Public information not found'}), 404
 
         # Get the unlock key from request
-        data = request.get_json()
+        data = request.get_json(silent=True)
         unlock_key = data.get('unlock_key') if data else None
+        
+        if not unlock_key:
+            return jsonify({'success': False, 'message': 'अनलक कुञ्जी आवश्यक छ'}), 400
 
         # Check if the key is correct (in a real app, this would be more secure)
         # For now, we'll use a simple hardcoded key from environment variable
@@ -2835,8 +2868,11 @@ def toggle_lock_ssf_beneficiary(id):
             return jsonify({'success': False, 'message': 'सामाजिक सुरक्षा लाभग्राही फेला परेन'}), 404
 
         # Get the unlock key from request
-        data = request.get_json()
+        data = request.get_json(silent=True)
         unlock_key = data.get('unlock_key') if data else None
+        
+        if not unlock_key:
+            return jsonify({'success': False, 'message': 'अनलक कुञ्जी आवश्यक छ'}), 400
 
         # Check if the key is correct
         correct_unlock_key = os.getenv('UNLOCK_KEY', 'admin123')
@@ -4074,8 +4110,12 @@ def toggle_lock_inventory(id):
         item = InventoryItem.query.get(id)
         if not item:
             return jsonify({'success': False, 'message': 'सामग्री फेला परेन'}), 404
-        data = request.get_json()
-        unlock_key = data.get('unlock_key')
+        data = request.get_json(silent=True)
+        unlock_key = data.get('unlock_key') if data else None
+        
+        if not unlock_key:
+            return jsonify({'success': False, 'message': 'अनलक कुञ्जी आवश्यक छ'}), 400
+            
         correct_unlock_key = os.getenv('UNLOCK_KEY', 'admin123')
         if unlock_key == correct_unlock_key:
             item.is_locked = not item.is_locked
@@ -4093,8 +4133,12 @@ def toggle_lock_fund(id):
         transaction = FundTransaction.query.get(id)
         if not transaction:
             return jsonify({'success': False, 'message': 'लेनदेन फेला परेन'}), 404
-        data = request.get_json()
-        unlock_key = data.get('unlock_key')
+        data = request.get_json(silent=True)
+        unlock_key = data.get('unlock_key') if data else None
+        
+        if not unlock_key:
+            return jsonify({'success': False, 'message': 'अनलक कुञ्जी आवश्यक छ'}), 400
+            
         correct_unlock_key = os.getenv('UNLOCK_KEY', 'admin123')
         if unlock_key == correct_unlock_key:
             transaction.is_locked = not transaction.is_locked
