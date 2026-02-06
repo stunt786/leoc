@@ -368,6 +368,24 @@
             color: white;
         }
 
+        .btn-image {
+            background-color: #28a745;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 11pt;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn-image:hover {
+            background-color: #218838;
+        }
+
         .date-selector {
             position: fixed;
             top: 20px;
@@ -436,11 +454,14 @@
     <!-- Print Actions -->
     <div class="print-actions no-print">
         <button class="btn-print" onclick="window.print()">
-            <i class="bi bi-printer"></i> प्रतिवेदन प्रिन्ट गर्नुहोस्
+            <i class="bi bi-printer"></i> प्रतिवेदन प्रिन्ट
         </button>
-        <a href="/api/generate-daily-report?from_bs_date={{ start_bs }}&to_bs_date={{ end_bs }}" class="btn-pdf">
-            <i class="bi bi-file-earmark-pdf"></i> PDF मा सुरक्षित गर्नुहोस्
-        </a>
+        <button class="btn-pdf" onclick="saveAsPDF()">
+            <i class="bi bi-download"></i> PDF
+        </button>
+        <button class="btn-image" onclick="saveAsImage()">
+            <i class="bi bi-download"></i> Image
+        </button>
     </div>
 
     <!-- Date Selector -->
@@ -785,7 +806,7 @@
                     else 'सामान्य' if advisory.priority == 'Normal' else advisory.priority }}
                 </span>
                 <br>
-                <small>{{ advisory.content[:200] }}{% if advisory.content|length > 200 %}...{% endif %}</small>
+                <small>{{ advisory.content[:300] }}{% if advisory.content|length > 300 %}...{% endif %}</small>
             </div>
         </div>
         {% endif %}
@@ -823,7 +844,10 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script>
+        window.jsPDF = window.jspdf.jsPDF;
         function applyFilter() {
             const fromDate = document.getElementById('fromDateBS').value;
             const toDate = document.getElementById('toDateBS').value;
@@ -838,6 +862,132 @@
                 alert('Please enter both From and To dates');
             }
         }
+
+        async function saveAsPDF() {
+            const reportContainer = document.querySelector('.container');
+            const fileName = 'Daily_Report_{{ start_bs }}{% if start_bs != end_bs %}_to_{{ end_bs }}{% endif %}.pdf';
+
+            const btn = event.currentTarget || event.target;
+            const originalContent = btn.innerHTML;
+            btn.innerHTML = '<i class="bi bi-hourglass-split"></i> तयार गर्दै...';
+            btn.disabled = true;
+
+            const a4WidthPx = 794;
+
+            try {
+                const canvas = await html2canvas(reportContainer, {
+                    scale: 2,
+                    useCORS: true,
+                    allowTaint: true,
+                    backgroundColor: '#ffffff',
+                    windowWidth: a4WidthPx,
+                    onclone: (clonedDoc) => {
+                        const clonedContainer = clonedDoc.querySelector('.container');
+                        if (clonedContainer) {
+                            clonedContainer.style.width = a4WidthPx + 'px';
+                            clonedContainer.style.maxWidth = 'none';
+                            clonedContainer.style.margin = '0 auto';
+                            clonedContainer.style.padding = '10mm';
+                        }
+                    }
+                });
+
+                const imgData = canvas.toDataURL('image/jpeg', 0.95);
+                const pdf = new jsPDF({
+                    orientation: 'portrait',
+                    unit: 'mm',
+                    format: 'a4'
+                });
+
+                const pdfWidth = pdf.internal.pageSize.getWidth();
+                const pdfHeight = pdf.internal.pageSize.getHeight();
+
+                // Set margins (15mm top & bottom)
+                const margin = 15;
+                const usableHeight = pdfHeight - (margin * 2);
+
+                const canvasWidth = canvas.width;
+                const canvasHeight = canvas.height;
+                const imgHeightOnPdf = (canvasHeight * pdfWidth) / canvasWidth;
+
+                let heightLeft = imgHeightOnPdf;
+                let position = margin;
+
+                const addMasks = (doc) => {
+                    doc.setFillColor(255, 255, 255);
+                    doc.rect(0, 0, pdfWidth, margin, 'F');
+                    doc.rect(0, pdfHeight - margin, pdfWidth, margin, 'F');
+                };
+
+                // Add first page
+                pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, imgHeightOnPdf);
+                addMasks(pdf);
+                heightLeft -= usableHeight;
+
+                // Add extra pages if content is long
+                while (heightLeft > 0) {
+                    pdf.addPage();
+                    position -= usableHeight;
+                    pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, imgHeightOnPdf);
+                    addMasks(pdf);
+                    heightLeft -= usableHeight;
+                }
+
+                pdf.save(fileName);
+            } catch (error) {
+                console.error('Error generating PDF:', error);
+                alert('PDF सुरक्षित गर्न समस्या भयो।');
+            } finally {
+                btn.innerHTML = originalContent;
+                btn.disabled = false;
+            }
+        }
+
+        async function saveAsImage() {
+            const reportContainer = document.querySelector('.container');
+            const fileName = 'Daily_Report_{{ start_bs }}{% if start_bs != end_bs %}_to_{{ end_bs }}{% endif %}.png';
+
+            const btn = event.currentTarget || event.target;
+            const originalContent = btn.innerHTML;
+            btn.innerHTML = '<i class="bi bi-hourglass-split"></i> तयार गर्दै...';
+            btn.disabled = true;
+
+            const a4Width = 794;
+
+            try {
+                const canvas = await html2canvas(reportContainer, {
+                    scale: 2,
+                    useCORS: true,
+                    allowTaint: true,
+                    backgroundColor: '#ffffff',
+                    windowWidth: a4Width,
+                    onclone: (clonedDoc) => {
+                        const clonedContainer = clonedDoc.querySelector('.container');
+                        if (clonedContainer) {
+                            clonedContainer.style.width = a4Width + 'px';
+                            clonedContainer.style.maxWidth = 'none';
+                            clonedContainer.style.padding = '20px';
+                        }
+                    }
+                });
+
+                canvas.toBlob(blob => {
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = fileName;
+                    link.click();
+                    URL.revokeObjectURL(url);
+                }, 'image/png');
+            } catch (error) {
+                console.error('Error generating image:', error);
+                alert('Image सुरक्षित गर्न समस्या भयो।');
+            } finally {
+                btn.innerHTML = originalContent;
+                btn.disabled = false;
+            }
+        }
+
 
         // Auto-print on load if requested
         if (window.location.search.includes('autoprint=1')) {

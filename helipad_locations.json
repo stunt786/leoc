@@ -1,0 +1,135 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "ward": 1,
+        "place": "Motipur",
+        "open_area": 550,
+        "road_access": "Yes"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [80.924942, 29.451532]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "ward": 2,
+        "place": "Bagada",
+        "open_area": 800,
+        "road_access": "Yes"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [80.943611, 29.449094]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "ward": 3,
+        "place": "Khuidhar",
+        "open_area": 700,
+        "road_access": "Yes"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [81.009225, 29.457744]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "ward": 4,
+        "place": "Mahendradhar",
+        "open_area": 1200,
+        "road_access": "Yes"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [80.980267, 29.451916]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "ward": 5,
+        "place": "Kholi",
+        "open_area": 500,
+        "road_access": "No"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [81.025833, 29.465581]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "ward": 6,
+        "place": "Jhanana",
+        "open_area": 800,
+        "road_access": "Yes"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [81.035955, 29.478891]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "ward": 7,
+        "place": "Madukatne",
+        "open_area": 1500,
+        "road_access": "Yes"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [81.060209, 29.458817]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "ward": 7,
+        "place": "Gadabaaj Army Barack",
+        "open_area": 50,
+        "road_access": "No"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [81.093285, 29.443125]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "ward": 8,
+        "place": "Panditgaun",
+        "open_area": 140,
+        "road_access": "No"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [81.054485, 29.460225]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "ward": 9,
+        "place": "Kulakatne",
+        "open_area": 210,
+        "road_access": "Yes"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [81.067811, 29.488495]
+      }
+    }
+  ]
+}

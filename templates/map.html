@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,24 +9,28 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
     <style>
-        html, body {
+        html,
+        body {
             height: 100%;
             margin: 0;
             padding: 0;
             overflow: hidden;
         }
+
         #map {
             height: 100vh;
             width: 100%;
         }
+
         .legend {
             padding: 6px 8px;
             font: 14px Arial, Helvetica, sans-serif;
             background: white;
-            background: rgba(255,255,255,0.8);
-            box-shadow: 0 0 15px rgba(0,0,0,0.2);
+            background: rgba(255, 255, 255, 0.8);
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
             border-radius: 5px;
         }
+
         .legend i {
             width: 18px;
             height: 18px;
@@ -33,6 +38,7 @@
             margin-right: 8px;
             opacity: 0.7;
         }
+
         .loading-overlay {
             position: absolute;
             top: 0;
@@ -46,12 +52,14 @@
             z-index: 1000;
             display: none;
         }
+
         .spinner-border {
             width: 3rem;
             height: 3rem;
         }
     </style>
 </head>
+
 <body>
     <div id="map"></div>
     <div class="loading-overlay" id="loadingOverlay">
@@ -98,6 +106,7 @@
         // Define marker clusters for better performance
         const distributionMarkers = L.layerGroup().addTo(map);
         const disasterMarkers = L.layerGroup().addTo(map);
+        const helipadMarkers = L.layerGroup().addTo(map);
         const wardBoundaries = L.layerGroup().addTo(map);
         const boundaryLayer = L.layerGroup();  // This is the layer group for municipality boundary (not added to map by default)
 
@@ -105,10 +114,11 @@
         const overlays = {
             "Relief Distributions": distributionMarkers,
             "Disasters": disasterMarkers,
+            "Helipads": helipadMarkers,
             "Wards": wardBoundaries,
             "Thalara Boundary": boundaryLayer
         };
-        L.control.layers(null, overlays, {collapsed: false}).addTo(map);
+        L.control.layers(null, overlays, { collapsed: false }).addTo(map);
 
         // Function to show loading overlay
         function showLoading() {
@@ -149,6 +159,18 @@
             `;
         }
 
+        function formatHelipadTooltip(helipad) {
+            return `
+                <div>
+                    <h5 style="margin: 0 0 10px 0; color: #198754; border-bottom: 2px solid #198754; padding-bottom: 5px; font-size: 16px;">🚁 Helipad Location</h5>
+                    <p style="margin: 5px 0; font-size: 14px;"><b>Place:</b> ${helipad.place}</p>
+                    <p style="margin: 5px 0; font-size: 14px;"><b>Ward:</b> ${helipad.ward}</p>
+                    <p style="margin: 5px 0; font-size: 14px;"><b>Open Area:</b> ${helipad.open_area} m²</p>
+                    <p style="margin: 5px 0; font-size: 14px;"><b>Road Access:</b> ${helipad.road_access}</p>
+                </div>
+            `;
+        }
+
         // Function to load map data
         async function loadMapData() {
             showLoading();
@@ -168,16 +190,16 @@
                         const marker = L.marker([dist.latitude, dist.longitude], {
                             icon: L.divIcon({
                                 className: 'custom-div-icon',
-                                html: "<div class='marker-pin' style='background-color:#dc3545; width: 32px; height: 32px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); display: flex; align-items: center; justify-content: center;'><i class='bi bi-home' style='transform: rotate(45deg); color:white !important; font-size:18px; line-height:1;'></i></div>",
-                                iconSize: [32, 32],
-                                iconAnchor: [16, 32]
+                                html: "<div style='background-color:#dc3545; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.3);'><i class='bi bi-house-fill' style='color:white; font-size:20px;'></i></div>",
+                                iconSize: [36, 36],
+                                iconAnchor: [18, 18]
                             })
                         })
-                        .bindTooltip(formatDistributionTooltip(dist), {
-                            permanent: false,
-                            direction: 'top',
-                            className: 'custom-tooltip'
-                        });
+                            .bindTooltip(formatDistributionTooltip(dist), {
+                                permanent: false,
+                                direction: 'top',
+                                className: 'custom-tooltip'
+                            });
 
                         distributionMarkers.addLayer(marker);
                     });
@@ -187,16 +209,16 @@
                         const marker = L.marker([disaster.latitude, disaster.longitude], {
                             icon: L.divIcon({
                                 className: 'custom-div-icon',
-                                html: "<div class='marker-pin' style='background-color:#0d6efd; width: 32px; height: 32px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); display: flex; align-items: center; justify-content: center;'><i class='bi bi-home' style='transform: rotate(45deg); color:white !important; font-size:18px; line-height:1;'></i></div>",
-                                iconSize: [30, 30],
-                                iconAnchor: [15, 30]
+                                html: "<div style='background-color:#ff6b35; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.3);'><i class='bi bi-exclamation-triangle-fill' style='color:white; font-size:20px;'></i></div>",
+                                iconSize: [36, 36],
+                                iconAnchor: [18, 18]
                             })
                         })
-                        .bindTooltip(formatDisasterTooltip(disaster), {
-                            permanent: false,
-                            direction: 'top',
-                            className: 'custom-tooltip'
-                        });
+                            .bindTooltip(formatDisasterTooltip(disaster), {
+                                permanent: false,
+                                direction: 'top',
+                                className: 'custom-tooltip'
+                            });
 
                         disasterMarkers.addLayer(marker);
                     });
@@ -227,7 +249,7 @@
                         wardBoundaries.clearLayers();
 
                         L.geoJSON(wardsData, {
-                            style: function(feature) {
+                            style: function (feature) {
                                 return {
                                     fillColor: '#ffeb3b',
                                     color: '#fbc02d',
@@ -235,7 +257,7 @@
                                     fillOpacity: 0.15
                                 };
                             },
-                            onEachFeature: function(feature, layer) {
+                            onEachFeature: function (feature, layer) {
                                 // Add tooltip
                                 if (feature.properties && feature.properties.name) {
                                     layer.bindTooltip(`Ward: ${feature.properties.name}`, {
@@ -248,13 +270,13 @@
 
                                 // Highlight on mouseover
                                 layer.on({
-                                    mouseover: function(e) {
+                                    mouseover: function (e) {
                                         this.setStyle({
                                             weight: 2.5,
                                             fillOpacity: 0.25
                                         });
                                     },
-                                    mouseout: function(e) {
+                                    mouseout: function (e) {
                                         this.setStyle({
                                             weight: 1.5,
                                             fillOpacity: 0.15
@@ -276,7 +298,7 @@
 
                         // Create new boundary geojson layer
                         const newBoundaryLayer = L.geoJSON(boundaryData, {
-                            style: function(feature) {
+                            style: function (feature) {
                                 return {
                                     fillColor: 'transparent',
                                     color: '#0d6efd',
@@ -284,7 +306,7 @@
                                     opacity: 0.8
                                 };
                             },
-                            onEachFeature: function(feature, layer) {
+                            onEachFeature: function (feature, layer) {
                                 layer.bindPopup('<b>Thalara Municipality Boundary</b>');
                             }
                         });
@@ -337,7 +359,7 @@
                                     map.fitBounds(boundaryBounds);
 
                                     // Add event listener to enforce bounds
-                                    map.on('moveend', function() {
+                                    map.on('moveend', function () {
                                         if (!boundaryBounds.contains(map.getBounds().getNorthWest()) ||
                                             !boundaryBounds.contains(map.getBounds().getSouthEast())) {
                                             map.fitBounds(boundaryBounds, { animate: false });
@@ -349,6 +371,39 @@
                     }
                 } catch (error) {
                     console.error('Error loading municipality boundary:', error);
+                }
+
+                // Load helipad locations
+                try {
+                    const helipadResponse = await fetch('/helipad_locations.json');
+                    if (helipadResponse.ok) {
+                        const helipadData = await helipadResponse.json();
+
+                        helipadMarkers.clearLayers();
+
+                        helipadData.features.forEach(feature => {
+                            const props = feature.properties;
+                            const coords = feature.geometry.coordinates;
+
+                            const marker = L.marker([coords[1], coords[0]], {
+                                icon: L.divIcon({
+                                    className: 'custom-div-icon',
+                                    html: "<div style='background-color:#198754; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.3);'><span style='color:white; font-size:22px;'>🚁</span></div>",
+                                    iconSize: [36, 36],
+                                    iconAnchor: [18, 18]
+                                })
+                            })
+                                .bindTooltip(formatHelipadTooltip(props), {
+                                    permanent: false,
+                                    direction: 'top',
+                                    className: 'custom-tooltip'
+                                });
+
+                            helipadMarkers.addLayer(marker);
+                        });
+                    }
+                } catch (error) {
+                    console.error('Error loading helipad locations:', error);
                 }
 
             } catch (error) {
@@ -367,7 +422,7 @@
         });
 
         // Add zoom restriction to prevent zooming out too far
-        map.on('zoomend', function() {
+        map.on('zoomend', function () {
             if (map.getZoom() < 10) {
                 map.setZoom(10);
             }
@@ -387,33 +442,13 @@
                 color: #333 !important;
                 max-width: 350px !important;
             }
-            .marker-pin {
-                position: relative;
-                overflow: visible;
-                display: flex !important;
-                align-items: center !important;
-                justify-content: center !important;
-            }
-            .marker-pin i {
-                display: flex;
-                align-items: center;
-                justify-content: center;
-            }
-            .marker-pin:after {
-                content: "";
-                position: absolute;
-                top: 100%;
-                left: 50%;
-                transform: translateX(-50%);
-                width: 0;
-                height: 0;
-                border-left: 5px solid transparent;
-                border-right: 5px solid transparent;
-                border-top: 5px solid currentColor;
-                filter: brightness(30%);
+            .custom-div-icon {
+                background: transparent !important;
+                border: none !important;
             }
         `;
         document.head.appendChild(style);
     </script>
 </body>
+
 </html>

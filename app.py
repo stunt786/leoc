@@ -28,40 +28,37 @@ import os
 def register_unicode_fonts():
     """Register fonts that support Unicode/Devanagari characters."""
     try:
-        # Try to use system fonts that support Devanagari
-        font_paths = [
-            # Linux system fonts
-            '/usr/share/fonts/truetype/noto/NotoSansDevanagari-Regular.ttf',
-            '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
-            '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf',
-            # Windows fonts
-            'C:/Windows/Fonts/arial.ttf',
-            'C:/Windows/Fonts/segoeui.ttf',
-            # macOS fonts
-            '/System/Library/Fonts/Helvetica.ttc',
-            '/Library/Fonts/Arial.ttf',
-        ]
+        # Use FreeSans which has good coverage for both English and Devanagari
+        font_paths = {
+            'FreeSans': '/usr/share/fonts/truetype/freefont/FreeSans.ttf',
+            'FreeSansBold': '/usr/share/fonts/truetype/freefont/FreeSansBold.ttf'
+        }
         
-        registered_font = None
-        for font_path in font_paths:
-            if os.path.exists(font_path):
+        registered_fonts = {}
+        for name, path in font_paths.items():
+            if os.path.exists(path):
                 try:
-                    font_name = os.path.basename(font_path).replace('.ttf', '').replace('.ttc', '')
-                    pdfmetrics.registerFont(TTFont(font_name, font_path))
-                    registered_font = font_name
-                    print(f"Registered font: {font_name} from {font_path}")
-                    break
+                    pdfmetrics.registerFont(TTFont(name, path))
+                    registered_fonts[name] = name
+                    print(f"Registered font: {name} from {path}")
                 except Exception as e:
-                    print(f"Failed to register font {font_path}: {e}")
-                    continue
+                    print(f"Failed to register font {path}: {e}")
         
-        return registered_font
+        if 'FreeSans' in registered_fonts and 'FreeSansBold' in registered_fonts:
+            # Register them as a family so ReportLab can switch between normal and bold
+            pdfmetrics.registerFontFamily('FreeSans', normal='FreeSans', bold='FreeSansBold')
+            return 'FreeSans'
+        elif 'FreeSans' in registered_fonts:
+            return 'FreeSans'
+            
+        return None
     except Exception as e:
         print(f"Error registering fonts: {e}")
         return None
 
 # Register fonts at module load
 UNICODE_FONT = register_unicode_fonts()
+UNICODE_FONT_BOLD = 'FreeSansBold' if UNICODE_FONT else None
 
 # Load environment variables from .env file
 load_dotenv()
@@ -692,6 +689,10 @@ def get_wards_json():
 @app.route('/thalara_boundary.json')
 def get_boundary_json():
     return send_from_directory('.', 'thalara_boundary.json')
+
+@app.route('/helipad_locations.json')
+def get_helipad_json():
+    return send_from_directory('.', 'helipad_locations.json')
 
 @app.route('/form')
 def form():
@@ -3423,7 +3424,7 @@ def generate_pdf_report(data, start_date, end_date=None, start_bs=None, end_bs=N
     
     # Determine font names based on availability
     font_name = UNICODE_FONT if UNICODE_FONT else 'Helvetica'
-    font_name_bold = UNICODE_FONT if UNICODE_FONT else 'Helvetica-Bold'
+    font_name_bold = UNICODE_FONT_BOLD if UNICODE_FONT_BOLD else 'Helvetica-Bold'
     
     # Custom styles with Unicode support
     title_style = ParagraphStyle(
