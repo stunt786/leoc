@@ -4,6 +4,8 @@ from flask_wtf.csrf import CSRFProtect
 from datetime import datetime, date, timedelta
 import os
 import json
+import csv
+import io
 import logging
 import folium
 from folium import plugins
@@ -341,6 +343,8 @@ class Disaster(db.Model):
     # Additional disaster impact fields
     deaths = db.Column(db.Integer, default=0)
     missing_persons = db.Column(db.Integer, default=0)
+    injured = db.Column(db.Integer, default=0)
+    casualties = db.Column(db.Integer, default=0)
     road_blocked_status = db.Column(db.Boolean, default=False)
     electricity_blocked_status = db.Column(db.Boolean, default=False)
     communication_blocked_status = db.Column(db.Boolean, default=False)
@@ -383,6 +387,8 @@ class Disaster(db.Model):
             'affected_people': self.affected_people,
             'deaths': self.deaths,
             'missing_persons': self.missing_persons,
+            'injured': self.injured,
+            'casualties': self.casualties,
             'road_blocked_status': self.road_blocked_status,
             'electricity_blocked_status': self.electricity_blocked_status,
             'communication_blocked_status': self.communication_blocked_status,
@@ -1697,7 +1703,7 @@ def get_disasters():
         per_page = request.args.get('per_page', 10, type=int)
 
         # Build query
-        query = Disaster.query.order_by(Disaster.disaster_date.desc())
+        query = Disaster.query.order_by(Disaster.created_at.desc())
 
         # Paginate
         pagination = query.paginate(page=page, per_page=per_page, error_out=False)
@@ -1713,6 +1719,42 @@ def get_disasters():
                 'has_prev': pagination.has_prev
             }
         })
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+@app.route('/api/disasters/export/excel', methods=['GET'])
+def export_disasters_csv():
+    try:
+        disasters = Disaster.query.order_by(Disaster.created_at.desc()).all()
+        
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        # Headers - automatically get all column names from the Disaster model
+        headers = [column.name for column in Disaster.__table__.columns]
+        writer.writerow(headers)
+        
+        for disaster in disasters:
+            row = [getattr(disaster, header) for header in headers]
+            # Format dates for Excel compatibility
+            formatted_row = []
+            for item in row:
+                if isinstance(item, (date, datetime)):
+                    formatted_row.append(item.strftime('%Y-%m-%d %H:%M:%S'))
+                else:
+                    formatted_row.append(item)
+            writer.writerow(formatted_row)
+            
+        output.seek(0)
+        
+        return make_response(
+            output.getvalue(),
+            200,
+            {
+                'Content-Type': 'text/csv',
+                'Content-Disposition': 'attachment; filename=disasters_export.csv'
+            }
+        )
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 400
 
@@ -1756,6 +1798,8 @@ def get_disaster_statistics():
         total_public_buildings_damaged = sum(d.public_building_damage for d in filtered_disasters)
         total_livestock_injured = sum(d.livestock_injured for d in filtered_disasters)
         total_livestock_death = sum(d.livestock_death for d in filtered_disasters)
+        total_injured = sum(d.injured for d in filtered_disasters)
+        total_casualties = sum(d.casualties for d in filtered_disasters)
         
         # Livestock breakdown totals
         total_cattle_lost = sum(d.cattle_lost or 0 for d in filtered_disasters)
@@ -1826,6 +1870,8 @@ def get_disaster_statistics():
             'total_public_buildings_damaged': total_public_buildings_damaged,
             'total_livestock_injured': total_livestock_injured,
             'total_livestock_death': total_livestock_death,
+            'total_injured': total_injured,
+            'total_casualties': total_casualties,
             'total_cattle_lost': total_cattle_lost,
             'total_cattle_injured': total_cattle_injured,
             'total_poultry_lost': total_poultry_lost,
@@ -1970,6 +2016,8 @@ def add_disaster_report():
             affected_people=int(data.get('affected_people', 0)),
             deaths=int(data.get('deaths', 0)),
             missing_persons=int(data.get('missing_persons', 0)),
+            injured=int(data.get('injured', 0)),
+            casualties=int(data.get('casualties', 0)),
             road_blocked_status=bool(data.get('road_blocked_status', False)),
             electricity_blocked_status=bool(data.get('electricity_blocked_status', False)),
             communication_blocked_status=bool(data.get('communication_blocked_status', False)),
@@ -3080,6 +3128,15 @@ def init_db():
                 db.session.execute(text("ALTER TABLE disaster ADD COLUMN disaster_date_bs VARCHAR(10)"))
                 print("Added disaster_date_bs column to disaster table")
 
+            # Check and add injured and casualties columns to disaster table
+            if 'injured' not in columns:
+                db.session.execute(text("ALTER TABLE disaster ADD COLUMN injured INTEGER DEFAULT 0"))
+                print("Added injured column to disaster table")
+            
+            if 'casualties' not in columns:
+                db.session.execute(text("ALTER TABLE disaster ADD COLUMN casualties INTEGER DEFAULT 0"))
+                print("Added casualties column to disaster table")
+
             # Check and add is_locked column to event_log table
             result = db.session.execute(text("PRAGMA table_info(event_log)"))
             columns = [row[1] for row in result.fetchall()]
@@ -3246,7 +3303,13 @@ def fetch_daily_report_data(start_date, end_date, start_bs=None, end_bs=None):
             PublicInformation.valid_until == None,
             PublicInformation.valid_until >= report_start_datetime
         )
-    ).order_by(PublicInformation.priority.desc(), PublicInformation.created_at.desc()).limit(5).all()
+    ).all()
+    
+    # Sort by creation date only (latest first)
+    public_advisories.sort(key=lambda x: x.created_at, reverse=True)
+    
+    # Take the top 5 (template will only show 1)
+    public_advisories = public_advisories[:5]
     
     # Calculate ward-wise statistics
     ward_stats = {}
@@ -3256,7 +3319,7 @@ def fetch_daily_report_data(start_date, end_date, start_bs=None, end_bs=None):
             'total_incidents': len(ward_disasters),
             'deaths': sum(d.deaths for d in ward_disasters),
             'missing': sum(d.missing_persons for d in ward_disasters),
-            'injured': sum(d.livestock_injured for d in ward_disasters), # Using livestock injured as human injured placeholder if needed
+            'injured': sum(d.injured for d in ward_disasters), 
             'estimated_loss': sum(d.estimated_loss for d in ward_disasters if d.estimated_loss),
             'road_blocked': any(d.road_blocked_status for d in ward_disasters),
             'electricity_blocked': any(d.electricity_blocked_status for d in ward_disasters),
@@ -3276,13 +3339,17 @@ def fetch_daily_report_data(start_date, end_date, start_bs=None, end_bs=None):
         }
     
     # Calculate disaster type statistics
-    disaster_types = set()
+    # Fetch all disaster types from settings to ensure all categories are reflected
+    disaster_types_from_settings = AppSettings.get_setting('disaster_types', [])
+    # Normalize types from settings
+    disaster_types = [t.strip().title() for t in disaster_types_from_settings]
+    
+    # Add any types that exist in the current disasters list but not in settings (for completeness)
     for d in disasters:
         if d.disaster_type:
             dtype_normalized = d.disaster_type.lower().replace('_', ' ').title()
-            disaster_types.add(dtype_normalized)
-    
-    disaster_types = list(disaster_types) if disaster_types else []
+            if dtype_normalized not in disaster_types:
+                disaster_types.append(dtype_normalized)
 
     # Get or create Sit Rep count (only for daily reports, not ranges)
     sit_rep_no = "N/A"
@@ -3305,18 +3372,19 @@ def fetch_daily_report_data(start_date, end_date, start_bs=None, end_bs=None):
     
     type_stats = {}
     for dtype in disaster_types:
-        type_disasters = [d for d in disasters if d.disaster_type and
-                         (dtype.lower() in d.disaster_type.lower() or
-                          d.disaster_type.lower() in dtype.lower())]
+        # Match by normalized type
+        type_disasters = [d for d in disasters if d.disaster_type and 
+                          d.disaster_type.lower().replace('_', ' ').title() == dtype]
+        
         type_stats[dtype] = {
             'total': len(type_disasters),
-            'male_death': sum(d.deaths for d in type_disasters),
+            'male_death': sum(d.deaths for d in type_disasters), # We don't have separate male/female death in model yet
             'female_death': 0,
             'missing': sum(d.missing_persons for d in type_disasters),
-            'male_injured': sum(d.livestock_injured for d in type_disasters),
+            'male_injured': sum(d.injured for d in type_disasters), # Using human injured field
             'female_injured': 0,
             'affected_families': sum(d.affected_households for d in type_disasters),
-            'house_damaged': sum(d.public_building_damage for d in type_disasters),
+            'house_damaged': sum(d.public_building_damage for d in type_disasters), # Fix: should be house_damage if exists, using public as fallback
             'house_destroyed': sum(d.public_building_destruction for d in type_disasters),
             'public_building_damaged': sum(d.public_building_damage for d in type_disasters),
             'public_building_destroyed': sum(d.public_building_destruction for d in type_disasters),
@@ -3343,9 +3411,11 @@ def fetch_daily_report_data(start_date, end_date, start_bs=None, end_bs=None):
             'incidents': len(disasters),
             'deaths': sum(d.deaths for d in disasters),
             'missing': sum(d.missing_persons for d in disasters),
-            'injured': sum(d.livestock_injured for d in disasters),
+            'injured': sum(d.injured for d in disasters),
             'affected_households': sum(d.affected_households for d in disasters),
             'affected_people': sum(d.affected_people for d in disasters),
+            'livestock_death': sum(d.livestock_death for d in disasters),
+            'livestock_injured': sum(d.livestock_injured for d in disasters),
             'estimated_loss': sum(d.estimated_loss for d in disasters if d.estimated_loss)
         },
         'disasters': [d.to_dict() for d in disasters],
@@ -3354,18 +3424,7 @@ def fetch_daily_report_data(start_date, end_date, start_bs=None, end_bs=None):
         'event_logs': [e.to_dict() for e in event_logs],
         'situation_report': situation_report.to_dict() if situation_report else None,
         'public_advisories': [p.to_dict() for p in public_advisories],
-        'infrastructure': infrastructure,
-        'total_stats': {
-            'incidents': len(disasters),
-            'deaths': sum(d.deaths for d in disasters),
-            'missing': sum(d.missing_persons for d in disasters),
-            'injured': sum(d.livestock_injured for d in disasters),
-            'affected_people': sum(d.affected_people_male + d.affected_people_female for d in disasters),
-            'affected_households': sum(d.affected_households for d in disasters),
-            'livestock_death': sum(d.livestock_death for d in disasters),
-            'livestock_injured': sum(d.livestock_injured for d in disasters),
-            'estimated_loss': sum(d.estimated_loss for d in disasters if d.estimated_loss),
-        }
+        'infrastructure': infrastructure
     }
 
 

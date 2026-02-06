@@ -110,6 +110,10 @@
 
     .disaster-type-badge {
         font-size: 0.8em;
+        background-color: #4a69bd !important;
+        color: white !important;
+        padding: 0.4em 0.8em;
+        border-radius: 4px;
     }
 
     .navbar-brand {
@@ -330,6 +334,9 @@
                     <a href="/api/generate-daily-report" class="btn btn-outline-danger">
                         <i class="bi bi-file-earmark-pdf"></i> PDF डाउनलोड
                     </a>
+                    <a href="/api/disasters/export/excel" class="btn btn-outline-success">
+                        <i class="bi bi-file-earmark-spreadsheet"></i> Excel निर्यात
+                    </a>
                 </div>
             </div>
 
@@ -466,6 +473,12 @@
                                     </tbody>
                                 </table>
                             </div>
+                            <!-- Pagination -->
+                            <nav aria-label="Incident pagination" class="mt-4">
+                                <ul class="pagination justify-content-center" id="incident-pagination">
+                                    <!-- Pagination buttons will be injected here -->
+                                </ul>
+                            </nav>
                         </div>
                     </div>
                 </div>
@@ -1330,6 +1343,8 @@
     let humanImpactChart = null;
     let damageAssessmentChart = null;
     let livestockDamageChart = null;
+    let currentPage = 1;
+    const perPage = 10;
 
     // Load disaster types from settings
     async function loadDisasterTypes() {
@@ -1721,7 +1736,8 @@
     }
 
     // Load data from API
-    async function loadData() {
+    async function loadData(page = 1) {
+        currentPage = page;
         try {
             // Load disaster statistics
             const statsResponse = await fetch('/api/disaster-statistics');
@@ -1731,12 +1747,13 @@
             updateStatsUI(statsData);
 
             // Load disaster data for recent incidents and charts
-            const response = await fetch('/api/disasters');
+            const response = await fetch(`/api/disasters?page=${currentPage}&per_page=${perPage}`);
             const data = await response.json();
 
             if (data.disasters) {
                 renderRecentIncidents(data.disasters);
                 renderCharts(data.disasters, statsData);
+                renderPagination(data.pagination);
             }
 
             // Load situation report data
@@ -1781,7 +1798,7 @@
         if (displacedEl) displacedEl.textContent = statsData.total_affected_people || 0; // Proxy
 
         const injuredEl = document.getElementById('injured');
-        if (injuredEl) injuredEl.textContent = 0; // Not in model yet
+        if (injuredEl) injuredEl.textContent = statsData.total_injured || 0;
 
         const rescuedEl = document.getElementById('rescued');
         if (rescuedEl) rescuedEl.textContent = (statsData.total_affected_people || 0) - (statsData.total_deaths || 0); // Proxy
@@ -1860,10 +1877,7 @@
         const tbody = document.getElementById('recent-incidents-body');
         tbody.innerHTML = '';
 
-        // Sort by date (most recent first) and take the last 10
-        const recent = disasters.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 10);
-
-        recent.forEach(incident => {
+        disasters.forEach(incident => {
             const row = document.createElement('tr');
 
             // Format date - use BS date (disaster_date_bs) if available, otherwise fall back to AD date
@@ -1876,7 +1890,7 @@
             row.innerHTML = `
                     <td>${formattedDate}</td>
                     <td>${formattedTime}</td>
-                    <td><span class="badge bg-warning disaster-type-badge">${incident.disaster_type}</span></td>
+                    <td><span class="badge bg-primary disaster-type-badge">${incident.disaster_type}</span></td>
                     <td><span class="badge bg-info ward-badge">Ward ${incident.ward}</span></td>
                     <td>${incident.tole || incident.location || 'N/A'}</td>
                     <td>${estimatedLoss}</td>
@@ -1899,9 +1913,46 @@
             tbody.appendChild(row);
         });
 
-        if (recent.length === 0) {
+        if (disasters.length === 0) {
             tbody.innerHTML = '<tr><td colspan="8" class="text-center">No incidents reported</td></tr>';
         }
+    }
+
+    // Render pagination controls
+    function renderPagination(pagination) {
+        const paginationUl = document.getElementById('incident-pagination');
+        if (!paginationUl) return;
+
+        paginationUl.innerHTML = '';
+        if (pagination.pages <= 1) return;
+
+        // Previous button
+        const prevLi = document.createElement('li');
+        prevLi.className = `page-item ${!pagination.has_prev ? 'disabled' : ''}`;
+        prevLi.innerHTML = `<a class="page-link" href="#" onclick="loadData(${pagination.page - 1}); return false;">Previous</a>`;
+        paginationUl.appendChild(prevLi);
+
+        // Page numbers
+        for (let i = 1; i <= pagination.pages; i++) {
+            // Show only first, last, current, and pages around current
+            if (i === 1 || i === pagination.pages || (i >= pagination.page - 2 && i <= pagination.page + 2)) {
+                const pageLi = document.createElement('li');
+                pageLi.className = `page-item ${i === pagination.page ? 'active' : ''}`;
+                pageLi.innerHTML = `<a class="page-link" href="#" onclick="loadData(${i}); return false;">${i}</a>`;
+                paginationUl.appendChild(pageLi);
+            } else if (i === 2 || i === pagination.pages - 1) {
+                const ellipsisLi = document.createElement('li');
+                ellipsisLi.className = 'page-item disabled';
+                ellipsisLi.innerHTML = '<span class="page-link">...</span>';
+                paginationUl.appendChild(ellipsisLi);
+            }
+        }
+
+        // Next button
+        const nextLi = document.createElement('li');
+        nextLi.className = `page-item ${!pagination.has_next ? 'disabled' : ''}`;
+        nextLi.innerHTML = `<a class="page-link" href="#" onclick="loadData(${pagination.page + 1}); return false;">Next</a>`;
+        paginationUl.appendChild(nextLi);
     }
 
     // Helper function to determine severity class
