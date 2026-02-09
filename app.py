@@ -336,6 +336,7 @@ class Disaster(db.Model):
     fiscal_year = db.Column(db.String(20), index=True)  # Added index
     description = db.Column(db.Text)
     affected_households = db.Column(db.Integer, default=0)
+    house_destroyed = db.Column(db.Integer, default=0)  # Added missing field for fully damaged houses
     affected_people = db.Column(db.Integer, default=0)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)  # Added index
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, index=True)  # Added index
@@ -384,6 +385,7 @@ class Disaster(db.Model):
             'fiscal_year': self.fiscal_year,
             'description': self.description,
             'affected_households': self.affected_households,
+            'house_destroyed': self.house_destroyed,
             'affected_people': self.affected_people,
             'deaths': self.deaths,
             'missing_persons': self.missing_persons,
@@ -1794,6 +1796,7 @@ def get_disaster_statistics():
         total_deaths = sum(d.deaths for d in filtered_disasters)
         total_missing = sum(d.missing_persons for d in filtered_disasters)
         total_affected_households = sum(d.affected_households for d in filtered_disasters)
+        total_house_destroyed = sum(d.house_destroyed for d in filtered_disasters)
         total_public_buildings_destroyed = sum(d.public_building_destruction for d in filtered_disasters)
         total_public_buildings_damaged = sum(d.public_building_damage for d in filtered_disasters)
         total_livestock_injured = sum(d.livestock_injured for d in filtered_disasters)
@@ -1866,6 +1869,7 @@ def get_disaster_statistics():
             'total_deaths': total_deaths,
             'total_missing': total_missing,
             'total_affected_households': total_affected_households,
+            'total_house_destroyed': total_house_destroyed,
             'total_public_buildings_destroyed': total_public_buildings_destroyed,
             'total_public_buildings_damaged': total_public_buildings_damaged,
             'total_livestock_injured': total_livestock_injured,
@@ -1900,6 +1904,7 @@ def get_disaster_statistics():
             'total_deaths': 0,
             'total_missing': 0,
             'total_affected_households': 0,
+            'total_house_destroyed': 0,
             'total_public_buildings_destroyed': 0,
             'total_public_buildings_damaged': 0,
             'total_livestock_injured': 0,
@@ -2013,6 +2018,7 @@ def add_disaster_report():
             longitude=float(data.get('longitude')) if data.get('longitude') else None,
             description=data.get('description'),
             affected_households=int(data.get('affected_households', 0)),
+            house_destroyed=int(data.get('destroyed_houses', 0)),  # Map from form field
             affected_people=int(data.get('affected_people', 0)),
             deaths=int(data.get('deaths', 0)),
             missing_persons=int(data.get('missing_persons', 0)),
@@ -2149,6 +2155,9 @@ def edit_disaster(id):
         disaster.fiscal_year = data.get('fiscal_year', disaster.fiscal_year)
         disaster.description = data.get('description', disaster.description)
         disaster.affected_households = int(data.get('affected_households', disaster.affected_households))
+        # Handle destroyed_houses mapping
+        if 'destroyed_houses' in data:
+            disaster.house_destroyed = int(data.get('destroyed_houses', 0))
         disaster.affected_people = int(data.get('affected_people', disaster.affected_people))
         disaster.deaths = int(data.get('deaths', disaster.deaths))
         disaster.missing_persons = int(data.get('missing_persons', disaster.missing_persons))
@@ -3027,7 +3036,7 @@ def init_db():
             db.create_all()
 
             # Check if the is_locked column exists in each table and add it if missing
-            from sqlalchemy import text
+            from sqlalchemy import text, inspect
 
             # Check and add is_locked column to relief_distribution table
             result = db.session.execute(text("PRAGMA table_info(relief_distribution)"))
@@ -3049,6 +3058,13 @@ def init_db():
             if 'is_locked' not in columns:
                 db.session.execute(text("ALTER TABLE social_security_beneficiary ADD COLUMN is_locked BOOLEAN DEFAULT 0"))
                 print("Added is_locked column to social_security_beneficiary table")
+
+            # Check house_destroyed in DISASTER table
+            result = db.session.execute(text("PRAGMA table_info(disaster)"))
+            columns = [row[1] for row in result.fetchall()]
+            if 'house_destroyed' not in columns:
+                db.session.execute(text("ALTER TABLE disaster ADD COLUMN house_destroyed INTEGER DEFAULT 0"))
+                print("Added house_destroyed column to disaster table")
 
             # Check and add new disaster impact columns to disaster table
             result = db.session.execute(text("PRAGMA table_info(disaster)"))
@@ -3282,10 +3298,16 @@ def fetch_daily_report_data(start_date, end_date, start_bs=None, end_bs=None):
         db.func.date(Disaster.created_at) <= end_date
     ).all()
     
-    # Get event logs for the range
+    # Create datetime range for filtering (start of start_date to end of end_date)
+    start_datetime = datetime.combine(start_date, datetime.min.time())
+    end_datetime = datetime.combine(end_date, datetime.max.time())
+    
+    print(f"Fetching event logs from {start_datetime} to {end_datetime}")
+
+    # Get event logs for the range using datetime comparison
     event_logs = EventLog.query.filter(
-        db.func.date(EventLog.timestamp) >= start_date,
-        db.func.date(EventLog.timestamp) <= end_date
+        EventLog.timestamp >= start_datetime,
+        EventLog.timestamp <= end_datetime
     ).order_by(EventLog.timestamp.desc()).all()
     
     # Get latest situation report for the end of the range
@@ -3383,9 +3405,9 @@ def fetch_daily_report_data(start_date, end_date, start_bs=None, end_bs=None):
             'missing': sum(d.missing_persons for d in type_disasters),
             'male_injured': sum(d.injured for d in type_disasters), # Using human injured field
             'female_injured': 0,
-            'affected_families': sum(d.affected_households for d in type_disasters),
-            'house_damaged': sum(d.public_building_damage for d in type_disasters), # Fix: should be house_damage if exists, using public as fallback
-            'house_destroyed': sum(d.public_building_destruction for d in type_disasters),
+            'affected_families': sum(d.affected_households for d in type_disasters) + sum(d.house_destroyed for d in type_disasters), # Sum of partial + full
+            'house_damaged': sum(d.affected_households for d in type_disasters), # Partial damage
+            'house_destroyed': sum(d.house_destroyed for d in type_disasters), # Full damage
             'public_building_damaged': sum(d.public_building_damage for d in type_disasters),
             'public_building_destroyed': sum(d.public_building_destruction for d in type_disasters),
             'livestock_loss': sum(d.livestock_death for d in type_disasters),

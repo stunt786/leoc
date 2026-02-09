@@ -1808,7 +1808,7 @@
 
         // Damage Assessment Stats
         const destroyedHousesEl = document.getElementById('destroyed-houses');
-        if (destroyedHousesEl) destroyedHousesEl.textContent = statsData.total_affected_households || 0;
+        if (destroyedHousesEl) destroyedHousesEl.textContent = statsData.total_house_destroyed || 0;
 
         const damagedBuildingsEl = document.getElementById('damaged-buildings');
         if (damagedBuildingsEl) damagedBuildingsEl.textContent = statsData.total_public_buildings_damaged || 0;
@@ -1846,8 +1846,11 @@
         const totalAffected = disasters.reduce((sum, incident) => sum + incident.affected_people, 0);
         document.getElementById('affected-people').textContent = totalAffected;
 
-        // Damaged houses (we'll use affected households as proxy)
+        // Damaged houses (Private Partial)
         const totalHouses = disasters.reduce((sum, incident) => sum + incident.affected_households, 0);
+
+        // Destroyed houses (Private Full)
+        const totalDestroyed = disasters.reduce((sum, incident) => sum + (incident.house_destroyed || 0), 0);
         document.getElementById('damaged-houses').textContent = totalHouses;
 
         // Relief actions (placeholder - would come from relief distribution data)
@@ -1860,10 +1863,15 @@
         document.getElementById('rescued').textContent = '0'; // Placeholder
 
         // Damage assessment stats
-        document.getElementById('destroyed-houses').textContent = '0'; // Placeholder
-        document.getElementById('damaged-buildings').textContent = totalHouses; // Using affected as damaged
-        document.getElementById('infrastructure-damage').textContent = '0'; // Placeholder
-        document.getElementById('estimated-loss').textContent = '0'; // Placeholder
+        // Public Buildings Data
+        const totalPublicDamaged = disasters.reduce((sum, incident) => sum + (incident.public_building_damage || 0), 0);
+        const totalPublicDestroyed = disasters.reduce((sum, incident) => sum + (incident.public_building_destruction || 0), 0);
+        const totalEstimatedLoss = disasters.reduce((sum, incident) => sum + (incident.estimated_loss || 0), 0);
+
+        document.getElementById('destroyed-houses').textContent = totalDestroyed;
+        document.getElementById('damaged-buildings').textContent = totalPublicDamaged;
+        document.getElementById('infrastructure-damage').textContent = totalPublicDestroyed;
+        document.getElementById('estimated-loss').textContent = totalEstimatedLoss.toLocaleString(); // Format currency
 
         // Livestock damage stats
         document.getElementById('cattle-lost').textContent = '0'; // Placeholder
