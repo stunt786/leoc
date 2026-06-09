@@ -42,6 +42,16 @@
                 </div>
                 <div class="card-body">
                     <p class="text-muted">विपद् वर्गीकरणका लागि प्रयोग हुने आर्थिक वर्षहरू व्यवस्थापन गर्नुहोस्</p>
+                    <div class="mb-3">
+                        <label for="activeFiscalYear" class="form-label">हालको सक्रिय आर्थिक वर्ष</label>
+                        <div class="input-group">
+                            <select class="form-select" id="activeFiscalYear"></select>
+                            <button type="button" class="btn btn-outline-primary" onclick="saveActiveFiscalYear()">
+                                <i class="bi bi-check2-circle"></i> सक्रिय बनाउनुहोस्
+                            </button>
+                        </div>
+                        <small class="text-muted">नयाँ विपद् रेकर्डमा यही आर्थिक वर्ष स्वतः प्रयोग हुनेछ</small>
+                    </div>
                     <div id="fiscalYearsContainer" class="mb-3"></div>
                     <button type="button" class="btn btn-success btn-sm" onclick="addFiscalYear()">
                         <i class="bi bi-plus-circle"></i> नयाँ थप्नुहोस्
@@ -99,6 +109,25 @@
 
 {% block extra_js %}
 <script>
+    const NEPALI_TO_ENGLISH = {
+        '०': '0', '१': '1', '२': '2', '३': '3', '४': '4',
+        '५': '5', '६': '6', '७': '7', '८': '8', '९': '9'
+    };
+    const ENGLISH_TO_NEPALI = {
+        '0': '०', '1': '१', '2': '२', '3': '३', '4': '४',
+        '5': '५', '6': '६', '7': '७', '8': '८', '9': '९'
+    };
+
+    function toEnglishDigits(value) {
+        if (!value) return '';
+        return value.replace(/[०-९]/g, ch => NEPALI_TO_ENGLISH[ch] || ch);
+    }
+
+    function toNepaliDigits(value) {
+        if (!value) return '';
+        return value.replace(/[0-9]/g, ch => ENGLISH_TO_NEPALI[ch] || ch);
+    }
+
     // ============ RELIEF ITEMS ============
     async function loadReliefItems() {
         try {
@@ -201,11 +230,78 @@
                 years = ['2080/81', '2081/82', '2082/83'];
             }
 
-            console.log('Fiscal years to display:', years);
-            displayItems('fiscalYearsContainer', years, 'fiscal-year');
+            const normalizedYears = years.map(toEnglishDigits);
+            console.log('Fiscal years to display:', normalizedYears);
+            displayItems('fiscalYearsContainer', normalizedYears, 'fiscal-year');
+            await loadActiveFiscalYear(normalizedYears);
         } catch (error) {
             console.error('Error loading fiscal years:', error);
             showAlert('danger', '<i class="bi bi-exclamation-circle"></i> आर्थिक वर्षहरू लोड गर्न त्रुटि');
+        }
+    }
+
+    async function loadActiveFiscalYear(years) {
+        try {
+            const response = await fetch('/api/settings/active_fiscal_year');
+            const data = await response.json();
+            const activeYear = data && data.value ? data.value : '';
+            const activeYearEnglish = toEnglishDigits(activeYear);
+            renderActiveFiscalYearSelect(years, activeYearEnglish);
+        } catch (error) {
+            console.error('Error loading active fiscal year:', error);
+            renderActiveFiscalYearSelect(years, '');
+        }
+    }
+
+    function renderActiveFiscalYearSelect(years, activeYear) {
+        const select = document.getElementById('activeFiscalYear');
+        select.innerHTML = '';
+
+        const placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.textContent = 'सक्रिय आर्थिक वर्ष छान्नुहोस्';
+        select.appendChild(placeholder);
+
+        const normalizedYears = years.map(toEnglishDigits);
+        normalizedYears.forEach(year => {
+            const option = document.createElement('option');
+            option.value = year;
+            option.textContent = toNepaliDigits(year);
+            if (year === activeYear) {
+                option.selected = true;
+            }
+            select.appendChild(option);
+        });
+    }
+
+    async function saveActiveFiscalYear() {
+        const select = document.getElementById('activeFiscalYear');
+        const value = toEnglishDigits(select.value);
+
+        if (!value) {
+            showAlert('warning', '<i class="bi bi-exclamation-triangle"></i> कृपया सक्रिय आर्थिक वर्ष छान्नुहोस्');
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/settings/active_fiscal_year', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                },
+                body: JSON.stringify({ value: value })
+            });
+            const data = await response.json();
+
+            if (data.success) {
+                showAlert('success', '<i class="bi bi-check-circle"></i> सक्रिय आर्थिक वर्ष सेट गरियो');
+            } else {
+                showAlert('danger', '<i class="bi bi-exclamation-circle"></i> Error: ' + data.message);
+            }
+        } catch (error) {
+            console.error('Save error:', error);
+            showAlert('danger', '<i class="bi bi-exclamation-circle"></i> Error: ' + error.message);
         }
     }
 
@@ -227,8 +323,9 @@
         const years = [];
         document.querySelectorAll('.fiscal-year input').forEach(input => {
             const value = input.value.trim();
-            if (value && !years.includes(value)) {
-                years.push(value);
+            const englishValue = toEnglishDigits(value);
+            if (englishValue && !years.includes(englishValue)) {
+                years.push(englishValue);
             }
         });
 
@@ -431,8 +528,9 @@
         items.forEach(item => {
             const div = document.createElement('div');
             div.className = `input-group mb-2 ${className}`;
+            const displayValue = className === 'fiscal-year' ? toNepaliDigits(item) : item;
             div.innerHTML = `
-                <input type="text" class="form-control" value="${item}">
+                <input type="text" class="form-control" value="${displayValue}">
                 <button type="button" class="btn btn-outline-danger" onclick="removeItemFromUI(this, '${className}')">
                     <i class="bi bi-trash"></i> हटाउनुहोस्
                 </button>

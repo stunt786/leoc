@@ -368,6 +368,7 @@ class Disaster(db.Model):
     affected_people_male = db.Column(db.Integer, default=0)
     affected_people_female = db.Column(db.Integer, default=0)
     estimated_loss = db.Column(db.Float, default=0.0)  # Estimated financial loss in Rs.
+    severity = db.Column(db.String(20), default='medium', index=True)
 
     # Lock Status
     is_locked = db.Column(db.Boolean, default=False, index=True)  # Added index
@@ -411,6 +412,7 @@ class Disaster(db.Model):
             'affected_people_male': self.affected_people_male,
             'affected_people_female': self.affected_people_female,
             'estimated_loss': self.estimated_loss,
+            'severity': self.severity,
             'is_locked': self.is_locked,
             'created_at': self.created_at.strftime('%Y-%m-%d')
         }
@@ -1704,8 +1706,17 @@ def get_disasters():
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 10, type=int)
 
+        # Filters
+        fiscal_year = request.args.get('fiscal_year')
+        disaster_type = request.args.get('disaster_type')
+
         # Build query
         query = Disaster.query.order_by(Disaster.created_at.desc())
+
+        if fiscal_year:
+            query = query.filter(Disaster.fiscal_year == fiscal_year)
+        if disaster_type:
+            query = query.filter(Disaster.disaster_type == disaster_type)
 
         # Paginate
         pagination = query.paginate(page=page, per_page=per_page, error_out=False)
@@ -1816,6 +1827,10 @@ def get_disaster_statistics():
         total_affected_males = sum(d.affected_people_male for d in filtered_disasters)
         total_affected_females = sum(d.affected_people_female for d in filtered_disasters)
         total_estimated_loss = sum(d.estimated_loss for d in filtered_disasters if hasattr(d, 'estimated_loss'))
+        total_road_blocked = sum(1 for d in filtered_disasters if d.road_blocked_status)
+        total_electricity_blocked = sum(1 for d in filtered_disasters if d.electricity_blocked_status)
+        total_communication_blocked = sum(1 for d in filtered_disasters if d.communication_blocked_status)
+        total_drinking_water_disrupted = sum(1 for d in filtered_disasters if d.drinking_water_status)
 
         # Ward distribution - with proper filtering
         ward_base_query = db.session.query(
@@ -1887,6 +1902,10 @@ def get_disaster_statistics():
             'total_affected_males': total_affected_males,
             'total_affected_females': total_affected_females,
             'total_estimated_loss': total_estimated_loss,
+            'total_road_blocked': total_road_blocked,
+            'total_electricity_blocked': total_electricity_blocked,
+            'total_communication_blocked': total_communication_blocked,
+            'total_drinking_water_disrupted': total_drinking_water_disrupted,
             'ward_distribution': [
                 {'ward': ward, 'count': count}
                 for ward, count in ward_data if ward is not None  # Only include non-null wards
@@ -1912,6 +1931,10 @@ def get_disaster_statistics():
             'total_affected_males': 0,
             'total_affected_females': 0,
             'total_estimated_loss': 0,
+            'total_road_blocked': 0,
+            'total_electricity_blocked': 0,
+            'total_communication_blocked': 0,
+            'total_drinking_water_disrupted': 0,
             'ward_distribution': [],
             'disaster_type_distribution': []
         })
@@ -1920,6 +1943,9 @@ def get_disaster_statistics():
 def add_disaster():
     try:
         data = request.get_json()
+        active_fiscal_year = AppSettings.get_setting('active_fiscal_year')
+        fiscal_year = data.get('fiscal_year') or active_fiscal_year
+
         disaster = Disaster(
             disaster_type=data.get('disaster_type'),
             disaster_date=datetime.strptime(data.get('disaster_date'), '%Y-%m-%d').date(),
@@ -1928,8 +1954,9 @@ def add_disaster():
             tole=data.get('tole'),
             latitude=float(data.get('latitude', 0)) if data.get('latitude') else None,
             longitude=float(data.get('longitude', 0)) if data.get('longitude') else None,
-            fiscal_year=data.get('fiscal_year'),
+            fiscal_year=fiscal_year,
             description=data.get('description'),
+            severity=data.get('severity', 'medium'),
             affected_households=int(data.get('affected_households', 0)),
             affected_people=int(data.get('affected_people', 0)),
             deaths=int(data.get('deaths', 0)),
@@ -2008,6 +2035,9 @@ def add_disaster_report():
             disaster_date_ad = date.today()
 
         # Create disaster record
+        active_fiscal_year = AppSettings.get_setting('active_fiscal_year')
+        fiscal_year = data.get('fiscal_year') or active_fiscal_year
+
         disaster = Disaster(
             disaster_type=data.get('disaster_type'),
             disaster_date=disaster_date_ad,
@@ -2016,6 +2046,7 @@ def add_disaster_report():
             tole=data.get('tole'),
             latitude=float(data.get('latitude')) if data.get('latitude') else None,
             longitude=float(data.get('longitude')) if data.get('longitude') else None,
+            fiscal_year=fiscal_year,
             description=data.get('description'),
             affected_households=int(data.get('affected_households', 0)),
             house_destroyed=int(data.get('destroyed_houses', 0)),  # Map from form field
@@ -2043,7 +2074,8 @@ def add_disaster_report():
             agriculture_crop_damage=data.get('agriculture_crop_damage'),
             affected_people_male=int(data.get('affected_people_male', 0)),
             affected_people_female=int(data.get('affected_people_female', 0)),
-            estimated_loss=float(data.get('estimated_loss', 0)) if data.get('estimated_loss') else 0.0
+            estimated_loss=float(data.get('estimated_loss', 0)) if data.get('estimated_loss') else 0.0,
+            severity=data.get('severity', 'medium')
         )
         db.session.add(disaster)
         db.session.commit()
@@ -2138,8 +2170,20 @@ def edit_disaster(id):
 
         data = request.get_json()
         disaster.disaster_type = data.get('disaster_type', disaster.disaster_type)
-        disaster.disaster_date = datetime.strptime(data.get('disaster_date'), '%Y-%m-%d').date()
-        disaster.disaster_date_bs = data.get('disaster_date_bs', disaster.disaster_date_bs)  # BS date from frontend
+
+        incoming_disaster_date = data.get('disaster_date')
+        incoming_disaster_date_bs = data.get('disaster_date_bs')
+        if incoming_disaster_date:
+            disaster.disaster_date = datetime.strptime(incoming_disaster_date, '%Y-%m-%d').date()
+        elif incoming_disaster_date_bs:
+            try:
+                ad_date_str = bs_to_ad(incoming_disaster_date_bs)
+                disaster.disaster_date = datetime.strptime(ad_date_str, '%Y-%m-%d').date()
+            except Exception as e:
+                print(f"Error converting BS to AD in edit_disaster: {e}")
+
+        if incoming_disaster_date_bs:
+            disaster.disaster_date_bs = incoming_disaster_date_bs  # BS date from frontend
 
         # Handle multi-select ward field - if it's a comma-separated string, take the first value
         ward_value = data.get('ward', disaster.ward)
@@ -2154,6 +2198,7 @@ def edit_disaster(id):
         disaster.longitude = float(data.get('longitude')) if data.get('longitude') else None
         disaster.fiscal_year = data.get('fiscal_year', disaster.fiscal_year)
         disaster.description = data.get('description', disaster.description)
+        disaster.severity = data.get('severity', disaster.severity)
         disaster.affected_households = int(data.get('affected_households', disaster.affected_households))
         # Handle destroyed_houses mapping
         if 'destroyed_houses' in data:
@@ -2161,6 +2206,8 @@ def edit_disaster(id):
         disaster.affected_people = int(data.get('affected_people', disaster.affected_people))
         disaster.deaths = int(data.get('deaths', disaster.deaths))
         disaster.missing_persons = int(data.get('missing_persons', disaster.missing_persons))
+        disaster.injured = int(data.get('injured', disaster.injured))
+        disaster.casualties = int(data.get('casualties', disaster.casualties))
         disaster.road_blocked_status = bool(data.get('road_blocked_status', disaster.road_blocked_status))
         disaster.electricity_blocked_status = bool(data.get('electricity_blocked_status', disaster.electricity_blocked_status))
         disaster.communication_blocked_status = bool(data.get('communication_blocked_status', disaster.communication_blocked_status))
@@ -3093,6 +3140,9 @@ def init_db():
             if 'drinking_water_status' not in columns:
                 db.session.execute(text("ALTER TABLE disaster ADD COLUMN drinking_water_status BOOLEAN DEFAULT 0"))
                 print("Added drinking_water_status column to disaster table")
+            if 'severity' not in columns:
+                db.session.execute(text("ALTER TABLE disaster ADD COLUMN severity VARCHAR(20) DEFAULT 'medium'"))
+                print("Added severity column to disaster table")
 
             if 'public_building_destruction' not in columns:
                 db.session.execute(text("ALTER TABLE disaster ADD COLUMN public_building_destruction INTEGER DEFAULT 0"))
@@ -3191,6 +3241,8 @@ def init_db():
                 ])
             if not AppSettings.get_setting('fiscal_years'):
                 AppSettings.set_setting('fiscal_years', ['2080/81', '2081/82', '2082/83', '2083/84'])
+            if not AppSettings.get_setting('active_fiscal_year'):
+                AppSettings.set_setting('active_fiscal_year', '2080/81')
             if not AppSettings.get_setting('ssf_types'):
                 AppSettings.set_setting('ssf_types', ['OAS (बर्षा पेन्सन)', 'विधवा (Widow)', 'अपाङ्गता (Disabled)', 'कोही नभएको (Endangered)', 'बाल भत्ता (Child Grant)', 'अन्य (Other)'])
             if not AppSettings.get_setting('disaster_types'):

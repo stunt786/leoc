@@ -21,7 +21,7 @@
 
     .stat-card {
         text-align: center;
-        padding: 1.5rem;
+        padding: 0.7rem;
         border: none;
         border-radius: 15px !important;
         transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
@@ -54,24 +54,47 @@
     }
 
     .stat-card .icon {
-        font-size: 2.8rem;
-        margin-bottom: 0.5rem;
+        font-size: 1.6rem;
+        margin-bottom: 0.25rem;
         opacity: 0.9;
     }
 
     .stat-card .number {
-        font-size: 2.5rem;
+        font-size: 1.4rem;
         font-weight: 800;
-        margin: 0.2rem 0;
+        margin: 0.15rem 0;
         letter-spacing: -1px;
     }
 
     .stat-card .label {
-        font-size: 0.95rem;
+        font-size: 0.7rem;
         font-weight: 500;
         text-transform: uppercase;
-        letter-spacing: 1px;
+        letter-spacing: 0.5px;
         opacity: 0.8;
+    }
+
+    .stat-card.compact {
+        padding: 0.6rem;
+    }
+
+    .stat-card.compact .icon {
+        font-size: 1.4rem;
+        margin-bottom: 0.2rem;
+    }
+
+    .stat-card.compact .number {
+        font-size: 1.25rem;
+    }
+
+    .stat-card.compact .label {
+        font-size: 0.65rem;
+        letter-spacing: 0.3px;
+    }
+
+    .stat-card {
+        width: 92%;
+        margin: 0 auto;
     }
 
     .bg-gradient-blue {
@@ -122,38 +145,36 @@
 
     /* Modern Tab Styling - Centralized in style.css */
     #overview-tab.active {
+        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%) !important;
+    }
 
-        #overview-tab.active {
-            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%) !important;
-        }
+    #event-log-tab.active {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+    }
 
-        #event-log-tab.active {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-        }
+    #situation-report-tab.active {
+        background: linear-gradient(135deg, #4481eb 0%, #04befe 100%) !important;
+    }
 
-        #situation-report-tab.active {
-            background: linear-gradient(135deg, #4481eb 0%, #04befe 100%) !important;
-        }
+    #human-impact-tab.active {
+        background: linear-gradient(135deg, #ff0844 0%, #ffb199 100%) !important;
+    }
 
-        #human-impact-tab.active {
-            background: linear-gradient(135deg, #ff0844 0%, #ffb199 100%) !important;
-        }
+    #damage-assessment-tab.active {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%) !important;
+    }
 
-        #damage-assessment-tab.active {
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%) !important;
-        }
+    #livestock-damage-tab.active {
+        background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%) !important;
+    }
 
-        #livestock-damage-tab.active {
-            background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%) !important;
-        }
+    #public-info-tab.active {
+        background: linear-gradient(135deg, #37ecba 0%, #72afd3 100%) !important;
+    }
 
-        #public-info-tab.active {
-            background: linear-gradient(135deg, #37ecba 0%, #72afd3 100%) !important;
-        }
-
-        #input-form-tab.active {
-            background: linear-gradient(135deg, #8e2de2 0%, #4a00e0 100%) !important;
-        }
+    #input-form-tab.active {
+        background: linear-gradient(135deg, #8e2de2 0%, #4a00e0 100%) !important;
+    }
 
 
         /* Reduce white space in assessment tabs */
@@ -356,20 +377,6 @@
                         स्थिति रिपोर्ट (SitRep)</button>
                 </li>
                 <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="human-impact-tab" data-bs-toggle="tab" data-bs-target="#human-impact"
-                        type="button" role="tab"><i class="bi bi-people"></i> मानवीय प्रभाव</button>
-                </li>
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="damage-assessment-tab" data-bs-toggle="tab"
-                        data-bs-target="#damage-assessment" type="button" role="tab"><i
-                            class="bi bi-house-exclamation"></i> क्षति मूल्याङ्कन</button>
-                </li>
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="livestock-damage-tab" data-bs-toggle="tab"
-                        data-bs-target="#livestock-damage" type="button" role="tab"><i class="bi bi-bug"></i> पशुचौपाया
-                        क्षति</button>
-                </li>
-                <li class="nav-item" role="presentation">
                     <button class="nav-link" id="public-info-tab" data-bs-toggle="tab" data-bs-target="#public-info"
                         type="button" role="tab"><i class="bi bi-megaphone"></i> सार्वजनिक जानकारी</button>
                 </li>
@@ -383,8 +390,8 @@
             <div class="tab-content" id="disasterTabsContent">
                 <!-- Overview Tab -->
                 <div class="tab-pane fade show active" id="overview" role="tabpanel">
-                    <div class="row mb-3">
-                        <div class="col-md-3 mb-3">
+                    <div class="card-row-5 mb-3">
+                        <div>
                             <div class="card stat-card bg-gradient-blue">
                                 <div class="icon">
                                     <i class="bi bi-exclamation-circle-fill"></i>
@@ -393,7 +400,7 @@
                                 <div class="label">जम्मा घटनाहरू</div>
                             </div>
                         </div>
-                        <div class="col-md-3 mb-3">
+                        <div>
                             <div class="card stat-card bg-gradient-red">
                                 <div class="icon">
                                     <i class="bi bi-people-fill"></i>
@@ -402,7 +409,7 @@
                                 <div class="label">प्रभावित व्यक्तिहरू</div>
                             </div>
                         </div>
-                        <div class="col-md-3 mb-3">
+                        <div>
                             <div class="card stat-card bg-gradient-orange text-dark">
                                 <div class="icon">
                                     <i class="bi bi-house-door-fill"></i>
@@ -411,7 +418,7 @@
                                 <div class="label">क्षतिग्रस्त घरहरू</div>
                             </div>
                         </div>
-                        <div class="col-md-3 mb-3">
+                        <div>
                             <div class="card stat-card bg-gradient-green text-dark">
                                 <div class="icon">
                                     <i class="bi bi-shield-check"></i>
@@ -448,39 +455,225 @@
                             </div>
                         </div>
                     </div>
+                    <h5 class="mt-4 mb-2"><i class="bi bi-people"></i> मानवीय प्रभाव</h5>
+                    <div class="mt-2">
+                    <div class="card-row-5 mb-3">
+                        <div>
+                            <div class="card stat-card compact bg-gradient-blue">
+                                <div class="icon">
+                                    <i class="bi bi-people-fill"></i>
+                                </div>
+                                <div class="number" id="human-affected">०</div>
+                                <div class="label">प्रभावित</div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="card stat-card compact bg-gradient-orange text-dark">
+                                <div class="icon">
+                                    <i class="bi bi-person-fill-exclamation"></i>
+                                </div>
+                                <div class="number" id="human-injured">०</div>
+                                <div class="label">घाइते</div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="card stat-card compact bg-gradient-red">
+                                <div class="icon">
+                                    <i class="bi bi-emoji-frown-fill"></i>
+                                </div>
+                                <div class="number" id="human-deaths">०</div>
+                                <div class="label">मृतक</div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="card stat-card compact bg-gradient-purple">
+                                <div class="icon">
+                                    <i class="bi bi-person-x-fill"></i>
+                                </div>
+                                <div class="number" id="human-missing">०</div>
+                                <div class="label">बेपत्ता</div>
+                            </div>
+                        </div>
+                    </div>
 
                     <div class="card">
                         <div class="card-header bg-primary text-white">
-                            <h5 class="mb-0"><i class="bi bi-list-ul"></i> हालैका घटनाहरू</h5>
+                            <h5 class="mb-0"><i class="bi bi-people"></i> जनसांख्यिकीय विवरण अनुसार मानवीय प्रभाव</h5>
                         </div>
                         <div class="card-body">
-                            <div class="table-responsive">
-                                <table class="table table-hover incident-table">
-                                    <thead>
-                                        <tr>
-                                            <th>मिति</th>
-                                            <th>समय</th>
-                                            <th>विपद्को प्रकार</th>
-                                            <th>वडा नम्बर</th>
-                                            <th>स्थान</th>
-                                            <th>अनुमानित क्षति</th>
-                                            <th>गम्भीरता</th>
-                                            <th>कार्य</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="recent-incidents-body">
-                                        <!-- Data will be populated by JavaScript -->
-                                    </tbody>
-                                </table>
+                            <div class="chart-container">
+                                <canvas id="humanImpactChart"></canvas>
                             </div>
-                            <!-- Pagination -->
-                            <nav aria-label="Incident pagination" class="mt-4">
-                                <ul class="pagination justify-content-center" id="incident-pagination">
-                                    <!-- Pagination buttons will be injected here -->
-                                </ul>
-                            </nav>
                         </div>
                     </div>
+                </div>
+
+                <h5 class="mt-4 mb-2"><i class="bi bi-signpost-split"></i> पूर्वाधार क्षति</h5>
+                <div class="mt-2">
+                    <div class="card-row-5 mb-3">
+                        <div>
+                            <div class="card stat-card compact bg-gradient-orange text-dark">
+                                <div class="icon">
+                                    <i class="bi bi-house-door-fill"></i>
+                                </div>
+                                <div class="number" id="house-damaged">०</div>
+                                <div class="label">घर आंशिक क्षति</div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="card stat-card compact bg-gradient-red">
+                                <div class="icon">
+                                    <i class="bi bi-house-dash-fill"></i>
+                                </div>
+                                <div class="number" id="house-destroyed">०</div>
+                                <div class="label">घर पूर्ण क्षति</div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="card stat-card compact bg-gradient-blue">
+                                <div class="icon">
+                                    <i class="bi bi-building-fill-dash"></i>
+                                </div>
+                                <div class="number" id="public-building-damaged">०</div>
+                                <div class="label">सार्वजनिक भवन आंशिक क्षति</div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="card stat-card compact bg-gradient-purple">
+                                <div class="icon">
+                                    <i class="bi bi-building-x"></i>
+                                </div>
+                                <div class="number" id="public-building-destroyed">०</div>
+                                <div class="label">सार्वजनिक भवन पूर्ण क्षति</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card-row-5 mb-3">
+                        <div>
+                            <div class="card stat-card compact bg-gradient-red">
+                                <div class="icon">
+                                    <i class="bi bi-cone-striped"></i>
+                                </div>
+                                <div class="number" id="road-blocked">०</div>
+                                <div class="label">सडक अवरुद्ध</div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="card stat-card compact bg-gradient-orange text-dark">
+                                <div class="icon">
+                                    <i class="bi bi-lightning-charge-fill"></i>
+                                </div>
+                                <div class="number" id="electricity-blocked">०</div>
+                                <div class="label">विद्युत अवरुद्ध</div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="card stat-card compact bg-gradient-blue">
+                                <div class="icon">
+                                    <i class="bi bi-broadcast-pin"></i>
+                                </div>
+                                <div class="number" id="communication-blocked">०</div>
+                                <div class="label">सञ्चार अवरुद्ध</div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="card stat-card compact bg-gradient-green text-dark">
+                                <div class="icon">
+                                    <i class="bi bi-droplet-half"></i>
+                                </div>
+                                <div class="number" id="drinking-water-disrupted">०</div>
+                                <div class="label">खानेपानी अवरुद्ध</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <h5 class="mt-4 mb-2"><i class="bi bi-bug"></i> पशुचौपाया क्षति</h5>
+                <div class="mt-2">
+                    <div class="card-row-5 mb-3">
+                        <div>
+                            <div class="card stat-card bg-gradient-red">
+                                <div class="icon">
+                                    <i class="bi bi-activity"></i>
+                                </div>
+                                <div class="number" id="cattle-lost">०</div>
+                                <div class="label">ठूला पशुचौपाया क्षति</div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="card stat-card bg-gradient-orange text-dark">
+                                <div class="icon">
+                                    <i class="bi bi-bug-fill"></i>
+                                </div>
+                                <div class="number" id="small-livestock-lost">०</div>
+                                <div class="label">साधारण पशुचौपाया क्षति</div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="card stat-card bg-gradient-blue">
+                                <div class="icon">
+                                    <i class="bi bi-egg-fill"></i>
+                                </div>
+                                <div class="number" id="poultry-lost">०</div>
+                                <div class="label">पशुपन्छी क्षति</div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="card stat-card bg-gradient-purple">
+                                <div class="icon">
+                                    <i class="bi bi-grid-3x3-gap-fill"></i>
+                                </div>
+                                <div class="number" id="livestock-loss">०</div>
+                                <div class="label">अन्य</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card chart-card">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="bi bi-pie-chart-fill"></i> पशुचौपाया क्षति विवरण</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="chart-container" style="height: 300px;">
+                                <canvas id="livestockDamageChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mt-4">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="bi bi-list-ul"></i> हालैका घटनाहरू</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover incident-table">
+                                <thead>
+                                    <tr>
+                                        <th>मिति</th>
+                                        <th>समय</th>
+                                        <th>विपद्को प्रकार</th>
+                                        <th>वडा नम्बर</th>
+                                        <th>स्थान</th>
+                                        <th>अनुमानित क्षति</th>
+                                        <th>गम्भीरता</th>
+                                        <th>कार्य</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="recent-incidents-body">
+                                    <!-- Data will be populated by JavaScript -->
+                                </tbody>
+                            </table>
+                        </div>
+                        <!-- Pagination -->
+                        <nav aria-label="Incident pagination" class="mt-4">
+                            <ul class="pagination justify-content-center" id="incident-pagination">
+                                <!-- Pagination buttons will be injected here -->
+                            </ul>
+                        </nav>
+                    </div>
+                </div>
                 </div>
 
                 <!-- Event Action Log Tab -->
@@ -609,165 +802,6 @@
                     </div>
                 </div>
 
-                <!-- Human Impact Tab -->
-                <div class="tab-pane fade" id="human-impact" role="tabpanel">
-                    <div class="row mb-3">
-                        <div class="col-md-3 mb-3">
-                            <div class="card stat-card bg-gradient-red">
-                                <div class="icon">
-                                    <i class="bi bi-emoji-frown-fill"></i>
-                                </div>
-                                <div class="number" id="casualties">०</div>
-                                <div class="label">मृतक</div>
-                            </div>
-                        </div>
-                        <div class="col-md-3 mb-3">
-                            <div class="card stat-card bg-gradient-orange text-dark">
-                                <div class="icon">
-                                    <i class="bi bi-person-fill-exclamation"></i>
-                                </div>
-                                <div class="number" id="injured">०</div>
-                                <div class="label">घाइते</div>
-                            </div>
-                        </div>
-                        <div class="col-md-3 mb-3">
-                            <div class="card stat-card bg-gradient-blue">
-                                <div class="icon">
-                                    <i class="bi bi-people-fill"></i>
-                                </div>
-                                <div class="number" id="displaced">०</div>
-                                <div class="label">विस्थापित</div>
-                            </div>
-                        </div>
-                        <div class="col-md-3 mb-3">
-                            <div class="card stat-card bg-gradient-green text-dark">
-                                <div class="icon">
-                                    <i class="bi bi-heart-pulse-fill"></i>
-                                </div>
-                                <div class="number" id="rescued">०</div>
-                                <div class="label">उद्धार गरिएको</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="card">
-                        <div class="card-header bg-primary text-white">
-                            <h5 class="mb-0"><i class="bi bi-people"></i> जनसांख्यिकीय विवरण अनुसार मानवीय प्रभाव</h5>
-                        </div>
-                        <div class="card-body">
-                            <div class="chart-container">
-                                <canvas id="humanImpactChart"></canvas>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Damage Assessment Tab -->
-                <div class="tab-pane fade" id="damage-assessment" role="tabpanel">
-                    <div class="row mb-3">
-                        <div class="col-md-3 mb-3">
-                            <div class="card stat-card bg-gradient-orange text-dark">
-                                <div class="icon">
-                                    <i class="bi bi-house-dash-fill"></i>
-                                </div>
-                                <div class="number" id="destroyed-houses">०</div>
-                                <div class="label">पूर्ण क्षति (घर)</div>
-                            </div>
-                        </div>
-                        <div class="col-md-3 mb-3">
-                            <div class="card stat-card bg-gradient-red">
-                                <div class="icon">
-                                    <i class="bi bi-building-fill-dash"></i>
-                                </div>
-                                <div class="number" id="damaged-buildings">०</div>
-                                <div class="label">आंशिक क्षति (भवन)</div>
-                            </div>
-                        </div>
-                        <div class="col-md-3 mb-3">
-                            <div class="card stat-card bg-gradient-blue">
-                                <div class="icon">
-                                    <i class="bi bi-cone-striped"></i>
-                                </div>
-                                <div class="number" id="infrastructure-damage">०</div>
-                                <div class="label">पूर्वाधार क्षति</div>
-                            </div>
-                        </div>
-                        <div class="col-md-3 mb-3">
-                            <div class="card stat-card bg-gradient-purple">
-                                <div class="icon">
-                                    <i class="bi bi-cash-stack"></i>
-                                </div>
-                                <div class="number" id="estimated-loss">०</div>
-                                <div class="label">अनुमानित क्षति (रु.)</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="card">
-                        <div class="card-header bg-primary text-white">
-                            <h5 class="mb-0"><i class="bi bi-bar-chart"></i> विधा अनुसार क्षति मूल्याङ्कन</h5>
-                        </div>
-                        <div class="card-body">
-                            <div class="chart-container">
-                                <canvas id="damageAssessmentChart"></canvas>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Livestock Damage Tab -->
-                <div class="tab-pane fade" id="livestock-damage" role="tabpanel">
-                    <div class="row mb-3">
-                        <div class="col-md-3 mb-3">
-                            <div class="card stat-card bg-gradient-red">
-                                <div class="icon">
-                                    <i class="bi bi-activity"></i>
-                                </div>
-                                <div class="number" id="cattle-lost">०</div>
-                                <div class="label">ठूला पशुचौपाया क्षति</div>
-                            </div>
-                        </div>
-                        <div class="col-md-3 mb-3">
-                            <div class="card stat-card bg-gradient-orange text-dark">
-                                <div class="icon">
-                                    <i class="bi bi-bug-fill"></i>
-                                </div>
-                                <div class="number" id="small-livestock-lost">०</div>
-                                <div class="label">साधारण पशुचौपाया क्षति</div>
-                            </div>
-                        </div>
-                        <div class="col-md-3 mb-3">
-                            <div class="card stat-card bg-gradient-blue">
-                                <div class="icon">
-                                    <i class="bi bi-egg-fill"></i>
-                                </div>
-                                <div class="number" id="poultry-lost">०</div>
-                                <div class="label">पशुपन्छी क्षति</div>
-                            </div>
-                        </div>
-                        <div class="col-md-3 mb-3">
-                            <div class="card stat-card bg-gradient-purple">
-                                <div class="icon">
-                                    <i class="bi bi-grid-3x3-gap-fill"></i>
-                                </div>
-                                <div class="number" id="livestock-loss">०</div>
-                                <div class="label">अन्य</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="card chart-card">
-                        <div class="card-header">
-                            <h5 class="mb-0"><i class="bi bi-pie-chart-fill"></i> पशुचौपाया क्षति विवरण</h5>
-                        </div>
-                        <div class="card-body">
-                            <div class="chart-container" style="height: 300px;">
-                                <canvas id="livestockDamageChart"></canvas>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
                 <!-- Public Info Tab -->
                 <div class="tab-pane fade" id="public-info" role="tabpanel">
                     <div class="card">
@@ -878,6 +912,12 @@
             </button>
         </div>
         <div class="card-body">
+            <div id="editModeBanner" class="alert alert-warning d-none align-items-center justify-content-between" role="alert">
+                <div>
+                    <strong>सम्पादन मोड:</strong> रेकर्ड #<span id="editRecordId"></span> सम्पादन हुँदैछ।
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-dark" id="cancelEditBtn">सम्पादन रद्द</button>
+            </div>
             <form id="disasterReportForm">
                 <!-- Basic Incident Information -->
                 <div class="card mb-3 form-section-card">
@@ -1297,7 +1337,7 @@
                     <button type="button" class="btn btn-secondary me-md-2" id="resetForm">रिसेट (Reset)</button>
                     <button type="button" class="btn btn-warning me-md-2" id="noIncidentsBtn">No Incidents
                         Today</button>
-                    <button type="submit" class="btn btn-primary">पेश गर्नुहोस् (Submit Report)</button>
+                    <button type="submit" class="btn btn-primary" id="submitDisasterBtn">पेश गर्नुहोस् (Submit Report)</button>
                 </div>
             </form>
         </div>
@@ -1791,17 +1831,17 @@
         const affectedPeopleEl = document.getElementById('affected-people');
         if (affectedPeopleEl) affectedPeopleEl.textContent = statsData.total_affected_people || 0;
 
-        const casualtiesEl = document.getElementById('casualties');
-        if (casualtiesEl) casualtiesEl.textContent = statsData.total_deaths || 0;
+        const humanAffectedEl = document.getElementById('human-affected');
+        if (humanAffectedEl) humanAffectedEl.textContent = statsData.total_affected_people || 0;
 
-        const displacedEl = document.getElementById('displaced');
-        if (displacedEl) displacedEl.textContent = statsData.total_affected_people || 0; // Proxy
+        const humanInjuredEl = document.getElementById('human-injured');
+        if (humanInjuredEl) humanInjuredEl.textContent = statsData.total_injured || 0;
 
-        const injuredEl = document.getElementById('injured');
-        if (injuredEl) injuredEl.textContent = statsData.total_injured || 0;
+        const humanDeathsEl = document.getElementById('human-deaths');
+        if (humanDeathsEl) humanDeathsEl.textContent = statsData.total_deaths || 0;
 
-        const rescuedEl = document.getElementById('rescued');
-        if (rescuedEl) rescuedEl.textContent = (statsData.total_affected_people || 0) - (statsData.total_deaths || 0); // Proxy
+        const humanMissingEl = document.getElementById('human-missing');
+        if (humanMissingEl) humanMissingEl.textContent = statsData.total_missing || 0;
 
         const reliefActionsEl = document.getElementById('relief-actions');
         if (reliefActionsEl) reliefActionsEl.textContent = '0'; // Placeholder
@@ -1821,6 +1861,30 @@
             const lossValue = statsData.total_estimated_loss || 0;
             estimatedLossEl.textContent = lossValue.toLocaleString();
         }
+
+        const houseDamagedEl = document.getElementById('house-damaged');
+        if (houseDamagedEl) houseDamagedEl.textContent = statsData.total_affected_households || 0;
+
+        const houseDestroyedEl = document.getElementById('house-destroyed');
+        if (houseDestroyedEl) houseDestroyedEl.textContent = statsData.total_house_destroyed || 0;
+
+        const publicBuildingDamagedEl = document.getElementById('public-building-damaged');
+        if (publicBuildingDamagedEl) publicBuildingDamagedEl.textContent = statsData.total_public_buildings_damaged || 0;
+
+        const publicBuildingDestroyedEl = document.getElementById('public-building-destroyed');
+        if (publicBuildingDestroyedEl) publicBuildingDestroyedEl.textContent = statsData.total_public_buildings_destroyed || 0;
+
+        const roadBlockedEl = document.getElementById('road-blocked');
+        if (roadBlockedEl) roadBlockedEl.textContent = statsData.total_road_blocked || 0;
+
+        const electricityBlockedEl = document.getElementById('electricity-blocked');
+        if (electricityBlockedEl) electricityBlockedEl.textContent = statsData.total_electricity_blocked || 0;
+
+        const communicationBlockedEl = document.getElementById('communication-blocked');
+        if (communicationBlockedEl) communicationBlockedEl.textContent = statsData.total_communication_blocked || 0;
+
+        const drinkingWaterDisruptedEl = document.getElementById('drinking-water-disrupted');
+        if (drinkingWaterDisruptedEl) drinkingWaterDisruptedEl.textContent = statsData.total_drinking_water_disrupted || 0;
 
         // Livestock Damage Stats
         const cattleLostEl = document.getElementById('cattle-lost');
@@ -1857,21 +1921,57 @@
         document.getElementById('relief-actions').textContent = '0';
 
         // Human impact stats
-        document.getElementById('casualties').textContent = '0'; // Placeholder
-        document.getElementById('injured').textContent = '0'; // Placeholder
-        document.getElementById('displaced').textContent = totalAffected; // Using affected as displaced
-        document.getElementById('rescued').textContent = '0'; // Placeholder
+        const humanAffectedEl = document.getElementById('human-affected');
+        if (humanAffectedEl) humanAffectedEl.textContent = totalAffected;
+
+        const humanInjuredEl = document.getElementById('human-injured');
+        if (humanInjuredEl) humanInjuredEl.textContent = disasters.reduce((sum, incident) => sum + (incident.injured || 0), 0);
+
+        const humanDeathsEl = document.getElementById('human-deaths');
+        if (humanDeathsEl) humanDeathsEl.textContent = disasters.reduce((sum, incident) => sum + (incident.deaths || 0), 0);
+
+        const humanMissingEl = document.getElementById('human-missing');
+        if (humanMissingEl) humanMissingEl.textContent = disasters.reduce((sum, incident) => sum + (incident.missing_persons || 0), 0);
 
         // Damage assessment stats
         // Public Buildings Data
         const totalPublicDamaged = disasters.reduce((sum, incident) => sum + (incident.public_building_damage || 0), 0);
         const totalPublicDestroyed = disasters.reduce((sum, incident) => sum + (incident.public_building_destruction || 0), 0);
         const totalEstimatedLoss = disasters.reduce((sum, incident) => sum + (incident.estimated_loss || 0), 0);
+        const totalHouseDamaged = disasters.reduce((sum, incident) => sum + (incident.affected_households || 0), 0);
+        const totalRoadBlocked = disasters.reduce((sum, incident) => sum + (incident.road_blocked_status ? 1 : 0), 0);
+        const totalElectricityBlocked = disasters.reduce((sum, incident) => sum + (incident.electricity_blocked_status ? 1 : 0), 0);
+        const totalCommunicationBlocked = disasters.reduce((sum, incident) => sum + (incident.communication_blocked_status ? 1 : 0), 0);
+        const totalDrinkingWaterDisrupted = disasters.reduce((sum, incident) => sum + (incident.drinking_water_status ? 1 : 0), 0);
 
         document.getElementById('destroyed-houses').textContent = totalDestroyed;
         document.getElementById('damaged-buildings').textContent = totalPublicDamaged;
         document.getElementById('infrastructure-damage').textContent = totalPublicDestroyed;
         document.getElementById('estimated-loss').textContent = totalEstimatedLoss.toLocaleString(); // Format currency
+
+        const houseDamagedEl = document.getElementById('house-damaged');
+        if (houseDamagedEl) houseDamagedEl.textContent = totalHouseDamaged;
+
+        const houseDestroyedEl = document.getElementById('house-destroyed');
+        if (houseDestroyedEl) houseDestroyedEl.textContent = totalDestroyed;
+
+        const publicBuildingDamagedEl = document.getElementById('public-building-damaged');
+        if (publicBuildingDamagedEl) publicBuildingDamagedEl.textContent = totalPublicDamaged;
+
+        const publicBuildingDestroyedEl = document.getElementById('public-building-destroyed');
+        if (publicBuildingDestroyedEl) publicBuildingDestroyedEl.textContent = totalPublicDestroyed;
+
+        const roadBlockedEl = document.getElementById('road-blocked');
+        if (roadBlockedEl) roadBlockedEl.textContent = totalRoadBlocked;
+
+        const electricityBlockedEl = document.getElementById('electricity-blocked');
+        if (electricityBlockedEl) electricityBlockedEl.textContent = totalElectricityBlocked;
+
+        const communicationBlockedEl = document.getElementById('communication-blocked');
+        if (communicationBlockedEl) communicationBlockedEl.textContent = totalCommunicationBlocked;
+
+        const drinkingWaterDisruptedEl = document.getElementById('drinking-water-disrupted');
+        if (drinkingWaterDisruptedEl) drinkingWaterDisruptedEl.textContent = totalDrinkingWaterDisrupted;
 
         // Livestock damage stats
         document.getElementById('cattle-lost').textContent = '0'; // Placeholder
@@ -1907,6 +2007,9 @@
                         <div class="btn-group btn-group-sm">
                             <button class="btn btn-outline-primary" onclick="viewIncidentDetails(${incident.id})" title="View Details">
                                 <i class="bi bi-eye"></i>
+                            </button>
+                            <button class="btn btn-outline-success" onclick="openEditIncident(${incident.id}, ${incident.is_locked})" title="${incident.is_locked ? 'Record is locked' : 'Edit Record'}" ${incident.is_locked ? 'disabled' : ''}>
+                                <i class="bi bi-pencil"></i>
                             </button>
                             <button class="btn ${incident.is_locked ? 'btn-warning' : 'btn-secondary'}" onclick="toggleLock(${incident.id}, ${incident.is_locked})" title="${incident.is_locked ? 'Unlock record' : 'Lock record'}">
                                 <i class="bi bi-${incident.is_locked ? 'unlock-fill' : 'lock'}"></i>
@@ -2598,8 +2701,18 @@
         };
 
         try {
-            const response = await fetch('/api/disaster-reports', {
-                method: 'POST',
+            const form = document.getElementById('disasterReportForm');
+            const editId = form.getAttribute('data-edit-id');
+            const editDateAd = form.getAttribute('data-edit-date');
+            const url = editId ? `/api/disasters/${editId}` : '/api/disaster-reports';
+            const method = editId ? 'PUT' : 'POST';
+
+            if (editDateAd) {
+                formData.disaster_date = editDateAd;
+            }
+
+            const response = await fetch(url, {
+                method: method,
                 headers: {
                     'Content-Type': 'application/json',
                     'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
@@ -2610,8 +2723,9 @@
             const result = await response.json();
 
             if (result.success) {
-                showToast('Disaster report submitted successfully!', 'success');
+                showToast(editId ? 'Disaster record updated successfully!' : 'Disaster report submitted successfully!', 'success');
                 resetForm();
+                exitEditMode();
                 loadData(); // Refresh data
 
                 // Switch to overview tab
@@ -2918,6 +3032,127 @@
         }
     }
 
+    // Open incident in edit mode
+    async function openEditIncident(id, isLocked) {
+        if (isLocked) {
+            showToast('Record is locked. Please unlock to edit.', 'warning');
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/disasters/${id}`);
+            const result = await response.json();
+
+            if (!result.success || !result.data) {
+                showToast('Error loading incident for editing', 'danger');
+                return;
+            }
+
+            const incident = result.data;
+            enterEditMode(incident);
+        } catch (error) {
+            console.error('Error loading incident for edit:', error);
+            showToast('Error loading incident for edit', 'danger');
+        }
+    }
+
+    function enterEditMode(incident) {
+        const form = document.getElementById('disasterReportForm');
+        form.setAttribute('data-edit-id', incident.id);
+        form.setAttribute('data-edit-date', incident.disaster_date || '');
+
+        const banner = document.getElementById('editModeBanner');
+        const recordIdEl = document.getElementById('editRecordId');
+        const submitBtn = document.getElementById('submitDisasterBtn');
+
+        recordIdEl.textContent = incident.id;
+        banner.classList.remove('d-none');
+        banner.classList.add('d-flex');
+        submitBtn.textContent = 'अपडेट गर्नुहोस् (Update Record)';
+
+        // Populate form fields
+        document.getElementById('disasterDateBS').value = incident.disaster_date_bs || '';
+        document.getElementById('disasterType').value = incident.disaster_type || '';
+        if (document.getElementById('disasterType').value === '' && incident.disaster_type) {
+            const option = document.createElement('option');
+            option.value = incident.disaster_type;
+            option.textContent = incident.disaster_type;
+            document.getElementById('disasterType').appendChild(option);
+            document.getElementById('disasterType').value = incident.disaster_type;
+        }
+
+        // Ward selection (single)
+        if (window.selectedWards && typeof window.updateSelectedWardsDisplay === 'function') {
+            window.selectedWards.clear();
+            if (incident.ward) {
+                window.selectedWards.add(String(incident.ward));
+            }
+            const dropdownItems = document.querySelectorAll('#wardDropdownMenu .dropdown-item');
+            dropdownItems.forEach(item => {
+                const value = item.getAttribute('data-value');
+                item.classList.toggle('active', incident.ward && String(incident.ward) === String(value));
+            });
+            window.updateSelectedWardsDisplay();
+        } else {
+            document.getElementById('ward').value = incident.ward || '';
+        }
+
+        document.getElementById('location').value = incident.tole || '';
+        const coordsValue = incident.latitude != null && incident.longitude != null
+            ? `${incident.latitude}, ${incident.longitude}`
+            : '';
+        document.getElementById('coordinates').value = coordsValue;
+        document.getElementById('description').value = incident.description || '';
+        document.getElementById('affectedPeople').value = incident.affected_people || 0;
+        document.getElementById('injuredCount').value = incident.injured || 0;
+        document.getElementById('casualtiesCount').value = incident.casualties || 0;
+        document.getElementById('deaths').value = incident.deaths || 0;
+        document.getElementById('missingPersons').value = incident.missing_persons || 0;
+        document.getElementById('affectedPeopleMale').value = incident.affected_people_male || 0;
+        document.getElementById('affectedPeopleFemale').value = incident.affected_people_female || 0;
+        document.getElementById('housesDamaged').value = incident.affected_households || 0;
+        document.getElementById('housesDestroyed').value = incident.house_destroyed || 0;
+        document.getElementById('publicBuildingDestruction').value = incident.public_building_destruction || 0;
+        document.getElementById('publicBuildingDamage').value = incident.public_building_damage || 0;
+        document.getElementById('estimatedLoss').value = incident.estimated_loss || 0;
+        document.getElementById('agricultureCropDamage').value = incident.agriculture_crop_damage || '';
+        document.getElementById('cattleLost').value = incident.cattle_lost || 0;
+        document.getElementById('cattleInjured').value = incident.cattle_injured || 0;
+        document.getElementById('poultryLost').value = incident.poultry_lost || 0;
+        document.getElementById('poultryInjured').value = incident.poultry_injured || 0;
+        document.getElementById('goatsSheepLost').value = incident.goats_sheep_lost || 0;
+        document.getElementById('goatsSheepInjured').value = incident.goats_sheep_injured || 0;
+        document.getElementById('otherLivestockLost').value = incident.other_livestock_lost || 0;
+        document.getElementById('otherLivestockInjured').value = incident.other_livestock_injured || 0;
+        document.getElementById('roadBlocked').checked = !!incident.road_blocked_status;
+        document.getElementById('electricityBlocked').checked = !!incident.electricity_blocked_status;
+        document.getElementById('communicationBlocked').checked = !!incident.communication_blocked_status;
+        document.getElementById('drinkingWaterDisrupted').checked = !!incident.drinking_water_status;
+
+        calculateTotalLivestock();
+        validateAffectedPeople();
+
+        // Switch to input form tab
+        const inputTab = document.getElementById('input-form-tab');
+        if (inputTab) {
+            const tab = new bootstrap.Tab(inputTab);
+            tab.show();
+        }
+    }
+
+    function exitEditMode() {
+        const form = document.getElementById('disasterReportForm');
+        form.removeAttribute('data-edit-id');
+        form.removeAttribute('data-edit-date');
+
+        const banner = document.getElementById('editModeBanner');
+        const submitBtn = document.getElementById('submitDisasterBtn');
+
+        banner.classList.add('d-none');
+        banner.classList.remove('d-flex');
+        submitBtn.textContent = 'पेश गर्नुहोस् (Submit Report)';
+    }
+
     // Toggle lock status for an incident
     async function toggleLock(id, isCurrentlyLocked) {
         // Prompt for unlock key
@@ -3027,35 +3262,15 @@
 
     document.addEventListener('DOMContentLoaded', function () {
         lockDisasterForms();
-        // Load data when Human Impact tab is shown
-        const humanImpactTab = document.querySelector('#disasterTabs a[data-bs-target="#human-impact"]');
-        if (humanImpactTab) {
-            humanImpactTab.addEventListener('shown.bs.tab', function () {
-                // Load disaster statistics for human impact
-                loadDisasterStatistics();
+        const cancelEditBtn = document.getElementById('cancelEditBtn');
+        if (cancelEditBtn) {
+            cancelEditBtn.addEventListener('click', function () {
+                resetForm();
+                exitEditMode();
             });
         }
-
-        // Load data when Damage Assessment tab is shown
-        const damageAssessmentTab = document.querySelector('#disasterTabs a[data-bs-target="#damage-assessment"]');
-        if (damageAssessmentTab) {
-            damageAssessmentTab.addEventListener('shown.bs.tab', function () {
-                // Load disaster statistics for damage assessment
-                loadDisasterStatistics();
-            });
-        }
-
-        // Load data when Livestock Damage tab is shown
-        const livestockDamageTab = document.querySelector('#disasterTabs a[data-bs-target="#livestock-damage"]');
-        if (livestockDamageTab) {
-            livestockDamageTab.addEventListener('shown.bs.tab', function () {
-                // Load disaster statistics for livestock damage
-                loadDisasterStatistics();
-            });
-        }
-
         // Load data when Public Info tab is shown
-        const publicInfoTab = document.querySelector('#disasterTabs a[data-bs-target="#public-info"]');
+        const publicInfoTab = document.querySelector('#disasterTabs [data-bs-target="#public-info"]');
         if (publicInfoTab) {
             publicInfoTab.addEventListener('shown.bs.tab', function () {
                 // Load public information
@@ -3064,7 +3279,7 @@
         }
 
         // Load data when Event Log tab is shown
-        const eventLogTab = document.querySelector('#disasterTabs a[data-bs-target="#event-log"]');
+        const eventLogTab = document.querySelector('#disasterTabs [data-bs-target="#event-log"]');
         if (eventLogTab) {
             eventLogTab.addEventListener('shown.bs.tab', function () {
                 // Load event log data when tab is shown

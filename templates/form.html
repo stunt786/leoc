@@ -532,6 +532,24 @@
 
 {% block extra_js %}
 <script>
+    const NEPALI_TO_ENGLISH = {
+        '०': '0', '१': '1', '२': '2', '३': '3', '४': '4',
+        '५': '5', '६': '6', '७': '7', '८': '8', '९': '9'
+    };
+    const ENGLISH_TO_NEPALI = {
+        '0': '०', '1': '१', '2': '२', '3': '३', '4': '४',
+        '5': '५', '6': '६', '7': '७', '8': '८', '9': '९'
+    };
+
+    function toEnglishDigits(value) {
+        if (!value) return '';
+        return value.replace(/[०-९]/g, ch => NEPALI_TO_ENGLISH[ch] || ch);
+    }
+
+    function toNepaliDigits(value) {
+        if (!value) return '';
+        return value.replace(/[0-9]/g, ch => ENGLISH_TO_NEPALI[ch] || ch);
+    }
     let reliefItemOptions = [];  // Will be loaded from API
     let availableFundBalance = 0;
 
@@ -605,8 +623,9 @@
             const fiscalData = await fiscalResponse.json();
             const fiscalYears = Array.isArray(fiscalData.value) ? fiscalData.value :
                 (typeof fiscalData.value === 'string' ? JSON.parse(fiscalData.value) : []);
-            console.log('Loaded fiscal years:', fiscalYears);
-            populateFiscalYearDropdown(fiscalYears);
+            const normalizedYears = fiscalYears.map(toEnglishDigits);
+            console.log('Loaded fiscal years:', normalizedYears);
+            populateFiscalYearDropdown(normalizedYears);
         } catch (error) {
             console.error('Error loading fiscal years:', error);
         }
@@ -629,10 +648,11 @@
     function populateFiscalYearDropdown(years) {
         const select = document.getElementById('fiscal_year');
         select.innerHTML = '<option value="">-- आर्थिक वर्ष छान्नुहोस् --</option>';
-        years.forEach(year => {
+        const normalizedYears = years.map(toEnglishDigits);
+        normalizedYears.forEach(year => {
             const option = document.createElement('option');
             option.value = year;
-            option.textContent = year;
+            option.textContent = toNepaliDigits(year);
             select.appendChild(option);
         });
     }
@@ -740,7 +760,7 @@
                 // Populate disaster information
                 document.getElementById('disaster_date').value = dist.disaster_date || '';
                 document.getElementById('disaster_type').value = dist.disaster_type || '';
-                document.getElementById('fiscal_year').value = dist.fiscal_year || '';
+                document.getElementById('fiscal_year').value = toEnglishDigits(dist.fiscal_year || '');
                 document.getElementById('ward').value = dist.ward || '';
                 document.getElementById('tole').value = dist.tole || '';
                 document.getElementById('location').value = dist.location || '';
@@ -1299,6 +1319,7 @@
         const items = collectItems();
 
         const formData = new FormData(this);
+        formData.set('fiscal_year', toEnglishDigits(document.getElementById('fiscal_year').value));
         formData.set('relief_items_json', JSON.stringify(items));
         formData.set('family_members_json', JSON.stringify(collectFamilyMembers()));
         formData.set('harms_json', JSON.stringify(collectHarms()));
