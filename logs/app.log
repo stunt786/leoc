@@ -1355,3 +1355,221 @@
 2026-06-09 11:16:20,194 INFO: LEOC Application started [in /app/app.py:123]
 2026-06-09 11:16:20,194 INFO: LEOC Application started [in /app/app.py:123]
 2026-06-09 11:16:20,194 INFO: LEOC Application started [in /app/app.py:123]
+2026-06-09 18:03:38,822 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:126]
+2026-06-09 18:03:46,362 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:126]
+2026-06-09 18:03:53,248 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:126]
+2026-06-09 21:15:23,058 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:126]
+2026-06-09 21:15:52,131 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:126]
+2026-06-09 21:16:46,726 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:126]
+2026-06-09 21:16:49,232 ERROR: Exception on /api/auth/me [GET] [in /home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py:825]
+Traceback (most recent call last):
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py", line 1455, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py", line 869, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py", line 867, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py", line 852, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/app.py", line 818, in api_auth_me
+    return jsonify({'success': True, 'user': current_user.to_dict()})
+                                             ^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/auth_helpers.py", line 34, in to_dict
+    'created_at': self.created_at.strftime('%Y-%m-%d %H:%M') if self.created_at else None,
+                  ^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'str' object has no attribute 'strftime'
+2026-06-09 21:17:08,777 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:126]
+2026-06-09 15:33:28,886 ERROR: Exception on /settings [GET] [in /usr/local/lib/python3.11/site-packages/flask/app.py:825]
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.11/site-packages/flask/app.py", line 1455, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/flask/app.py", line 869, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/flask/app.py", line 867, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/flask/app.py", line 852, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/app/app.py", line 744, in settings
+    else:
+          
+  File "/usr/local/lib/python3.11/site-packages/flask/templating.py", line 152, in render_template
+    return _render(app, template, context)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/flask/templating.py", line 133, in _render
+    rv = template.render(context)
+         ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/jinja2/environment.py", line 1295, in render
+    self.environment.handle_exception()
+  File "/usr/local/lib/python3.11/site-packages/jinja2/environment.py", line 942, in handle_exception
+    raise rewrite_traceback_stack(source=source)
+  File "/app/templates/settings.html", line 1, in top-level template code
+    {% extends "base.html" %}
+  File "/app/templates/base.html", line 55, in top-level template code
+    <span class="badge bg-light text-dark">{{ current_user.role }}</span>
+    ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/app/templates/settings.html", line 14, in block 'content'
+    {% if current_user.is_authenticated and current_user.role == 'admin' %}
+    ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/jinja2/environment.py", line 490, in getattr
+    return getattr(obj, attribute)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+jinja2.exceptions.UndefinedError: 'current_user' is undefined
+2026-06-09 21:23:52,816 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:126]
+2026-06-09 21:23:59,725 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:126]
+2026-06-09 15:40:20,748 ERROR: Exception on /disaster-report [GET] [in /usr/local/lib/python3.11/site-packages/flask/app.py:825]
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.11/site-packages/flask/app.py", line 1455, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/flask/app.py", line 869, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/flask/app.py", line 867, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/flask/app.py", line 852, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/app/app.py", line 713, in disaster_report
+    @app.route('/helipad_locations.json')
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/flask/templating.py", line 152, in render_template
+    return _render(app, template, context)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/flask/templating.py", line 133, in _render
+    rv = template.render(context)
+         ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/jinja2/environment.py", line 1295, in render
+    self.environment.handle_exception()
+  File "/usr/local/lib/python3.11/site-packages/jinja2/environment.py", line 942, in handle_exception
+    raise rewrite_traceback_stack(source=source)
+  File "/app/templates/disaster_report.html", line 1, in top-level template code
+    {% extends 'base.html' %}
+  File "/app/templates/base.html", line 55, in top-level template code
+    <span class="badge bg-light text-dark">{{ current_user.role }}</span>
+    ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/app/templates/disaster_report.html", line 750, in block 'content'
+    {% if not current_user.is_authenticated %}
+    ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/jinja2/environment.py", line 490, in getattr
+    return getattr(obj, attribute)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+jinja2.exceptions.UndefinedError: 'current_user' is undefined
+2026-06-09 21:27:00,957 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:126]
+2026-06-09 21:34:08,889 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:126]
+2026-06-09 21:34:34,377 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:126]
+2026-06-09 21:34:48,991 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:126]
+2026-06-09 21:35:11,194 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:126]
+2026-06-09 21:36:01,261 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:126]
+2026-06-09 21:36:31,386 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:126]
+2026-06-09 21:36:40,882 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:126]
+2026-06-09 21:41:08,533 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:126]
+2026-06-09 21:41:16,853 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:126]
+2026-06-09 21:41:37,707 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:126]
+2026-06-09 21:43:26,688 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:126]
+2026-06-09 21:44:32,377 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:126]
+2026-06-09 21:44:40,701 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:126]
+2026-06-09 21:44:49,862 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:126]
+2026-06-09 21:46:42,148 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:126]
+2026-06-09 21:47:01,056 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:126]
+2026-06-09 21:48:32,213 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:126]
+2026-06-09 22:02:43,782 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:126]
+2026-06-09 22:37:35,674 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:126]
+2026-06-09 22:39:04,335 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:126]
+2026-06-09 22:39:09,831 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:126]
+2026-06-09 22:40:22,120 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:126]
+2026-06-09 22:46:54,311 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:126]
+2026-06-09 22:54:03,691 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:126]
+2026-06-09 22:54:09,837 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:126]
+2026-06-09 23:52:36,863 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:126]
+2026-06-09 23:52:42,745 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:126]
+2026-06-09 23:52:50,376 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:126]
+2026-06-10 05:50:19,897 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:126]
+2026-06-10 06:51:36,814 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:96]
+2026-06-10 06:51:43,601 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:96]
+2026-06-10 06:51:46,401 ERROR: Exception on /api/data [GET] [in /home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py:825]
+Traceback (most recent call last):
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+sqlite3.OperationalError: no such column: warehouse.address
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py", line 1455, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py", line 869, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py", line 867, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py", line 852, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/app.py", line 1309, in get_form_data
+    'warehouses': [w.to_dict() for w in Warehouse.query.all()],
+                                        ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/orm/query.py", line 2704, in all
+    return self._iter().all()  # type: ignore
+           ^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/orm/query.py", line 2857, in _iter
+    result: Union[ScalarResult[_T], Result[_T]] = self.session.execute(
+                                                  ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 2351, in execute
+    return self._execute_internal(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 2249, in _execute_internal
+    result: Result[Any] = compile_state_cls.orm_execute_statement(
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/orm/context.py", line 306, in orm_execute_statement
+    result = conn.execute(
+             ^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1419, in execute
+    return meth(
+           ^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/sql/elements.py", line 527, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1641, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1846, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1986, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 2363, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+sqlalchemy.exc.OperationalError: (sqlite3.OperationalError) no such column: warehouse.address
+[SQL: SELECT warehouse.id AS warehouse_id, warehouse.name AS warehouse_name, warehouse.code AS warehouse_code, warehouse.address AS warehouse_address, warehouse.contact_person AS warehouse_contact_person, warehouse.phone AS warehouse_phone, warehouse.capacity AS warehouse_capacity, warehouse.remarks AS warehouse_remarks, warehouse.created_at AS warehouse_created_at, warehouse.updated_at AS warehouse_updated_at 
+FROM warehouse]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2026-06-10 06:54:40,592 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:96]
+2026-06-10 06:55:33,736 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:96]
+2026-06-10 07:00:30,562 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:96]
+2026-06-10 07:06:33,040 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:96]
+2026-06-10 07:07:16,902 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:96]
+2026-06-10 07:08:18,670 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:96]
+2026-06-10 07:10:28,038 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:96]
+2026-06-10 07:28:11,712 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:96]
+2026-06-10 07:28:54,757 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:96]
+2026-06-10 07:29:25,740 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:96]
+2026-06-10 07:31:05,033 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:96]
+2026-06-10 07:31:57,572 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:96]
+2026-06-10 07:33:24,064 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:96]

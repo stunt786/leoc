@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% block title %}Reports - LEOC{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('index') }}"><i class="bi bi-house-fill"></i></a></li>
+<li class="breadcrumb-item active">Reports</li>
+{% endblock %}
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <h4><i class="bi bi-file-text me-2"></i>Reports</h4>
+    <div class="d-flex gap-2 flex-wrap">
+        <select class="form-select form-select-sm" id="reportType" style="width:auto" onchange="toggleFilters()">
+            <option value="inventory">Inventory Report</option>
+            <option value="stock-receipts">Stock Receipt Report</option>
+            <option value="dispatch">Dispatch Report</option>
+            <option value="distribution">Distribution Report</option>
+            <option value="incidents">Incident Report</option>
+            <option value="requests">Relief Request Report</option>
+            <option value="adjustments">Adjustment Report</option>
+            <option value="low-stock">Low Stock Report</option>
+            <option value="monthly-summary">Monthly Summary</option>
+        </select>
+        <button class="btn btn-primary btn-sm" onclick="downloadReport()"><i class="bi bi-download me-1"></i>Download PDF</button>
+    </div>
+</div>
+
+<div class="card mt-3">
+    <div class="card-body">
+        <div class="row g-2 align-items-end" id="filterRow">
+            <div class="col-auto">
+                <label class="form-label small">Date From</label>
+                <input type="date" class="form-control form-control-sm" id="dateFrom">
+            </div>
+            <div class="col-auto">
+                <label class="form-label small">Date To</label>
+                <input type="date" class="form-control form-control-sm" id="dateTo">
+            </div>
+            <div class="col-auto filter-optional" data-types="inventory,dispatch,stock-receipts,adjustments,low-stock">
+                <label class="form-label small">Warehouse</label>
+                <select class="form-select form-select-sm" id="filterWarehouse"><option value="">All</option></select>
+            </div>
+            <div class="col-auto filter-optional" data-types="inventory,items,dispatch,requests">
+                <label class="form-label small">Category</label>
+                <select class="form-select form-select-sm" id="filterCategory"><option value="">All</option></select>
+            </div>
+            <div class="col-auto filter-optional" data-types="dispatch,distribution,incidents,requests">
+                <label class="form-label small">Incident</label>
+                <select class="form-select form-select-sm" id="filterIncident"><option value="">All</option></select>
+            </div>
+            <div class="col-auto filter-optional" data-types="incidents,requests">
+                <label class="form-label small">Status</label>
+                <select class="form-select form-select-sm" id="filterStatus"><option value="">All</option>
+                    <option value="Active">Active</option><option value="Closed">Closed</option>
+                    <option value="Pending">Pending</option><option value="Completed">Completed</option>
+                </select>
+            </div>
+            <div class="col-auto filter-optional" data-types="monthly-summary">
+                <label class="form-label small">Month</label>
+                <input type="month" class="form-control form-control-sm" id="filterMonth">
+            </div>
+            <div class="col-auto filter-optional" data-types="inventory,dispatch,distribution,incidents,requests,adjustments,low-stock,stock-receipts">
+                <label class="form-label small">Fiscal Year</label>
+                <select class="form-select form-select-sm" id="filterFiscalYear"><option value="">All</option></select>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card mt-3">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0" id="reportTable">
+                <thead>
+                    <tr id="reportHeaders"></tr>
+                </thead>
+                <tbody id="reportBody">
+                    <tr><td colspan="10" class="text-center text-muted py-4">Select a report type and click Download</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+let formData = {};
+
+async function loadFormData() {
+    try {
+        const resp = await fetch('/api/data');
+        const data = await resp.json();
+        if (data.success) formData = data;
+        populateSelect('filterWarehouse', data.warehouses, 'id', 'name');
+        populateSelect('filterCategory', data.categories, 'id', 'name');
+        populateSelect('filterIncident', data.incidents, 'id', 'incident_name');
+        populateSelect('filterFiscalYear', (data.fiscal_years || []).map(y => ({value: y, label: y})), 'value', 'label');
+        document.getElementById('filterMonth').value = new Date().toISOString().slice(0, 7);
+    } catch(e) { console.error(e); }
+}
+
+function populateSelect(id, items, valKey, labelKey) {
+    const sel = document.getElementById(id);
+    items.forEach(item => {
+        const opt = document.createElement('option');
+        opt.value = item[valKey];
+        opt.textContent = item[labelKey];
+        sel.appendChild(opt);
+    });
+}
+
+function toggleFilters() {
+    const type = document.getElementById('reportType').value;
+    document.querySelectorAll('.filter-optional').forEach(el => {
+        const types = el.dataset.types.split(',');
+        el.style.display = types.includes(type) ? '' : 'none';
+    });
+}
+
+function getFilterParams() {
+    const type = document.getElementById('reportType').value;
+    const params = new URLSearchParams();
+    const warehouse = document.getElementById('filterWarehouse').value;
+    const category = document.getElementById('filterCategory').value;
+    const incident = document.getElementById('filterIncident').value;
+    const status = document.getElementById('filterStatus').value;
+    const fiscalYear = document.getElementById('filterFiscalYear').value;
+    const month = document.getElementById('filterMonth').value;
+
+    if (warehouse && type !== 'monthly-summary') params.set('warehouse_id', warehouse);
+    if (category && ['inventory','dispatch','requests'].includes(type)) params.set('category_id', category);
+    if (incident && ['dispatch','distribution','incidents','requests'].includes(type)) params.set('incident_id', incident);
+    if (status && ['incidents','requests'].includes(type)) params.set('status', status);
+    if (month && type === 'monthly-summary') params.set('month', month);
+    return params.toString();
+}
+
+async function downloadReport() {
+    const type = document.getElementById('reportType').value;
+    const params = getFilterParams();
+    const url = `/api/reports/${type}${params ? '?' + params : ''}`;
+    window.open(url, '_blank');
+}
+
+document.addEventListener('DOMContentLoaded', loadFormData);
+</script>
+{% endblock %}

@@ -1,0 +1,248 @@
+{% extends "base.html" %}
+{% block title %}Adjustments - LEOC{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('index') }}"><i class="bi bi-house-fill"></i></a></li>
+<li class="breadcrumb-item"><a href="{{ url_for('inventory_page') }}">Inventory</a></li>
+<li class="breadcrumb-item active">Adjustments</li>
+{% endblock %}
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center">
+    <div>
+        <h4><i class="bi bi-sliders me-2"></i>Manual Stock Adjustment</h4>
+        <p>Record stock adjustments for Damage, Loss, Physical Count, Correction, or Expired items.</p>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-5">
+        <div class="card">
+            <div class="card-header">
+                <span><i class="bi bi-pencil-square me-2 text-primary"></i>New Adjustment</span>
+            </div>
+            <div class="card-body">
+                <form id="adjustmentForm">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Adjustment No.</label>
+                            <input type="text" class="form-control" id="adjNo" readonly>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Date</label>
+                            <input type="date" class="form-control" id="adjDate">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Warehouse <span class="text-danger">*</span></label>
+                            <select class="form-select" id="adjWarehouse" required>
+                                <option value="">Select Warehouse</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Item <span class="text-danger">*</span></label>
+                            <select class="form-select" id="adjItem" required>
+                                <option value="">Select Item</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Current Quantity</label>
+                            <input type="text" class="form-control" id="adjCurrentQty" readonly value="0">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Adjustment Type <span class="text-danger">*</span></label>
+                            <select class="form-select" id="adjType" required>
+                                <option value="Increase">Increase</option>
+                                <option value="Decrease">Decrease</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Reason <span class="text-danger">*</span></label>
+                            <select class="form-select" id="adjReason" required>
+                                <option value="">Select Reason</option>
+                                <option value="Damage">Damage</option>
+                                <option value="Loss">Loss</option>
+                                <option value="Physical Count">Physical Count</option>
+                                <option value="Correction">Correction</option>
+                                <option value="Expired">Expired</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Adjusted Quantity <span class="text-danger">*</span></label>
+                            <input type="number" class="form-control" id="adjQty" min="1" required>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Remarks</label>
+                            <textarea class="form-control" id="adjRemarks" rows="2"></textarea>
+                        </div>
+                        <div class="col-12">
+                            <button type="button" class="btn btn-primary w-100" onclick="saveAdjustment()">
+                                <i class="bi bi-check-lg me-1"></i>Record Adjustment
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-7">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-clock-history me-2 text-primary"></i>Recent Adjustments</span>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Adj. No.</th>
+                                <th>Date</th>
+                                <th>Warehouse</th>
+                                <th>Item</th>
+                                <th>Type</th>
+                                <th>Reason</th>
+                                <th class="text-end">Qty</th>
+                                <th>Remarks</th>
+                            </tr>
+                        </thead>
+                        <tbody id="adjustmentTableBody">
+                            <tr><td colspan="8" class="text-center py-4"><div class="spinner-border text-primary"></div></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+function setDefaultDate() {
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('adjDate').value = today;
+}
+
+function generateAdjNo() {
+    document.getElementById('adjNo').value = 'ADJ-' + String(Date.now()).slice(-6);
+}
+
+async function loadFormData() {
+    try {
+        const r = await fetch('/api/data');
+        const d = await r.json();
+        if (!d.success) { showToast('danger', d.message); return; }
+        const warehouseSel = document.getElementById('adjWarehouse');
+        d.warehouses.forEach(w => {
+            warehouseSel.innerHTML += `<option value="${w.id}">${w.name}</option>`;
+        });
+        const itemSel = document.getElementById('adjItem');
+        d.items.forEach(i => {
+            itemSel.innerHTML += `<option value="${i.id}" data-unit="${i.unit}">${i.name} (${i.item_code || 'No Code'})</option>`;
+        });
+    } catch (e) { showToast('danger', 'Error loading form data: ' + e.message); }
+}
+
+async function loadCurrentQty() {
+    const warehouseId = document.getElementById('adjWarehouse').value;
+    const itemId = document.getElementById('adjItem').value;
+    if (!warehouseId || !itemId) {
+        document.getElementById('adjCurrentQty').value = '0';
+        return;
+    }
+    try {
+        const r = await fetch(`/api/inventory?warehouse_id=${warehouseId}`);
+        const d = await r.json();
+        const match = d.success ? d.inventory.find(inv => inv.item_id == itemId) : null;
+        document.getElementById('adjCurrentQty').value = match ? match.quantity : '0';
+    } catch (e) {
+        document.getElementById('adjCurrentQty').value = '0';
+    }
+}
+
+async function loadAdjustments() {
+    try {
+        const r = await fetch('/api/adjustments');
+        const d = await r.json();
+        if (!d.success) { showToast('danger', d.message); return; }
+        const tbody = document.getElementById('adjustmentTableBody');
+        const adj = d.adjustments;
+        if (adj.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-muted">No adjustments recorded yet</td></tr>';
+            return;
+        }
+        tbody.innerHTML = adj.map(a => {
+            const typeBadge = a.adjustment_type === 'Increase'
+                ? '<span class="badge bg-success">Increase</span>'
+                : '<span class="badge bg-danger">Decrease</span>';
+            return `<tr>
+                <td><strong>${a.adjustment_no}</strong></td>
+                <td>${a.date}</td>
+                <td>${a.warehouse_name || a.warehouse_id}</td>
+                <td>${a.item_name || a.item_id}</td>
+                <td>${typeBadge}</td>
+                <td>${a.reason || '-'}</td>
+                <td class="text-end fw-bold">${a.adjusted_quantity}</td>
+                <td><small>${a.remarks || '-'}</small></td>
+            </tr>`;
+        }).join('');
+    } catch (e) { showToast('danger', 'Error loading adjustments: ' + e.message); }
+}
+
+async function saveAdjustment() {
+    const warehouseId = document.getElementById('adjWarehouse').value;
+    const itemId = document.getElementById('adjItem').value;
+    const date = document.getElementById('adjDate').value;
+    const adjType = document.getElementById('adjType').value;
+    const reason = document.getElementById('adjReason').value;
+    const adjQty = parseInt(document.getElementById('adjQty').value);
+    const remarks = document.getElementById('adjRemarks').value;
+
+    if (!warehouseId) { showToast('danger', 'Please select a warehouse'); return; }
+    if (!itemId) { showToast('danger', 'Please select an item'); return; }
+    if (!date) { showToast('danger', 'Please select a date'); return; }
+    if (!reason) { showToast('danger', 'Please select a reason'); return; }
+    if (!adjQty || adjQty <= 0) { showToast('danger', 'Adjusted quantity must be greater than 0'); return; }
+
+    const body = {
+        adjustment_no: document.getElementById('adjNo').value,
+        date: date,
+        warehouse_id: parseInt(warehouseId),
+        item_id: parseInt(itemId),
+        adjustment_type: adjType,
+        reason: reason,
+        adjusted_quantity: adjQty,
+        remarks: remarks
+    };
+
+    try {
+        const r = await fetch('/api/adjustments', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrf},
+            body: JSON.stringify(body)
+        });
+        const d = await r.json();
+        if (d.success) {
+            showToast('success', 'Adjustment recorded successfully');
+            document.getElementById('adjQty').value = '';
+            document.getElementById('adjRemarks').value = '';
+            generateAdjNo();
+            loadAdjustments();
+            loadCurrentQty();
+        } else {
+            showToast('danger', d.message);
+        }
+    } catch (e) { showToast('danger', 'Error: ' + e.message); }
+}
+
+document.getElementById('adjItem').addEventListener('change', loadCurrentQty);
+document.getElementById('adjWarehouse').addEventListener('change', loadCurrentQty);
+
+document.addEventListener('DOMContentLoaded', () => {
+    setDefaultDate();
+    generateAdjNo();
+    loadFormData();
+    loadAdjustments();
+});
+</script>
+{% endblock %}

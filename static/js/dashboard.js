@@ -234,18 +234,19 @@ function renderTablePage() {
                                 <button class="btn btn-outline-info" onclick="viewDistribution(${dist.id})" title="View Details">
                                     <i class="bi bi-eye"></i>
                                 </button>
-                                <button class="btn btn-outline-primary" onclick="openEditModal(${dist.id})" title="Edit" ${dist.is_locked ? 'disabled title="Record is locked"' : ''}>
+                                ${window.currentUserRole && window.currentUserRole !== 'guest' && window.currentUserRole !== 'viewer' ? `
+                                <button class="btn btn-outline-primary" onclick="openEditModal(${dist.id})" title="Edit" ${dist.is_locked ? 'disabled' : ''}>
                                     <i class="bi bi-pencil"></i>
                                 </button>
                                 ${dist.image_filename ? `<a href="/static/uploads/${escapeHtml(dist.image_filename)}" class="btn btn-outline-info" target="_blank" title="View Image">
                                     <i class="bi bi-image"></i>
                                 </a>` : ''}
-                                <button class="btn btn-outline-danger" onclick="deleteDistribution(${dist.id})" title="Delete" ${dist.is_locked ? 'disabled title="Record is locked"' : ''}>
+                                <button class="btn btn-outline-danger" onclick="deleteDistribution(${dist.id})" title="Delete" ${dist.is_locked ? 'disabled' : ''}>
                                     <i class="bi bi-trash"></i>
                                 </button>
                                 <button class="btn ${dist.is_locked ? 'btn-warning' : 'btn-secondary'}" onclick="toggleLock(${dist.id}, ${dist.is_locked})" title="${dist.is_locked ? 'Unlock record' : 'Lock record'}">
                                     <i class="bi bi-${dist.is_locked ? 'unlock-fill' : 'lock'}"></i>
-                                </button>
+                                </button>` : ''}
                             </div>
                         </td>
                     </tr>
@@ -1177,28 +1178,19 @@ function viewDistribution(id) {
 
 // Toggle lock status for a distribution record
 async function toggleLock(id, isCurrentlyLocked) {
-    // Prompt for unlock key
-    const unlockKey = prompt(`Enter unlock key to ${isCurrentlyLocked ? 'unlock' : 'lock'} this record:`);
-
-    if (!unlockKey) {
-        return; // User cancelled
-    }
-
     try {
         const response = await fetch(`/api/distributions/${id}/lock`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-            },
-            body: JSON.stringify({ unlock_key: unlockKey })
+            }
         });
 
         const data = await response.json();
 
         if (data.success) {
             showNotification('success', `Record ${data.is_locked ? 'locked' : 'unlocked'} successfully`);
-            // Reload the table to reflect the new lock status
             loadDistributions();
             loadStatistics();
         } else {

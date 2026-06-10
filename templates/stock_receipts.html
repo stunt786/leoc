@@ -1,0 +1,304 @@
+{% extends "base.html" %}
+{% block title %}Stock Receipts - LEOC{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('index') }}"><i class="bi bi-house-fill"></i></a></li>
+<li class="breadcrumb-item"><a href="#">Inventory</a></li>
+<li class="breadcrumb-item active">Stock Receipt</li>
+{% endblock %}
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center">
+    <div>
+        <h4><i class="bi bi-clipboard-check me-2"></i>Stock Receipt</h4>
+        <p>Record incoming stock receipts</p>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header">
+        <span><i class="bi bi-plus-circle me-2 text-primary"></i>New Stock Receipt</span>
+    </div>
+    <div class="card-body">
+        <form id="receiptForm">
+            <input type="hidden" id="receipt_id">
+            <div class="row g-3 mb-3">
+                <div class="col-md-3">
+                    <label class="form-label">Receipt No</label>
+                    <input type="text" class="form-control" id="receipt_no" readonly>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Date *</label>
+                    <input type="date" class="form-control" id="receipt_date" required>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Warehouse *</label>
+                    <select class="form-select" id="receipt_warehouse_id" required>
+                        <option value="">Select Warehouse</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Source Type *</label>
+                    <select class="form-select" id="receipt_source_type" required>
+                        <option value="">Select Source</option>
+                        <option value="Government">Government</option>
+                        <option value="Donation">Donation</option>
+                        <option value="NGO">NGO</option>
+                        <option value="Transfer">Transfer</option>
+                        <option value="Purchase">Purchase</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Source Name</label>
+                    <input type="text" class="form-control" id="receipt_source_name" placeholder="e.g. Organization name">
+                </div>
+                <div class="col-md-8">
+                    <label class="form-label">Remarks</label>
+                    <textarea class="form-control" id="receipt_remarks" rows="1"></textarea>
+                </div>
+            </div>
+
+            <hr>
+            <h6 class="mb-3"><i class="bi bi-box me-2"></i>Received Items</h6>
+            <div class="table-responsive mb-3">
+                <table class="table table-bordered" id="itemsTable">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="min-width:200px">Item *</th>
+                            <th style="min-width:100px">Unit</th>
+                            <th style="min-width:120px">Quantity *</th>
+                            <th style="width:50px"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="itemsBody"></tbody>
+                </table>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-primary" onclick="addItemRow()">
+                <i class="bi bi-plus-lg me-1"></i>Add Item
+            </button>
+
+            <div class="mt-4">
+                <button type="button" class="btn btn-primary" onclick="saveReceipt()"><i class="bi bi-check-lg me-1"></i>Save Receipt</button>
+                <button type="button" class="btn btn-secondary" onclick="resetReceiptForm()"><i class="bi bi-arrow-counterclockwise me-1"></i>Reset</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-list-check me-2 text-primary"></i>Recent Receipts</span>
+        <input type="text" class="form-control form-control-sm" style="width:200px" id="receiptSearch" placeholder="Search by receipt no..." oninput="filterReceipts()">
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Receipt No</th>
+                        <th>Date</th>
+                        <th>Warehouse</th>
+                        <th>Source</th>
+                        <th>Items</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="receiptTableBody">
+                    <tr><td colspan="6" class="text-center py-4"><div class="spinner-border text-primary"></div></td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Receipt Detail Modal -->
+<div class="modal fade" id="receiptDetailModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-receipt me-2"></i>Receipt Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="receiptDetailBody">
+                <div class="text-center py-4"><div class="spinner-border text-primary"></div></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+let receipts = [];
+let warehouses = [];
+let itemsList = [];
+
+async function loadFormData() {
+    const r = await fetch('/api/data');
+    const d = await r.json();
+    if (!d.success) { showToast('danger', d.message); return; }
+    warehouses = d.warehouses || [];
+    itemsList = d.items || [];
+    const whSelect = document.getElementById('receipt_warehouse_id');
+    whSelect.innerHTML = '<option value="">Select Warehouse</option>' +
+        warehouses.map(w => `<option value="${w.id}">${w.name} (${w.code})</option>`).join('');
+    loadReceipts();
+}
+
+function loadReceipts() {
+    fetch('/api/stock-receipts')
+        .then(r => r.json())
+        .then(d => {
+            if (!d.success) { showToast('danger', d.message); return; }
+            receipts = d.receipts;
+            renderReceipts(receipts);
+        });
+}
+
+function renderReceipts(data) {
+    const tbody = document.getElementById('receiptTableBody');
+    if (data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-muted">No receipts found</td></tr>';
+        return;
+    }
+    tbody.innerHTML = data.map(r => {
+        const itemCount = r.items ? r.items.length : 0;
+        return `<tr style="cursor:pointer" onclick="viewReceipt(${r.id})">
+            <td><strong>${r.receipt_no}</strong></td>
+            <td>${r.date || '-'}</td>
+            <td>${r.warehouse_name || '-'}</td>
+            <td>${r.source_type}${r.source_name ? ' - ' + r.source_name : ''}</td>
+            <td><span class="badge bg-dark">${itemCount} item${itemCount !== 1 ? 's' : ''}</span></td>
+            <td class="text-end" onclick="event.stopPropagation()">
+                <button class="btn btn-sm btn-outline-info" onclick='viewReceipt(${r.id})'><i class="bi bi-eye"></i></button>
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+function filterReceipts() {
+    const q = document.getElementById('receiptSearch').value.toLowerCase();
+    const filtered = receipts.filter(r => r.receipt_no.toLowerCase().includes(q));
+    renderReceipts(filtered);
+}
+
+function resetReceiptForm() {
+    document.getElementById('receipt_id').value = '';
+    document.getElementById('receiptForm').reset();
+    document.getElementById('receipt_no').value = 'RCPT-' + String(Date.now()).slice(-6);
+    document.getElementById('receipt_date').value = new Date().toISOString().split('T')[0];
+    document.getElementById('itemsBody').innerHTML = '';
+}
+
+let itemRowIndex = 0;
+
+function addItemRow(itemId = '', unit = '', qty = '') {
+    const tr = document.createElement('tr');
+    const itemOpts = itemsList.map(i =>
+        `<option value="${i.id}" data-unit="${i.unit || ''}" ${i.id == itemId ? 'selected' : ''}>${i.item_code ? i.item_code + ' - ' : ''}${i.name}</option>`
+    ).join('');
+    tr.innerHTML = `
+        <td>
+            <select class="form-select form-select-sm receipt-item" onchange="updateItemUnit(this)">
+                <option value="">Select Item</option>
+                ${itemOpts}
+            </select>
+        </td>
+        <td><input type="text" class="form-control form-control-sm receipt-unit" value="${unit}" readonly></td>
+        <td><input type="number" class="form-control form-control-sm receipt-qty" value="${qty}" min="1" step="1"></td>
+        <td><button class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove()"><i class="bi bi-x"></i></button></td>
+    `;
+    document.getElementById('itemsBody').appendChild(tr);
+}
+
+function updateItemUnit(select) {
+    const opt = select.options[select.selectedIndex];
+    const unit = opt ? opt.getAttribute('data-unit') : '';
+    select.closest('tr').querySelector('.receipt-unit').value = unit;
+}
+
+async function saveReceipt() {
+    const itemRows = document.querySelectorAll('#itemsBody tr');
+    const items = Array.from(itemRows).map(tr => ({
+        item_id: parseInt(tr.querySelector('.receipt-item').value),
+        quantity: parseInt(tr.querySelector('.receipt-qty').value) || 0,
+        unit: tr.querySelector('.receipt-unit').value
+    })).filter(i => i.item_id && i.quantity > 0);
+
+    if (items.length === 0) { showToast('danger', 'Add at least one item with quantity'); return; }
+
+    const body = {
+        receipt_no: document.getElementById('receipt_no').value,
+        date: document.getElementById('receipt_date').value,
+        warehouse_id: parseInt(document.getElementById('receipt_warehouse_id').value),
+        source_type: document.getElementById('receipt_source_type').value,
+        source_name: document.getElementById('receipt_source_name').value,
+        remarks: document.getElementById('receipt_remarks').value,
+        items: items
+    };
+
+    if (!body.warehouse_id) { showToast('danger', 'Warehouse is required'); return; }
+    if (!body.source_type) { showToast('danger', 'Source type is required'); return; }
+    if (!body.date) { showToast('danger', 'Date is required'); return; }
+
+    const r = await fetch('/api/stock-receipts', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json','X-CSRFToken':csrf},
+        body: JSON.stringify(body)
+    });
+    const d = await r.json();
+    if (d.success) {
+        showToast('success', 'Stock receipt recorded');
+        resetReceiptForm();
+        loadReceipts();
+    } else { showToast('danger', d.message); }
+}
+
+async function viewReceipt(id) {
+    const modal = new bootstrap.Modal(document.getElementById('receiptDetailModal'));
+    document.getElementById('receiptDetailBody').innerHTML = '<div class="text-center py-4"><div class="spinner-border text-primary"></div></div>';
+    modal.show();
+
+    try {
+        const r = await fetch('/api/stock-receipts/'+id);
+        const d = await r.json();
+        if (!d.success) { document.getElementById('receiptDetailBody').innerHTML = '<p class="text-danger">Failed to load details</p>'; return; }
+        const rc = d.receipt;
+        const whName = warehouses.find(w => w.id === rc.warehouse_id)?.name || rc.warehouse_name || '-';
+        const itemsHtml = (rc.items || []).map(i => `<tr>
+            <td>${i.item_name || '-'}</td>
+            <td>${i.quantity || 0}</td>
+            <td>${i.unit || '-'}</td>
+        </tr>`).join('') || '<tr><td colspan="3" class="text-center text-muted">No items</td></tr>';
+
+        document.getElementById('receiptDetailBody').innerHTML = `
+            <div class="row g-3 mb-3">
+                <div class="col-md-4"><strong>Receipt No:</strong><br>${rc.receipt_no}</div>
+                <div class="col-md-4"><strong>Date:</strong><br>${rc.date || '-'}</div>
+                <div class="col-md-4"><strong>Warehouse:</strong><br>${whName}</div>
+                <div class="col-md-4"><strong>Source Type:</strong><br>${rc.source_type || '-'}</div>
+                <div class="col-md-4"><strong>Source Name:</strong><br>${rc.source_name || '-'}</div>
+                <div class="col-md-4"><strong>Remarks:</strong><br>${rc.remarks || '-'}</div>
+            </div>
+            <hr>
+            <h6>Items Received</h6>
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    <thead><tr><th>Item</th><th>Quantity</th><th>Unit</th></tr></thead>
+                    <tbody>${itemsHtml}</tbody>
+                </table>
+            </div>
+        `;
+    } catch(e) {
+        document.getElementById('receiptDetailBody').innerHTML = '<p class="text-danger">Error loading details</p>';
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    resetReceiptForm();
+    loadFormData();
+});
+</script>
+{% endblock %}

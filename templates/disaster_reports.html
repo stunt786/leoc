@@ -1,0 +1,374 @@
+{% extends "base.html" %}
+{% block title %}Disaster Reports - LEOC{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('index') }}"><i class="bi bi-house-fill"></i></a></li>
+<li class="breadcrumb-item active">Disaster Reports</li>
+{% endblock %}
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <h4><i class="bi bi-exclamation-triangle-fill me-2"></i>Disaster Reports</h4>
+    <div class="d-flex gap-2">
+        <button class="btn btn-outline-primary btn-sm" onclick="showPrintPreview()"><i class="bi bi-eye me-1"></i>Print Preview</button>
+        <button class="btn btn-primary btn-sm" onclick="downloadDailyReport()"><i class="bi bi-download me-1"></i>Download Daily Report</button>
+    </div>
+</div>
+
+<div class="row g-3 mt-1">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-plus-circle me-2"></i>New Disaster Assessment</span>
+            </div>
+            <div class="card-body">
+                <form id="assessmentForm">
+                    <div class="row g-2 mb-2">
+                        <div class="col-md-4">
+                            <label class="form-label small">Incident</label>
+                            <select class="form-select form-select-sm" id="incident_id" required></select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small">Disaster Type</label>
+                            <select class="form-select form-select-sm" id="disaster_type" required></select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small">Fiscal Year</label>
+                            <select class="form-select form-select-sm" id="fiscal_year"></select>
+                        </div>
+                    </div>
+                    <div class="row g-2 mb-2">
+                        <div class="col-md-4">
+                            <label class="form-label small">Date (BS)</label>
+                            <input type="text" class="form-control form-control-sm" id="disaster_date_bs" placeholder="2081-12-25">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small">Location/Tole</label>
+                            <input type="text" class="form-control form-control-sm" id="tole">
+                        </div>
+                    </div>
+
+                    <h6 class="mt-3 mb-2"><i class="bi bi-people-fill me-1"></i>Human Impact</h6>
+                    <div class="row g-2 mb-2">
+                        <div class="col-3"><label class="form-label small">Deaths</label><input type="number" class="form-control form-control-sm" id="deaths" min="0" value="0"></div>
+                        <div class="col-3"><label class="form-label small">Missing</label><input type="number" class="form-control form-control-sm" id="missing_persons" min="0" value="0"></div>
+                        <div class="col-3"><label class="form-label small">Injured</label><input type="number" class="form-control form-control-sm" id="injured" min="0" value="0"></div>
+                        <div class="col-3"><label class="form-label small">Affected Households</label><input type="number" class="form-control form-control-sm" id="affected_households" min="0" value="0"></div>
+                    </div>
+                    <div class="row g-2 mb-2">
+                        <div class="col-4"><label class="form-label small">Affected People (Male)</label><input type="number" class="form-control form-control-sm" id="affected_people_male" min="0" value="0"></div>
+                        <div class="col-4"><label class="form-label small">Affected People (Female)</label><input type="number" class="form-control form-control-sm" id="affected_people_female" min="0" value="0"></div>
+                        <div class="col-4"><label class="form-label small">Affected People (Total)</label><input type="number" class="form-control form-control-sm" id="affected_people" min="0" value="0"></div>
+                    </div>
+
+                    <h6 class="mt-3 mb-2"><i class="bi bi-building me-1"></i>Property Damage</h6>
+                    <div class="row g-2 mb-2">
+                        <div class="col-3"><label class="form-label small">House Destroyed</label><input type="number" class="form-control form-control-sm" id="house_destroyed" min="0" value="0"></div>
+                        <div class="col-3"><label class="form-label small">House Damaged</label><input type="number" class="form-control form-control-sm" id="house_damaged" min="0" value="0"></div>
+                        <div class="col-3"><label class="form-label small">Public Bldg Destroyed</label><input type="number" class="form-control form-control-sm" id="public_building_destroyed" min="0" value="0"></div>
+                        <div class="col-3"><label class="form-label small">Public Bldg Damaged</label><input type="number" class="form-control form-control-sm" id="public_building_damaged" min="0" value="0"></div>
+                    </div>
+                    <div class="row g-2 mb-2">
+                        <div class="col-4"><label class="form-label small">Est. Loss (NPR)</label><input type="number" class="form-control form-control-sm" id="estimated_loss" min="0" value="0" step="0.01"></div>
+                        <div class="col-8"><label class="form-label small">Crop Damage</label><input type="text" class="form-control form-control-sm" id="agriculture_crop_damage" placeholder="e.g. 5 ha paddy destroyed"></div>
+                    </div>
+
+                    <h6 class="mt-3 mb-2"><i class="bi bi-paw me-1"></i>Livestock Impact</h6>
+                    <div class="row g-2 mb-2">
+                        <div class="col-3"><label class="form-label small">Cattle Lost</label><input type="number" class="form-control form-control-sm" id="cattle_lost" min="0" value="0"></div>
+                        <div class="col-3"><label class="form-label small">Cattle Injured</label><input type="number" class="form-control form-control-sm" id="cattle_injured" min="0" value="0"></div>
+                        <div class="col-3"><label class="form-label small">Poultry Lost</label><input type="number" class="form-control form-control-sm" id="poultry_lost" min="0" value="0"></div>
+                        <div class="col-3"><label class="form-label small">Poultry Injured</label><input type="number" class="form-control form-control-sm" id="poultry_injured" min="0" value="0"></div>
+                    </div>
+                    <div class="row g-2 mb-2">
+                        <div class="col-3"><label class="form-label small">Goats/Sheep Lost</label><input type="number" class="form-control form-control-sm" id="goats_sheep_lost" min="0" value="0"></div>
+                        <div class="col-3"><label class="form-label small">Goats/Sheep Injured</label><input type="number" class="form-control form-control-sm" id="goats_sheep_injured" min="0" value="0"></div>
+                        <div class="col-3"><label class="form-label small">Other Livestock Lost</label><input type="number" class="form-control form-control-sm" id="other_livestock_lost" min="0" value="0"></div>
+                        <div class="col-3"><label class="form-label small">Other Livestock Injured</label><input type="number" class="form-control form-control-sm" id="other_livestock_injured" min="0" value="0"></div>
+                    </div>
+
+                    <h6 class="mt-3 mb-2"><i class="bi bi-infinity me-1"></i>Infrastructure</h6>
+                    <div class="row g-2 mb-2">
+                        <div class="col-3"><div class="form-check"><input class="form-check-input" type="checkbox" id="road_blocked"><label class="form-check-label small">Road Blocked</label></div></div>
+                        <div class="col-3"><div class="form-check"><input class="form-check-input" type="checkbox" id="electricity_blocked"><label class="form-check-label small">Electricity Disrupted</label></div></div>
+                        <div class="col-3"><div class="form-check"><input class="form-check-input" type="checkbox" id="communication_blocked"><label class="form-check-label small">Communication Down</label></div></div>
+                        <div class="col-3"><div class="form-check"><input class="form-check-input" type="checkbox" id="drinking_water_disrupted"><label class="form-check-label small">Water Disrupted</label></div></div>
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-label small">Remarks</label>
+                        <textarea class="form-control form-control-sm" id="remarks" rows="2"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-check-lg me-1"></i>Save Assessment</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card mb-3">
+            <div class="card-header"><span><i class="bi bi-funnel me-2"></i>Filter</span></div>
+            <div class="card-body">
+                <div class="mb-2">
+                    <label class="form-label small">Fiscal Year</label>
+                    <select class="form-select form-select-sm" id="statFiscalYear" onchange="loadStatistics()">
+                        <option value="">All</option>
+                    </select>
+                </div>
+                <div class="mb-2">
+                    <label class="form-label small">Disaster Type</label>
+                    <select class="form-select form-select-sm" id="statDisasterType" onchange="loadStatistics()">
+                        <option value="">All</option>
+                    </select>
+                </div>
+                <div class="mb-2">
+                    <label class="form-label small">Ward</label>
+                    <select class="form-select form-select-sm" id="statWard" onchange="loadStatistics()">
+                        <option value="">All</option>
+                        <option value="1">Ward 1</option><option value="2">Ward 2</option>
+                        <option value="3">Ward 3</option><option value="4">Ward 4</option>
+                        <option value="5">Ward 5</option><option value="6">Ward 6</option>
+                        <option value="7">Ward 7</option><option value="8">Ward 8</option>
+                        <option value="9">Ward 9</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-header"><span><i class="bi bi-bar-chart me-2"></i>Summary</span></div>
+            <div class="card-body">
+                <div class="row g-1 text-center" id="statCards">
+                    <div class="col-6 mb-1"><div class="p-2 bg-light rounded"><small class="text-muted d-block">Total Assessments</small><strong id="statCount">0</strong></div></div>
+                    <div class="col-6 mb-1"><div class="p-2 bg-danger bg-opacity-10 rounded"><small class="text-muted d-block">Deaths</small><strong id="statDeaths" class="text-danger">0</strong></div></div>
+                    <div class="col-6 mb-1"><div class="p-2 bg-warning bg-opacity-10 rounded"><small class="text-muted d-block">Missing</small><strong id="statMissing" class="text-warning">0</strong></div></div>
+                    <div class="col-6 mb-1"><div class="p-2 bg-info bg-opacity-10 rounded"><small class="text-muted d-block">Injured</small><strong id="statInjured" class="text-info">0</strong></div></div>
+                    <div class="col-6 mb-1"><div class="p-2 bg-success bg-opacity-10 rounded"><small class="text-muted d-block">Affected HH</small><strong id="statAffectedHH" class="text-success">0</strong></div></div>
+                    <div class="col-6 mb-1"><div class="p-2 bg-secondary bg-opacity-10 rounded"><small class="text-muted d-block">House Destroyed</small><strong id="statHouseDestroyed">0</strong></div></div>
+                    <div class="col-12 mt-2"><div class="p-2 bg-primary bg-opacity-10 rounded"><small class="text-muted d-block">Est. Loss (NPR)</small><strong id="statLoss" class="text-primary">0</strong></div></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-header"><span><i class="bi bi-pie-chart me-2"></i>By Disaster Type</span></div>
+            <div class="card-body"><canvas id="typeChart" height="150"></canvas></div>
+        </div>
+
+        <div class="card">
+            <div class="card-header"><span><i class="bi bi-pie-chart me-2"></i>By Ward</span></div>
+            <div class="card-body"><canvas id="wardChart" height="150"></canvas></div>
+        </div>
+    </div>
+</div>
+
+<div class="card mt-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-list me-2"></i>Assessment Records</span>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0" id="assessmentTable">
+                <thead><tr>
+                    <th>Incident</th><th>Type</th><th>Fiscal Year</th><th>BS Date</th><th>Deaths</th><th>Missing</th><th>Injured</th><th>Actions</th>
+                </tr></thead>
+                <tbody id="assessmentBody"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+let formData = {};
+let typeChart = null, wardChart = null;
+
+async function loadFormData() {
+    try {
+        const resp = await fetch('/api/data');
+        formData = await resp.json();
+        populateSelect('incident_id', formData.incidents, 'id', 'incident_name');
+        populateSelect('disaster_type', formData.disaster_types, null, null);
+        populateSelect('fiscal_year', formData.fiscal_years, null, null);
+        populateSelect('statFiscalYear', formData.fiscal_years, null, null);
+        populateSelect('statDisasterType', formData.disaster_types, null, null);
+        if (formData.active_fiscal_year) document.getElementById('fiscal_year').value = formData.active_fiscal_year;
+    } catch(e) { console.error(e); }
+    loadAssessments();
+    loadStatistics();
+}
+
+function populateSelect(id, items, valKey, labelKey) {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    items.forEach(item => {
+        const opt = document.createElement('option');
+        if (valKey === null) { opt.value = item; opt.textContent = item; }
+        else { opt.value = item[valKey]; opt.textContent = item[labelKey]; }
+        sel.appendChild(opt);
+    });
+}
+
+document.getElementById('assessmentForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const data = {
+        incident_id: parseInt(document.getElementById('incident_id').value),
+        disaster_type: document.getElementById('disaster_type').value,
+        fiscal_year: document.getElementById('fiscal_year').value,
+        disaster_date_bs: document.getElementById('disaster_date_bs').value,
+        tole: document.getElementById('tole').value,
+        deaths: parseInt(document.getElementById('deaths').value) || 0,
+        missing_persons: parseInt(document.getElementById('missing_persons').value) || 0,
+        injured: parseInt(document.getElementById('injured').value) || 0,
+        affected_households: parseInt(document.getElementById('affected_households').value) || 0,
+        affected_people: parseInt(document.getElementById('affected_people').value) || 0,
+        affected_people_male: parseInt(document.getElementById('affected_people_male').value) || 0,
+        affected_people_female: parseInt(document.getElementById('affected_people_female').value) || 0,
+        house_destroyed: parseInt(document.getElementById('house_destroyed').value) || 0,
+        house_damaged: parseInt(document.getElementById('house_damaged').value) || 0,
+        public_building_destroyed: parseInt(document.getElementById('public_building_destroyed').value) || 0,
+        public_building_damaged: parseInt(document.getElementById('public_building_damaged').value) || 0,
+        estimated_loss: parseFloat(document.getElementById('estimated_loss').value) || 0.0,
+        agriculture_crop_damage: document.getElementById('agriculture_crop_damage').value,
+        cattle_lost: parseInt(document.getElementById('cattle_lost').value) || 0,
+        cattle_injured: parseInt(document.getElementById('cattle_injured').value) || 0,
+        poultry_lost: parseInt(document.getElementById('poultry_lost').value) || 0,
+        poultry_injured: parseInt(document.getElementById('poultry_injured').value) || 0,
+        goats_sheep_lost: parseInt(document.getElementById('goats_sheep_lost').value) || 0,
+        goats_sheep_injured: parseInt(document.getElementById('goats_sheep_injured').value) || 0,
+        other_livestock_lost: parseInt(document.getElementById('other_livestock_lost').value) || 0,
+        other_livestock_injured: parseInt(document.getElementById('other_livestock_injured').value) || 0,
+        road_blocked: document.getElementById('road_blocked').checked,
+        electricity_blocked: document.getElementById('electricity_blocked').checked,
+        communication_blocked: document.getElementById('communication_blocked').checked,
+        drinking_water_disrupted: document.getElementById('drinking_water_disrupted').checked,
+        remarks: document.getElementById('remarks').value,
+    };
+    try {
+        const resp = await fetch('/api/disaster-assessments', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json','X-CSRFToken':document.querySelector('meta[name="csrf-token"]').getAttribute('content')},
+            body: JSON.stringify(data)
+        });
+        const result = await resp.json();
+        if (result.success) {
+            showToast('success', 'Assessment saved');
+            document.getElementById('assessmentForm').reset();
+            loadAssessments();
+            loadStatistics();
+        } else {
+            showToast('danger', result.message);
+        }
+    } catch(e) { showToast('danger', e.message); }
+});
+
+async function loadAssessments() {
+    try {
+        const resp = await fetch('/api/disaster-assessments');
+        const data = await resp.json();
+        const tbody = document.getElementById('assessmentBody');
+        if (!data.success || !data.assessments.length) {
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">No assessments yet</td></tr>';
+            return;
+        }
+        tbody.innerHTML = data.assessments.map(a => `
+            <tr>
+                <td>${a.incident_name || ''}</td>
+                <td>${a.disaster_type}</td>
+                <td>${a.fiscal_year || ''}</td>
+                <td>${a.disaster_date_bs || ''}</td>
+                <td>${a.deaths}</td>
+                <td>${a.missing_persons}</td>
+                <td>${a.injured}</td>
+                <td><button class="btn btn-sm btn-outline-danger" onclick="deleteAssessment(${a.id})"><i class="bi bi-trash"></i></button></td>
+            </tr>
+        `).join('');
+    } catch(e) { console.error(e); }
+}
+
+async function deleteAssessment(id) {
+    if (!confirm('Delete this assessment?')) return;
+    try {
+        await fetch(`/api/disaster-assessments/${id}`, {
+            method: 'DELETE',
+            headers: {'X-CSRFToken':document.querySelector('meta[name="csrf-token"]').getAttribute('content')}
+        });
+        loadAssessments();
+        loadStatistics();
+        showToast('success', 'Deleted');
+    } catch(e) { showToast('danger', e.message); }
+}
+
+async function loadStatistics() {
+    const params = new URLSearchParams();
+    const fy = document.getElementById('statFiscalYear').value;
+    const dt = document.getElementById('statDisasterType').value;
+    const wd = document.getElementById('statWard').value;
+    if (fy) params.set('fiscal_year', fy);
+    if (dt) params.set('disaster_type', dt);
+    if (wd) params.set('ward', wd);
+    try {
+        const resp = await fetch(`/api/disaster-statistics?${params.toString()}`);
+        const data = await resp.json();
+        if (!data.success) return;
+        document.getElementById('statCount').textContent = data.total.count || 0;
+        document.getElementById('statDeaths').textContent = data.total.deaths || 0;
+        document.getElementById('statMissing').textContent = data.total.missing || 0;
+        document.getElementById('statInjured').textContent = data.total.injured || 0;
+        document.getElementById('statAffectedHH').textContent = data.total.affected_households || 0;
+        document.getElementById('statHouseDestroyed').textContent = data.total.house_destroyed || 0;
+        document.getElementById('statLoss').textContent = (data.total.estimated_loss || 0).toLocaleString();
+        renderTypeChart(data.by_type);
+        renderWardChart(data.by_ward);
+    } catch(e) { console.error(e); }
+}
+
+function renderTypeChart(byType) {
+    const labels = Object.keys(byType);
+    const values = labels.map(k => byType[k].count || 0);
+    const colors = ['#ef4444','#f97316','#eab308','#22c55e','#3b82f6','#8b5cf6','#ec4899'];
+    if (typeChart) typeChart.destroy();
+    const ctx = document.getElementById('typeChart').getContext('2d');
+    typeChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: { labels, datasets: [{ data: values, backgroundColor: colors.slice(0, labels.length) }] },
+        options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12 } } } }
+    });
+}
+
+function renderWardChart(byWard) {
+    const labels = Object.keys(byWard).sort((a,b) => parseInt(a) - parseInt(b));
+    const deaths = labels.map(k => byWard[k].deaths || 0);
+    const injured = labels.map(k => byWard[k].injured || 0);
+    if (wardChart) wardChart.destroy();
+    const ctx = document.getElementById('wardChart').getContext('2d');
+    wardChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels.map(w => `W${w}`),
+            datasets: [
+                { label: 'Deaths', data: deaths, backgroundColor: '#ef4444' },
+                { label: 'Injured', data: injured, backgroundColor: '#f97316' },
+            ]
+        },
+        options: { responsive: true, scales: { y: { beginAtZero: true } }, plugins: { legend: { position: 'bottom' } } }
+    });
+}
+
+function showPrintPreview() {
+    const fy = document.getElementById('statFiscalYear').value;
+    const params = new URLSearchParams();
+    if (fy) params.set('fiscal_year', fy);
+    const url = `/daily-report-preview?bs_date=${new Date().toISOString().slice(0,10)}`;
+    window.open(url, '_blank');
+}
+
+function downloadDailyReport() {
+    const params = new URLSearchParams();
+    const fy = document.getElementById('statFiscalYear').value;
+    if (fy) params.set('fiscal_year', fy);
+    window.open(`/api/generate-daily-report?bs_date=${new Date().toISOString().slice(0,10)}`, '_blank');
+}
+
+document.addEventListener('DOMContentLoaded', loadFormData);
+</script>
+{% endblock %}

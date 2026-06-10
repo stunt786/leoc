@@ -1,0 +1,330 @@
+{% extends "base.html" %}
+{% block title %}Distribution - LEOC{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('index') }}"><i class="bi bi-house-fill"></i></a></li>
+<li class="breadcrumb-item">Operations</li>
+<li class="breadcrumb-item active">Distribution</li>
+{% endblock %}
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center">
+    <div>
+        <h4><i class="bi bi-people me-2"></i>Distribution Management</h4>
+        <p>Final distribution of relief supplies to beneficiaries</p>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header">
+        <span><i class="bi bi-plus-circle me-2 text-primary"></i>Record Distribution</span>
+    </div>
+    <div class="card-body">
+        <form id="distributionForm">
+            <input type="hidden" id="dist_id">
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">Distribution Number</label>
+                    <input type="text" class="form-control" id="dist_distribution_no" readonly>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Dispatch *</label>
+                    <select class="form-select" id="dist_dispatch_id" required>
+                        <option value="">Select Dispatch</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Incident</label>
+                    <input type="text" class="form-control" id="dist_incident" readonly>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Location</label>
+                    <input type="text" class="form-control" id="dist_location">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Distribution Date</label>
+                    <input type="date" class="form-control" id="dist_distribution_date">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Officer</label>
+                    <input type="text" class="form-control" id="dist_officer">
+                </div>
+                <div class="col-12">
+                    <label class="form-label">Remarks</label>
+                    <textarea class="form-control" id="dist_remarks" rows="2"></textarea>
+                </div>
+            </div>
+
+            <hr>
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <label class="form-label mb-0 fw-bold"><i class="bi bi-people me-1"></i>Beneficiaries</label>
+                <button type="button" class="btn btn-sm btn-outline-primary" onclick="addBeneficiaryRow()"><i class="bi bi-plus-lg"></i> Add Beneficiary</button>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm table-bordered mb-0" id="beneficiaryTable">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="min-width:160px">Family Name</th>
+                            <th style="min-width:130px">ID Number</th>
+                            <th style="width:90px">Members</th>
+                            <th style="min-width:160px">Item</th>
+                            <th style="width:100px">Qty</th>
+                            <th style="width:40px"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="beneficiaryBody">
+                        <tr><td colspan="6" class="text-center text-muted py-3">Add beneficiaries to this distribution</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="mt-3">
+                <button type="button" class="btn btn-primary" onclick="saveDistribution()"><i class="bi bi-check-lg me-1"></i>Save Distribution</button>
+                <button type="button" class="btn btn-secondary" onclick="resetDistributionForm()"><i class="bi bi-arrow-counterclockwise me-1"></i>Reset</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-list-check me-2 text-primary"></i>Recent Distributions</span>
+        <input type="text" class="form-control form-control-sm" style="width:200px" id="distSearch" placeholder="Search..." oninput="filterDistributions()">
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Distribution #</th>
+                        <th>Dispatch #</th>
+                        <th>Incident</th>
+                        <th>Location</th>
+                        <th>Date</th>
+                        <th>Officer</th>
+                        <th>Beneficiaries</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="distributionTableBody">
+                    <tr><td colspan="8" class="text-center py-4"><div class="spinner-border text-primary"></div></td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+let distributions = [];
+let dispatchItemsCache = {};
+
+async function loadFormData() {
+    const r = await fetch('/api/data');
+    const d = await r.json();
+    if (!d.success) { showToast('danger', d.message); return; }
+
+    const dispSel = document.getElementById('dist_dispatch_id');
+    const dispatches = d.dispatches || [];
+    dispSel.innerHTML = '<option value="">Select Dispatch</option>' +
+        dispatches.map(dp => `<option value="${dp.id}">${dp.dispatch_number} - ${dp.incident_name || ''} (${dp.date || ''})</option>`).join('');
+
+    document.getElementById('dist_distribution_date').value = new Date().toISOString().split('T')[0];
+    document.getElementById('dist_distribution_no').value = 'DIST-' + String(Date.now()).slice(-4);
+}
+
+document.getElementById('dist_dispatch_id').addEventListener('change', function() {
+    const dispatchId = parseInt(this.value);
+    if (!dispatchId) {
+        document.getElementById('dist_incident').value = '';
+        document.getElementById('beneficiaryBody').innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">Add beneficiaries to this distribution</td></tr>';
+        return;
+    }
+
+    fetch('/api/dispatch/' + dispatchId)
+        .then(r => r.json())
+        .then(d => {
+            if (d.success && d.dispatch) {
+                const dp = d.dispatch;
+                document.getElementById('dist_incident').value = dp.incident_name || '';
+
+                dispatchItemsCache[dispatchId] = dp.items || [];
+                const existingRows = document.querySelectorAll('#beneficiaryBody tr');
+                existingRows.forEach(tr => {
+                    const itemSelect = tr.querySelector('.ben-item');
+                    if (itemSelect) updateItemDropdown(itemSelect);
+                });
+            }
+        })
+        .catch(() => showToast('danger', 'Failed to load dispatch details'));
+});
+
+function updateItemDropdown(selectEl) {
+    const dispatchId = parseInt(document.getElementById('dist_dispatch_id').value);
+    const items = dispatchItemsCache[dispatchId] || [];
+    const currentVal = selectEl.value;
+    selectEl.innerHTML = '<option value="">Select Item</option>' +
+        items.map(i => `<option value="${i.item_name}">${i.item_name}</option>`).join('');
+    if (currentVal) selectEl.value = currentVal;
+}
+
+function addBeneficiaryRow(familyName = '', idNumber = '', members = '', item = '', qty = '') {
+    const tbody = document.getElementById('beneficiaryBody');
+    const placeholder = tbody.querySelector('tr td[colspan]');
+    if (placeholder) tbody.innerHTML = '';
+
+    const dispatchId = parseInt(document.getElementById('dist_dispatch_id').value);
+    const items = dispatchItemsCache[dispatchId] || [];
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+        <td><input type="text" class="form-control form-control-sm ben-family-name" value="${familyName}" placeholder="Family name"></td>
+        <td><input type="text" class="form-control form-control-sm ben-id-number" value="${idNumber}" placeholder="ID number"></td>
+        <td><input type="number" class="form-control form-control-sm ben-members" value="${members || 1}" min="1"></td>
+        <td><select class="form-select form-select-sm ben-item">
+            <option value="">Select Item</option>
+            ${items.map(i => `<option value="${i.item_name}" ${item === i.item_name ? 'selected' : ''}>${i.item_name}</option>`).join('')}
+        </select></td>
+        <td><input type="number" class="form-control form-control-sm ben-qty" value="${qty}" min="0"></td>
+        <td><button class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove()"><i class="bi bi-x"></i></button></td>
+    `;
+    tbody.appendChild(tr);
+}
+
+async function loadDistributions() {
+    const r = await fetch('/api/distributions');
+    const d = await r.json();
+    if (!d.success) { showToast('danger', d.message); return; }
+    distributions = d.distributions || [];
+    renderDistributions(distributions);
+}
+
+function renderDistributions(data) {
+    const tbody = document.getElementById('distributionTableBody');
+    if (data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-muted">No distributions found</td></tr>';
+        return;
+    }
+    tbody.innerHTML = data.map(dist => {
+        const benCount = dist.beneficiaries ? dist.beneficiaries.length : 0;
+        return `<tr>
+            <td><strong>${dist.distribution_no}</strong></td>
+            <td>${dist.dispatch_number || '-'}</td>
+            <td>${dist.incident_name || '-'}</td>
+            <td>${dist.location || '-'}</td>
+            <td>${dist.distribution_date ? new Date(dist.distribution_date).toLocaleDateString() : '-'}</td>
+            <td>${dist.officer || '-'}</td>
+            <td><span class="badge bg-dark">${benCount} beneficiary${benCount !== 1 ? 'ies' : 'y'}</span></td>
+            <td class="text-end">
+                <button class="btn btn-sm btn-outline-primary" onclick="viewDistribution(${dist.id})"><i class="bi bi-eye"></i></button>
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+function filterDistributions() {
+    const q = document.getElementById('distSearch').value.toLowerCase();
+    const filtered = distributions.filter(d =>
+        (d.distribution_no && d.distribution_no.toLowerCase().includes(q)) ||
+        (d.dispatch_number && d.dispatch_number.toLowerCase().includes(q)) ||
+        (d.incident_name && d.incident_name.toLowerCase().includes(q)) ||
+        (d.location && d.location.toLowerCase().includes(q))
+    );
+    renderDistributions(filtered);
+}
+
+async function viewDistribution(id) {
+    const r = await fetch('/api/distributions/' + id);
+    const d = await r.json();
+    if (!d.success) { showToast('danger', d.message); return; }
+    const dist = d.distribution;
+
+    let benHtml = '<table class="table table-sm mb-0"><thead><tr><th>Family Name</th><th>ID Number</th><th>Members</th><th>Item</th><th>Qty</th></tr></thead><tbody>';
+    if (dist.beneficiaries && dist.beneficiaries.length > 0) {
+        dist.beneficiaries.forEach(b => {
+            benHtml += `<tr><td>${b.family_name}</td><td>${b.id_number || '-'}</td><td>${b.members}</td><td>${b.item || '-'}</td><td>${b.quantity}</td></tr>`;
+        });
+    }
+    benHtml += '</tbody></table>';
+
+    const modal = document.createElement('div');
+    modal.className = 'modal fade';
+    modal.innerHTML = `<div class="modal-dialog modal-lg"><div class="modal-content">
+        <div class="modal-header"><h5 class="modal-title"><i class="bi bi-people me-2"></i>${dist.distribution_no}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+            <div class="row g-3 mb-3">
+                <div class="col-md-4"><strong>Dispatch:</strong> ${dist.dispatch_number || '-'}</div>
+                <div class="col-md-4"><strong>Incident:</strong> ${dist.incident_name || '-'}</div>
+                <div class="col-md-4"><strong>Location:</strong> ${dist.location || '-'}</div>
+                <div class="col-md-4"><strong>Date:</strong> ${dist.distribution_date || '-'}</div>
+                <div class="col-md-4"><strong>Officer:</strong> ${dist.officer || '-'}</div>
+                <div class="col-12"><strong>Remarks:</strong> ${dist.remarks || '-'}</div>
+            </div>
+            <hr><h6>Beneficiaries</h6>${benHtml}
+        </div>
+        <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div>
+    </div></div>`;
+    document.body.appendChild(modal);
+    const bsModal = new bootstrap.Modal(modal);
+    modal.addEventListener('hidden.bs.modal', () => modal.remove());
+    bsModal.show();
+}
+
+function resetDistributionForm() {
+    document.getElementById('dist_id').value = '';
+    document.getElementById('distributionForm').reset();
+    document.getElementById('dist_distribution_no').value = 'DIST-' + String(Date.now()).slice(-4);
+    document.getElementById('dist_distribution_date').value = new Date().toISOString().split('T')[0];
+    document.getElementById('dist_incident').value = '';
+    document.getElementById('beneficiaryBody').innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">Add beneficiaries to this distribution</td></tr>';
+}
+
+async function saveDistribution() {
+    const beneficiaries = Array.from(document.querySelectorAll('#beneficiaryBody tr')).map(tr => {
+        const inputs = tr.querySelectorAll('input, select');
+        if (inputs.length < 5) return null;
+        const familyName = inputs[0].value.trim();
+        if (!familyName) return null;
+        return {
+            family_name: familyName,
+            id_number: inputs[1].value,
+            members: parseInt(inputs[2].value) || 1,
+            item: inputs[3].value,
+            quantity: parseInt(inputs[4].value) || 0
+        };
+    }).filter(b => b !== null);
+
+    const body = {
+        distribution_no: document.getElementById('dist_distribution_no').value,
+        dispatch_id: parseInt(document.getElementById('dist_dispatch_id').value),
+        location: document.getElementById('dist_location').value,
+        distribution_date: document.getElementById('dist_distribution_date').value,
+        officer: document.getElementById('dist_officer').value,
+        remarks: document.getElementById('dist_remarks').value,
+        beneficiaries: beneficiaries
+    };
+
+    if (!body.dispatch_id) { showToast('danger', 'Please select a dispatch'); return; }
+    if (beneficiaries.length === 0) { showToast('danger', 'Please add at least one beneficiary'); return; }
+
+    const r = await fetch('/api/distributions', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrf},
+        body: JSON.stringify(body)
+    });
+    const d = await r.json();
+    if (d.success) {
+        showToast('success', 'Distribution recorded successfully');
+        resetDistributionForm();
+        loadDistributions();
+    } else {
+        showToast('danger', d.message);
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadFormData();
+    loadDistributions();
+});
+</script>
+{% endblock %}

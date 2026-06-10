@@ -1,0 +1,260 @@
+{% extends "base.html" %}
+{% block title %}Incidents - LEOC{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('index') }}"><i class="bi bi-house-fill"></i></a></li>
+<li class="breadcrumb-item"><a href="#">Operations</a></li>
+<li class="breadcrumb-item active">Incidents</li>
+{% endblock %}
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center">
+    <div>
+        <h4><i class="bi bi-lightning-charge-fill me-2"></i>Incident Management</h4>
+        <p>Track and manage disaster incidents</p>
+    </div>
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#incidentModal" onclick="resetIncidentForm()">
+        <i class="bi bi-plus-lg me-1"></i>Add Incident
+    </button>
+</div>
+
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-funnel me-2 text-primary"></i>Filter by Status</span>
+        <div>
+            <select class="form-select form-select-sm" style="width:160px" id="statusFilter" onchange="filterIncidents()">
+                <option value="">All Status</option>
+                <option value="Active">Active</option>
+                <option value="Closed">Closed</option>
+            </select>
+        </div>
+    </div>
+</div>
+
+<div class="card mt-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-list-check me-2 text-primary"></i>All Incidents</span>
+        <input type="text" class="form-control form-control-sm" style="width:200px" id="incidentSearch" placeholder="Search incidents..." oninput="filterIncidents()">
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Name</th>
+                        <th>Type</th>
+                        <th>Province</th>
+                        <th>District</th>
+                        <th>Municipality</th>
+                        <th>Ward</th>
+                        <th>Start Date</th>
+                        <th>Status</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="incidentTableBody">
+                    <tr><td colspan="10" class="text-center py-4"><div class="spinner-border text-primary"></div></td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Incident Modal -->
+<div class="modal fade" id="incidentModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="incidentModalTitle"><i class="bi bi-lightning-charge-fill me-2"></i>Add Incident</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="incidentForm">
+                    <input type="hidden" id="inc_id">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Incident Name *</label>
+                            <input type="text" class="form-control" id="inc_incident_name" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Incident Type *</label>
+                            <select class="form-select" id="inc_incident_type">
+                                <option value="">Select Type</option>
+                                <option value="Flood">Flood</option>
+                                <option value="Earthquake">Earthquake</option>
+                                <option value="Landslide">Landslide</option>
+                                <option value="Fire">Fire</option>
+                                <option value="Storm">Storm</option>
+                                <option value="Epidemic">Epidemic</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Province</label>
+                            <input type="text" class="form-control" id="inc_province">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">District</label>
+                            <input type="text" class="form-control" id="inc_district">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Municipality</label>
+                            <input type="text" class="form-control" id="inc_municipality">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Ward</label>
+                            <select class="form-select" id="inc_ward">
+                                <option value="">Select Ward</option>
+                                <option value="1">Ward 1</option>
+                                <option value="2">Ward 2</option>
+                                <option value="3">Ward 3</option>
+                                <option value="4">Ward 4</option>
+                                <option value="5">Ward 5</option>
+                                <option value="6">Ward 6</option>
+                                <option value="7">Ward 7</option>
+                                <option value="8">Ward 8</option>
+                                <option value="9">Ward 9</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Start Date</label>
+                            <input type="date" class="form-control" id="inc_start_date">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Status</label>
+                            <select class="form-select" id="inc_status">
+                                <option value="Active">Active</option>
+                                <option value="Closed">Closed</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Description</label>
+                            <textarea class="form-control" id="inc_description" rows="3"></textarea>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveIncident()"><i class="bi bi-check-lg"></i> Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+let incidents = [];
+
+async function loadIncidents() {
+    const statusFilter = document.getElementById('statusFilter').value;
+    const url = '/api/incidents' + (statusFilter ? '?status=' + statusFilter : '');
+    const r = await fetch(url);
+    const d = await r.json();
+    if (!d.success) { showToast('danger', d.message); return; }
+    incidents = d.incidents;
+    renderIncidents(incidents);
+}
+
+function renderIncidents(data) {
+    const tbody = document.getElementById('incidentTableBody');
+    if (data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="10" class="text-center py-4 text-muted">No incidents found</td></tr>';
+        return;
+    }
+    tbody.innerHTML = data.map(i => {
+        const statusColor = i.status === 'Active' ? 'success' : 'secondary';
+        return `<tr>
+            <td>${i.id}</td>
+            <td><strong>${i.incident_name}</strong></td>
+            <td><span class="badge bg-info">${i.incident_type}</span></td>
+            <td>${i.province || '-'}</td>
+            <td>${i.district || '-'}</td>
+            <td>${i.municipality || '-'}</td>
+            <td>${i.ward ? 'Ward ' + i.ward : '-'}</td>
+            <td>${i.start_date || '-'}</td>
+            <td><span class="badge bg-${statusColor}">${i.status}</span></td>
+            <td class="text-end">
+                <button class="btn btn-sm btn-outline-primary" onclick="editIncident(${i.id})"><i class="bi bi-pencil"></i></button>
+                <button class="btn btn-sm btn-outline-danger" onclick="deleteIncident(${i.id})"><i class="bi bi-trash"></i></button>
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+function filterIncidents() {
+    const q = document.getElementById('incidentSearch').value.toLowerCase();
+    const filtered = incidents.filter(i =>
+        (i.incident_name && i.incident_name.toLowerCase().includes(q)) ||
+        (i.incident_type && i.incident_type.toLowerCase().includes(q)) ||
+        (i.province && i.province.toLowerCase().includes(q)) ||
+        (i.district && i.district.toLowerCase().includes(q)) ||
+        (i.municipality && i.municipality.toLowerCase().includes(q))
+    );
+    renderIncidents(filtered);
+}
+
+document.getElementById('statusFilter').addEventListener('change', loadIncidents);
+
+function resetIncidentForm() {
+    document.getElementById('incidentModalTitle').textContent = 'Add Incident';
+    document.getElementById('inc_id').value = '';
+    document.getElementById('incidentForm').reset();
+    document.getElementById('inc_status').value = 'Active';
+}
+
+async function editIncident(id) {
+    const i = incidents.find(x => x.id === id);
+    if (!i) return;
+    document.getElementById('incidentModalTitle').textContent = 'Edit Incident';
+    document.getElementById('inc_id').value = i.id;
+    document.getElementById('inc_incident_name').value = i.incident_name;
+    document.getElementById('inc_incident_type').value = i.incident_type;
+    document.getElementById('inc_province').value = i.province || '';
+    document.getElementById('inc_district').value = i.district || '';
+    document.getElementById('inc_municipality').value = i.municipality || '';
+    document.getElementById('inc_ward').value = i.ward || '';
+    document.getElementById('inc_start_date').value = i.start_date || '';
+    document.getElementById('inc_status').value = i.status || 'Active';
+    document.getElementById('inc_description').value = i.description || '';
+    new bootstrap.Modal(document.getElementById('incidentModal')).show();
+}
+
+async function saveIncident() {
+    const id = document.getElementById('inc_id').value;
+    const body = {
+        incident_name: document.getElementById('inc_incident_name').value,
+        incident_type: document.getElementById('inc_incident_type').value,
+        province: document.getElementById('inc_province').value,
+        district: document.getElementById('inc_district').value,
+        municipality: document.getElementById('inc_municipality').value,
+        ward: parseInt(document.getElementById('inc_ward').value) || null,
+        start_date: document.getElementById('inc_start_date').value || null,
+        status: document.getElementById('inc_status').value,
+        description: document.getElementById('inc_description').value
+    };
+    if (!body.incident_name) { showToast('danger', 'Incident name is required'); return; }
+    if (!body.incident_type) { showToast('danger', 'Incident type is required'); return; }
+    const url = id ? '/api/incidents/' + id : '/api/incidents';
+    const method = id ? 'PUT' : 'POST';
+    const r = await fetch(url, {method, headers:{'Content-Type':'application/json','X-CSRFToken':csrf}, body: JSON.stringify(body)});
+    const d = await r.json();
+    if (d.success) {
+        showToast('success', id ? 'Incident updated' : 'Incident created');
+        bootstrap.Modal.getInstance(document.getElementById('incidentModal')).hide();
+        loadIncidents();
+    } else { showToast('danger', d.message); }
+}
+
+async function deleteIncident(id) {
+    if (!confirm('Delete this incident?')) return;
+    const r = await fetch('/api/incidents/' + id, {method:'DELETE', headers:{'X-CSRFToken':csrf}});
+    const d = await r.json();
+    if (d.success) { showToast('success', 'Incident deleted'); loadIncidents(); }
+    else showToast('danger', d.message);
+}
+
+document.addEventListener('DOMContentLoaded', loadIncidents);
+</script>
+{% endblock %}

@@ -1,0 +1,215 @@
+{% extends "base.html" %}
+{% block title %}Inventory - LEOC{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('index') }}"><i class="bi bi-house-fill"></i></a></li>
+<li class="breadcrumb-item"><a href="{{ url_for('inventory_page') }}">Inventory</a></li>
+<li class="breadcrumb-item active">Current Stock</li>
+{% endblock %}
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center">
+    <div>
+        <h4><i class="bi bi-box-seam-fill me-2"></i>Current Stock</h4>
+        <p>System-generated inventory view — updates automatically from Stock Receipt, Dispatch, and Adjustments.</p>
+    </div>
+</div>
+
+<div class="row g-3 mb-4" id="summaryCards">
+    <div class="col-md-3 col-6">
+        <div class="stat-card stat-card-primary">
+            <div class="stat-icon"><i class="bi bi-boxes"></i></div>
+            <div class="stat-content">
+                <div class="stat-label">Total Items</div>
+                <div class="stat-value" id="totalItems">0</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6">
+        <div class="stat-card stat-card-success">
+            <div class="stat-icon"><i class="bi bi-cubes"></i></div>
+            <div class="stat-content">
+                <div class="stat-label">Total Stock Qty</div>
+                <div class="stat-value" id="totalStock">0</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6">
+        <div class="stat-card stat-card-warning">
+            <div class="stat-icon"><i class="bi bi-exclamation-triangle"></i></div>
+            <div class="stat-content">
+                <div class="stat-label">Low Stock Items</div>
+                <div class="stat-value" id="lowStockCount">0</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6">
+        <div class="stat-card stat-card-danger">
+            <div class="stat-icon"><i class="bi bi-x-circle"></i></div>
+            <div class="stat-content">
+                <div class="stat-label">Out of Stock Items</div>
+                <div class="stat-value" id="outOfStockCount">0</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="row g-2 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label">Warehouse</label>
+                <select class="form-select" id="filterWarehouse" onchange="loadInventory()">
+                    <option value="">All Warehouses</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Category</label>
+                <select class="form-select" id="filterCategory" onchange="loadInventory()">
+                    <option value="">All Categories</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Status</label>
+                <select class="form-select" id="filterStatus" onchange="loadInventory()">
+                    <option value="">All Status</option>
+                    <option value="available">Available</option>
+                    <option value="low_stock">Low Stock</option>
+                    <option value="out_of_stock">Out of Stock</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Search</label>
+                <input type="text" class="form-control" id="filterSearch" placeholder="Search item name..." oninput="debounceSearch()">
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-list-check me-2 text-primary"></i>Inventory Records</span>
+        <span class="text-muted small"><i class="bi bi-info-circle me-1"></i>View-only — inventory is system-generated and updates automatically from Stock Receipt, Dispatch, and Adjustments.</span>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Item Code</th>
+                        <th>Item Name</th>
+                        <th>Category</th>
+                        <th>Warehouse</th>
+                        <th class="text-end">Available Qty</th>
+                        <th>Unit</th>
+                        <th class="text-end">Min Stock</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="inventoryTableBody">
+                    <tr><td colspan="8" class="text-center py-4"><div class="spinner-border text-primary"></div></td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div class="card-footer d-flex justify-content-between align-items-center">
+        <small class="text-muted" id="inventoryCount">Loading...</small>
+        <small class="text-muted"><i class="bi bi-arrow-clockwise me-1"></i>Auto-refreshes every 30s</small>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+let refreshInterval;
+
+function statusBadge(status) {
+    const map = {
+        'available': '<span class="badge bg-success">Available</span>',
+        'low_stock': '<span class="badge bg-warning text-dark">Low Stock</span>',
+        'out_of_stock': '<span class="badge bg-danger">Out of Stock</span>'
+    };
+    return map[status] || `<span class="badge bg-secondary">${status}</span>`;
+}
+
+async function loadFormData() {
+    try {
+        const r = await fetch('/api/data');
+        const d = await r.json();
+        if (!d.success) return;
+        const warehouseSel = document.getElementById('filterWarehouse');
+        d.warehouses.forEach(w => {
+            warehouseSel.innerHTML += `<option value="${w.id}">${w.name}</option>`;
+        });
+        const catSel = document.getElementById('filterCategory');
+        d.categories.forEach(c => {
+            catSel.innerHTML += `<option value="${c.id}">${c.name}</option>`;
+        });
+    } catch (e) { console.error('Error loading form data:', e); }
+}
+
+async function loadInventory() {
+    try {
+        const warehouse = document.getElementById('filterWarehouse').value;
+        const category = document.getElementById('filterCategory').value;
+        const status = document.getElementById('filterStatus').value;
+        const search = document.getElementById('filterSearch').value;
+
+        const params = new URLSearchParams();
+        if (warehouse) params.append('warehouse_id', warehouse);
+        if (category) params.append('category_id', category);
+        if (status) params.append('status', status);
+        if (search) params.append('search', search);
+
+        const r = await fetch(`/api/inventory?${params.toString()}`);
+        const d = await r.json();
+        if (!d.success) { showToast('danger', d.message); return; }
+
+        const tbody = document.getElementById('inventoryTableBody');
+        const inv = d.inventory;
+        if (inv.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-muted">No inventory records found</td></tr>';
+        } else {
+            tbody.innerHTML = inv.map(item => `<tr>
+                <td><span class="badge bg-light text-dark">${item.item_code || '-'}</span></td>
+                <td class="fw-medium">${item.item_name}</td>
+                <td>${item.category_name || '-'}</td>
+                <td>${item.warehouse_name || '-'}</td>
+                <td class="text-end fw-bold">${item.quantity}</td>
+                <td>${item.unit || '-'}</td>
+                <td class="text-end">${item.minimum_stock || 0}</td>
+                <td>${statusBadge(item.status)}</td>
+            </tr>`).join('');
+        }
+        document.getElementById('inventoryCount').textContent = `Showing ${inv.length} record${inv.length !== 1 ? 's' : ''}`;
+    } catch (e) { showToast('danger', 'Error loading inventory: ' + e.message); }
+}
+
+async function loadSummary() {
+    try {
+        const r = await fetch('/api/inventory/summary');
+        const d = await r.json();
+        if (!d.success) return;
+        document.getElementById('totalItems').textContent = d.total_items;
+        document.getElementById('totalStock').textContent = d.total_stock;
+        document.getElementById('lowStockCount').textContent = d.low_stock;
+        document.getElementById('outOfStockCount').textContent = d.out_of_stock;
+    } catch (e) { console.error('Error loading summary:', e); }
+}
+
+let searchTimeout;
+function debounceSearch() {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(loadInventory, 400);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    loadFormData();
+    loadInventory();
+    loadSummary();
+    refreshInterval = setInterval(() => {
+        loadInventory();
+        loadSummary();
+    }, 30000);
+});
+</script>
+{% endblock %}
