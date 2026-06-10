@@ -64,43 +64,17 @@ def seed_default_users():
         print("[SKIP] Users already exist")
 
 def seed_roles_and_permissions():
-    """Seed default roles and permissions."""
-    from app import Role, Permission
-    if Role.query.first():
-        print("[SKIP] Roles already exist")
-        return
-    
-    roles = [
-        {'name': 'admin', 'description': 'Full system access', 'is_system': True},
-        {'name': 'warehouse_manager', 'description': 'Warehouse operations management', 'is_system': True},
-        {'name': 'store_keeper', 'description': 'Inventory and stock management', 'is_system': True},
-        {'name': 'viewer', 'description': 'Read-only access', 'is_system': True},
-        {'name': 'operator', 'description': 'Field operations', 'is_system': True},
-        {'name': 'finance', 'description': 'Financial management', 'is_system': True},
-        {'name': 'dispatcher', 'description': 'Dispatch and logistics', 'is_system': True},
-    ]
-    
-    for role_data in roles:
-        role = Role(**role_data)
-        db.session.add(role)
-    db.session.commit()
-    
-    # Create default permissions for admin (all access)
-    admin_role = Role.query.filter_by(name='admin').first()
-    resources = ['dashboard', 'inventory', 'warehouse', 'dispatch', 'distribution', 'incident',
-                 'supplier', 'donation', 'fleet', 'report', 'settings', 'user', 'beneficiary']
-    actions = ['create', 'read', 'update', 'delete', 'approve', 'export']
-    for resource in resources:
-        for action in actions:
-            perm = Permission(role_id=admin_role.id, resource=resource, action=action)
-            db.session.add(perm)
-    db.session.commit()
-    print(f"[OK] Seeded {len(roles)} roles with permissions")
+    """Compatibility placeholder for older deployments.
+
+    The current app stores roles as string fields on the user table, so the
+    legacy Role/Permission tables are not part of the live schema anymore.
+    """
+    print("[SKIP] Role/permission tables are not part of the current schema")
 
 def seed_item_categories():
     """Seed default item categories."""
-    from app import ItemCategory
-    if ItemCategory.query.first():
+    from app import Category
+    if Category.query.first():
         print("[SKIP] Categories already exist")
         return
     
@@ -112,7 +86,7 @@ def seed_item_categories():
         'Kitchen & Cooking', 'Baby & Child Care', 'Other'
     ]
     for cat_name in categories:
-        cat = ItemCategory(name=cat_name)
+        cat = Category(name=cat_name)
         db.session.add(cat)
     db.session.commit()
     print(f"[OK] Seeded {len(categories)} item categories")

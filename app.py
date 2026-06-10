@@ -2,13 +2,15 @@ from flask import Flask, render_template, request, jsonify, send_from_directory,
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf.csrf import CSRFProtect
 from flask_login import login_user, logout_user, login_required as flask_login_required, current_user
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 import os
 import json
 import io
 import logging
+import sqlite3
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash
+from werkzeug.exceptions import NotFound
 import re
 from functools import wraps
 import time
@@ -75,6 +77,21 @@ def clear_cache():
     global cache
     cache.clear()
 
+def db_get(model, ident):
+    return db.session.get(model, ident)
+
+def db_get_or_404(model, ident):
+    obj = db.session.get(model, ident)
+    if obj is None:
+        raise NotFound()
+    return obj
+
+def utc_now():
+    return datetime.now(timezone.utc)
+
+sqlite3.register_adapter(datetime, lambda val: val.isoformat(sep=' '))
+sqlite3.register_adapter(date, lambda val: val.isoformat())
+
 app = Flask(__name__)
 
 secret_key = os.getenv('SECRET_KEY')
@@ -130,6 +147,53 @@ def is_valid_nepali_date(date_string):
     if (year >= 2025 and year <= 2090) or (year >= 1968 and year <= 2033):
         return True
     return False
+
+def parse_int_field(data, field_name, minimum=None, default=None):
+    value = data.get(field_name, default)
+    if value in (None, ''):
+        return default
+    try:
+        value = int(value)
+    except (TypeError, ValueError):
+        raise ValueError(f"{field_name} must be an integer")
+    if minimum is not None and value < minimum:
+        raise ValueError(f"{field_name} must be at least {minimum}")
+    return value
+
+def parse_float_field(data, field_name, minimum=None, default=None):
+    value = data.get(field_name, default)
+    if value in (None, ''):
+        return default
+    try:
+        value = float(value)
+    except (TypeError, ValueError):
+        raise ValueError(f"{field_name} must be a number")
+    if minimum is not None and value < minimum:
+        raise ValueError(f"{field_name} must be at least {minimum}")
+    return value
+
+def parse_bool_field(data, field_name, default=False):
+    value = data.get(field_name, default)
+    if isinstance(value, bool):
+        return value
+    if value in (None, ''):
+        return default
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in ('true', '1', 'yes', 'on'):
+            return True
+        if normalized in ('false', '0', 'no', 'off'):
+            return False
+    return bool(value)
+
+def parse_date_field(data, field_name, default=None):
+    value = data.get(field_name, default)
+    if value in (None, ''):
+        return default
+    try:
+        return datetime.strptime(value, '%Y-%m-%d').date()
+    except (TypeError, ValueError):
+        raise ValueError(f"{field_name} must be in YYYY-MM-DD format")
 
 # ============ BS DATE CONVERSION HELPERS ============
 def ad_to_bs(ad_year, ad_month, ad_day):
@@ -204,8 +268,8 @@ class AppSettings(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     setting_key = db.Column(db.String(100), unique=True, nullable=False)
     setting_value = db.Column(db.Text, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=utc_now)
+    updated_at = db.Column(db.DateTime, default=utc_now, onupdate=utc_now)
 
     @staticmethod
     def get_setting(key, default=None):
@@ -243,8 +307,8 @@ class Warehouse(db.Model):
     phone = db.Column(db.String(50))
     capacity = db.Column(db.Float, default=0)
     remarks = db.Column(db.Text)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=utc_now)
+    updated_at = db.Column(db.DateTime, default=utc_now, onupdate=utc_now)
 
     def to_dict(self):
         return {
@@ -259,7 +323,7 @@ class Category(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), unique=True, nullable=False, index=True)
     description = db.Column(db.Text)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=utc_now)
 
     def to_dict(self):
         return {'id': self.id, 'name': self.name, 'description': self.description}
@@ -288,8 +352,8 @@ class Item(db.Model):
     status = db.Column(db.String(20), default='Active')
     created_by = db.Column(db.Integer)
     updated_by = db.Column(db.Integer)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=utc_now)
+    updated_at = db.Column(db.DateTime, default=utc_now, onupdate=utc_now)
     category = db.relationship('Category', backref=db.backref('items', lazy=True))
 
     def to_dict(self):
@@ -331,7 +395,7 @@ class StockReceipt(db.Model):
     verified_by = db.Column(db.String(200))
     remarks = db.Column(db.Text)
     created_by = db.Column(db.Integer)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=utc_now)
     warehouse = db.relationship('Warehouse', backref=db.backref('receipts', lazy=True))
     items = db.relationship('StockReceiptItem', backref='receipt', lazy=True, cascade='all,delete-orphan')
     attachments = db.relationship('StockReceiptAttachment', backref='receipt', lazy=True, cascade='all,delete-orphan')
@@ -384,7 +448,7 @@ class StockReceiptAttachment(db.Model):
     original_name = db.Column(db.String(500))
     file_type = db.Column(db.String(50))
     file_size = db.Column(db.Integer)
-    uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
+    uploaded_at = db.Column(db.DateTime, default=utc_now)
 
     def to_dict(self):
         return {
@@ -407,7 +471,7 @@ class ManualAdjustment(db.Model):
     remarks = db.Column(db.Text)
     approval_user = db.Column(db.String(200))
     created_by = db.Column(db.Integer)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=utc_now)
     warehouse = db.relationship('Warehouse', backref=db.backref('adjustments', lazy=True))
     item = db.relationship('Item', backref=db.backref('adjustments', lazy=True))
 
@@ -429,7 +493,7 @@ class Inventory(db.Model):
     warehouse_id = db.Column(db.Integer, db.ForeignKey('warehouse.id'), nullable=False, index=True)
     quantity = db.Column(db.Integer, nullable=False, default=0)
     reserved_quantity = db.Column(db.Integer, default=0)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=utc_now, onupdate=utc_now)
     item = db.relationship('Item', backref=db.backref('inventory_records', lazy=True))
     warehouse = db.relationship('Warehouse', backref=db.backref('inventory_records', lazy=True))
 
@@ -480,8 +544,8 @@ class Incident(db.Model):
     start_date = db.Column(db.Date, nullable=False, default=date.today)
     status = db.Column(db.String(50), default='Active', index=True)
     description = db.Column(db.Text)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=utc_now)
+    updated_at = db.Column(db.DateTime, default=utc_now, onupdate=utc_now)
 
     def to_dict(self):
         return {
@@ -508,7 +572,7 @@ class ReliefRequest(db.Model):
     cash_purpose = db.Column(db.String(100))
     remarks = db.Column(db.Text)
     status = db.Column(db.String(20), default='Pending', index=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=utc_now)
     incident = db.relationship('Incident', backref=db.backref('relief_requests', lazy=True))
     items = db.relationship('ReliefRequestItem', backref='request', lazy=True, cascade='all,delete-orphan')
 
@@ -559,7 +623,7 @@ class Dispatch(db.Model):
     phone = db.Column(db.String(50))
     remarks = db.Column(db.Text)
     created_by = db.Column(db.Integer)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=utc_now)
     warehouse = db.relationship('Warehouse', backref=db.backref('dispatches', lazy=True))
     incident = db.relationship('Incident', backref=db.backref('dispatches', lazy=True))
     relief_request = db.relationship('ReliefRequest', backref=db.backref('dispatches', lazy=True))
@@ -640,8 +704,8 @@ class DisasterAssessment(db.Model):
     other_livestock_injured = db.Column(db.Integer, default=0)
     remarks = db.Column(db.Text)
     created_by = db.Column(db.Integer)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=utc_now)
+    updated_at = db.Column(db.DateTime, default=utc_now, onupdate=utc_now)
     incident = db.relationship('Incident', backref=db.backref('assessments', lazy=True))
 
     def to_dict(self):
@@ -675,7 +739,7 @@ class DisasterAssessment(db.Model):
 class DailyReportLog(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     report_date_bs = db.Column(db.String(10), unique=True, nullable=False, index=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=utc_now)
 
 # ============ DISTRIBUTION MODEL (Module 12) ============
 class Distribution(db.Model):
@@ -688,7 +752,7 @@ class Distribution(db.Model):
     officer = db.Column(db.String(200))
     remarks = db.Column(db.Text)
     created_by = db.Column(db.Integer)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=utc_now)
     dispatch = db.relationship('Dispatch', backref=db.backref('distributions', lazy=True))
     incident = db.relationship('Incident', backref=db.backref('distributions', lazy=True))
     beneficiaries = db.relationship('DistributionBeneficiary', backref='distribution', lazy=True, cascade='all,delete-orphan')
@@ -709,17 +773,22 @@ class Distribution(db.Model):
 class DistributionBeneficiary(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     distribution_id = db.Column(db.Integer, db.ForeignKey('distribution.id'), nullable=False, index=True)
+    beneficiary_id = db.Column(db.Integer, db.ForeignKey('beneficiary.id'), nullable=True, index=True)
     family_name = db.Column(db.String(200), nullable=False)
     id_number = db.Column(db.String(100))
     members = db.Column(db.Integer, default=1)
     item = db.Column(db.String(200))
     quantity = db.Column(db.Integer, nullable=False)
 
+    beneficiary = db.relationship('Beneficiary', backref=db.backref('distribution_links', lazy=True))
+
     def to_dict(self):
         return {
             'id': self.id, 'family_name': self.family_name,
             'id_number': self.id_number, 'members': self.members,
-            'item': self.item, 'quantity': self.quantity
+            'item': self.item, 'quantity': self.quantity,
+            'beneficiary_id': self.beneficiary_id,
+            'beneficiary_name': self.beneficiary.name if self.beneficiary else None
         }
 
 # ============ CASH FUND MODEL ============
@@ -734,8 +803,8 @@ class CashFund(db.Model):
     description = db.Column(db.Text)
     status = db.Column(db.String(20), default='Active')
     created_by = db.Column(db.Integer)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=utc_now)
+    updated_at = db.Column(db.DateTime, default=utc_now, onupdate=utc_now)
     receipts = db.relationship('CashReceipt', backref='fund', lazy=True, cascade='all,delete-orphan')
     distributions = db.relationship('CashDistribution', backref='fund', lazy=True, cascade='all,delete-orphan')
 
@@ -763,7 +832,7 @@ class CashReceipt(db.Model):
     remarks = db.Column(db.Text)
     document_file = db.Column(db.String(500))
     created_by = db.Column(db.Integer)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=utc_now)
 
     def to_dict(self):
         return {
@@ -792,8 +861,8 @@ class CashRequest(db.Model):
     remarks = db.Column(db.Text)
     status = db.Column(db.String(20), default='Pending')
     created_by = db.Column(db.Integer)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=utc_now)
+    updated_at = db.Column(db.DateTime, default=utc_now, onupdate=utc_now)
     incident = db.relationship('Incident', backref=db.backref('cash_requests', lazy=True))
 
     def to_dict(self):
@@ -822,7 +891,7 @@ class CashDistribution(db.Model):
     officer = db.Column(db.String(200))
     remarks = db.Column(db.Text)
     created_by = db.Column(db.Integer)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=utc_now)
     incident = db.relationship('Incident', backref=db.backref('cash_distributions', lazy=True))
     cash_request = db.relationship('CashRequest', backref=db.backref('cash_distributions', lazy=True))
     relief_request = db.relationship('ReliefRequest', backref=db.backref('cash_distributions_ref', lazy=True))
@@ -875,8 +944,8 @@ class Beneficiary(db.Model):
     mobile_wallet = db.Column(db.String(100))
     remarks = db.Column(db.Text)
     created_by = db.Column(db.Integer)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=utc_now)
+    updated_at = db.Column(db.DateTime, default=utc_now, onupdate=utc_now)
 
     def to_dict(self):
         return {
@@ -921,10 +990,10 @@ def login():
         user = authenticate_user(db, username, password)
         if user:
             login_user(user)
-            user.last_login = datetime.utcnow()
+            user.last_login = datetime.now(timezone.utc)
             db.session.execute(
                 db.text("UPDATE \"user\" SET last_login = :last_login WHERE id = :id"),
-                {'last_login': datetime.utcnow(), 'id': user.id}
+                {'last_login': datetime.now(timezone.utc), 'id': user.id}
             )
             db.session.commit()
             next_page = request.args.get('next')
@@ -942,83 +1011,103 @@ def logout():
 
 # ============ PAGE ROUTES ============
 @app.route('/')
+@login_required
 def index():
     return render_template('index.html')
 
 @app.route('/settings')
+@login_required
 def settings():
     return render_template('settings.html')
 
 @app.route('/warehouses')
+@login_required
 def warehouses_page():
     return render_template('warehouses.html')
 
 @app.route('/categories')
+@login_required
 def categories_page():
     return render_template('categories.html')
 
 @app.route('/items')
+@login_required
 def items_page():
     return render_template('items.html')
 
 @app.route('/stock-receipts')
+@login_required
 def stock_receipts_page():
     return render_template('stock_receipts.html')
 
 @app.route('/inventory')
+@login_required
 def inventory_page():
     return render_template('inventory.html')
 
 @app.route('/adjustments')
+@login_required
 def adjustments_page():
     return render_template('adjustments.html')
 
 @app.route('/incidents')
+@login_required
 def incidents_page():
     return render_template('incidents.html')
 
 @app.route('/relief-requests')
+@login_required
 def relief_requests_page():
     return render_template('relief_requests.html')
 
 @app.route('/dispatch')
+@login_required
 def dispatch_page():
     return render_template('dispatch.html')
 
 @app.route('/distributions')
+@login_required
 def distributions_page():
     return render_template('distributions.html')
 
 @app.route('/reports')
+@login_required
 def reports_page():
     return render_template('reports.html')
 
 @app.route('/disaster-reports')
+@login_required
 def disaster_reports_page():
     return render_template('disaster_reports.html')
 
 @app.route('/cash-funds')
+@login_required
 def cash_funds_page():
     return render_template('cash_funds.html')
 
 @app.route('/cash-receipts')
+@login_required
 def cash_receipts_page():
     return render_template('cash_receipts.html')
 
 @app.route('/cash-requests')
+@login_required
 def cash_requests_page():
     return render_template('cash_requests.html')
 
 @app.route('/cash-distributions')
+@login_required
 def cash_distributions_page():
     return render_template('cash_distributions.html')
 
 @app.route('/beneficiaries')
+@login_required
 def beneficiaries_page():
     return render_template('beneficiaries.html')
 
 # ============ SETTINGS API ============
 @app.route('/api/settings', methods=['GET'])
+@login_required
 def get_settings():
     try:
         settings = AppSettings.query.all()
@@ -1032,23 +1121,33 @@ def handle_setting(key):
     if request.method == 'GET':
         try:
             setting = AppSettings.query.filter_by(setting_key=key).first()
-            value = json.loads(setting.setting_value) if setting else None
+            if not setting:
+                value = None
+            else:
+                try:
+                    value = json.loads(setting.setting_value)
+                except (TypeError, json.JSONDecodeError):
+                    value = setting.setting_value
             return jsonify({'success': True, 'key': key, 'value': value})
         except Exception as e:
             return jsonify({'success': False, 'message': str(e)}), 400
     try:
         data = request.get_json()
+        if not isinstance(data, dict):
+            return jsonify({'success': False, 'message': 'Invalid JSON payload'}), 400
+        if 'value' not in data:
+            return jsonify({'success': False, 'message': 'Setting value is required'}), 400
         setting = AppSettings.query.filter_by(setting_key=key).first()
         if not setting:
             setting = AppSettings(setting_key=key)
         value = data.get('value')
-        if isinstance(value, (list, dict)):
-            setting.setting_value = json.dumps(value)
-        else:
-            setting.setting_value = str(value)
+        setting.setting_value = json.dumps(value)
         db.session.add(setting)
         db.session.commit()
         return jsonify({'success': True, 'message': f'Setting {key} updated'})
+    except ValueError as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 400
@@ -1062,16 +1161,22 @@ def handle_warehouses():
         return jsonify({'success': True, 'warehouses': [w.to_dict() for w in warehouses]})
     try:
         data = request.get_json()
-        if not data.get('name'):
+        if not isinstance(data, dict):
+            return jsonify({'success': False, 'message': 'Invalid JSON payload'}), 400
+        name = (data.get('name') or '').strip()
+        if not name:
             return jsonify({'success': False, 'message': 'Warehouse name is required'}), 400
-        wh = Warehouse(name=data['name'], code=data.get('code', ''), address=data.get('address'),
+        wh = Warehouse(name=name, code=(data.get('code') or '').strip(), address=data.get('address'),
                        contact_person=data.get('contact_person'), phone=data.get('phone'),
-                       capacity=data.get('capacity', 0), remarks=data.get('remarks'))
+                       capacity=parse_int_field(data, 'capacity', minimum=0, default=0), remarks=data.get('remarks'))
         if not wh.code:
             wh.code = f"WH-{Warehouse.query.count() + 1}"
         db.session.add(wh)
         db.session.commit()
         return jsonify({'success': True, 'message': 'Warehouse created', 'data': wh.to_dict()}), 201
+    except ValueError as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 500
@@ -1079,18 +1184,32 @@ def handle_warehouses():
 @app.route('/api/warehouses/<int:id>', methods=['PUT', 'DELETE'])
 @permission_required('edit')
 def manage_warehouse(id):
-    wh = Warehouse.query.get_or_404(id)
+    wh = db_get(Warehouse, id)
+    if not wh:
+        return jsonify({'success': False, 'message': 'Warehouse not found'}), 404
     try:
         if request.method == 'DELETE':
             db.session.delete(wh)
             db.session.commit()
             return jsonify({'success': True, 'message': 'Warehouse deleted'})
         data = request.get_json()
-        for field in ['name', 'code', 'address', 'contact_person', 'phone', 'capacity', 'remarks']:
+        if 'name' in data:
+            name = (data.get('name') or '').strip()
+            if not name:
+                return jsonify({'success': False, 'message': 'Warehouse name is required'}), 400
+            wh.name = name
+        if 'code' in data:
+            wh.code = (data.get('code') or '').strip()
+        for field in ['address', 'contact_person', 'phone', 'remarks']:
             if field in data:
                 setattr(wh, field, data[field])
+        if 'capacity' in data:
+            wh.capacity = parse_int_field(data, 'capacity', minimum=0, default=0)
         db.session.commit()
         return jsonify({'success': True, 'message': 'Warehouse updated', 'data': wh.to_dict()})
+    except ValueError as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 500
@@ -1104,12 +1223,18 @@ def handle_categories():
         return jsonify({'success': True, 'categories': [c.to_dict() for c in categories]})
     try:
         data = request.get_json()
-        if not data.get('name'):
+        if not isinstance(data, dict):
+            return jsonify({'success': False, 'message': 'Invalid JSON payload'}), 400
+        name = (data.get('name') or '').strip()
+        if not name:
             return jsonify({'success': False, 'message': 'Category name is required'}), 400
-        cat = Category(name=data['name'], description=data.get('description'))
+        cat = Category(name=name, description=data.get('description'))
         db.session.add(cat)
         db.session.commit()
         return jsonify({'success': True, 'message': 'Category created', 'data': cat.to_dict()}), 201
+    except ValueError as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 500
@@ -1117,7 +1242,9 @@ def handle_categories():
 @app.route('/api/categories/<int:id>', methods=['PUT', 'DELETE'])
 @permission_required('edit')
 def manage_category(id):
-    cat = Category.query.get_or_404(id)
+    cat = db_get(Category, id)
+    if not cat:
+        return jsonify({'success': False, 'message': 'Category not found'}), 404
     try:
         if request.method == 'DELETE':
             db.session.delete(cat)
@@ -1125,11 +1252,17 @@ def manage_category(id):
             return jsonify({'success': True, 'message': 'Category deleted'})
         data = request.get_json()
         if 'name' in data:
-            cat.name = data['name']
+            name = (data.get('name') or '').strip()
+            if not name:
+                return jsonify({'success': False, 'message': 'Category name is required'}), 400
+            cat.name = name
         if 'description' in data:
             cat.description = data['description']
         db.session.commit()
         return jsonify({'success': True, 'message': 'Category updated', 'data': cat.to_dict()})
+    except ValueError as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 500
@@ -1166,6 +1299,14 @@ def handle_items():
         data = request.get_json()
         if not data.get('name') or not data.get('unit') or not data.get('category_id'):
             return jsonify({'success': False, 'message': 'Name, unit, and category are required'}), 400
+        category = db_get(Category, data['category_id'])
+        if not category:
+            return jsonify({'success': False, 'message': 'Category not found'}), 404
+        minimum_stock = parse_int_field(data, 'minimum_stock', minimum=0, default=0)
+        max_stock = parse_int_field(data, 'max_stock', minimum=0, default=0)
+        if max_stock is not None and minimum_stock is not None and max_stock < minimum_stock:
+            return jsonify({'success': False, 'message': 'Max stock must be greater than or equal to minimum stock'}), 400
+        storage_life_days = parse_int_field(data, 'storage_life_days', minimum=0, default=None)
         item = Item(
             uuid=str(uuid_lib.uuid4()),
             item_code=data.get('item_code') or generate_item_code(),
@@ -1173,9 +1314,9 @@ def handle_items():
             category_id=data['category_id'], name=data['name'],
             local_name=data.get('local_name'), description=data.get('description'),
             unit=data['unit'],
-            minimum_stock=int(data.get('minimum_stock', 0)),
-            max_stock=int(data.get('max_stock', 0)),
-            storage_life_days=int(data.get('storage_life_days', 0)) if data.get('storage_life_days') else None,
+            minimum_stock=minimum_stock,
+            max_stock=max_stock,
+            storage_life_days=storage_life_days,
             expiry_tracking=bool(data.get('expiry_tracking', False)),
             batch_tracking=bool(data.get('batch_tracking', False)),
             serial_tracking=bool(data.get('serial_tracking', False)),
@@ -1187,6 +1328,9 @@ def handle_items():
         db.session.add(item)
         db.session.commit()
         return jsonify({'success': True, 'message': 'Item created', 'data': item.to_dict()}), 201
+    except ValueError as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 500
@@ -1194,22 +1338,56 @@ def handle_items():
 @app.route('/api/items/<int:id>', methods=['PUT', 'DELETE'])
 @permission_required('edit')
 def manage_item(id):
-    item = Item.query.get_or_404(id)
+    item = db_get(Item, id)
+    if not item:
+        return jsonify({'success': False, 'message': 'Item not found'}), 404
     try:
         if request.method == 'DELETE':
             db.session.delete(item)
             db.session.commit()
             return jsonify({'success': True, 'message': 'Item deleted'})
         data = request.get_json()
-        for field in ['item_code', 'barcode', 'qr_code', 'category_id', 'name', 'local_name',
-                       'description', 'unit', 'minimum_stock', 'max_stock', 'storage_life_days',
-                       'expiry_tracking', 'batch_tracking', 'serial_tracking', 'is_consumable',
+        if 'name' in data:
+            name = (data.get('name') or '').strip()
+            if not name:
+                return jsonify({'success': False, 'message': 'Item name is required'}), 400
+            item.name = name
+        if 'unit' in data:
+            unit = (data.get('unit') or '').strip()
+            if not unit:
+                return jsonify({'success': False, 'message': 'Item unit is required'}), 400
+            item.unit = unit
+        if 'category_id' in data:
+            category = db_get(Category, data['category_id'])
+            if not category:
+                return jsonify({'success': False, 'message': 'Category not found'}), 404
+            item.category_id = category.id
+        if 'minimum_stock' in data:
+            item.minimum_stock = parse_int_field(data, 'minimum_stock', minimum=0, default=0)
+        if 'max_stock' in data:
+            item.max_stock = parse_int_field(data, 'max_stock', minimum=0, default=0)
+        if item.max_stock is not None and item.minimum_stock is not None and item.max_stock < item.minimum_stock:
+            return jsonify({'success': False, 'message': 'Max stock must be greater than or equal to minimum stock'}), 400
+        if 'storage_life_days' in data:
+            item.storage_life_days = parse_int_field(data, 'storage_life_days', minimum=0, default=None)
+        if 'expiry_tracking' in data:
+            item.expiry_tracking = parse_bool_field(data, 'expiry_tracking', default=item.expiry_tracking)
+        if 'batch_tracking' in data:
+            item.batch_tracking = parse_bool_field(data, 'batch_tracking', default=item.batch_tracking)
+        if 'serial_tracking' in data:
+            item.serial_tracking = parse_bool_field(data, 'serial_tracking', default=item.serial_tracking)
+        if 'is_consumable' in data:
+            item.is_consumable = parse_bool_field(data, 'is_consumable', default=item.is_consumable)
+        for field in ['item_code', 'barcode', 'qr_code', 'local_name', 'description',
                        'storage_requirement', 'photo', 'status']:
             if field in data:
                 setattr(item, field, data[field])
         item.updated_by = current_user.id
         db.session.commit()
         return jsonify({'success': True, 'message': 'Item updated', 'data': item.to_dict()})
+    except ValueError as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 500
@@ -1223,8 +1401,12 @@ def generate_receipt_no():
 def update_inventory(item_id, warehouse_id, quantity_change):
     inv = Inventory.query.filter_by(item_id=item_id, warehouse_id=warehouse_id).first()
     if inv:
+        if inv.quantity + quantity_change < 0:
+            raise ValueError('Inventory cannot go below zero')
         inv.quantity += quantity_change
     else:
+        if quantity_change < 0:
+            raise ValueError('Inventory cannot go below zero')
         inv = Inventory(item_id=item_id, warehouse_id=warehouse_id, quantity=quantity_change)
         db.session.add(inv)
     return inv
@@ -1244,9 +1426,9 @@ def handle_stock_receipts():
         if source_type:
             query = query.filter(StockReceipt.source_type == source_type)
         if date_from:
-            query = query.filter(StockReceipt.date >= datetime.strptime(date_from, '%Y-%m-%d').date())
+            query = query.filter(StockReceipt.date >= parse_date_field({'date_from': date_from}, 'date_from'))
         if date_to:
-            query = query.filter(StockReceipt.date <= datetime.strptime(date_to, '%Y-%m-%d').date())
+            query = query.filter(StockReceipt.date <= parse_date_field({'date_to': date_to}, 'date_to'))
         if search:
             q = f'%{search}%'
             query = query.filter(db.or_(
@@ -1258,12 +1440,22 @@ def handle_stock_receipts():
         return jsonify({'success': True, 'receipts': [r.to_dict() for r in receipts]})
     try:
         data = request.get_json()
+        if not data.get('warehouse_id'):
+            return jsonify({'success': False, 'message': 'Warehouse is required'}), 400
+        warehouse = db_get(Warehouse, data['warehouse_id'])
+        if not warehouse:
+            return jsonify({'success': False, 'message': 'Warehouse not found'}), 404
+        if not data.get('source_type'):
+            return jsonify({'success': False, 'message': 'Source type is required'}), 400
+        items_payload = data.get('items', [])
+        if not items_payload:
+            return jsonify({'success': False, 'message': 'At least one item is required'}), 400
         invoice_date = None
         if data.get('invoice_date'):
-            invoice_date = datetime.strptime(data['invoice_date'], '%Y-%m-%d').date()
+            invoice_date = parse_date_field({'invoice_date': data['invoice_date']}, 'invoice_date')
         receipt = StockReceipt(
             receipt_no=data.get('receipt_no') or generate_receipt_no(),
-            date=datetime.strptime(data['date'], '%Y-%m-%d').date() if data.get('date') else date.today(),
+            date=parse_date_field({'date': data.get('date')}, 'date', default=date.today()),
             warehouse_id=data['warehouse_id'], source_type=data['source_type'],
             source_name=data.get('source_name'),
             source_contact=data.get('source_contact'), phone=data.get('phone'),
@@ -1277,37 +1469,52 @@ def handle_stock_receipts():
         )
         db.session.add(receipt)
         db.session.flush()
-        for item_data in data.get('items', []):
+        for item_data in items_payload:
+            item = db_get(Item, item_data.get('item_id'))
+            if not item:
+                return jsonify({'success': False, 'message': 'One or more items were not found'}), 404
             mfg = None
             exp = None
             if item_data.get('mfg_date'):
-                mfg = datetime.strptime(item_data['mfg_date'], '%Y-%m-%d').date()
+                mfg = parse_date_field({'mfg_date': item_data['mfg_date']}, 'mfg_date')
             if item_data.get('expiry_date'):
-                exp = datetime.strptime(item_data['expiry_date'], '%Y-%m-%d').date()
-            qty = int(item_data['quantity'])
-            unit_cost = float(item_data.get('unit_cost', 0))
+                exp = parse_date_field({'expiry_date': item_data['expiry_date']}, 'expiry_date')
+            qty = parse_int_field(item_data, 'quantity', minimum=1)
+            unit_cost = parse_float_field(item_data, 'unit_cost', minimum=0, default=0)
+            if mfg and exp and exp < mfg:
+                return jsonify({'success': False, 'message': 'Expiry date cannot be earlier than manufacturing date'}), 400
+            item_id = item_data.get('item_id')
+            if item_id is None:
+                return jsonify({'success': False, 'message': 'Each receipt item requires an item_id'}), 400
             ri = StockReceiptItem(
-                receipt_id=receipt.id, item_id=item_data['item_id'],
+                receipt_id=receipt.id, item_id=item_id,
                 quantity=qty, unit=item_data.get('unit'),
                 batch_no=item_data.get('batch_no'), serial_no=item_data.get('serial_no'),
                 mfg_date=mfg, expiry_date=exp,
                 unit_cost=unit_cost, total_cost=unit_cost * qty
             )
             db.session.add(ri)
-            update_inventory(item_data['item_id'], data['warehouse_id'], qty)
+            update_inventory(item_id, data['warehouse_id'], qty)
         db.session.commit()
         return jsonify({'success': True, 'message': 'Stock receipt recorded', 'data': receipt.to_dict()}), 201
+    except ValueError as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/stock-receipts/<int:id>', methods=['GET'])
+@login_required
 def get_stock_receipt(id):
-    receipt = StockReceipt.query.get_or_404(id)
+    receipt = db_get(StockReceipt, id)
+    if not receipt:
+        return jsonify({'success': False, 'message': 'Stock receipt not found'}), 404
     return jsonify({'success': True, 'receipt': receipt.to_dict()})
 
 # ============ INVENTORY API ============
 @app.route('/api/inventory', methods=['GET'])
+@login_required
 def get_inventory():
     try:
         query = Inventory.query
@@ -1334,6 +1541,7 @@ def get_inventory():
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/inventory/summary', methods=['GET'])
+@login_required
 def get_inventory_summary():
     try:
         total_items = Item.query.count()
@@ -1395,30 +1603,46 @@ def handle_adjustments():
         return jsonify({'success': True, 'adjustments': [a.to_dict() for a in adjustments]})
     try:
         data = request.get_json()
-        item = Item.query.get(data['item_id'])
+        if not isinstance(data, dict):
+            return jsonify({'success': False, 'message': 'Invalid JSON payload'}), 400
+        item_id = data.get('item_id')
+        if item_id is None:
+            return jsonify({'success': False, 'message': 'Item is required'}), 400
+        item = db_get(Item, item_id)
         if not item:
             return jsonify({'success': False, 'message': 'Item not found'}), 404
-        warehouse_id = data['warehouse_id']
+        warehouse_id = data.get('warehouse_id')
+        if not warehouse_id:
+            return jsonify({'success': False, 'message': 'Warehouse is required'}), 400
+        warehouse = db_get(Warehouse, warehouse_id)
+        if not warehouse:
+            return jsonify({'success': False, 'message': 'Warehouse not found'}), 404
+        adj_type = data.get('adjustment_type')
+        allowed_types = {'Increase', 'Decrease', 'Damage', 'Expired', 'Lost', 'Correction', 'Correction_Increase'}
+        if adj_type not in allowed_types:
+            return jsonify({'success': False, 'message': 'Invalid adjustment type'}), 400
+        adj_qty = parse_int_field(data, 'adjusted_quantity', minimum=1)
         inv = Inventory.query.filter_by(item_id=item.id, warehouse_id=warehouse_id).first()
         current_qty = inv.available_quantity if inv else 0
         adjustment = ManualAdjustment(
             adjustment_no=data.get('adjustment_no') or generate_adjustment_no(),
-            date=datetime.strptime(data['date'], '%Y-%m-%d').date() if data.get('date') else date.today(),
+            date=parse_date_field({'date': data.get('date')}, 'date', default=date.today()),
             warehouse_id=warehouse_id, item_id=item.id,
-            adjustment_type=data['adjustment_type'], reason=data.get('reason'),
-            current_quantity=current_qty, adjusted_quantity=int(data['adjusted_quantity']),
+            adjustment_type=adj_type, reason=data.get('reason'),
+            current_quantity=current_qty, adjusted_quantity=adj_qty,
             remarks=data.get('remarks'), approval_user=data.get('approval_user'),
             created_by=current_user.id
         )
         db.session.add(adjustment)
-        adj_type = data['adjustment_type']
-        adj_qty = int(data['adjusted_quantity'])
         if adj_type in ('Increase', 'Correction_Increase'):
             update_inventory(item.id, warehouse_id, adj_qty)
         elif adj_type in ('Decrease', 'Damage', 'Expired', 'Lost', 'Correction'):
             update_inventory(item.id, warehouse_id, -adj_qty)
         db.session.commit()
         return jsonify({'success': True, 'message': 'Adjustment recorded', 'data': adjustment.to_dict()}), 201
+    except ValueError as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 500
@@ -1436,18 +1660,28 @@ def handle_incidents():
         return jsonify({'success': True, 'incidents': [i.to_dict() for i in incidents]})
     try:
         data = request.get_json()
-        if not data.get('incident_name') or not data.get('incident_type'):
+        if not isinstance(data, dict):
+            return jsonify({'success': False, 'message': 'Invalid JSON payload'}), 400
+        incident_name = (data.get('incident_name') or '').strip()
+        incident_type = (data.get('incident_type') or '').strip()
+        if not incident_name or not incident_type:
             return jsonify({'success': False, 'message': 'Incident name and type are required'}), 400
+        ward = parse_int_field(data, 'ward', minimum=1, default=None)
+        if ward is not None and ward not in range(1, 10):
+            return jsonify({'success': False, 'message': 'Ward must be between 1 and 9'}), 400
         incident = Incident(
-            incident_name=data['incident_name'], incident_type=data['incident_type'],
+            incident_name=incident_name, incident_type=incident_type,
             province=data.get('province'), district=data.get('district'),
-            municipality=data.get('municipality'), ward=data.get('ward'),
-            start_date=datetime.strptime(data['start_date'], '%Y-%m-%d').date() if data.get('start_date') else date.today(),
+            municipality=data.get('municipality'), ward=ward,
+            start_date=parse_date_field(data, 'start_date', default=date.today()),
             status=data.get('status', 'Active'), description=data.get('description')
         )
         db.session.add(incident)
         db.session.commit()
         return jsonify({'success': True, 'message': 'Incident created', 'data': incident.to_dict()}), 201
+    except ValueError as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 500
@@ -1455,20 +1689,40 @@ def handle_incidents():
 @app.route('/api/incidents/<int:id>', methods=['PUT', 'DELETE'])
 @permission_required('edit')
 def manage_incident(id):
-    incident = Incident.query.get_or_404(id)
+    incident = db_get(Incident, id)
+    if not incident:
+        return jsonify({'success': False, 'message': 'Incident not found'}), 404
     try:
         if request.method == 'DELETE':
             db.session.delete(incident)
             db.session.commit()
             return jsonify({'success': True, 'message': 'Incident deleted'})
         data = request.get_json()
-        for field in ['incident_name', 'incident_type', 'province', 'district', 'municipality', 'ward', 'status', 'description']:
+        if 'incident_name' in data:
+            name = (data.get('incident_name') or '').strip()
+            if not name:
+                return jsonify({'success': False, 'message': 'Incident name is required'}), 400
+            incident.incident_name = name
+        if 'incident_type' in data:
+            incident_type = (data.get('incident_type') or '').strip()
+            if not incident_type:
+                return jsonify({'success': False, 'message': 'Incident type is required'}), 400
+            incident.incident_type = incident_type
+        if 'ward' in data:
+            ward = parse_int_field(data, 'ward', minimum=1, default=None)
+            if ward is not None and ward not in range(1, 10):
+                return jsonify({'success': False, 'message': 'Ward must be between 1 and 9'}), 400
+            incident.ward = ward
+        for field in ['province', 'district', 'municipality', 'status', 'description']:
             if field in data:
                 setattr(incident, field, data[field])
         if data.get('start_date'):
-            incident.start_date = datetime.strptime(data['start_date'], '%Y-%m-%d').date()
+            incident.start_date = parse_date_field(data, 'start_date', default=incident.start_date)
         db.session.commit()
         return jsonify({'success': True, 'message': 'Incident updated', 'data': incident.to_dict()})
+    except ValueError as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 500
@@ -1494,26 +1748,46 @@ def handle_relief_requests():
         return jsonify({'success': True, 'relief_requests': [r.to_dict() for r in requests]})
     try:
         data = request.get_json()
+        if not isinstance(data, dict):
+            return jsonify({'success': False, 'message': 'Invalid JSON payload'}), 400
+        incident_id = data.get('incident_id')
+        incident = db_get(Incident, incident_id)
+        if not incident:
+            return jsonify({'success': False, 'message': 'Incident not found'}), 404
+        items_payload = data.get('items', [])
+        requested_cash_amount = parse_float_field(data, 'requested_cash_amount', minimum=0, default=0)
+        if not items_payload and requested_cash_amount <= 0:
+            return jsonify({'success': False, 'message': 'At least one item or cash amount is required'}), 400
         req = ReliefRequest(
             request_number=data.get('request_number') or generate_request_no(),
-            request_date=datetime.strptime(data['request_date'], '%Y-%m-%d').date() if data.get('request_date') else date.today(),
-            incident_id=data['incident_id'], organization=data.get('organization'),
+            request_date=parse_date_field({'request_date': data.get('request_date')}, 'request_date', default=date.today()),
+            incident_id=incident.id, organization=data.get('organization'),
             requester_name=data.get('requester_name'), phone=data.get('phone'),
             priority=data.get('priority', 'Medium'),
-            requested_cash_amount=float(data.get('requested_cash_amount', 0)),
+            requested_cash_amount=requested_cash_amount,
             cash_purpose=data.get('cash_purpose'),
             remarks=data.get('remarks')
         )
         db.session.add(req)
         db.session.flush()
-        for item_data in data.get('items', []):
+        for item_data in items_payload:
+            item = db_get(Item, item_data.get('item_id'))
+            if not item:
+                return jsonify({'success': False, 'message': 'One or more items were not found'}), 404
+            item_id = item_data.get('item_id')
+            if item_id is None:
+                return jsonify({'success': False, 'message': 'Each request item requires an item_id'}), 400
             ri = ReliefRequestItem(
-                request_id=req.id, item_id=item_data['item_id'],
-                quantity_requested=int(item_data['quantity_requested']), unit=item_data.get('unit')
+                request_id=req.id, item_id=item_id,
+                quantity_requested=parse_int_field(item_data, 'quantity_requested', minimum=1),
+                unit=item_data.get('unit')
             )
             db.session.add(ri)
         db.session.commit()
         return jsonify({'success': True, 'message': 'Relief request created', 'data': req.to_dict()}), 201
+    except ValueError as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 500
@@ -1521,7 +1795,9 @@ def handle_relief_requests():
 @app.route('/api/relief-requests/<int:id>', methods=['GET', 'PUT', 'DELETE'])
 @permission_required('edit')
 def manage_relief_request(id):
-    req = ReliefRequest.query.get_or_404(id)
+    req = db_get(ReliefRequest, id)
+    if not req:
+        return jsonify({'success': False, 'message': 'Relief request not found'}), 404
     try:
         if request.method == 'GET':
             return jsonify({'success': True, 'relief_request': req.to_dict()})
@@ -1530,22 +1806,36 @@ def manage_relief_request(id):
             db.session.commit()
             return jsonify({'success': True, 'message': 'Relief request deleted'})
         data = request.get_json()
-        for field in ['incident_id', 'organization', 'requester_name', 'phone', 'priority', 'remarks', 'status',
-                       'requested_cash_amount', 'cash_purpose']:
+        if 'incident_id' in data:
+            incident = db_get(Incident, data.get('incident_id'))
+            if not incident:
+                return jsonify({'success': False, 'message': 'Incident not found'}), 404
+            req.incident_id = incident.id
+        for field in ['organization', 'requester_name', 'phone', 'priority', 'remarks', 'status', 'cash_purpose']:
             if field in data:
                 setattr(req, field, data[field])
+        if 'requested_cash_amount' in data:
+            req.requested_cash_amount = parse_float_field(data, 'requested_cash_amount', minimum=0, default=0)
         if data.get('request_date'):
-            req.request_date = datetime.strptime(data['request_date'], '%Y-%m-%d').date()
+            req.request_date = parse_date_field(data, 'request_date', default=req.request_date)
         if data.get('items') is not None:
             ReliefRequestItem.query.filter_by(request_id=req.id).delete()
+            if not data['items'] and (req.requested_cash_amount or 0) <= 0:
+                return jsonify({'success': False, 'message': 'At least one item or cash amount is required'}), 400
             for item_data in data['items']:
+                item = db_get(Item, item_data.get('item_id'))
+                if not item:
+                    return jsonify({'success': False, 'message': 'One or more items were not found'}), 404
                 ri = ReliefRequestItem(
-                    request_id=req.id, item_id=item_data['item_id'],
-                    quantity_requested=int(item_data['quantity_requested']), unit=item_data.get('unit')
+                    request_id=req.id, item_id=item.id,
+                    quantity_requested=parse_int_field(item_data, 'quantity_requested', minimum=1), unit=item_data.get('unit')
                 )
                 db.session.add(ri)
         db.session.commit()
         return jsonify({'success': True, 'message': 'Relief request updated', 'data': req.to_dict()})
+    except ValueError as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 500
@@ -1571,28 +1861,46 @@ def handle_dispatches():
         return jsonify({'success': True, 'dispatches': [d.to_dict() for d in dispatches]})
     try:
         data = request.get_json()
+        if not isinstance(data, dict):
+            return jsonify({'success': False, 'message': 'Invalid JSON payload'}), 400
+        warehouse_id = data.get('warehouse_id')
+        incident_id = data.get('incident_id')
+        warehouse = db_get(Warehouse, warehouse_id)
+        incident = db_get(Incident, incident_id)
+        if not warehouse:
+            return jsonify({'success': False, 'message': 'Warehouse not found'}), 404
+        if not incident:
+            return jsonify({'success': False, 'message': 'Incident not found'}), 404
+        items_payload = data.get('items', [])
+        if not items_payload:
+            return jsonify({'success': False, 'message': 'At least one dispatch item is required'}), 400
         dispatch = Dispatch(
             dispatch_number=data.get('dispatch_number') or generate_dispatch_no(),
-            date=datetime.strptime(data['date'], '%Y-%m-%d').date() if data.get('date') else date.today(),
-            warehouse_id=data['warehouse_id'], incident_id=data['incident_id'],
+            date=parse_date_field({'date': data.get('date')}, 'date', default=date.today()),
+            warehouse_id=warehouse.id, incident_id=incident.id,
             relief_request_id=data.get('relief_request_id'),
             destination=data.get('destination'), receiver=data.get('receiver'),
             phone=data.get('phone'), remarks=data.get('remarks'), created_by=current_user.id
         )
         db.session.add(dispatch)
         db.session.flush()
-        for item_data in data.get('items', []):
-            item_id = item_data['item_id']
-            qty = int(item_data['quantity'])
-            inv = Inventory.query.filter_by(item_id=item_id, warehouse_id=data['warehouse_id']).first()
+        for item_data in items_payload:
+            item_id = item_data.get('item_id')
+            if item_id is None:
+                return jsonify({'success': False, 'message': 'Each dispatch item requires an item_id'}), 400
+            qty = parse_int_field(item_data, 'quantity', minimum=1)
+            item = db_get(Item, item_id)
+            if not item:
+                return jsonify({'success': False, 'message': 'One or more items were not found'}), 404
+            inv = Inventory.query.filter_by(item_id=item_id, warehouse_id=warehouse.id).first()
             if not inv or inv.available_quantity < qty:
                 db.session.rollback()
-                item_name = Item.query.get(item_id).name if Item.query.get(item_id) else 'Unknown'
+                item_name = item.name if item else 'Unknown'
                 return jsonify({'success': False, 'message': f'Insufficient stock for {item_name}. Available: {inv.available_quantity if inv else 0}, Required: {qty}'}), 400
             batch = item_data.get('batch_no') or ''
             expiry = None
             if item_data.get('expiry_date'):
-                expiry = datetime.strptime(item_data['expiry_date'], '%Y-%m-%d').date()
+                expiry = parse_date_field({'expiry_date': item_data['expiry_date']}, 'expiry_date')
             di = DispatchItem(dispatch_id=dispatch.id, item_id=item_id, quantity=qty,
                               unit=item_data.get('unit'), batch_no=batch, expiry_date=expiry)
             db.session.add(di)
@@ -1602,7 +1910,7 @@ def handle_dispatches():
                 for rr_item in rr_items:
                     rr_item.quantity_dispatched = (rr_item.quantity_dispatched or 0) + qty
         if data.get('relief_request_id'):
-            req = ReliefRequest.query.get(data['relief_request_id'])
+            req = db_get(ReliefRequest, data['relief_request_id'])
             if req:
                 if req.items:
                     all_dispatched = all(ri.quantity_dispatched >= ri.quantity_requested for ri in req.items)
@@ -1621,8 +1929,11 @@ def handle_dispatches():
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/dispatch/<int:id>', methods=['GET'])
+@login_required
 def get_dispatch(id):
-    dispatch = Dispatch.query.get_or_404(id)
+    dispatch = db_get(Dispatch, id)
+    if not dispatch:
+        return jsonify({'success': False, 'message': 'Dispatch not found'}), 404
     return jsonify({'success': True, 'dispatch': dispatch.to_dict()})
 
 # ============ DISTRIBUTION API ============
@@ -1643,23 +1954,43 @@ def handle_distributions():
         return jsonify({'success': True, 'distributions': [d.to_dict() for d in distributions]})
     try:
         data = request.get_json()
-        dispatch = Dispatch.query.get(data['dispatch_id'])
+        if not isinstance(data, dict):
+            return jsonify({'success': False, 'message': 'Invalid JSON payload'}), 400
+        dispatch_id = data.get('dispatch_id')
+        if dispatch_id is None:
+            return jsonify({'success': False, 'message': 'Dispatch is required'}), 400
+        dispatch = db_get(Dispatch, dispatch_id)
         if not dispatch:
             return jsonify({'success': False, 'message': 'Dispatch not found'}), 404
+        incident_id = data.get('incident_id')
+        if incident_id and int(incident_id) != dispatch.incident_id:
+            return jsonify({'success': False, 'message': 'Incident does not match selected dispatch'}), 400
+        allowed_items = {di.item.name for di in dispatch.items if di.item}
+        beneficiaries_payload = data.get('beneficiaries', [])
+        if not beneficiaries_payload:
+            return jsonify({'success': False, 'message': 'At least one beneficiary is required'}), 400
         dist = Distribution(
             distribution_no=data.get('distribution_no') or generate_distribution_no(),
-            dispatch_id=data['dispatch_id'], incident_id=dispatch.incident_id,
+            dispatch_id=dispatch_id, incident_id=dispatch.incident_id,
             location=data.get('location'),
-            distribution_date=datetime.strptime(data['distribution_date'], '%Y-%m-%d').date() if data.get('distribution_date') else date.today(),
+            distribution_date=parse_date_field({'distribution_date': data.get('distribution_date')}, 'distribution_date', default=date.today()),
             officer=data.get('officer'), remarks=data.get('remarks'), created_by=current_user.id
         )
         db.session.add(dist)
         db.session.flush()
-        for ben_data in data.get('beneficiaries', []):
+        for ben_data in beneficiaries_payload:
+            family_name = (ben_data.get('family_name') or '').strip()
+            if not family_name:
+                return jsonify({'success': False, 'message': 'Family name is required for each beneficiary'}), 400
+            qty = parse_int_field(ben_data, 'quantity', minimum=1)
+            item_name = (ben_data.get('item') or '').strip()
+            if item_name and item_name not in allowed_items:
+                return jsonify({'success': False, 'message': f'Item "{item_name}" is not part of the selected dispatch'}), 400
             ben = DistributionBeneficiary(
-                distribution_id=dist.id, family_name=ben_data['family_name'],
-                id_number=ben_data.get('id_number'), members=int(ben_data.get('members', 1)),
-                item=ben_data.get('item'), quantity=int(ben_data.get('quantity', 0))
+                distribution_id=dist.id, family_name=family_name,
+                beneficiary_id=ben_data.get('beneficiary_id'),
+                id_number=ben_data.get('id_number'), members=parse_int_field(ben_data, 'members', minimum=1, default=1),
+                item=item_name or None, quantity=qty
             )
             db.session.add(ben)
         db.session.commit()
@@ -1669,8 +2000,11 @@ def handle_distributions():
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/distributions/<int:id>', methods=['GET'])
+@login_required
 def get_distribution(id):
-    dist = Distribution.query.get_or_404(id)
+    dist = db_get(Distribution, id)
+    if not dist:
+        return jsonify({'success': False, 'message': 'Distribution not found'}), 404
     return jsonify({'success': True, 'distribution': dist.to_dict()})
 
 # ============ DISASTER ASSESSMENT API ============
@@ -1695,46 +2029,56 @@ def handle_disaster_assessments():
         return jsonify({'success': True, 'assessments': [a.to_dict() for a in assessments]})
     try:
         data = request.get_json()
-        incident = Incident.query.get(data['incident_id'])
+        if not isinstance(data, dict):
+            return jsonify({'success': False, 'message': 'Invalid JSON payload'}), 400
+        incident_id = data.get('incident_id')
+        if incident_id is None:
+            return jsonify({'success': False, 'message': 'Incident is required'}), 400
+        incident = db_get(Incident, incident_id)
         if not incident:
             return jsonify({'success': False, 'message': 'Incident not found'}), 404
+        if data.get('disaster_date_bs') and not is_valid_nepali_date(data['disaster_date_bs']):
+            return jsonify({'success': False, 'message': 'Invalid BS date format'}), 400
         assessment = DisasterAssessment(
-            incident_id=data['incident_id'],
+            incident_id=incident_id,
             disaster_type=data.get('disaster_type', incident.incident_type),
             fiscal_year=data.get('fiscal_year') or AppSettings.get_setting('fiscal_year', '2081/82'),
             disaster_date_bs=data.get('disaster_date_bs'),
             tole=data.get('tole'),
-            deaths=int(data.get('deaths', 0)),
-            missing_persons=int(data.get('missing_persons', 0)),
-            injured=int(data.get('injured', 0)),
-            affected_households=int(data.get('affected_households', 0)),
-            affected_people=int(data.get('affected_people', 0)),
-            affected_people_male=int(data.get('affected_people_male', 0)),
-            affected_people_female=int(data.get('affected_people_female', 0)),
-            house_destroyed=int(data.get('house_destroyed', 0)),
-            house_damaged=int(data.get('house_damaged', 0)),
-            public_building_destroyed=int(data.get('public_building_destroyed', 0)),
-            public_building_damaged=int(data.get('public_building_damaged', 0)),
-            estimated_loss=float(data.get('estimated_loss', 0)),
+            deaths=parse_int_field(data, 'deaths', minimum=0, default=0),
+            missing_persons=parse_int_field(data, 'missing_persons', minimum=0, default=0),
+            injured=parse_int_field(data, 'injured', minimum=0, default=0),
+            affected_households=parse_int_field(data, 'affected_households', minimum=0, default=0),
+            affected_people=parse_int_field(data, 'affected_people', minimum=0, default=0),
+            affected_people_male=parse_int_field(data, 'affected_people_male', minimum=0, default=0),
+            affected_people_female=parse_int_field(data, 'affected_people_female', minimum=0, default=0),
+            house_destroyed=parse_int_field(data, 'house_destroyed', minimum=0, default=0),
+            house_damaged=parse_int_field(data, 'house_damaged', minimum=0, default=0),
+            public_building_destroyed=parse_int_field(data, 'public_building_destroyed', minimum=0, default=0),
+            public_building_damaged=parse_int_field(data, 'public_building_damaged', minimum=0, default=0),
+            estimated_loss=parse_float_field(data, 'estimated_loss', minimum=0, default=0),
             agriculture_crop_damage=data.get('agriculture_crop_damage'),
-            road_blocked=bool(data.get('road_blocked', False)),
-            electricity_blocked=bool(data.get('electricity_blocked', False)),
-            communication_blocked=bool(data.get('communication_blocked', False)),
-            drinking_water_disrupted=bool(data.get('drinking_water_disrupted', False)),
-            cattle_lost=int(data.get('cattle_lost', 0)),
-            cattle_injured=int(data.get('cattle_injured', 0)),
-            poultry_lost=int(data.get('poultry_lost', 0)),
-            poultry_injured=int(data.get('poultry_injured', 0)),
-            goats_sheep_lost=int(data.get('goats_sheep_lost', 0)),
-            goats_sheep_injured=int(data.get('goats_sheep_injured', 0)),
-            other_livestock_lost=int(data.get('other_livestock_lost', 0)),
-            other_livestock_injured=int(data.get('other_livestock_injured', 0)),
+            road_blocked=parse_bool_field(data, 'road_blocked', default=False),
+            electricity_blocked=parse_bool_field(data, 'electricity_blocked', default=False),
+            communication_blocked=parse_bool_field(data, 'communication_blocked', default=False),
+            drinking_water_disrupted=parse_bool_field(data, 'drinking_water_disrupted', default=False),
+            cattle_lost=parse_int_field(data, 'cattle_lost', minimum=0, default=0),
+            cattle_injured=parse_int_field(data, 'cattle_injured', minimum=0, default=0),
+            poultry_lost=parse_int_field(data, 'poultry_lost', minimum=0, default=0),
+            poultry_injured=parse_int_field(data, 'poultry_injured', minimum=0, default=0),
+            goats_sheep_lost=parse_int_field(data, 'goats_sheep_lost', minimum=0, default=0),
+            goats_sheep_injured=parse_int_field(data, 'goats_sheep_injured', minimum=0, default=0),
+            other_livestock_lost=parse_int_field(data, 'other_livestock_lost', minimum=0, default=0),
+            other_livestock_injured=parse_int_field(data, 'other_livestock_injured', minimum=0, default=0),
             remarks=data.get('remarks'),
             created_by=current_user.id
         )
         db.session.add(assessment)
         db.session.commit()
         return jsonify({'success': True, 'message': 'Disaster assessment recorded', 'data': assessment.to_dict()}), 201
+    except ValueError as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 500
@@ -1742,7 +2086,9 @@ def handle_disaster_assessments():
 @app.route('/api/disaster-assessments/<int:id>', methods=['GET', 'PUT', 'DELETE'])
 @permission_required('edit')
 def manage_disaster_assessment(id):
-    assessment = DisasterAssessment.query.get_or_404(id)
+    assessment = db_get(DisasterAssessment, id)
+    if not assessment:
+        return jsonify({'success': False, 'message': 'Assessment not found'}), 404
     try:
         if request.method == 'GET':
             return jsonify({'success': True, 'assessment': assessment.to_dict()})
@@ -1751,18 +2097,29 @@ def manage_disaster_assessment(id):
             db.session.commit()
             return jsonify({'success': True, 'message': 'Assessment deleted'})
         data = request.get_json()
-        for field in ['disaster_type', 'fiscal_year', 'disaster_date_bs', 'tole', 'deaths', 'missing_persons',
-                       'injured', 'affected_households', 'affected_people', 'affected_people_male',
-                       'affected_people_female', 'house_destroyed', 'house_damaged',
-                       'public_building_destroyed', 'public_building_damaged', 'estimated_loss',
-                       'agriculture_crop_damage', 'road_blocked', 'electricity_blocked',
-                       'communication_blocked', 'drinking_water_disrupted', 'cattle_lost', 'cattle_injured',
-                       'poultry_lost', 'poultry_injured', 'goats_sheep_lost', 'goats_sheep_injured',
-                       'other_livestock_lost', 'other_livestock_injured', 'remarks']:
+        if data.get('disaster_date_bs') and not is_valid_nepali_date(data['disaster_date_bs']):
+            return jsonify({'success': False, 'message': 'Invalid BS date format'}), 400
+        for field in ['disaster_type', 'fiscal_year', 'disaster_date_bs', 'tole', 'agriculture_crop_damage', 'remarks']:
             if field in data:
                 setattr(assessment, field, data[field])
+        int_fields = ['deaths', 'missing_persons', 'injured', 'affected_households', 'affected_people',
+                      'affected_people_male', 'affected_people_female', 'house_destroyed', 'house_damaged',
+                      'public_building_destroyed', 'public_building_damaged', 'cattle_lost', 'cattle_injured',
+                      'poultry_lost', 'poultry_injured', 'goats_sheep_lost', 'goats_sheep_injured',
+                      'other_livestock_lost', 'other_livestock_injured']
+        for field in int_fields:
+            if field in data:
+                setattr(assessment, field, parse_int_field(data, field, minimum=0, default=0))
+        if 'estimated_loss' in data:
+            assessment.estimated_loss = parse_float_field(data, 'estimated_loss', minimum=0, default=0)
+        for field in ['road_blocked', 'electricity_blocked', 'communication_blocked', 'drinking_water_disrupted']:
+            if field in data:
+                setattr(assessment, field, parse_bool_field(data, field, default=getattr(assessment, field)))
         db.session.commit()
         return jsonify({'success': True, 'message': 'Assessment updated', 'data': assessment.to_dict()})
+    except ValueError as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 500
@@ -1783,18 +2140,22 @@ def handle_cash_funds():
         data = request.get_json()
         if not data.get('name'):
             return jsonify({'success': False, 'message': 'Fund name is required'}), 400
+        allocated_amount = parse_float_field(data, 'allocated_amount', minimum=0, default=0)
         fund = CashFund(
             fund_no=data.get('fund_no') or generate_fund_no(),
             name=data['name'], fiscal_year=data.get('fiscal_year'),
             funding_source=data.get('funding_source'),
-            allocated_amount=float(data.get('allocated_amount', 0)),
-            current_balance=float(data.get('allocated_amount', 0)),
+            allocated_amount=allocated_amount,
+            current_balance=allocated_amount,
             description=data.get('description'), status=data.get('status', 'Active'),
             created_by=current_user.id
         )
         db.session.add(fund)
         db.session.commit()
         return jsonify({'success': True, 'message': 'Fund created', 'data': fund.to_dict()}), 201
+    except ValueError as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 500
@@ -1802,7 +2163,9 @@ def handle_cash_funds():
 @app.route('/api/cash-funds/<int:id>', methods=['GET', 'PUT', 'DELETE'])
 @permission_required('edit')
 def manage_cash_fund(id):
-    fund = CashFund.query.get_or_404(id)
+    fund = db_get(CashFund, id)
+    if not fund:
+        return jsonify({'success': False, 'message': 'Fund not found'}), 404
     try:
         if request.method == 'GET':
             return jsonify({'success': True, 'fund': fund.to_dict()})
@@ -1811,11 +2174,24 @@ def manage_cash_fund(id):
             db.session.commit()
             return jsonify({'success': True, 'message': 'Fund deleted'})
         data = request.get_json()
-        for field in ['name', 'fiscal_year', 'funding_source', 'allocated_amount', 'description', 'status']:
+        if 'name' in data:
+            name = (data.get('name') or '').strip()
+            if not name:
+                return jsonify({'success': False, 'message': 'Fund name is required'}), 400
+            fund.name = name
+        for field in ['fiscal_year', 'funding_source', 'description', 'status']:
             if field in data:
                 setattr(fund, field, data[field])
+        if 'allocated_amount' in data:
+            allocated_amount = parse_float_field(data, 'allocated_amount', minimum=0, default=0)
+            fund.allocated_amount = allocated_amount
+            if fund.current_balance is None or fund.current_balance > allocated_amount:
+                fund.current_balance = allocated_amount
         db.session.commit()
         return jsonify({'success': True, 'message': 'Fund updated', 'data': fund.to_dict()})
+    except ValueError as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 500
@@ -1838,31 +2214,41 @@ def handle_cash_receipts():
         return jsonify({'success': True, 'receipts': [r.to_dict() for r in receipts]})
     try:
         data = request.get_json()
-        if not data.get('fund_id') or not data.get('amount_received'):
+        fund = db_get(CashFund, data.get('fund_id'))
+        amount_received = parse_float_field(data, 'amount_received', minimum=0.01)
+        if not fund:
+            return jsonify({'success': False, 'message': 'Fund not found'}), 404
+        if amount_received is None:
+            return jsonify({'success': False, 'message': 'Amount received is required'}), 400
+        if amount_received <= 0:
             return jsonify({'success': False, 'message': 'Fund and amount are required'}), 400
         receipt = CashReceipt(
             receipt_no=data.get('receipt_no') or generate_cash_receipt_no(),
-            receipt_date=datetime.strptime(data['receipt_date'], '%Y-%m-%d').date() if data.get('receipt_date') else date.today(),
-            fund_id=data['fund_id'], funding_source=data.get('funding_source'),
+            receipt_date=parse_date_field({'receipt_date': data.get('receipt_date')}, 'receipt_date', default=date.today()),
+            fund_id=fund.id, funding_source=data.get('funding_source'),
             reference_number=data.get('reference_number'), voucher_number=data.get('voucher_number'),
             bank_transaction_no=data.get('bank_transaction_no'),
-            amount_received=float(data['amount_received']),
+            amount_received=amount_received,
             received_by=data.get('received_by'), remarks=data.get('remarks'),
             created_by=current_user.id
         )
         db.session.add(receipt)
-        fund = CashFund.query.get(data['fund_id'])
-        if fund:
-            fund.current_balance += float(data['amount_received'])
+        fund.current_balance += amount_received
         db.session.commit()
         return jsonify({'success': True, 'message': 'Cash receipt recorded', 'data': receipt.to_dict()}), 201
+    except ValueError as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/cash-receipts/<int:id>', methods=['GET'])
+@login_required
 def get_cash_receipt(id):
-    receipt = CashReceipt.query.get_or_404(id)
+    receipt = db_get(CashReceipt, id)
+    if not receipt:
+        return jsonify({'success': False, 'message': 'Cash receipt not found'}), 404
     return jsonify({'success': True, 'receipt': receipt.to_dict()})
 
 # ============ CASH REQUEST API ============
@@ -1886,20 +2272,27 @@ def handle_cash_requests():
         return jsonify({'success': True, 'cash_requests': [r.to_dict() for r in cash_reqs]})
     try:
         data = request.get_json()
-        if not data.get('incident_id') or not data.get('requested_amount'):
+        incident = db_get(Incident, data.get('incident_id'))
+        requested_amount = parse_float_field(data, 'requested_amount', minimum=0.01)
+        if not incident:
+            return jsonify({'success': False, 'message': 'Incident not found'}), 404
+        if requested_amount is None or requested_amount <= 0:
             return jsonify({'success': False, 'message': 'Incident and amount are required'}), 400
         req = CashRequest(
             request_number=data.get('request_number') or generate_cash_request_no(),
-            request_date=datetime.strptime(data['request_date'], '%Y-%m-%d').date() if data.get('request_date') else date.today(),
-            incident_id=data['incident_id'], requesting_office=data.get('requesting_office'),
+            request_date=parse_date_field({'request_date': data.get('request_date')}, 'request_date', default=date.today()),
+            incident_id=incident.id, requesting_office=data.get('requesting_office'),
             requester_name=data.get('requester_name'), phone=data.get('phone'),
             priority=data.get('priority', 'Medium'),
-            requested_amount=float(data['requested_amount']),
+            requested_amount=requested_amount,
             purpose=data.get('purpose'), remarks=data.get('remarks')
         )
         db.session.add(req)
         db.session.commit()
         return jsonify({'success': True, 'message': 'Cash request created', 'data': req.to_dict()}), 201
+    except ValueError as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 500
@@ -1907,7 +2300,9 @@ def handle_cash_requests():
 @app.route('/api/cash-requests/<int:id>', methods=['GET', 'PUT', 'DELETE'])
 @permission_required('edit')
 def manage_cash_request(id):
-    req = CashRequest.query.get_or_404(id)
+    req = db_get(CashRequest, id)
+    if not req:
+        return jsonify({'success': False, 'message': 'Cash request not found'}), 404
     try:
         if request.method == 'GET':
             return jsonify({'success': True, 'cash_request': req.to_dict()})
@@ -1916,13 +2311,23 @@ def manage_cash_request(id):
             db.session.commit()
             return jsonify({'success': True, 'message': 'Cash request deleted'})
         data = request.get_json()
-        for field in ['incident_id', 'requesting_office', 'requester_name', 'phone', 'priority', 'requested_amount', 'purpose', 'remarks', 'status']:
+        if 'incident_id' in data:
+            incident = db_get(Incident, data.get('incident_id'))
+            if not incident:
+                return jsonify({'success': False, 'message': 'Incident not found'}), 404
+            req.incident_id = incident.id
+        for field in ['requesting_office', 'requester_name', 'phone', 'priority', 'purpose', 'remarks', 'status']:
             if field in data:
                 setattr(req, field, data[field])
+        if 'requested_amount' in data:
+            req.requested_amount = parse_float_field(data, 'requested_amount', minimum=0.01, default=req.requested_amount)
         if data.get('request_date'):
-            req.request_date = datetime.strptime(data['request_date'], '%Y-%m-%d').date()
+            req.request_date = parse_date_field(data, 'request_date', default=req.request_date)
         db.session.commit()
         return jsonify({'success': True, 'message': 'Cash request updated', 'data': req.to_dict()})
+    except ValueError as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 500
@@ -1951,7 +2356,11 @@ def handle_cash_distributions():
         return jsonify({'success': True, 'distributions': [d.to_dict() for d in dists]})
     try:
         data = request.get_json()
-        if not data.get('fund_id') or not data.get('incident_id'):
+        if not isinstance(data, dict):
+            return jsonify({'success': False, 'message': 'Invalid JSON payload'}), 400
+        fund = db_get(CashFund, data.get('fund_id'))
+        incident = db_get(Incident, data.get('incident_id'))
+        if not fund or not incident:
             return jsonify({'success': False, 'message': 'Fund and incident are required'}), 400
         if not data.get('cash_request_id') and not data.get('relief_request_id'):
             return jsonify({'success': False, 'message': 'Cash request or relief request is required'}), 400
@@ -1959,29 +2368,33 @@ def handle_cash_distributions():
         relief_req = None
         max_amount = float('inf')
         if data.get('cash_request_id'):
-            cash_req = CashRequest.query.get(data['cash_request_id'])
+            cash_req = db_get(CashRequest, data['cash_request_id'])
             if not cash_req:
                 return jsonify({'success': False, 'message': 'Cash request not found'}), 404
+            if cash_req.incident_id != incident.id:
+                return jsonify({'success': False, 'message': 'Cash request does not match selected incident'}), 400
             max_amount = cash_req.requested_amount
         if data.get('relief_request_id'):
-            relief_req = ReliefRequest.query.get(data['relief_request_id'])
+            relief_req = db_get(ReliefRequest, data['relief_request_id'])
             if not relief_req:
                 return jsonify({'success': False, 'message': 'Relief request not found'}), 404
+            if relief_req.incident_id != incident.id:
+                return jsonify({'success': False, 'message': 'Relief request does not match selected incident'}), 400
             max_amount = min(max_amount, relief_req.requested_cash_amount - relief_req.distributed_cash_amount)
-        total = sum(float(b.get('amount', 0)) for b in data.get('beneficiaries', []))
+        beneficiaries_payload = data.get('beneficiaries', [])
+        if not beneficiaries_payload:
+            return jsonify({'success': False, 'message': 'At least one beneficiary is required'}), 400
+        total = sum(parse_float_field(b, 'amount', minimum=0.01, default=0) or 0 for b in beneficiaries_payload)
         if total <= 0:
             return jsonify({'success': False, 'message': 'At least one beneficiary with amount > 0 is required'}), 400
         if total > max_amount:
             return jsonify({'success': False, 'message': f'Total amount ({total}) exceeds available amount ({max_amount})'}), 400
-        fund = CashFund.query.get(data['fund_id'])
-        if not fund:
-            return jsonify({'success': False, 'message': 'Fund not found'}), 404
         if total > fund.current_balance:
             return jsonify({'success': False, 'message': f'Insufficient fund balance. Available: {fund.current_balance}, Required: {total}'}), 400
         dist = CashDistribution(
             distribution_no=data.get('distribution_no') or generate_cash_distribution_no(),
-            distribution_date=datetime.strptime(data['distribution_date'], '%Y-%m-%d').date() if data.get('distribution_date') else date.today(),
-            fund_id=data['fund_id'], incident_id=data['incident_id'],
+            distribution_date=parse_date_field({'distribution_date': data.get('distribution_date')}, 'distribution_date', default=date.today()),
+            fund_id=fund.id, incident_id=incident.id,
             cash_request_id=data.get('cash_request_id'),
             relief_request_id=data.get('relief_request_id'),
             distribution_type=data.get('distribution_type', 'Individual'),
@@ -1990,11 +2403,16 @@ def handle_cash_distributions():
         )
         db.session.add(dist)
         db.session.flush()
-        for ben_data in data.get('beneficiaries', []):
+        for ben_data in beneficiaries_payload:
+            amount = parse_float_field(ben_data, 'amount', minimum=0.01)
+            if amount is None or amount <= 0:
+                return jsonify({'success': False, 'message': 'Each beneficiary amount must be greater than zero'}), 400
+            if not (ben_data.get('name') or '').strip():
+                return jsonify({'success': False, 'message': 'Each beneficiary requires a name'}), 400
             ben = CashDistributionBeneficiary(
-                distribution_id=dist.id, name=ben_data['name'],
+                distribution_id=dist.id, name=ben_data['name'].strip(),
                 national_id=ben_data.get('national_id'), address=ben_data.get('address'),
-                phone=ben_data.get('phone'), amount=float(ben_data.get('amount', 0)),
+                phone=ben_data.get('phone'), amount=amount,
                 beneficiary_id=ben_data.get('beneficiary_id')
             )
             db.session.add(ben)
@@ -2019,13 +2437,19 @@ def handle_cash_distributions():
                 relief_req.status = 'Partial'
         db.session.commit()
         return jsonify({'success': True, 'message': 'Cash distribution recorded', 'data': dist.to_dict()}), 201
+    except ValueError as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/cash-distributions/<int:id>', methods=['GET'])
+@login_required
 def get_cash_distribution(id):
-    dist = CashDistribution.query.get_or_404(id)
+    dist = db_get(CashDistribution, id)
+    if not dist:
+        return jsonify({'success': False, 'message': 'Cash distribution not found'}), 404
     return jsonify({'success': True, 'distribution': dist.to_dict()})
 
 # ============ BENEFICIARY API ============
@@ -2047,17 +2471,24 @@ def handle_beneficiaries():
         data = request.get_json()
         if not data.get('name'):
             return jsonify({'success': False, 'message': 'Beneficiary name is required'}), 400
+        ward = parse_int_field(data, 'ward', minimum=1, default=None)
+        if ward is not None and ward not in range(1, 10):
+            return jsonify({'success': False, 'message': 'Ward must be between 1 and 9'}), 400
+        family_members = parse_int_field(data, 'family_members', minimum=1, default=1)
         ben = Beneficiary(
             name=data['name'], national_id=data.get('national_id'), phone=data.get('phone'),
             address=data.get('address'), municipality=data.get('municipality'),
-            ward=int(data['ward']) if data.get('ward') else None,
-            family_members=int(data.get('family_members', 1)),
+            ward=ward,
+            family_members=family_members,
             bank_account=data.get('bank_account'), mobile_wallet=data.get('mobile_wallet'),
             remarks=data.get('remarks'), created_by=current_user.id
         )
         db.session.add(ben)
         db.session.commit()
         return jsonify({'success': True, 'message': 'Beneficiary created', 'data': ben.to_dict()}), 201
+    except ValueError as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 500
@@ -2065,7 +2496,9 @@ def handle_beneficiaries():
 @app.route('/api/beneficiaries/<int:id>', methods=['GET', 'PUT', 'DELETE'])
 @permission_required('edit')
 def manage_beneficiary(id):
-    ben = Beneficiary.query.get_or_404(id)
+    ben = db_get(Beneficiary, id)
+    if not ben:
+        return jsonify({'success': False, 'message': 'Beneficiary not found'}), 404
     try:
         if request.method == 'GET':
             return jsonify({'success': True, 'beneficiary': ben.to_dict()})
@@ -2074,11 +2507,21 @@ def manage_beneficiary(id):
             db.session.commit()
             return jsonify({'success': True, 'message': 'Beneficiary deleted'})
         data = request.get_json()
+        if 'ward' in data:
+            ward = parse_int_field(data, 'ward', minimum=1, default=None)
+            if ward is not None and ward not in range(1, 10):
+                return jsonify({'success': False, 'message': 'Ward must be between 1 and 9'}), 400
+            data['ward'] = ward
+        if 'family_members' in data:
+            data['family_members'] = parse_int_field(data, 'family_members', minimum=1, default=1)
         for field in ['name', 'national_id', 'phone', 'address', 'municipality', 'ward', 'family_members', 'bank_account', 'mobile_wallet', 'remarks']:
             if field in data:
                 setattr(ben, field, data[field])
         db.session.commit()
         return jsonify({'success': True, 'message': 'Beneficiary updated', 'data': ben.to_dict()})
+    except ValueError as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 500
@@ -2086,10 +2529,15 @@ def manage_beneficiary(id):
 @app.route('/api/beneficiaries/<int:id>/history', methods=['GET'])
 def get_beneficiary_history(id):
     try:
-        ben = Beneficiary.query.get_or_404(id)
+        ben = db_get(Beneficiary, id)
+        if not ben:
+            return jsonify({'success': False, 'message': 'Beneficiary not found'}), 404
         material_dists = DistributionBeneficiary.query.filter(
-            DistributionBeneficiary.family_name.ilike(f'%{ben.name}%')
-        ).all() if ben.name else []
+            db.or_(
+                DistributionBeneficiary.beneficiary_id == id,
+                DistributionBeneficiary.family_name.ilike(f'%{ben.name}%')
+            )
+        ).all() if ben.name else DistributionBeneficiary.query.filter(DistributionBeneficiary.beneficiary_id == id).all()
         cash_dist_items = CashDistributionBeneficiary.query.filter(
             db.or_(CashDistributionBeneficiary.beneficiary_id == id, CashDistributionBeneficiary.name.ilike(f'%{ben.name}%'))
         ).all()
@@ -2119,6 +2567,7 @@ def get_beneficiary_history(id):
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/disaster-statistics', methods=['GET'])
+@login_required
 def get_disaster_statistics():
     try:
         assessments = DisasterAssessment.query.all()
@@ -2183,6 +2632,7 @@ def get_disaster_statistics():
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/generate-daily-report', methods=['GET'])
+@login_required
 def generate_daily_report():
     try:
         from_bs = request.args.get('from_bs_date')
@@ -2192,11 +2642,15 @@ def generate_daily_report():
         start_bs, end_bs = None, None
 
         if from_bs and to_bs:
+            if not is_valid_nepali_date(from_bs) or not is_valid_nepali_date(to_bs):
+                return jsonify({'success': False, 'message': 'Invalid BS date range'}), 400
             start_ad = datetime.strptime(bs_to_ad(from_bs), '%Y-%m-%d').date()
             end_ad = datetime.strptime(bs_to_ad(to_bs), '%Y-%m-%d').date()
             start_date, end_date = start_ad, end_ad
             start_bs, end_bs = from_bs, to_bs
         elif bs_date:
+            if not is_valid_nepali_date(bs_date):
+                return jsonify({'success': False, 'message': 'Invalid BS date'}), 400
             start_ad = datetime.strptime(bs_to_ad(bs_date), '%Y-%m-%d').date()
             start_date = end_date = start_ad
             start_bs = end_bs = bs_date
@@ -2353,10 +2807,14 @@ def daily_report_preview():
     start_bs = end_bs = ad_to_bs(start_date.year, start_date.month, start_date.day)
 
     if from_bs and to_bs:
+        if not is_valid_nepali_date(from_bs) or not is_valid_nepali_date(to_bs):
+            return jsonify({'success': False, 'message': 'Invalid BS date range'}), 400
         start_bs, end_bs = from_bs, to_bs
         start_date = datetime.strptime(bs_to_ad(from_bs), '%Y-%m-%d').date()
         end_date = datetime.strptime(bs_to_ad(to_bs), '%Y-%m-%d').date()
     elif bs_date:
+        if not is_valid_nepali_date(bs_date):
+            return jsonify({'success': False, 'message': 'Invalid BS date'}), 400
         start_bs = end_bs = bs_date
         start_date = end_date = datetime.strptime(bs_to_ad(bs_date), '%Y-%m-%d').date()
 
@@ -2455,9 +2913,12 @@ def uploaded_file(filename):
 
 # ============ ITEM HISTORY ============
 @app.route('/api/items/<int:id>/history', methods=['GET'])
+@login_required
 def get_item_history(id):
     try:
-        item = Item.query.get_or_404(id)
+        item = db_get(Item, id)
+        if not item:
+            return jsonify({'success': False, 'message': 'Item not found'}), 404
         warehouse_id = request.args.get('warehouse_id', type=int)
 
         receipts = StockReceiptItem.query.filter_by(item_id=id).all()
@@ -2531,6 +2992,7 @@ def get_item_history(id):
 
 # ============ DASHBOARD API ============
 @app.route('/api/dashboard', methods=['GET'])
+@login_required
 @cached(timeout=30)
 def get_dashboard():
     try:
@@ -2565,9 +3027,28 @@ def get_dashboard():
             for ri in receipts:
                 if ri.expiry_date and (ri.expiry_date - today).days <= 90:
                     expiring_count += 1
-        recent_receipts = StockReceipt.query.order_by(StockReceipt.date.desc()).limit(5).all()
-        recent_dispatches = Dispatch.query.order_by(Dispatch.date.desc()).limit(5).all()
-        recent_requests = ReliefRequest.query.order_by(ReliefRequest.request_date.desc()).limit(5).all()
+        recent_receipts = []
+        for r in StockReceipt.query.order_by(StockReceipt.date.desc()).limit(5).all():
+            receipt_data = r.to_dict()
+            receipt_data['source'] = r.source_name or r.source_type
+            receipt_data['items'] = ', '.join(
+                f"{item.get('item_name') or ''} x {item.get('quantity')}"
+                for item in receipt_data.get('items', [])
+            ) or '-'
+            recent_receipts.append(receipt_data)
+
+        recent_dispatches = []
+        for d in Dispatch.query.order_by(Dispatch.date.desc()).limit(5).all():
+            dispatch_data = d.to_dict()
+            dispatch_data['dispatch_no'] = dispatch_data.get('dispatch_number')
+            recent_dispatches.append(dispatch_data)
+
+        recent_requests = []
+        for r in ReliefRequest.query.order_by(ReliefRequest.request_date.desc()).limit(5).all():
+            request_data = r.to_dict()
+            request_data['request_no'] = request_data.get('request_number')
+            request_data['incident'] = request_data.get('incident_name')
+            recent_requests.append(request_data)
         return jsonify({
             'success': True,
             'total_items': total_items,
@@ -2581,9 +3062,9 @@ def get_dashboard():
             'todays_distribution': todays_distribution,
             'stock_by_category': [{'category': c[0], 'total': c[1]} for c in stock_by_category],
             'low_stock_items': low_stock_items[:10],
-            'recent_receipts': [r.to_dict() for r in recent_receipts],
-            'recent_dispatches': [d.to_dict() for d in recent_dispatches],
-            'recent_requests': [r.to_dict() for r in recent_requests],
+            'recent_receipts': recent_receipts,
+            'recent_dispatches': recent_dispatches,
+            'recent_requests': recent_requests,
             'cash_balance': db.session.query(db.func.coalesce(db.func.sum(CashFund.current_balance), 0)).scalar(),
             'total_cash_distributed': db.session.query(db.func.coalesce(db.func.sum(CashDistribution.total_amount), 0)).scalar(),
             'todays_cash_distribution': db.session.query(db.func.coalesce(db.func.sum(CashDistribution.total_amount), 0)).filter(
@@ -2616,21 +3097,25 @@ def api_get_users():
 def api_create_user():
     try:
         data = request.get_json()
-        username = data.get('username', '').strip()
+        if not isinstance(data, dict):
+            return jsonify({'success': False, 'message': 'Invalid JSON payload'}), 400
+        username = (data.get('username') or '').strip()
         password = data.get('password', '')
-        role = data.get('role', 'viewer')
-        full_name = data.get('full_name', '').strip()
+        role = (data.get('role') or 'viewer').strip()
+        full_name = (data.get('full_name') or '').strip()
         if not username or not password:
             return jsonify({'success': False, 'message': 'Username and password required'}), 400
         if len(password) < 6:
             return jsonify({'success': False, 'message': 'Password must be at least 6 characters'}), 400
+        if role not in {'viewer', 'editor', 'operator', 'finance', 'admin'}:
+            return jsonify({'success': False, 'message': 'Invalid role'}), 400
         existing = get_user_by_username(db, username)
         if existing:
             return jsonify({'success': False, 'message': 'Username already exists'}), 409
         password_hash = generate_password_hash(password)
         db.session.execute(
             db.text("INSERT INTO \"user\" (username, password_hash, role, full_name, is_active, created_at) VALUES (:username, :password_hash, :role, :full_name, 1, :created_at)"),
-            {'username': username, 'password_hash': password_hash, 'role': role, 'full_name': full_name, 'created_at': datetime.utcnow()}
+            {'username': username, 'password_hash': password_hash, 'role': role, 'full_name': full_name, 'created_at': datetime.now(timezone.utc)}
         )
         db.session.commit()
         return jsonify({'success': True, 'message': 'User created successfully'}), 201
@@ -2644,21 +3129,28 @@ def api_create_user():
 def api_update_user(user_id):
     try:
         data = request.get_json()
+        if not isinstance(data, dict):
+            return jsonify({'success': False, 'message': 'Invalid JSON payload'}), 400
         existing = get_user_from_db(db, user_id)
         if not existing:
             return jsonify({'success': False, 'message': 'User not found'}), 404
         updates = []
         params = {'id': user_id}
         if 'role' in data:
+            role = (data.get('role') or '').strip()
+            if role not in {'viewer', 'editor', 'operator', 'finance', 'admin'}:
+                return jsonify({'success': False, 'message': 'Invalid role'}), 400
             updates.append("role = :role")
-            params['role'] = data['role']
+            params['role'] = role
         if 'full_name' in data:
             updates.append("full_name = :full_name")
-            params['full_name'] = data['full_name']
+            params['full_name'] = (data.get('full_name') or '').strip()
         if 'is_active' in data:
             updates.append("is_active = :is_active")
-            params['is_active'] = 1 if data['is_active'] else 0
+            params['is_active'] = 1 if parse_bool_field(data, 'is_active', default=True) else 0
         if 'password' in data and data['password']:
+            if len(data['password']) < 6:
+                return jsonify({'success': False, 'message': 'Password must be at least 6 characters'}), 400
             updates.append("password_hash = :password_hash")
             params['password_hash'] = generate_password_hash(data['password'])
         if updates:
@@ -2692,6 +3184,8 @@ def api_delete_user(user_id):
 def api_change_password():
     try:
         data = request.get_json()
+        if not isinstance(data, dict):
+            return jsonify({'success': False, 'message': 'Invalid JSON payload'}), 400
         old_password = data.get('old_password', '')
         new_password = data.get('new_password', '')
         if not old_password or not new_password:
@@ -2712,6 +3206,7 @@ def api_change_password():
 
 # ============ GLOBAL SEARCH ============
 @app.route('/api/search', methods=['GET'])
+@login_required
 def global_search():
     try:
         query = request.args.get('q', '').strip()
@@ -2750,25 +3245,27 @@ def global_search():
 
 # ============ NOTIFICATIONS ============
 @app.route('/api/notifications', methods=['GET'])
+@login_required
 def get_notifications():
     try:
         notifications = []
         low_stock = Inventory.query.all()
         low_count = sum(1 for inv in low_stock if inv.item and inv.item.minimum_stock > 0 and inv.quantity <= inv.item.minimum_stock)
         if low_count > 0:
-            notifications.append({'type': 'low_stock', 'title': 'Low Stock Alert', 'message': f'{low_count} item(s) are running low', 'url': url_for('inventory_page'), 'created_at': datetime.utcnow().isoformat()})
+            notifications.append({'type': 'low_stock', 'title': 'Low Stock Alert', 'message': f'{low_count} item(s) are running low', 'url': url_for('inventory_page'), 'created_at': datetime.now(timezone.utc).isoformat()})
         out_count = sum(1 for inv in low_stock if inv.quantity <= 0)
         if out_count > 0:
-            notifications.append({'type': 'out_of_stock', 'title': 'Out of Stock', 'message': f'{out_count} item(s) are out of stock', 'url': url_for('inventory_page'), 'created_at': datetime.utcnow().isoformat()})
+            notifications.append({'type': 'out_of_stock', 'title': 'Out of Stock', 'message': f'{out_count} item(s) are out of stock', 'url': url_for('inventory_page'), 'created_at': datetime.now(timezone.utc).isoformat()})
         active = Incident.query.filter(Incident.status == 'Active').count()
         if active > 0:
-            notifications.append({'type': 'incident', 'title': 'Active Incidents', 'message': f'{active} active incident(s)', 'url': url_for('incidents_page'), 'created_at': datetime.utcnow().isoformat()})
+            notifications.append({'type': 'incident', 'title': 'Active Incidents', 'message': f'{active} active incident(s)', 'url': url_for('incidents_page'), 'created_at': datetime.now(timezone.utc).isoformat()})
         return jsonify({'success': True, 'notifications': notifications})
     except Exception as e:
         return jsonify({'success': False, 'message': str(e), 'notifications': []}), 500
 
 # ============ DATA FOR DROPDOWNS ============
 @app.route('/api/data', methods=['GET'])
+@login_required
 def get_form_data():
     return jsonify({
         'success': True,
@@ -2810,7 +3307,17 @@ def make_pdf_report(title, headers, rows, col_widths):
     font_bold = UNICODE_FONT_BOLD if UNICODE_FONT_BOLD else 'Helvetica-Bold'
     styles = getSampleStyleSheet()
     title_style = ParagraphStyle('T', parent=styles['Heading1'], fontSize=14, alignment=TA_CENTER, fontName=font_bold)
+    header_style = ParagraphStyle('H', parent=styles['Normal'], fontSize=10, alignment=TA_CENTER, fontName=font_name)
     normal = ParagraphStyle('N', parent=styles['Normal'], fontSize=8, fontName=font_name)
+
+    report_header = AppSettings.get_setting('report_header', '')
+    if report_header:
+        for line in report_header.split('\n'):
+            line = line.strip()
+            if line:
+                elements.append(Paragraph(line, header_style))
+        elements.append(Spacer(1, 4))
+
     elements.append(Paragraph(title, title_style))
     elements.append(Spacer(1, 6))
     data = [headers]
@@ -2829,11 +3336,21 @@ def make_pdf_report(title, headers, rows, col_widths):
     elements.append(tbl)
     elements.append(Spacer(1, 6))
     elements.append(Paragraph(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}", normal))
+
+    report_footer = AppSettings.get_setting('report_footer', '')
+    if report_footer:
+        elements.append(Spacer(1, 4))
+        for line in report_footer.split('\n'):
+            line = line.strip()
+            if line:
+                elements.append(Paragraph(line, header_style))
+
     doc.build(elements)
     buffer.seek(0)
     return buffer
 
 @app.route('/api/reports/dispatch', methods=['GET'])
+@login_required
 def report_dispatch():
     incident_id = request.args.get('incident_id', type=int)
     warehouse_id = request.args.get('warehouse_id', type=int)
@@ -2851,6 +3368,7 @@ def report_dispatch():
     return make_response(pdf.getvalue(), 200, {'Content-Type': 'application/pdf', 'Content-Disposition': 'attachment; filename=dispatch_report.pdf'})
 
 @app.route('/api/reports/distribution', methods=['GET'])
+@login_required
 def report_distribution():
     incident_id = request.args.get('incident_id', type=int)
     q = Distribution.query.order_by(Distribution.distribution_date.desc())
@@ -2865,6 +3383,7 @@ def report_distribution():
     return make_response(pdf.getvalue(), 200, {'Content-Type': 'application/pdf', 'Content-Disposition': 'attachment; filename=distribution_report.pdf'})
 
 @app.route('/api/reports/incidents', methods=['GET'])
+@login_required
 def report_incidents():
     status = request.args.get('status')
     q = Incident.query.order_by(Incident.start_date.desc())
@@ -2878,6 +3397,7 @@ def report_incidents():
     return make_response(pdf.getvalue(), 200, {'Content-Type': 'application/pdf', 'Content-Disposition': 'attachment; filename=incidents_report.pdf'})
 
 @app.route('/api/reports/requests', methods=['GET'])
+@login_required
 def report_requests():
     status = request.args.get('status')
     incident_id = request.args.get('incident_id', type=int)
@@ -2894,6 +3414,7 @@ def report_requests():
     return make_response(pdf.getvalue(), 200, {'Content-Type': 'application/pdf', 'Content-Disposition': 'attachment; filename=requests_report.pdf'})
 
 @app.route('/api/reports/adjustments', methods=['GET'])
+@login_required
 def report_adjustments():
     q = ManualAdjustment.query.order_by(ManualAdjustment.date.desc())
     adjustments = q.all()
@@ -2905,6 +3426,7 @@ def report_adjustments():
     return make_response(pdf.getvalue(), 200, {'Content-Type': 'application/pdf', 'Content-Disposition': 'attachment; filename=adjustments_report.pdf'})
 
 @app.route('/api/reports/low-stock', methods=['GET'])
+@login_required
 def report_low_stock():
     items = []
     for inv in Inventory.query.all():
@@ -2917,6 +3439,7 @@ def report_low_stock():
     return make_response(pdf.getvalue(), 200, {'Content-Type': 'application/pdf', 'Content-Disposition': 'attachment; filename=low_stock_report.pdf'})
 
 @app.route('/api/reports/monthly-summary', methods=['GET'])
+@login_required
 def report_monthly_summary():
     month = request.args.get('month', datetime.now().strftime('%Y-%m'))
     try:
@@ -2942,63 +3465,234 @@ def report_monthly_summary():
     pdf = make_pdf_report(f'Monthly Summary - {month}', headers, rows, [80*mm, 40*mm])
     return make_response(pdf.getvalue(), 200, {'Content-Type': 'application/pdf', 'Content-Disposition': f'attachment; filename=monthly_summary_{month}.pdf'})
 @app.route('/api/reports/inventory', methods=['GET'])
+@login_required
 def report_inventory():
-    buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=15*mm, leftMargin=15*mm, topMargin=15*mm, bottomMargin=15*mm)
-    elements = []
-    font_name = UNICODE_FONT if UNICODE_FONT else 'Helvetica'
-    font_bold = UNICODE_FONT_BOLD if UNICODE_FONT_BOLD else 'Helvetica-Bold'
-    styles = getSampleStyleSheet()
-    title_style = ParagraphStyle('Title', parent=styles['Heading1'], fontSize=14, alignment=TA_CENTER, fontName=font_bold)
-    normal = ParagraphStyle('Normal', parent=styles['Normal'], fontSize=8, fontName=font_name)
-    elements.append(Paragraph(AppSettings.get_setting('office_name', 'LEOC') + ' - Inventory Report', title_style))
-    elements.append(Spacer(1, 6))
-    data = [['#', 'Item Code', 'Item Name', 'Category', 'Unit', 'Quantity', 'Min Stock', 'Status']]
+    headers = ['#', 'Item Code', 'Item Name', 'Category', 'Unit', 'Quantity', 'Min Stock', 'Status']
+    rows = []
     for i, inv in enumerate(Inventory.query.order_by(Inventory.updated_at.desc()).all(), 1):
         d = inv.to_dict()
-        data.append([str(i), d['item_code'] or '', d['item_name'] or '', d['category_name'] or '', d['unit'] or '', str(d['quantity']), str(d['minimum_stock']), d['status']])
-    table = Table(data, colWidths=[12*mm, 25*mm, 35*mm, 25*mm, 15*mm, 18*mm, 18*mm, 22*mm])
-    table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2c5282')),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-        ('FONTNAME', (0, 0), (-1, 0), font_bold),
-        ('FONTSIZE', (0, 0), (-1, -1), 7),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-    ]))
-    elements.append(table)
-    elements.append(Spacer(1, 6))
-    elements.append(Paragraph(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}", normal))
-    doc.build(elements)
-    buffer.seek(0)
-    return make_response(buffer.getvalue(), 200, {'Content-Type': 'application/pdf', 'Content-Disposition': 'attachment; filename=inventory_report.pdf'})
+        rows.append([i, d['item_code'] or '', d['item_name'] or '', d['category_name'] or '',
+                     d['unit'] or '', d['quantity'], d['minimum_stock'], d['status']])
+    pdf = make_pdf_report(AppSettings.get_setting('office_name', 'LEOC') + ' - Inventory Report',
+                          headers, rows, [12*mm, 25*mm, 35*mm, 25*mm, 15*mm, 18*mm, 18*mm, 22*mm])
+    return make_response(pdf.getvalue(), 200, {'Content-Type': 'application/pdf', 'Content-Disposition': 'attachment; filename=inventory_report.pdf'})
 
 @app.route('/api/reports/stock-receipts', methods=['GET'])
+@login_required
 def report_stock_receipts():
-    buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=15*mm, leftMargin=15*mm, topMargin=15*mm, bottomMargin=15*mm)
-    elements = []
-    font_name = UNICODE_FONT if UNICODE_FONT else 'Helvetica'
-    font_bold = UNICODE_FONT_BOLD if UNICODE_FONT_BOLD else 'Helvetica-Bold'
-    styles = getSampleStyleSheet()
-    title_style = ParagraphStyle('Title', parent=styles['Heading1'], fontSize=14, alignment=TA_CENTER, fontName=font_bold)
-    normal = ParagraphStyle('Normal', parent=styles['Normal'], fontSize=8, fontName=font_name)
-    elements.append(Paragraph('Stock Receipt Report', title_style))
-    elements.append(Spacer(1, 6))
+    headers = ['#', 'Receipt No', 'Date', 'Warehouse', 'Source Type', 'Source Name', 'Item', 'Qty', 'Unit']
+    rows = []
+    i = 0
     for r in StockReceipt.query.order_by(StockReceipt.date.desc()).all():
         d = r.to_dict()
-        elements.append(Paragraph(f"<b>{d['receipt_no']}</b> - {d['date']} - {d['warehouse_name']} - {d['source_type']}: {d['source_name']}", normal))
-        for i in d['items']:
-            elements.append(Paragraph(f"&nbsp;&nbsp;{i['item_name']}: {i['quantity']} {i['unit']}", normal))
-        elements.append(Spacer(1, 3))
-    elements.append(Paragraph(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}", normal))
-    doc.build(elements)
-    buffer.seek(0)
-    return make_response(buffer.getvalue(), 200, {'Content-Type': 'application/pdf', 'Content-Disposition': 'attachment; filename=stock_receipts_report.pdf'})
+        items = d.get('items', [])
+        if items:
+            for item in items:
+                i += 1
+                rows.append([i, d['receipt_no'], d['date'], d['warehouse_name'],
+                             d['source_type'], d['source_name'],
+                             item['item_name'], item['quantity'], item['unit']])
+        else:
+            i += 1
+            rows.append([i, d['receipt_no'], d['date'], d['warehouse_name'],
+                         d['source_type'], d['source_name'], '', '', ''])
+    pdf = make_pdf_report('Stock Receipt Report', headers, rows,
+                          [10*mm, 30*mm, 22*mm, 25*mm, 22*mm, 25*mm, 30*mm, 15*mm, 12*mm])
+    return make_response(pdf.getvalue(), 200, {'Content-Type': 'application/pdf', 'Content-Disposition': 'attachment; filename=stock_receipts_report.pdf'})
+
+# ============ REPORTS JSON DATA ENDPOINT ============
+@app.route('/api/reports-data/<report_type>', methods=['GET'])
+@login_required
+def reports_data_json(report_type):
+    try:
+        date_from = request.args.get('date_from')
+        date_to = request.args.get('date_to')
+
+        def apply_date_filter(q, date_col):
+            if date_from:
+                q = q.filter(date_col >= datetime.strptime(date_from, '%Y-%m-%d').date())
+            if date_to:
+                q = q.filter(date_col <= datetime.strptime(date_to, '%Y-%m-%d').date())
+            return q
+
+        if report_type == 'inventory':
+            headers = ['Item Code', 'Item Name', 'Category', 'Unit', 'Quantity', 'Min Stock', 'Status']
+            rows = []
+            for inv in Inventory.query.order_by(Inventory.updated_at.desc()).all():
+                d = inv.to_dict()
+                rows.append([d['item_code'] or '', d['item_name'] or '', d['category_name'] or '',
+                             d['unit'] or '', d['quantity'], d['minimum_stock'], d['status']])
+        elif report_type == 'dispatch':
+            incident_id = request.args.get('incident_id', type=int)
+            warehouse_id = request.args.get('warehouse_id', type=int)
+            q = Dispatch.query.order_by(Dispatch.date.desc())
+            if incident_id: q = q.filter(Dispatch.incident_id == incident_id)
+            if warehouse_id: q = q.filter(Dispatch.warehouse_id == warehouse_id)
+            q = apply_date_filter(q, Dispatch.date)
+            headers = ['Dispatch No', 'Date', 'Warehouse', 'Incident', 'Destination', 'Receiver']
+            rows = [[d.dispatch_number, d.date.strftime('%Y-%m-%d') if d.date else '',
+                     d.warehouse.name if d.warehouse else '', d.incident.incident_name if d.incident else '',
+                     d.destination or '', d.receiver or ''] for d in q.all()]
+        elif report_type == 'distribution':
+            incident_id = request.args.get('incident_id', type=int)
+            q = Distribution.query.order_by(Distribution.distribution_date.desc())
+            if incident_id: q = q.filter(Distribution.incident_id == incident_id)
+            q = apply_date_filter(q, Distribution.distribution_date)
+            headers = ['Dist No', 'Date', 'Location', 'Incident', 'Officer', 'Beneficiaries']
+            rows = [[d.distribution_no, d.distribution_date.strftime('%Y-%m-%d') if d.distribution_date else '',
+                     d.location or '', d.incident.incident_name if d.incident else '',
+                     d.officer or '', len(d.beneficiaries)] for d in q.all()]
+        elif report_type == 'incidents':
+            status = request.args.get('status')
+            q = Incident.query.order_by(Incident.start_date.desc())
+            if status: q = q.filter(Incident.status == status)
+            q = apply_date_filter(q, Incident.start_date)
+            headers = ['Name', 'Type', 'District', 'Ward', 'Date', 'Status']
+            rows = [[inc.incident_name, inc.incident_type, inc.district or '', inc.ward or '',
+                     inc.start_date.strftime('%Y-%m-%d') if inc.start_date else '', inc.status] for inc in q.all()]
+        elif report_type == 'requests':
+            status = request.args.get('status')
+            incident_id = request.args.get('incident_id', type=int)
+            q = ReliefRequest.query.order_by(ReliefRequest.request_date.desc())
+            if status: q = q.filter(ReliefRequest.status == status)
+            if incident_id: q = q.filter(ReliefRequest.incident_id == incident_id)
+            q = apply_date_filter(q, ReliefRequest.request_date)
+            headers = ['Req No', 'Date', 'Incident', 'Organization', 'Priority', 'Status']
+            rows = [[r.request_number, r.request_date.strftime('%Y-%m-%d') if r.request_date else '',
+                     r.incident.incident_name if r.incident else '', r.organization or '',
+                     r.priority, r.status] for r in q.all()]
+        elif report_type == 'adjustments':
+            q = ManualAdjustment.query.order_by(ManualAdjustment.date.desc())
+            q = apply_date_filter(q, ManualAdjustment.date)
+            headers = ['Adj No', 'Date', 'Warehouse', 'Item', 'Type', 'Qty', 'Reason']
+            rows = [[a.adjustment_no, a.date.strftime('%Y-%m-%d') if a.date else '',
+                     a.warehouse.name if a.warehouse else '', a.item.name if a.item else '',
+                     a.adjustment_type, a.adjusted_quantity, a.reason or ''] for a in q.all()]
+        elif report_type == 'low-stock':
+            headers = ['Item', 'Code', 'Category', 'Qty', 'Min', 'Warehouse']
+            rows = []
+            for inv in Inventory.query.all():
+                if inv.item and inv.item.minimum_stock > 0 and inv.quantity <= inv.item.minimum_stock:
+                    d = inv.to_dict()
+                    rows.append([d['item_name'], d['item_code'] or '', d['category_name'] or '',
+                                 d['quantity'], d['minimum_stock'], d['warehouse_name'] or ''])
+        elif report_type == 'monthly-summary':
+            month = request.args.get('month', datetime.now().strftime('%Y-%m'))
+            try:
+                year, mon = map(int, month.split('-'))
+            except:
+                year, mon = datetime.now().year, datetime.now().month
+            start = date(year, mon, 1)
+            if mon == 12:
+                end = date(year+1, 1, 1)
+            else:
+                end = date(year, mon+1, 1)
+            from datetime import timedelta
+            end = end - timedelta(days=1)
+            receipts = StockReceipt.query.filter(db.func.date(StockReceipt.date) >= start, db.func.date(StockReceipt.date) <= end).count()
+            dispatches = Dispatch.query.filter(db.func.date(Dispatch.date) >= start, db.func.date(Dispatch.date) <= end).count()
+            distributions = Distribution.query.filter(db.func.date(Distribution.distribution_date) >= start, db.func.date(Distribution.distribution_date) <= end).count()
+            incidents = Incident.query.filter(db.func.date(Incident.start_date) >= start, db.func.date(Incident.start_date) <= end).count()
+            headers = ['Metric', 'Count']
+            rows = [['Total Receipts', receipts], ['Total Dispatches', dispatches],
+                    ['Total Distributions', distributions], ['New Incidents', incidents]]
+        elif report_type == 'stock-receipts':
+            warehouse_id = request.args.get('warehouse_id', type=int)
+            q = StockReceipt.query.order_by(StockReceipt.date.desc())
+            if warehouse_id: q = q.filter(StockReceipt.warehouse_id == warehouse_id)
+            q = apply_date_filter(q, StockReceipt.date)
+            headers = ['Receipt No', 'Date', 'Warehouse', 'Source Type', 'Source Name', 'Item', 'Qty', 'Unit']
+            rows = []
+            for r in q.all():
+                d = r.to_dict()
+                items = d.get('items', [])
+                if items:
+                    for item in items:
+                        rows.append([d['receipt_no'], d['date'], d['warehouse_name'],
+                                     d['source_type'], d['source_name'],
+                                     item['item_name'], item['quantity'], item['unit']])
+                else:
+                    rows.append([d['receipt_no'], d['date'], d['warehouse_name'],
+                                 d['source_type'], d['source_name'], '', '', ''])
+        elif report_type == 'cash-balance':
+            fund_id = request.args.get('fund_id', type=int)
+            q = CashFund.query
+            if fund_id: q = q.filter(CashFund.id == fund_id)
+            headers = ['Fund Name', 'Fiscal Year', 'Source', 'Allocated', 'Balance', 'Status']
+            rows = [[f.name, f.fiscal_year or '', f.funding_source or '',
+                     f.allocated_amount, f.current_balance, f.status] for f in q.order_by(CashFund.name).all()]
+        elif report_type == 'cash-receipts':
+            q = CashReceipt.query.order_by(CashReceipt.receipt_date.desc())
+            q = apply_date_filter(q, CashReceipt.receipt_date)
+            headers = ['Receipt No', 'Date', 'Fund', 'Source', 'Amount', 'Received By']
+            rows = [[cr.receipt_no, cr.receipt_date.strftime('%Y-%m-%d') if cr.receipt_date else '',
+                     cr.fund.name if cr.fund else '', cr.funding_source or '',
+                     cr.amount_received, cr.received_by or ''] for cr in q.all()]
+        elif report_type == 'cash-requests':
+            status = request.args.get('status')
+            incident_id = request.args.get('incident_id', type=int)
+            q = CashRequest.query.order_by(CashRequest.request_date.desc())
+            if status: q = q.filter(CashRequest.status == status)
+            if incident_id: q = q.filter(CashRequest.incident_id == incident_id)
+            q = apply_date_filter(q, CashRequest.request_date)
+            headers = ['Req No', 'Date', 'Incident', 'Amount', 'Priority', 'Status']
+            rows = [[cr.request_number, cr.request_date.strftime('%Y-%m-%d') if cr.request_date else '',
+                     cr.incident.incident_name if cr.incident else '', cr.requested_amount,
+                     cr.priority, cr.status] for cr in q.all()]
+        elif report_type == 'cash-distributions':
+            incident_id = request.args.get('incident_id', type=int)
+            fund_id = request.args.get('fund_id', type=int)
+            q = CashDistribution.query.order_by(CashDistribution.distribution_date.desc())
+            if incident_id: q = q.filter(CashDistribution.incident_id == incident_id)
+            if fund_id: q = q.filter(CashDistribution.fund_id == fund_id)
+            q = apply_date_filter(q, CashDistribution.distribution_date)
+            headers = ['Dist No', 'Date', 'Fund', 'Incident', 'Type', 'Amount']
+            rows = [[d.distribution_no, d.distribution_date.strftime('%Y-%m-%d') if d.distribution_date else '',
+                     d.fund.name if d.fund else '', d.incident.incident_name if d.incident else '',
+                     d.distribution_type, d.total_amount] for d in q.all()]
+        elif report_type == 'cash-by-incident':
+            from sqlalchemy import func
+            data = db.session.query(
+                Incident.incident_name,
+                func.coalesce(func.sum(CashDistribution.total_amount), 0)
+            ).outerjoin(CashDistribution, CashDistribution.incident_id == Incident.id).group_by(Incident.id).all()
+            headers = ['Incident', 'Total Cash Distributed']
+            rows = [[name, total] for name, total in data]
+        elif report_type == 'cash-by-funding-source':
+            from sqlalchemy import func
+            data = db.session.query(
+                CashFund.funding_source,
+                func.coalesce(func.sum(CashFund.allocated_amount), 0),
+                func.coalesce(func.sum(CashFund.current_balance), 0)
+            ).group_by(CashFund.funding_source).all()
+            headers = ['Funding Source', 'Total Allocated', 'Current Balance']
+            rows = [[src or 'Unknown', alloc, bal] for src, alloc, bal in data]
+        elif report_type == 'cash-yearly':
+            from sqlalchemy import func
+            year = request.args.get('year', str(date.today().year))
+            month_names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+            headers = ['Month', 'Received', 'Distributed']
+            rows = []
+            for m in range(1, 13):
+                recv = db.session.query(func.coalesce(func.sum(CashReceipt.amount_received), 0)).filter(
+                    db.extract('year', CashReceipt.receipt_date) == int(year),
+                    db.extract('month', CashReceipt.receipt_date) == m
+                ).scalar()
+                dist = db.session.query(func.coalesce(func.sum(CashDistribution.total_amount), 0)).filter(
+                    db.extract('year', CashDistribution.distribution_date) == int(year),
+                    db.extract('month', CashDistribution.distribution_date) == m
+                ).scalar()
+                rows.append([month_names[m-1], recv, dist])
+        else:
+            return jsonify({'success': False, 'message': f'Unknown report type: {report_type}'}), 400
+
+        return jsonify({'success': True, 'headers': headers, 'rows': rows})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 400
 
 # ============ CASH REPORT ENDPOINTS ============
 @app.route('/api/reports/cash-balance', methods=['GET'])
+@login_required
 def report_cash_balance():
     q = CashFund.query
     fund_id = request.args.get('fund_id', type=int)
@@ -3012,6 +3706,7 @@ def report_cash_balance():
     return make_response(pdf.getvalue(), 200, {'Content-Type': 'application/pdf', 'Content-Disposition': 'attachment; filename=cash_balance_report.pdf'})
 
 @app.route('/api/reports/cash-receipts', methods=['GET'])
+@login_required
 def report_cash_receipts_pdf():
     r = CashReceipt.query.order_by(CashReceipt.receipt_date.desc()).all()
     headers = ['#', 'Receipt No', 'Date', 'Fund', 'Source', 'Amount', 'Received By']
@@ -3021,6 +3716,7 @@ def report_cash_receipts_pdf():
     return make_response(pdf.getvalue(), 200, {'Content-Type': 'application/pdf', 'Content-Disposition': 'attachment; filename=cash_receipts_report.pdf'})
 
 @app.route('/api/reports/cash-requests', methods=['GET'])
+@login_required
 def report_cash_requests_pdf():
     status = request.args.get('status')
     incident_id = request.args.get('incident_id', type=int)
@@ -3035,6 +3731,7 @@ def report_cash_requests_pdf():
     return make_response(pdf.getvalue(), 200, {'Content-Type': 'application/pdf', 'Content-Disposition': 'attachment; filename=cash_requests_report.pdf'})
 
 @app.route('/api/reports/cash-distributions', methods=['GET'])
+@login_required
 def report_cash_distributions_pdf():
     incident_id = request.args.get('incident_id', type=int)
     fund_id = request.args.get('fund_id', type=int)
@@ -3050,6 +3747,7 @@ def report_cash_distributions_pdf():
     return make_response(pdf.getvalue(), 200, {'Content-Type': 'application/pdf', 'Content-Disposition': 'attachment; filename=cash_distributions_report.pdf'})
 
 @app.route('/api/reports/cash-by-incident', methods=['GET'])
+@login_required
 def report_cash_by_incident():
     from sqlalchemy import func
     data = db.session.query(
@@ -3062,6 +3760,7 @@ def report_cash_by_incident():
     return make_response(pdf.getvalue(), 200, {'Content-Type': 'application/pdf', 'Content-Disposition': 'attachment; filename=cash_by_incident_report.pdf'})
 
 @app.route('/api/reports/cash-by-funding-source', methods=['GET'])
+@login_required
 def report_cash_by_funding_source():
     from sqlalchemy import func
     data = db.session.query(
@@ -3075,6 +3774,7 @@ def report_cash_by_funding_source():
     return make_response(pdf.getvalue(), 200, {'Content-Type': 'application/pdf', 'Content-Disposition': 'attachment; filename=cash_by_funding_source_report.pdf'})
 
 @app.route('/api/reports/cash-yearly', methods=['GET'])
+@login_required
 def report_cash_yearly():
     from sqlalchemy import func
     year = request.args.get('year', str(date.today().year))
@@ -3102,6 +3802,11 @@ def init_db():
             db.create_all()
             from sqlalchemy import inspect
             inspector = inspect(db.engine)
+            if 'distribution_beneficiary' in inspector.get_table_names():
+                cols = [c['name'] for c in inspector.get_columns('distribution_beneficiary')]
+                if 'beneficiary_id' not in cols:
+                    db.session.execute(db.text("ALTER TABLE distribution_beneficiary ADD COLUMN beneficiary_id INTEGER REFERENCES beneficiary(id)"))
+                    db.session.commit()
             if 'user' not in inspector.get_table_names():
                 db.session.execute(db.text("""
                     CREATE TABLE "user" (

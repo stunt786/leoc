@@ -8,7 +8,8 @@
 <div class="page-header d-flex justify-content-between align-items-center flex-wrap gap-2">
     <h4><i class="bi bi-file-text me-2"></i>Reports</h4>
     <div class="d-flex gap-2 flex-wrap">
-        <select class="form-select form-select-sm" id="reportType" style="width:auto" onchange="toggleFilters()">
+        <select class="form-select form-select-sm" id="reportType" style="width:auto" onchange="onTypeChange()">
+            <option value="">-- Select Report --</option>
             <option value="inventory">Inventory Report</option>
             <option value="stock-receipts">Stock Receipt Report</option>
             <option value="dispatch">Dispatch Report</option>
@@ -26,7 +27,9 @@
             <option value="cash-by-funding-source">Cash by Funding Source</option>
             <option value="cash-yearly">Yearly Cash Report</option>
         </select>
-        <button class="btn btn-primary btn-sm" onclick="downloadReport()"><i class="bi bi-download me-1"></i>Download PDF</button>
+        <button class="btn btn-primary btn-sm" onclick="downloadReport()" id="downloadBtn" disabled>
+            <i class="bi bi-download me-1"></i>Download PDF
+        </button>
     </div>
 </div>
 
@@ -35,46 +38,46 @@
         <div class="row g-2 align-items-end" id="filterRow">
             <div class="col-auto">
                 <label class="form-label small">Date From</label>
-                <input type="date" class="form-control form-control-sm" id="dateFrom">
+                <input type="date" class="form-control form-control-sm" id="dateFrom" onchange="loadReportData()">
             </div>
             <div class="col-auto">
                 <label class="form-label small">Date To</label>
-                <input type="date" class="form-control form-control-sm" id="dateTo">
+                <input type="date" class="form-control form-control-sm" id="dateTo" onchange="loadReportData()">
             </div>
             <div class="col-auto filter-optional" data-types="inventory,dispatch,stock-receipts,adjustments,low-stock">
                 <label class="form-label small">Warehouse</label>
-                <select class="form-select form-select-sm" id="filterWarehouse"><option value="">All</option></select>
+                <select class="form-select form-select-sm" id="filterWarehouse" onchange="loadReportData()"><option value="">All</option></select>
             </div>
             <div class="col-auto filter-optional" data-types="inventory,items,dispatch,requests">
                 <label class="form-label small">Category</label>
-                <select class="form-select form-select-sm" id="filterCategory"><option value="">All</option></select>
+                <select class="form-select form-select-sm" id="filterCategory" onchange="loadReportData()"><option value="">All</option></select>
             </div>
             <div class="col-auto filter-optional" data-types="dispatch,distribution,incidents,requests,cash-distributions,cash-requests">
                 <label class="form-label small">Incident</label>
-                <select class="form-select form-select-sm" id="filterIncident"><option value="">All</option></select>
+                <select class="form-select form-select-sm" id="filterIncident" onchange="loadReportData()"><option value="">All</option></select>
             </div>
             <div class="col-auto filter-optional" data-types="incidents,requests,cash-requests">
                 <label class="form-label small">Status</label>
-                <select class="form-select form-select-sm" id="filterStatus"><option value="">All</option>
+                <select class="form-select form-select-sm" id="filterStatus" onchange="loadReportData()"><option value="">All</option>
                     <option value="Active">Active</option><option value="Closed">Closed</option>
                     <option value="Pending">Pending</option><option value="Completed">Completed</option>
                 </select>
             </div>
             <div class="col-auto filter-optional" data-types="monthly-summary">
                 <label class="form-label small">Month</label>
-                <input type="month" class="form-control form-control-sm" id="filterMonth">
+                <input type="month" class="form-control form-control-sm" id="filterMonth" onchange="loadReportData()">
             </div>
             <div class="col-auto filter-optional" data-types="cash-yearly">
                 <label class="form-label small">Year</label>
-                <input type="number" class="form-control form-control-sm" id="filterYear" value="{{ now().year }}">
+                <input type="number" class="form-control form-control-sm" id="filterYear" value="{{ now().year }}" onchange="loadReportData()">
             </div>
             <div class="col-auto filter-optional" data-types="cash-distributions,cash-requests,cash-balance">
                 <label class="form-label small">Fund</label>
-                <select class="form-select form-select-sm" id="filterFund"><option value="">All</option></select>
+                <select class="form-select form-select-sm" id="filterFund" onchange="loadReportData()"><option value="">All</option></select>
             </div>
             <div class="col-auto filter-optional" data-types="inventory,dispatch,distribution,incidents,requests,adjustments,low-stock,stock-receipts">
                 <label class="form-label small">Fiscal Year</label>
-                <select class="form-select form-select-sm" id="filterFiscalYear"><option value="">All</option></select>
+                <select class="form-select form-select-sm" id="filterFiscalYear" onchange="loadReportData()"><option value="">All</option></select>
             </div>
         </div>
     </div>
@@ -88,7 +91,7 @@
                     <tr id="reportHeaders"></tr>
                 </thead>
                 <tbody id="reportBody">
-                    <tr><td colspan="10" class="text-center text-muted py-4">Select a report type and click Download</td></tr>
+                    <tr><td colspan="20" class="text-center text-muted py-4">Select a report type to view data</td></tr>
                 </tbody>
             </table>
         </div>
@@ -134,6 +137,8 @@ function toggleFilters() {
 function getFilterParams() {
     const type = document.getElementById('reportType').value;
     const params = new URLSearchParams();
+    const dateFrom = document.getElementById('dateFrom').value;
+    const dateTo = document.getElementById('dateTo').value;
     const warehouse = document.getElementById('filterWarehouse').value;
     const category = document.getElementById('filterCategory').value;
     const incident = document.getElementById('filterIncident').value;
@@ -142,6 +147,8 @@ function getFilterParams() {
     const month = document.getElementById('filterMonth').value;
     const fund = document.getElementById('filterFund').value;
 
+    if (dateFrom) params.set('date_from', dateFrom);
+    if (dateTo) params.set('date_to', dateTo);
     if (warehouse && type !== 'monthly-summary' && !type.startsWith('cash-')) params.set('warehouse_id', warehouse);
     if (category && ['inventory','dispatch','requests'].includes(type)) params.set('category_id', category);
     if (incident && ['dispatch','distribution','incidents','requests','cash-requests','cash-distributions'].includes(type)) params.set('incident_id', incident);
@@ -152,13 +159,57 @@ function getFilterParams() {
     return params.toString();
 }
 
+async function onTypeChange() {
+    toggleFilters();
+    const type = document.getElementById('reportType').value;
+    document.getElementById('downloadBtn').disabled = !type;
+    if (type) {
+        await loadReportData();
+    } else {
+        document.getElementById('reportHeaders').innerHTML = '';
+        document.getElementById('reportBody').innerHTML = '<tr><td colspan="20" class="text-center text-muted py-4">Select a report type to view data</td></tr>';
+    }
+}
+
+async function loadReportData() {
+    const type = document.getElementById('reportType').value;
+    if (!type) return;
+    const params = getFilterParams();
+    const url = `/api/reports-data/${type}${params ? '?' + params : ''}`;
+    const tbody = document.getElementById('reportBody');
+    const thead = document.getElementById('reportHeaders');
+    try {
+        tbody.innerHTML = '<tr><td colspan="20" class="text-center py-4"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div></td></tr>';
+        const resp = await fetch(url);
+        const data = await resp.json();
+        if (data.success) {
+            thead.innerHTML = '<th>#</th>' + data.headers.map(h => `<th>${h}</th>`).join('');
+            if (data.rows.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="' + (data.headers.length + 1) + '" class="text-center text-muted py-4">No data found</td></tr>';
+            } else {
+                tbody.innerHTML = data.rows.map((row, i) =>
+                    '<tr>' + row.map((c, j) => '<td>' + (c ?? '') + '</td>').join('') + '</tr>'
+                ).join('');
+            }
+        } else {
+            tbody.innerHTML = '<tr><td colspan="20" class="text-center text-danger py-4">Error: ' + (data.message || 'Failed to load data') + '</td></tr>';
+        }
+    } catch(e) {
+        tbody.innerHTML = '<tr><td colspan="20" class="text-center text-danger py-4">Error loading report data</td></tr>';
+    }
+}
+
 async function downloadReport() {
     const type = document.getElementById('reportType').value;
+    if (!type) return;
     const params = getFilterParams();
     const url = `/api/reports/${type}${params ? '?' + params : ''}`;
     window.open(url, '_blank');
 }
 
-document.addEventListener('DOMContentLoaded', loadFormData);
+document.addEventListener('DOMContentLoaded', async function() {
+    await loadFormData();
+    toggleFilters();
+});
 </script>
 {% endblock %}

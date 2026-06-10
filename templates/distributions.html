@@ -56,7 +56,10 @@
             <hr>
             <div class="d-flex justify-content-between align-items-center mb-2">
                 <label class="form-label mb-0 fw-bold"><i class="bi bi-people me-1"></i>Beneficiaries</label>
-                <button type="button" class="btn btn-sm btn-outline-primary" onclick="addBeneficiaryRow()"><i class="bi bi-plus-lg"></i> Add Beneficiary</button>
+                <div>
+                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="addBeneficiaryRow()"><i class="bi bi-plus-lg"></i> Add Beneficiary</button>
+                    <button type="button" class="btn btn-sm btn-outline-info" onclick="openBeneficiaryPicker()"><i class="bi bi-person-lines-fill"></i> Select from Registry</button>
+                </div>
             </div>
             <div class="table-responsive">
                 <table class="table table-sm table-bordered mb-0" id="beneficiaryTable">
@@ -111,6 +114,31 @@
         </div>
     </div>
 </div>
+
+<!-- Beneficiary Picker Modal -->
+<div class="modal fade" id="benPickerModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-person-lines-fill me-2"></i>Select Beneficiary from Registry</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <input type="text" class="form-control" id="benPickerSearch" placeholder="Search by name, ID, phone..." oninput="filterBenPicker()">
+                </div>
+                <div class="table-responsive" style="max-height:350px">
+                    <table class="table table-sm table-hover mb-0">
+                        <thead class="table-light sticky-top">
+                            <tr><th>Name</th><th>National ID</th><th>Ward</th><th>Members</th><th></th></tr>
+                        </thead>
+                        <tbody id="benPickerBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
@@ -118,6 +146,8 @@
 const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 let distributions = [];
 let dispatchItemsCache = {};
+let beneficiaries = [];
+let benPickerModal = null;
 
 async function loadFormData() {
     const r = await fetch('/api/data');
@@ -131,6 +161,14 @@ async function loadFormData() {
 
     document.getElementById('dist_distribution_date').value = new Date().toISOString().split('T')[0];
     document.getElementById('dist_distribution_no').value = 'DIST-' + String(Date.now()).slice(-4);
+}
+
+async function loadBeneficiaries() {
+    try {
+        const r = await fetch('/api/beneficiaries');
+        const d = await r.json();
+        if (d.success) beneficiaries = d.beneficiaries || [];
+    } catch(e) { console.error(e); }
 }
 
 document.getElementById('dist_dispatch_id').addEventListener('change', function() {
@@ -168,7 +206,8 @@ function updateItemDropdown(selectEl) {
     if (currentVal) selectEl.value = currentVal;
 }
 
-function addBeneficiaryRow(familyName = '', idNumber = '', members = '', item = '', qty = '') {
+function addBeneficiaryRow(data) {
+    data = data || {};
     const tbody = document.getElementById('beneficiaryBody');
     const placeholder = tbody.querySelector('tr td[colspan]');
     if (placeholder) tbody.innerHTML = '';
@@ -177,10 +216,19 @@ function addBeneficiaryRow(familyName = '', idNumber = '', members = '', item = 
     const items = dispatchItemsCache[dispatchId] || [];
 
     const tr = document.createElement('tr');
+    const benId = data.id || '';
+    const familyName = data.name || data.family_name || '';
+    const idNumber = data.national_id || data.id_number || '';
+    const members = data.family_members || data.members || 1;
+    const item = data.item || '';
+    const qty = data.quantity || '';
     tr.innerHTML = `
-        <td><input type="text" class="form-control form-control-sm ben-family-name" value="${familyName}" placeholder="Family name"></td>
+        <input type="hidden" class="ben-beneficiary-id" value="${benId}">
+        <td>
+            <input type="text" class="form-control form-control-sm ben-family-name" value="${familyName}" placeholder="Family name" list="benDatalist" autocomplete="off" oninput="onBenNameInput(this)" onblur="onBenNameBlur(this)">
+        </td>
         <td><input type="text" class="form-control form-control-sm ben-id-number" value="${idNumber}" placeholder="ID number"></td>
-        <td><input type="number" class="form-control form-control-sm ben-members" value="${members || 1}" min="1"></td>
+        <td><input type="number" class="form-control form-control-sm ben-members" value="${members}" min="1"></td>
         <td><select class="form-select form-select-sm ben-item">
             <option value="">Select Item</option>
             ${items.map(i => `<option value="${i.item_name}" ${item === i.item_name ? 'selected' : ''}>${i.item_name}</option>`).join('')}
@@ -189,6 +237,70 @@ function addBeneficiaryRow(familyName = '', idNumber = '', members = '', item = 
         <td><button class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove()"><i class="bi bi-x"></i></button></td>
     `;
     tbody.appendChild(tr);
+}
+
+function onBenNameInput(input) {
+    const val = input.value.toLowerCase();
+    const match = beneficiaries.find(b => b.name.toLowerCase() === val);
+    if (match) {
+        fillBenRow(input, match);
+    }
+}
+
+function onBenNameBlur(input) {
+    const val = input.value.toLowerCase();
+    const match = beneficiaries.find(b => b.name.toLowerCase() === val);
+    if (match) {
+        fillBenRow(input, match);
+    }
+}
+
+function fillBenRow(input, ben) {
+    const tr = input.closest('tr');
+    tr.querySelector('.ben-beneficiary-id').value = ben.id;
+    tr.querySelector('.ben-id-number').value = ben.national_id || '';
+    tr.querySelector('.ben-members').value = ben.family_members || 1;
+}
+
+function openBeneficiaryPicker() {
+    renderBenPicker(beneficiaries);
+    if (!benPickerModal) {
+        benPickerModal = new bootstrap.Modal(document.getElementById('benPickerModal'));
+    }
+    benPickerModal.show();
+}
+
+function filterBenPicker() {
+    const q = document.getElementById('benPickerSearch').value.toLowerCase();
+    const filtered = beneficiaries.filter(b =>
+        (b.name && b.name.toLowerCase().includes(q)) ||
+        (b.national_id && b.national_id.toLowerCase().includes(q)) ||
+        (b.phone && b.phone.toLowerCase().includes(q))
+    );
+    renderBenPicker(filtered);
+}
+
+function renderBenPicker(list) {
+    const tbody = document.getElementById('benPickerBody');
+    if (list.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">No beneficiaries found</td></tr>';
+        return;
+    }
+    tbody.innerHTML = list.map(b => `<tr>
+        <td>${b.name}</td>
+        <td>${b.national_id || '-'}</td>
+        <td>${b.ward || '-'}</td>
+        <td>${b.family_members || 1}</td>
+        <td><button class="btn btn-sm btn-outline-primary" onclick="selectBeneficiaryFromPicker(${b.id})"><i class="bi bi-plus-lg"></i></button></td>
+    </tr>`).join('');
+}
+
+function selectBeneficiaryFromPicker(id) {
+    const ben = beneficiaries.find(b => b.id === id);
+    if (ben) {
+        addBeneficiaryRow(ben);
+        benPickerModal.hide();
+    }
 }
 
 async function loadDistributions() {
@@ -242,7 +354,8 @@ async function viewDistribution(id) {
     let benHtml = '<table class="table table-sm mb-0"><thead><tr><th>Family Name</th><th>ID Number</th><th>Members</th><th>Item</th><th>Qty</th></tr></thead><tbody>';
     if (dist.beneficiaries && dist.beneficiaries.length > 0) {
         dist.beneficiaries.forEach(b => {
-            benHtml += `<tr><td>${b.family_name}</td><td>${b.id_number || '-'}</td><td>${b.members}</td><td>${b.item || '-'}</td><td>${b.quantity}</td></tr>`;
+            const name = b.beneficiary_name || b.family_name;
+            benHtml += `<tr><td>${name}</td><td>${b.id_number || '-'}</td><td>${b.members}</td><td>${b.item || '-'}</td><td>${b.quantity}</td></tr>`;
         });
     }
     benHtml += '</tbody></table>';
@@ -286,6 +399,7 @@ async function saveDistribution() {
         const familyName = inputs[0].value.trim();
         if (!familyName) return null;
         return {
+            beneficiary_id: parseInt(tr.querySelector('.ben-beneficiary-id').value) || null,
             family_name: familyName,
             id_number: inputs[1].value,
             members: parseInt(inputs[2].value) || 1,
@@ -324,6 +438,7 @@ async function saveDistribution() {
 
 document.addEventListener('DOMContentLoaded', function() {
     loadFormData();
+    loadBeneficiaries();
     loadDistributions();
 });
 </script>
