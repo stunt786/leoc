@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+{% block title %}Cash Distributions - LEOC{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('index') }}"><i class="bi bi-house-fill"></i></a></li>
+<li class="breadcrumb-item active">Cash Distributions</li>
+{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="mb-0"><i class="bi bi-cash-stack me-2"></i>Cash Distributions</h4>
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#cdModal" onclick="openCdModal()">
+        <i class="bi bi-plus-lg"></i> New Distribution
+    </button>
+</div>
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle" id="cdTable">
+                <thead class="table-light"><tr>
+                    <th>Dist No</th><th>Date</th><th>Fund</th><th>Incident</th>
+                    <th>Type</th><th>Amount</th><th>Officer</th><th>Actions</th>
+                </tr></thead>
+                <tbody id="cdBody"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="cdModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title">Cash Distribution</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <form id="cdForm">
+                <div class="modal-body">
+                    <div class="row g-2">
+                        <div class="col-md-6 mb-3"><label class="form-label">Distribution Date</label><input type="date" class="form-control" name="distribution_date" id="cdDate" value="{{ now().strftime('%Y-%m-%d') }}"></div>
+                        <div class="col-md-6 mb-3"><label class="form-label">Distribution Type</label><select class="form-select" name="distribution_type" id="cdType"></select></div>
+                    </div>
+                    <div class="row g-2">
+                        <div class="col-md-4 mb-3"><label class="form-label">Fund <span class="text-danger">*</span></label><select class="form-select" name="fund_id" id="cdFund" required></select></div>
+                        <div class="col-md-4 mb-3"><label class="form-label">Incident <span class="text-danger">*</span></label><select class="form-select" name="incident_id" id="cdIncident" required></select></div>
+                        <div class="col-md-4 mb-3"><label class="form-label">Cash Request <span class="text-danger">*</span></label><select class="form-select" name="cash_request_id" id="cdRequest" required></select></div>
+                    </div>
+                    <div class="row g-2">
+                        <div class="col-md-6 mb-3"><label class="form-label">Officer</label><input class="form-control" name="officer" id="cdOfficer"></div>
+                        <div class="col-md-6 mb-3"><label class="form-label">Total Amount</label><input type="number" step="0.01" class="form-control" id="cdTotal" readonly></div>
+                    </div>
+                    <div class="mb-3"><label class="form-label">Remarks</label><textarea class="form-control" name="remarks" id="cdRemarks" rows="2"></textarea></div>
+
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <label class="form-label fw-bold mb-0">Beneficiaries</label>
+                        <button type="button" class="btn btn-sm btn-outline-success" onclick="addBeneficiaryRow()"><i class="bi bi-plus"></i> Add</button>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered" id="benTable">
+                            <thead class="table-light"><tr>
+                                <th style="min-width:120px">Name <span class="text-danger">*</span></th>
+                                <th style="min-width:100px">National ID</th>
+                                <th style="min-width:120px">Address</th>
+                                <th style="min-width:90px">Phone</th>
+                                <th style="min-width:80px">Amount <span class="text-danger">*</span></th>
+                                <th style="width:40px"></th>
+                            </tr></thead>
+                            <tbody id="benBody">
+                                <tr>
+                                    <td><input class="form-control form-control-sm" name="ben_name[]" required></td>
+                                    <td><input class="form-control form-control-sm" name="ben_nid[]"></td>
+                                    <td><input class="form-control form-control-sm" name="ben_addr[]"></td>
+                                    <td><input class="form-control form-control-sm" name="ben_phone[]"></td>
+                                    <td><input type="number" step="0.01" class="form-control form-control-sm ben-amount" name="ben_amount[]" required oninput="calcTotal()"></td>
+                                    <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove();calcTotal()"><i class="bi bi-x"></i></button></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg"></i> Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+async function loadDistributions() {
+    const r = await fetch('/api/cash-distributions');
+    const d = await r.json();
+    const t = document.getElementById('cdBody');
+    if (!d.success || d.distributions.length === 0) { t.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">No distributions found</td></tr>'; return; }
+    t.innerHTML = d.distributions.map(cd => `<tr>
+        <td>${cd.distribution_no}</td><td>${cd.distribution_date}</td>
+        <td>${cd.fund_name || '-'}</td>
+        <td>${cd.incident_name || '-'}</td>
+        <td>${cd.distribution_type}</td>
+        <td class="fw-bold text-danger">${Number(cd.total_amount).toLocaleString()}</td>
+        <td>${cd.officer || '-'}</td>
+        <td><button class="btn btn-sm btn-outline-primary" onclick="viewCd(${cd.id})"><i class="bi bi-eye"></i></button></td>
+    </tr>`).join('');
+}
+
+async function loadData() {
+    const r = await fetch('/api/data');
+    const d = await r.json();
+    if (!d.success) return;
+    document.getElementById('cdFund').innerHTML = '<option value="">Select Fund</option>' + (d.cash_funds||[]).filter(f=>f.status==='Active').map(f => `<option value="${f.id}">${f.name} (Bal: ${Number(f.current_balance).toLocaleString()})</option>`).join('');
+    document.getElementById('cdIncident').innerHTML = '<option value="">Select Incident</option>' + (d.incidents||[]).filter(i=>i.status==='Active').map(i => `<option value="${i.id}">${i.incident_name}</option>`).join('');
+    document.getElementById('cdRequest').innerHTML = '<option value="">Select Request</option>' + (d.cash_requests||[]).filter(rq=>['Pending','Approved','Partial'].includes(rq.status)).map(rq => `<option value="${rq.id}">${rq.request_number} - ${Number(rq.requested_amount).toLocaleString()}</option>`).join('');
+    document.getElementById('cdType').innerHTML = (d.distribution_types||['Individual','Family','Community','Local Government','Organization']).map(t => `<option value="${t}">${t}</option>`).join('');
+}
+
+function addBeneficiaryRow() {
+    const tbody = document.getElementById('benBody');
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+        <td><input class="form-control form-control-sm" name="ben_name[]" required></td>
+        <td><input class="form-control form-control-sm" name="ben_nid[]"></td>
+        <td><input class="form-control form-control-sm" name="ben_addr[]"></td>
+        <td><input class="form-control form-control-sm" name="ben_phone[]"></td>
+        <td><input type="number" step="0.01" class="form-control form-control-sm ben-amount" name="ben_amount[]" required oninput="calcTotal()"></td>
+        <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove();calcTotal()"><i class="bi bi-x"></i></button></td>
+    `;
+    tbody.appendChild(tr);
+}
+
+function calcTotal() {
+    let total = 0;
+    document.querySelectorAll('.ben-amount').forEach(el => { const v = parseFloat(el.value); if (!isNaN(v)) total += v; });
+    document.getElementById('cdTotal').value = total;
+}
+
+document.getElementById('cdForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const rows = document.querySelectorAll('#benBody tr');
+    const beneficiaries = [];
+    rows.forEach(tr => {
+        const inputs = tr.querySelectorAll('input');
+        const name = inputs[0].value.trim();
+        const amount = parseFloat(inputs[4].value);
+        if (name && amount > 0) {
+            beneficiaries.push({ name, national_id: inputs[1].value, address: inputs[2].value, phone: inputs[3].value, amount });
+        }
+    });
+    if (beneficiaries.length === 0) { showToast('danger', 'At least one beneficiary required'); return; }
+    const body = {
+        distribution_date: document.getElementById('cdDate').value,
+        fund_id: parseInt(document.getElementById('cdFund').value),
+        incident_id: parseInt(document.getElementById('cdIncident').value),
+        cash_request_id: parseInt(document.getElementById('cdRequest').value),
+        distribution_type: document.getElementById('cdType').value,
+        officer: document.getElementById('cdOfficer').value,
+        remarks: document.getElementById('cdRemarks').value,
+        beneficiaries
+    };
+    try {
+        const r = await fetch('/api/cash-distributions', {method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':csrf}, body: JSON.stringify(body)});
+        const d = await r.json();
+        if (d.success) { showToast('success', d.message); bootstrap.Modal.getInstance(document.getElementById('cdModal')).hide(); loadDistributions(); document.getElementById('cdForm').reset(); }
+        else showToast('danger', d.message);
+    } catch(e) { showToast('danger', e.message); }
+});
+
+async function viewCd(id) {
+    const r = await fetch(`/api/cash-distributions/${id}`);
+    const d = await r.json();
+    if (!d.success) return;
+    const cd = d.distribution;
+    const benList = (cd.beneficiaries||[]).map(b => `${b.name} (${b.amount})`).join(', ');
+    showToast('info', `${cd.distribution_no} | ${cd.distribution_date} | Fund: ${cd.fund_name} | Incident: ${cd.incident_name} | Type: ${cd.distribution_type} | Amount: ${Number(cd.total_amount).toLocaleString()} | Officer: ${cd.officer || '-'} | Beneficiaries: ${benList}`);
+}
+
+function openCdModal() { document.getElementById('cdForm').reset(); document.getElementById('cdTotal').value = '0'; }
+
+loadDistributions();
+loadData();
+</script>
+{% endblock %}

@@ -48,6 +48,15 @@
         </div>
     </div>
     <div class="col-md-3 col-6">
+        <div class="stat-card stat-card-warning">
+            <div class="stat-icon"><i class="bi bi-calendar-exclamation"></i></div>
+            <div class="stat-content">
+                <div class="stat-label">Expiring Soon</div>
+                <div class="stat-value" id="expiringCount">0</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6">
         <div class="stat-card stat-card-danger">
             <div class="stat-icon"><i class="bi bi-lightning-charge"></i></div>
             <div class="stat-content">
@@ -80,6 +89,45 @@
             <div class="stat-content">
                 <div class="stat-label">Today's Distribution</div>
                 <div class="stat-value" id="todaysDistribution">0</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-3 col-6">
+        <div class="stat-card stat-card-info">
+            <div class="stat-icon"><i class="bi bi-wallet2"></i></div>
+            <div class="stat-content">
+                <div class="stat-label">Cash Balance</div>
+                <div class="stat-value" id="cashBalance">0</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6">
+        <div class="stat-card stat-card-success">
+            <div class="stat-icon"><i class="bi bi-cash-stack"></i></div>
+            <div class="stat-content">
+                <div class="stat-label">Total Cash Distributed</div>
+                <div class="stat-value" id="totalCashDistributed">0</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6">
+        <div class="stat-card stat-card-warning">
+            <div class="stat-icon"><i class="bi bi-send-exclamation"></i></div>
+            <div class="stat-content">
+                <div class="stat-label">Pending Cash Req.</div>
+                <div class="stat-value" id="pendingCashRequests">0</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6">
+        <div class="stat-card stat-card-primary">
+            <div class="stat-icon"><i class="bi bi-calendar-check"></i></div>
+            <div class="stat-content">
+                <div class="stat-label">Cash This Month</div>
+                <div class="stat-value" id="cashThisMonth">0</div>
             </div>
         </div>
     </div>
@@ -195,10 +243,16 @@ async function loadDashboard() {
         document.getElementById('totalStock').textContent = data.total_stock ?? 0;
         document.getElementById('lowStock').textContent = data.low_stock ?? 0;
         document.getElementById('outOfStock').textContent = data.out_of_stock ?? 0;
+        document.getElementById('expiringCount').textContent = data.expiring_count ?? 0;
         document.getElementById('activeIncidents').textContent = data.active_incidents ?? 0;
         document.getElementById('pendingRequests').textContent = data.pending_requests ?? 0;
         document.getElementById('todaysDispatch').textContent = data.todays_dispatch ?? 0;
         document.getElementById('todaysDistribution').textContent = data.todays_distribution ?? 0;
+
+        document.getElementById('cashBalance').textContent = (data.cash_balance ?? 0).toLocaleString();
+        document.getElementById('totalCashDistributed').textContent = (data.total_cash_distributed ?? 0).toLocaleString();
+        document.getElementById('pendingCashRequests').textContent = data.pending_cash_requests ?? 0;
+        document.getElementById('cashThisMonth').textContent = (data.cash_distributed_this_month ?? 0).toLocaleString();
 
         if (data.stock_by_category && data.stock_by_category.length) {
             const labels = data.stock_by_category.map(c => c.category);

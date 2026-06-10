@@ -18,6 +18,13 @@
             <option value="adjustments">Adjustment Report</option>
             <option value="low-stock">Low Stock Report</option>
             <option value="monthly-summary">Monthly Summary</option>
+            <option value="cash-balance">Cash Balance</option>
+            <option value="cash-receipts">Cash Receipt</option>
+            <option value="cash-requests">Cash Request</option>
+            <option value="cash-distributions">Cash Distribution</option>
+            <option value="cash-by-incident">Cash by Incident</option>
+            <option value="cash-by-funding-source">Cash by Funding Source</option>
+            <option value="cash-yearly">Yearly Cash Report</option>
         </select>
         <button class="btn btn-primary btn-sm" onclick="downloadReport()"><i class="bi bi-download me-1"></i>Download PDF</button>
     </div>
@@ -42,11 +49,11 @@
                 <label class="form-label small">Category</label>
                 <select class="form-select form-select-sm" id="filterCategory"><option value="">All</option></select>
             </div>
-            <div class="col-auto filter-optional" data-types="dispatch,distribution,incidents,requests">
+            <div class="col-auto filter-optional" data-types="dispatch,distribution,incidents,requests,cash-distributions,cash-requests">
                 <label class="form-label small">Incident</label>
                 <select class="form-select form-select-sm" id="filterIncident"><option value="">All</option></select>
             </div>
-            <div class="col-auto filter-optional" data-types="incidents,requests">
+            <div class="col-auto filter-optional" data-types="incidents,requests,cash-requests">
                 <label class="form-label small">Status</label>
                 <select class="form-select form-select-sm" id="filterStatus"><option value="">All</option>
                     <option value="Active">Active</option><option value="Closed">Closed</option>
@@ -56,6 +63,14 @@
             <div class="col-auto filter-optional" data-types="monthly-summary">
                 <label class="form-label small">Month</label>
                 <input type="month" class="form-control form-control-sm" id="filterMonth">
+            </div>
+            <div class="col-auto filter-optional" data-types="cash-yearly">
+                <label class="form-label small">Year</label>
+                <input type="number" class="form-control form-control-sm" id="filterYear" value="{{ now().year }}">
+            </div>
+            <div class="col-auto filter-optional" data-types="cash-distributions,cash-requests,cash-balance">
+                <label class="form-label small">Fund</label>
+                <select class="form-select form-select-sm" id="filterFund"><option value="">All</option></select>
             </div>
             <div class="col-auto filter-optional" data-types="inventory,dispatch,distribution,incidents,requests,adjustments,low-stock,stock-receipts">
                 <label class="form-label small">Fiscal Year</label>
@@ -93,6 +108,7 @@ async function loadFormData() {
         populateSelect('filterCategory', data.categories, 'id', 'name');
         populateSelect('filterIncident', data.incidents, 'id', 'incident_name');
         populateSelect('filterFiscalYear', (data.fiscal_years || []).map(y => ({value: y, label: y})), 'value', 'label');
+        populateSelect('filterFund', data.cash_funds || [], 'id', 'name');
         document.getElementById('filterMonth').value = new Date().toISOString().slice(0, 7);
     } catch(e) { console.error(e); }
 }
@@ -124,12 +140,15 @@ function getFilterParams() {
     const status = document.getElementById('filterStatus').value;
     const fiscalYear = document.getElementById('filterFiscalYear').value;
     const month = document.getElementById('filterMonth').value;
+    const fund = document.getElementById('filterFund').value;
 
-    if (warehouse && type !== 'monthly-summary') params.set('warehouse_id', warehouse);
+    if (warehouse && type !== 'monthly-summary' && !type.startsWith('cash-')) params.set('warehouse_id', warehouse);
     if (category && ['inventory','dispatch','requests'].includes(type)) params.set('category_id', category);
-    if (incident && ['dispatch','distribution','incidents','requests'].includes(type)) params.set('incident_id', incident);
-    if (status && ['incidents','requests'].includes(type)) params.set('status', status);
+    if (incident && ['dispatch','distribution','incidents','requests','cash-requests','cash-distributions'].includes(type)) params.set('incident_id', incident);
+    if (status && ['incidents','requests','cash-requests'].includes(type)) params.set('status', status);
     if (month && type === 'monthly-summary') params.set('month', month);
+    if (type === 'cash-yearly') params.set('year', document.getElementById('filterYear').value || new Date().getFullYear());
+    if (fund && ['cash-distributions','cash-balance'].includes(type)) params.set('fund_id', fund);
     return params.toString();
 }
 

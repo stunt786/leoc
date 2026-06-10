@@ -1,0 +1,199 @@
+{% extends "base.html" %}
+{% block title %}Beneficiaries - LEOC{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('index') }}"><i class="bi bi-house-fill"></i></a></li>
+<li class="breadcrumb-item active">Beneficiaries</li>
+{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="mb-0"><i class="bi bi-people-fill me-2"></i>Beneficiaries</h4>
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#benModal" onclick="openBenModal()">
+        <i class="bi bi-plus-lg"></i> New Beneficiary
+    </button>
+</div>
+<div class="row mb-3">
+    <div class="col-md-4"><input type="text" class="form-control" id="benSearch" placeholder="Search name, ID, phone..." oninput="loadBeneficiaries()"></div>
+    <div class="col-md-2"><select class="form-select" id="benWard" onchange="loadBeneficiaries()"><option value="">All Wards</option></select></div>
+</div>
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle" id="benTable">
+                <thead class="table-light"><tr>
+                    <th>Name</th><th>National ID</th><th>Phone</th><th>Address</th>
+                    <th>Ward</th><th>Family</th><th>Actions</th>
+                </tr></thead>
+                <tbody id="benBody"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="benModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title">Beneficiary</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <form id="benForm">
+                <input type="hidden" name="id" id="benId">
+                <div class="modal-body">
+                    <div class="mb-3"><label class="form-label">Full Name <span class="text-danger">*</span></label><input class="form-control" name="name" id="benName" required></div>
+                    <div class="row g-2">
+                        <div class="col-md-6 mb-3"><label class="form-label">National ID</label><input class="form-control" name="national_id" id="benNid"></div>
+                        <div class="col-md-6 mb-3"><label class="form-label">Phone</label><input class="form-control" name="phone" id="benPhone"></div>
+                    </div>
+                    <div class="mb-3"><label class="form-label">Address</label><input class="form-control" name="address" id="benAddress"></div>
+                    <div class="row g-2">
+                        <div class="col-md-6 mb-3"><label class="form-label">Municipality</label><input class="form-control" name="municipality" id="benMunicipality"></div>
+                        <div class="col-md-3 mb-3"><label class="form-label">Ward</label><select class="form-select" name="ward" id="benWardSelect"></select></div>
+                        <div class="col-md-3 mb-3"><label class="form-label">Family Members</label><input type="number" class="form-control" name="family_members" id="benFamily" value="1"></div>
+                    </div>
+                    <div class="row g-2">
+                        <div class="col-md-6 mb-3"><label class="form-label">Bank Account</label><input class="form-control" name="bank_account" id="benBank"></div>
+                        <div class="col-md-6 mb-3"><label class="form-label">Mobile Wallet</label><input class="form-control" name="mobile_wallet" id="benWallet"></div>
+                    </div>
+                    <div class="mb-3"><label class="form-label">Remarks</label><textarea class="form-control" name="remarks" id="benRemarks" rows="2"></textarea></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg"></i> Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="historyModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title"><i class="bi bi-clock-history me-2"></i>Assistance History: <span id="historyBenName"></span></h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <div class="row g-2 mb-3" id="historySummary"></div>
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered">
+                        <thead class="table-light"><tr><th>Date</th><th>Type</th><th>Reference</th><th>Detail</th></tr></thead>
+                        <tbody id="historyBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+async function loadBeneficiaries() {
+    const search = document.getElementById('benSearch').value;
+    const ward = document.getElementById('benWard').value;
+    let url = '/api/beneficiaries?';
+    if (search) url += `search=${encodeURIComponent(search)}&`;
+    if (ward) url += `ward=${ward}&`;
+    const r = await fetch(url);
+    const d = await r.json();
+    const t = document.getElementById('benBody');
+    if (!d.success || d.beneficiaries.length === 0) { t.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">No beneficiaries found</td></tr>'; return; }
+    t.innerHTML = d.beneficiaries.map(b => `<tr>
+        <td><strong>${b.name}</strong></td>
+        <td>${b.national_id || '-'}</td>
+        <td>${b.phone || '-'}</td>
+        <td>${b.address || ''}${b.municipality ? ', '+b.municipality : ''}</td>
+        <td>${b.ward || '-'}</td>
+        <td>${b.family_members || 1}</td>
+        <td>
+            <button class="btn btn-sm btn-outline-info" onclick="showHistory(${b.id})" title="Assistance History"><i class="bi bi-clock-history"></i></button>
+            <button class="btn btn-sm btn-outline-primary" onclick="editBen(${b.id})"><i class="bi bi-pencil"></i></button>
+            <button class="btn btn-sm btn-outline-danger" onclick="deleteBen(${b.id})"><i class="bi bi-trash"></i></button>
+        </td>
+    </tr>`).join('');
+}
+
+async function loadData() {
+    const r = await fetch('/api/data');
+    const d = await r.json();
+    if (!d.success) return;
+    const wardOpts = '<option value="">All Wards</option>' + (d.wards||[]).map(w => `<option value="${w}">Ward ${w}</option>`).join('');
+    document.getElementById('benWard').innerHTML = wardOpts;
+    document.getElementById('benWardSelect').innerHTML = '<option value="">Select</option>' + (d.wards||[]).map(w => `<option value="${w}">Ward ${w}</option>`).join('');
+}
+
+document.getElementById('benForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const id = document.getElementById('benId').value;
+    const body = {
+        name: document.getElementById('benName').value,
+        national_id: document.getElementById('benNid').value,
+        phone: document.getElementById('benPhone').value,
+        address: document.getElementById('benAddress').value,
+        municipality: document.getElementById('benMunicipality').value,
+        ward: document.getElementById('benWardSelect').value ? parseInt(document.getElementById('benWardSelect').value) : null,
+        family_members: parseInt(document.getElementById('benFamily').value) || 1,
+        bank_account: document.getElementById('benBank').value,
+        mobile_wallet: document.getElementById('benWallet').value,
+        remarks: document.getElementById('benRemarks').value
+    };
+    const url = id ? `/api/beneficiaries/${id}` : '/api/beneficiaries';
+    const method = id ? 'PUT' : 'POST';
+    try {
+        const r = await fetch(url, {method, headers:{'Content-Type':'application/json','X-CSRFToken':csrf}, body: JSON.stringify(body)});
+        const d = await r.json();
+        if (d.success) { showToast('success', d.message); bootstrap.Modal.getInstance(document.getElementById('benModal')).hide(); loadBeneficiaries(); }
+        else showToast('danger', d.message);
+    } catch(e) { showToast('danger', e.message); }
+});
+
+function openBenModal() { document.getElementById('benForm').reset(); document.getElementById('benId').value = ''; }
+
+async function editBen(id) {
+    const r = await fetch(`/api/beneficiaries/${id}`);
+    const d = await r.json();
+    if (!d.success) return;
+    const b = d.beneficiary;
+    document.getElementById('benId').value = b.id;
+    document.getElementById('benName').value = b.name;
+    document.getElementById('benNid').value = b.national_id || '';
+    document.getElementById('benPhone').value = b.phone || '';
+    document.getElementById('benAddress').value = b.address || '';
+    document.getElementById('benMunicipality').value = b.municipality || '';
+    document.getElementById('benWardSelect').value = b.ward || '';
+    document.getElementById('benFamily').value = b.family_members || 1;
+    document.getElementById('benBank').value = b.bank_account || '';
+    document.getElementById('benWallet').value = b.mobile_wallet || '';
+    document.getElementById('benRemarks').value = b.remarks || '';
+    new bootstrap.Modal(document.getElementById('benModal')).show();
+}
+
+async function deleteBen(id) {
+    if (!confirm('Delete this beneficiary?')) return;
+    const r = await fetch(`/api/beneficiaries/${id}`, {method:'DELETE', headers:{'X-CSRFToken':csrf}});
+    const d = await r.json();
+    if (d.success) { showToast('success', d.message); loadBeneficiaries(); }
+    else showToast('danger', d.message);
+}
+
+async function showHistory(id) {
+    const r = await fetch(`/api/beneficiaries/${id}/history`);
+    const d = await r.json();
+    if (!d.success) { showToast('danger', 'Failed to load history'); return; }
+    document.getElementById('historyBenName').textContent = d.beneficiary.name;
+    document.getElementById('historySummary').innerHTML = `
+        <div class="col-6"><div class="p-2 bg-light rounded text-center"><small class="text-muted">Total Cash Received</small><br><strong class="text-success">${Number(d.total_cash).toLocaleString()}</strong></div></div>
+        <div class="col-6"><div class="p-2 bg-light rounded text-center"><small class="text-muted">Material Distributions</small><br><strong class="text-primary">${d.total_material_distributions}</strong></div></div>
+    `;
+    const events = d.events || [];
+    if (events.length === 0) {
+        document.getElementById('historyBody').innerHTML = '<tr><td colspan="4" class="text-center text-muted">No assistance history</td></tr>';
+    } else {
+        document.getElementById('historyBody').innerHTML = events.map(e => {
+            const cls = e.type === 'Cash' ? 'text-success' : 'text-primary';
+            const icon = e.type === 'Cash' ? 'bi bi-cash' : 'bi bi-box';
+            return `<tr><td>${e.date}</td><td><span class="${cls}"><i class="${icon} me-1"></i>${e.type}</span></td><td>${e.ref}</td><td>${e.detail}</td></tr>`;
+        }).join('');
+    }
+    new bootstrap.Modal(document.getElementById('historyModal')).show();
+}
+
+loadBeneficiaries();
+loadData();
+</script>
+{% endblock %}

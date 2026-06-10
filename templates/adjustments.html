@@ -49,19 +49,13 @@
                         <div class="col-md-6">
                             <label class="form-label">Adjustment Type <span class="text-danger">*</span></label>
                             <select class="form-select" id="adjType" required>
-                                <option value="Increase">Increase</option>
-                                <option value="Decrease">Decrease</option>
+                                <option value="">Select Type</option>
                             </select>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Reason <span class="text-danger">*</span></label>
                             <select class="form-select" id="adjReason" required>
                                 <option value="">Select Reason</option>
-                                <option value="Damage">Damage</option>
-                                <option value="Loss">Loss</option>
-                                <option value="Physical Count">Physical Count</option>
-                                <option value="Correction">Correction</option>
-                                <option value="Expired">Expired</option>
                             </select>
                         </div>
                         <div class="col-md-6">
@@ -71,6 +65,10 @@
                         <div class="col-12">
                             <label class="form-label">Remarks</label>
                             <textarea class="form-control" id="adjRemarks" rows="2"></textarea>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Approval User</label>
+                            <input type="text" class="form-control" id="adjApprovalUser" placeholder="Name of person who approved">
                         </div>
                         <div class="col-12">
                             <button type="button" class="btn btn-primary w-100" onclick="saveAdjustment()">
@@ -101,10 +99,11 @@
                                 <th>Reason</th>
                                 <th class="text-end">Qty</th>
                                 <th>Remarks</th>
+                                <th>Approval</th>
                             </tr>
                         </thead>
                         <tbody id="adjustmentTableBody">
-                            <tr><td colspan="8" class="text-center py-4"><div class="spinner-border text-primary"></div></td></tr>
+                            <tr><td colspan="9" class="text-center py-4"><div class="spinner-border text-primary"></div></td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -140,7 +139,28 @@ async function loadFormData() {
         d.items.forEach(i => {
             itemSel.innerHTML += `<option value="${i.id}" data-unit="${i.unit}">${i.name} (${i.item_code || 'No Code'})</option>`;
         });
+        const typeSel = document.getElementById('adjType');
+        d.adjustment_types.forEach(t => {
+            typeSel.innerHTML += `<option value="${t}">${t}</option>`;
+        });
+        const reasonSel = document.getElementById('adjReason');
+        d.adjustment_reasons.forEach(r => {
+            reasonSel.innerHTML += `<option value="${r}">${r}</option>`;
+        });
     } catch (e) { showToast('danger', 'Error loading form data: ' + e.message); }
+}
+
+function typeBadge(type) {
+    const map = {
+        'Increase': 'bg-success',
+        'Decrease': 'bg-danger',
+        'Damage': 'bg-warning text-dark',
+        'Expired': 'bg-secondary',
+        'Lost': 'bg-dark',
+        'Correction': 'bg-info text-dark',
+        'Correction_Increase': 'bg-info text-dark'
+    };
+    return `<span class="badge ${map[type] || 'bg-secondary'}">${type}</span>`;
 }
 
 async function loadCurrentQty() {
@@ -168,22 +188,20 @@ async function loadAdjustments() {
         const tbody = document.getElementById('adjustmentTableBody');
         const adj = d.adjustments;
         if (adj.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-muted">No adjustments recorded yet</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="9" class="text-center py-4 text-muted">No adjustments recorded yet</td></tr>';
             return;
         }
         tbody.innerHTML = adj.map(a => {
-            const typeBadge = a.adjustment_type === 'Increase'
-                ? '<span class="badge bg-success">Increase</span>'
-                : '<span class="badge bg-danger">Decrease</span>';
             return `<tr>
                 <td><strong>${a.adjustment_no}</strong></td>
                 <td>${a.date}</td>
                 <td>${a.warehouse_name || a.warehouse_id}</td>
                 <td>${a.item_name || a.item_id}</td>
-                <td>${typeBadge}</td>
+                <td>${typeBadge(a.adjustment_type)}</td>
                 <td>${a.reason || '-'}</td>
                 <td class="text-end fw-bold">${a.adjusted_quantity}</td>
                 <td><small>${a.remarks || '-'}</small></td>
+                <td>${a.approval_user || '-'}</td>
             </tr>`;
         }).join('');
     } catch (e) { showToast('danger', 'Error loading adjustments: ' + e.message); }
@@ -197,10 +215,12 @@ async function saveAdjustment() {
     const reason = document.getElementById('adjReason').value;
     const adjQty = parseInt(document.getElementById('adjQty').value);
     const remarks = document.getElementById('adjRemarks').value;
+    const approvalUser = document.getElementById('adjApprovalUser').value;
 
     if (!warehouseId) { showToast('danger', 'Please select a warehouse'); return; }
     if (!itemId) { showToast('danger', 'Please select an item'); return; }
     if (!date) { showToast('danger', 'Please select a date'); return; }
+    if (!adjType) { showToast('danger', 'Please select an adjustment type'); return; }
     if (!reason) { showToast('danger', 'Please select a reason'); return; }
     if (!adjQty || adjQty <= 0) { showToast('danger', 'Adjusted quantity must be greater than 0'); return; }
 
@@ -212,7 +232,8 @@ async function saveAdjustment() {
         adjustment_type: adjType,
         reason: reason,
         adjusted_quantity: adjQty,
-        remarks: remarks
+        remarks: remarks,
+        approval_user: approvalUser
     };
 
     try {
@@ -226,6 +247,7 @@ async function saveAdjustment() {
             showToast('success', 'Adjustment recorded successfully');
             document.getElementById('adjQty').value = '';
             document.getElementById('adjRemarks').value = '';
+            document.getElementById('adjApprovalUser').value = '';
             generateAdjNo();
             loadAdjustments();
             loadCurrentQty();

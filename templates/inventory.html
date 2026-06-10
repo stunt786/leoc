@@ -50,6 +50,15 @@
             </div>
         </div>
     </div>
+    <div class="col-md-3 col-6">
+        <div class="stat-card stat-card-orange">
+            <div class="stat-icon"><i class="bi bi-clock-history"></i></div>
+            <div class="stat-content">
+                <div class="stat-label">Expiring Soon</div>
+                <div class="stat-value" id="expiringCount">0</div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <div class="card mb-4">
@@ -95,17 +104,20 @@
                 <thead>
                     <tr>
                         <th>Item Code</th>
+                        <th>Barcode</th>
                         <th>Item Name</th>
                         <th>Category</th>
                         <th>Warehouse</th>
                         <th class="text-end">Available Qty</th>
+                        <th class="text-end">Reserved</th>
+                        <th class="text-end">Total Qty</th>
                         <th>Unit</th>
                         <th class="text-end">Min Stock</th>
                         <th>Status</th>
                     </tr>
                 </thead>
                 <tbody id="inventoryTableBody">
-                    <tr><td colspan="8" class="text-center py-4"><div class="spinner-border text-primary"></div></td></tr>
+                    <tr><td colspan="11" class="text-center py-4"><div class="spinner-border text-primary"></div></td></tr>
                 </tbody>
             </table>
         </div>
@@ -167,18 +179,24 @@ async function loadInventory() {
         const tbody = document.getElementById('inventoryTableBody');
         const inv = d.inventory;
         if (inv.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-muted">No inventory records found</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="11" class="text-center py-4 text-muted">No inventory records found</td></tr>';
         } else {
-            tbody.innerHTML = inv.map(item => `<tr>
-                <td><span class="badge bg-light text-dark">${item.item_code || '-'}</span></td>
-                <td class="fw-medium">${item.item_name}</td>
-                <td>${item.category_name || '-'}</td>
-                <td>${item.warehouse_name || '-'}</td>
-                <td class="text-end fw-bold">${item.quantity}</td>
-                <td>${item.unit || '-'}</td>
-                <td class="text-end">${item.minimum_stock || 0}</td>
-                <td>${statusBadge(item.status)}</td>
-            </tr>`).join('');
+            tbody.innerHTML = inv.map(item => {
+                const expiryIcon = item.expiry_tracking ? '<i class="bi bi-calendar-check text-warning ms-1" title="Expiry tracking enabled"></i>' : '';
+                return `<tr>
+                    <td><span class="badge bg-light text-dark">${item.item_code || '-'}</span></td>
+                    <td><span class="text-muted small">${item.barcode || '-'}</span></td>
+                    <td class="fw-medium">${item.item_name}${expiryIcon}</td>
+                    <td>${item.category_name || '-'}</td>
+                    <td>${item.warehouse_name || '-'}</td>
+                    <td class="text-end fw-bold">${item.available_quantity}</td>
+                    <td class="text-end text-muted">${item.reserved_quantity || 0}</td>
+                    <td class="text-end">${item.quantity}</td>
+                    <td>${item.unit || '-'}</td>
+                    <td class="text-end">${item.minimum_stock || 0}</td>
+                    <td>${statusBadge(item.status)}</td>
+                </tr>`;
+            }).join('');
         }
         document.getElementById('inventoryCount').textContent = `Showing ${inv.length} record${inv.length !== 1 ? 's' : ''}`;
     } catch (e) { showToast('danger', 'Error loading inventory: ' + e.message); }
@@ -193,6 +211,7 @@ async function loadSummary() {
         document.getElementById('totalStock').textContent = d.total_stock;
         document.getElementById('lowStockCount').textContent = d.low_stock;
         document.getElementById('outOfStockCount').textContent = d.out_of_stock;
+        document.getElementById('expiringCount').textContent = d.expiring_count;
     } catch (e) { console.error('Error loading summary:', e); }
 }
 

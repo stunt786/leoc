@@ -62,11 +62,11 @@
                 <thead>
                     <tr>
                         <th>Item Code</th>
-                        <th>Category</th>
                         <th>Name</th>
+                        <th>Category</th>
                         <th>Unit</th>
                         <th>Min Stock</th>
-                        <th>Description</th>
+                        <th>Status</th>
                         <th class="text-end">Actions</th>
                     </tr>
                 </thead>
@@ -80,7 +80,7 @@
 
 <!-- Item Modal -->
 <div class="modal fade" id="itemModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="itemModalTitle"><i class="bi bi-box-seam me-2"></i>Add Item</h5>
@@ -89,43 +89,139 @@
             <div class="modal-body">
                 <form id="itemForm">
                     <input type="hidden" id="item_id">
-                    <div class="row g-3">
-                        <div class="col-md-6">
-                            <label class="form-label">Item Code</label>
-                            <input type="text" class="form-control" id="item_code" placeholder="Auto-generated">
+
+                    <!-- Tabs -->
+                    <ul class="nav nav-tabs mb-3" id="itemTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="basic-tab" data-bs-toggle="tab" data-bs-target="#basic" type="button" role="tab">Basic Info</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="stock-tab" data-bs-toggle="tab" data-bs-target="#stock" type="button" role="tab">Stock Settings</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="tracking-tab" data-bs-toggle="tab" data-bs-target="#tracking" type="button" role="tab">Tracking</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="media-tab" data-bs-toggle="tab" data-bs-target="#media" type="button" role="tab">Status & Media</button>
+                        </li>
+                    </ul>
+
+                    <div class="tab-content">
+                        <!-- Section 1: Basic Info -->
+                        <div class="tab-pane fade show active" id="basic" role="tabpanel">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label">Item Code</label>
+                                    <input type="text" class="form-control" id="item_code" placeholder="Auto-generated">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Barcode</label>
+                                    <input type="text" class="form-control" id="item_barcode" placeholder="Scan or enter barcode">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Item Name *</label>
+                                    <input type="text" class="form-control" id="item_name" required>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Local Name</label>
+                                    <input type="text" class="form-control" id="item_local_name" placeholder="नेपाली नाम">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Category *</label>
+                                    <select class="form-select" id="item_category_id" required>
+                                        <option value="">Select Category</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Unit *</label>
+                                    <select class="form-select" id="item_unit" required>
+                                        <option value="">Select Unit</option>
+                                    </select>
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label">Description</label>
+                                    <textarea class="form-control" id="item_description" rows="3"></textarea>
+                                </div>
+                            </div>
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Category *</label>
-                            <select class="form-select" id="item_category_id" required>
-                                <option value="">Select Category</option>
-                            </select>
+
+                        <!-- Section 2: Stock Settings -->
+                        <div class="tab-pane fade" id="stock" role="tabpanel">
+                            <div class="row g-3">
+                                <div class="col-md-4">
+                                    <label class="form-label">Min Stock</label>
+                                    <input type="number" class="form-control" id="item_minimum_stock" min="0">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Max Stock</label>
+                                    <input type="number" class="form-control" id="item_max_stock" min="0">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Storage Life (Days)</label>
+                                    <input type="number" class="form-control" id="item_storage_life_days" min="0">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Storage Requirement</label>
+                                    <select class="form-select" id="item_storage_requirement">
+                                        <option value="">Select Storage</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6 d-flex align-items-end">
+                                    <div class="form-check form-switch mb-2">
+                                        <input class="form-check-input" type="checkbox" id="item_is_consumable">
+                                        <label class="form-check-label" for="item_is_consumable">Is Consumable</label>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Item Name *</label>
-                            <input type="text" class="form-control" id="item_name" required>
+
+                        <!-- Section 3: Tracking -->
+                        <div class="tab-pane fade" id="tracking" role="tabpanel">
+                            <div class="row g-3">
+                                <div class="col-12">
+                                    <div class="card bg-light border-0">
+                                        <div class="card-body">
+                                            <h6 class="card-title mb-3"><i class="bi bi-gear me-1"></i>Tracking Options</h6>
+                                            <div class="form-check form-switch mb-3">
+                                                <input class="form-check-input" type="checkbox" id="item_expiry_tracking">
+                                                <label class="form-check-label" for="item_expiry_tracking">Expiry Tracking</label>
+                                                <small class="d-block text-muted">Track expiration dates for this item</small>
+                                            </div>
+                                            <div class="form-check form-switch mb-3">
+                                                <input class="form-check-input" type="checkbox" id="item_batch_tracking">
+                                                <label class="form-check-label" for="item_batch_tracking">Batch Tracking</label>
+                                                <small class="d-block text-muted">Track by batch/lot numbers</small>
+                                            </div>
+                                            <div class="form-check form-switch mb-0">
+                                                <input class="form-check-input" type="checkbox" id="item_serial_tracking">
+                                                <label class="form-check-label" for="item_serial_tracking">Serial Tracking</label>
+                                                <small class="d-block text-muted">Track individual serial numbers</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        <div class="col-md-3">
-                            <label class="form-label">Unit *</label>
-                            <select class="form-select" id="item_unit" required>
-                                <option value="">Select Unit</option>
-                                <option value="Kg">Kg</option>
-                                <option value="Packet">Packet</option>
-                                <option value="Box">Box</option>
-                                <option value="Piece">Piece</option>
-                                <option value="Bottle">Bottle</option>
-                                <option value="Roll">Roll</option>
-                                <option value="Set">Set</option>
-                                <option value="Liter">Liter</option>
-                                <option value="Meter">Meter</option>
-                            </select>
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label">Min Stock</label>
-                            <input type="number" class="form-control" id="item_minimum_stock" min="0">
-                        </div>
-                        <div class="col-12">
-                            <label class="form-label">Description</label>
-                            <textarea class="form-control" id="item_description" rows="3"></textarea>
+
+                        <!-- Section 4: Status & Media -->
+                        <div class="tab-pane fade" id="media" role="tabpanel">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label">Status</label>
+                                    <select class="form-select" id="item_status">
+                                        <option value="Active">Active</option>
+                                        <option value="Inactive">Inactive</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Photo (file path)</label>
+                                    <input type="text" class="form-control" id="item_photo" placeholder="Path to photo file">
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label">QR Code Data</label>
+                                    <textarea class="form-control" id="item_qr_code" rows="3" placeholder="QR code content or data URL"></textarea>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </form>
@@ -138,6 +234,30 @@
     </div>
 </div>
 {% endblock %}
+
+<!-- History Modal -->
+<div class="modal fade" id="historyModal" tabindex="-1">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-clock-history me-2"></i>Item History: <span id="historyItemName"></span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="historySummary" class="row g-2 mb-3"></div>
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover">
+                        <thead><tr><th>Date</th><th>Type</th><th>Reference</th><th>Warehouse</th><th>Detail</th><th>Change</th></tr></thead>
+                        <tbody id="historyBody"><tr><td colspan="6" class="text-center text-muted py-3">Loading...</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
 
 {% block extra_js %}
 <script>
@@ -156,6 +276,17 @@ async function loadData() {
     catFilter.innerHTML = '<option value="">All Categories</option>' + opts;
     catSelect.innerHTML = '<option value="">Select Category</option>' + opts;
     document.getElementById('totalCategories').textContent = categories.length;
+
+    const units = d.units || [];
+    const unitSel = document.getElementById('item_unit');
+    unitSel.innerHTML = '<option value="">Select Unit</option>' +
+        units.map(u => `<option value="${u}">${u}</option>`).join('');
+
+    const storageReqs = d.storage_requirements || [];
+    const storageSel = document.getElementById('item_storage_requirement');
+    storageSel.innerHTML = '<option value="">Select Storage</option>' +
+        storageReqs.map(s => `<option value="${s}">${s}</option>`).join('');
+
     loadItems();
 }
 
@@ -193,12 +324,13 @@ function renderItems(data) {
     }
     tbody.innerHTML = data.map(i => `<tr>
         <td><strong>${i.item_code || '-'}</strong></td>
+        <td>${i.local_name ? i.name + ' (' + i.local_name + ')' : i.name}</td>
         <td>${i.category_name || '-'}</td>
-        <td>${i.name}</td>
         <td>${i.unit || '-'}</td>
         <td>${i.minimum_stock ?? '-'}</td>
-        <td>${i.description || '-'}</td>
+        <td><span class="badge ${i.status === 'Inactive' ? 'bg-secondary' : 'bg-success'}">${i.status || 'Active'}</span></td>
         <td class="text-end">
+            <button class="btn btn-sm btn-outline-info" onclick="showHistory(${i.id})" title="History"><i class="bi bi-clock-history"></i></button>
             <button class="btn btn-sm btn-outline-primary" onclick="editItem(${i.id})"><i class="bi bi-pencil"></i></button>
             <button class="btn btn-sm btn-outline-danger" onclick="deleteItem(${i.id})"><i class="bi bi-trash"></i></button>
         </td>
@@ -206,23 +338,36 @@ function renderItems(data) {
 }
 
 function resetForm() {
-    document.getElementById('itemModalTitle').textContent = 'Add Item';
+    document.getElementById('itemModalTitle').innerHTML = '<i class="bi bi-box-seam me-2"></i>Add Item';
     document.getElementById('item_id').value = '';
     document.getElementById('itemForm').reset();
     document.getElementById('item_code').value = '';
+    document.getElementById('item_status').value = 'Active';
 }
 
 async function editItem(id) {
     const i = items.find(x => x.id === id);
     if (!i) return;
-    document.getElementById('itemModalTitle').textContent = 'Edit Item';
+    document.getElementById('itemModalTitle').innerHTML = '<i class="bi bi-pencil me-2"></i>Edit Item';
     document.getElementById('item_id').value = i.id;
     document.getElementById('item_code').value = i.item_code || '';
-    document.getElementById('item_category_id').value = i.category_id || '';
+    document.getElementById('item_barcode').value = i.barcode || '';
     document.getElementById('item_name').value = i.name;
+    document.getElementById('item_local_name').value = i.local_name || '';
+    document.getElementById('item_category_id').value = i.category_id || '';
     document.getElementById('item_unit').value = i.unit || '';
-    document.getElementById('item_minimum_stock').value = i.minimum_stock ?? '';
     document.getElementById('item_description').value = i.description || '';
+    document.getElementById('item_minimum_stock').value = i.minimum_stock ?? '';
+    document.getElementById('item_max_stock').value = i.max_stock ?? '';
+    document.getElementById('item_storage_life_days').value = i.storage_life_days ?? '';
+    document.getElementById('item_storage_requirement').value = i.storage_requirement || '';
+    document.getElementById('item_is_consumable').checked = !!i.is_consumable;
+    document.getElementById('item_expiry_tracking').checked = !!i.expiry_tracking;
+    document.getElementById('item_batch_tracking').checked = !!i.batch_tracking;
+    document.getElementById('item_serial_tracking').checked = !!i.serial_tracking;
+    document.getElementById('item_photo').value = i.photo || '';
+    document.getElementById('item_qr_code').value = i.qr_code || '';
+    document.getElementById('item_status').value = i.status || 'Active';
     new bootstrap.Modal(document.getElementById('itemModal')).show();
 }
 
@@ -230,11 +375,23 @@ async function saveItem() {
     const id = document.getElementById('item_id').value;
     const body = {
         item_code: document.getElementById('item_code').value,
-        category_id: parseInt(document.getElementById('item_category_id').value) || null,
+        barcode: document.getElementById('item_barcode').value,
         name: document.getElementById('item_name').value,
+        local_name: document.getElementById('item_local_name').value,
+        category_id: parseInt(document.getElementById('item_category_id').value) || null,
         unit: document.getElementById('item_unit').value,
+        description: document.getElementById('item_description').value,
         minimum_stock: parseInt(document.getElementById('item_minimum_stock').value) || 0,
-        description: document.getElementById('item_description').value
+        max_stock: parseInt(document.getElementById('item_max_stock').value) || 0,
+        storage_life_days: parseInt(document.getElementById('item_storage_life_days').value) || 0,
+        storage_requirement: document.getElementById('item_storage_requirement').value,
+        is_consumable: document.getElementById('item_is_consumable').checked,
+        expiry_tracking: document.getElementById('item_expiry_tracking').checked,
+        batch_tracking: document.getElementById('item_batch_tracking').checked,
+        serial_tracking: document.getElementById('item_serial_tracking').checked,
+        photo: document.getElementById('item_photo').value,
+        qr_code: document.getElementById('item_qr_code').value,
+        status: document.getElementById('item_status').value
     };
     if (!body.name) { showToast('danger', 'Item name is required'); return; }
     if (!body.unit) { showToast('danger', 'Unit is required'); return; }
@@ -248,6 +405,46 @@ async function saveItem() {
         bootstrap.Modal.getInstance(document.getElementById('itemModal')).hide();
         loadData();
     } else { showToast('danger', d.message); }
+}
+
+async function showHistory(id) {
+    const item = items.find(x => x.id === id);
+    if (!item) return;
+    document.getElementById('historyItemName').textContent = item.name;
+    document.getElementById('historyBody').innerHTML = '<tr><td colspan="6" class="text-center py-3"><div class="spinner-border spinner-border-sm"></div> Loading...</td></tr>';
+    const modal = new bootstrap.Modal(document.getElementById('historyModal'));
+    modal.show();
+    try {
+        const r = await fetch(`/api/items/${id}/history`);
+        const d = await r.json();
+        if (!d.success) { document.getElementById('historyBody').innerHTML = '<tr><td colspan="6" class="text-danger">Failed to load</td></tr>'; return; }
+        const s = d.summary;
+        document.getElementById('historySummary').innerHTML = `
+            <div class="col-3"><div class="p-2 bg-light rounded text-center"><small class="text-muted">Received</small><br><strong class="text-success">${s.total_received}</strong></div></div>
+            <div class="col-3"><div class="p-2 bg-light rounded text-center"><small class="text-muted">Dispatched</small><br><strong class="text-danger">${s.total_dispatched}</strong></div></div>
+            <div class="col-3"><div class="p-2 bg-light rounded text-center"><small class="text-muted">Current Stock</small><br><strong class="text-primary">${s.current_stock}</strong></div></div>
+            <div class="col-3"><div class="p-2 bg-light rounded text-center"><small class="text-muted">Warehouse</small><br><strong>${s.warehouse}</strong></div></div>
+        `;
+        const events = d.events || [];
+        if (events.length === 0) {
+            document.getElementById('historyBody').innerHTML = '<tr><td colspan="6" class="text-center text-muted">No history yet</td></tr>';
+            return;
+        }
+        document.getElementById('historyBody').innerHTML = events.map(e => {
+            const cls = e.type === 'Receipt' ? 'text-success' : e.type === 'Dispatch' ? 'text-danger' : 'text-warning';
+            const icon = e.type === 'Receipt' ? 'bi bi-box-arrow-in-down' : e.type === 'Dispatch' ? 'bi bi-box-arrow-up' : 'bi bi-sliders';
+            return `<tr>
+                <td>${e.date}</td>
+                <td><span class="${cls}"><i class="${icon} me-1"></i>${e.type}</span></td>
+                <td>${e.ref}</td>
+                <td>${e.warehouse}</td>
+                <td>${e.detail}</td>
+                <td class="fw-bold ${e.qty_change.startsWith('+') ? 'text-success' : 'text-danger'}">${e.qty_change}</td>
+            </tr>`;
+        }).join('');
+    } catch(e) {
+        document.getElementById('historyBody').innerHTML = `<tr><td colspan="6" class="text-danger">Error: ${e.message}</td></tr>`;
+    }
 }
 
 async function deleteItem(id) {

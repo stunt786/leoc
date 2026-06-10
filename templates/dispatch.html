@@ -77,10 +77,12 @@
                             <th style="width:130px">Available Qty</th>
                             <th style="width:130px">Dispatch Qty</th>
                             <th style="width:100px">Unit</th>
+                            <th style="width:120px">Batch No</th>
+                            <th style="width:120px">Expiry Date</th>
                         </tr>
                     </thead>
                     <tbody id="dispatchItemsBody">
-                        <tr><td colspan="4" class="text-center text-muted py-3">Select a relief request to load items</td></tr>
+                        <tr><td colspan="6" class="text-center text-muted py-3">Select a relief request to load items</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -180,16 +182,43 @@ document.getElementById('dp_warehouse_id').addEventListener('change', function()
 document.getElementById('dp_relief_request_id').addEventListener('change', function() {
     const rrId = parseInt(this.value);
     if (!rrId) {
-        document.getElementById('dispatchItemsBody').innerHTML = '<tr><td colspan="4" class="text-center text-muted py-3">Select a relief request to load items</td></tr>';
+        document.getElementById('dispatchItemsBody').innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">Select a relief request to load items</td></tr>';
         return;
     }
     populateItems(rrId);
 });
 
-function populateItems(rrId) {
+async function addItemRow(item, availQty) {
+    const tbody = document.getElementById('dispatchItemsBody');
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td><input type="text" class="form-control form-control-sm" value="${item.item_name}" readonly>
+        <input type="hidden" class="dp-item-id" value="${item.item_id}"></td>
+        <td><input type="number" class="form-control form-control-sm dp-avail-qty" value="${availQty}" readonly></td>
+        <td><input type="number" class="form-control form-control-sm dp-dispatch-qty" value="0" min="0" max="${availQty}" onchange="validateQty(this)"></td>
+        <td><input type="text" class="form-control form-control-sm dp-unit" value="${item.unit || 'pcs'}" readonly></td>
+        <td><input type="text" class="form-control form-control-sm dp-batch-no" placeholder="Auto-fill"></td>
+        <td><input type="date" class="form-control form-control-sm dp-expiry-date"></td>`;
+    tbody.appendChild(tr);
+
+    try {
+        const res = await fetch(`/api/items/${item.item_id}/history`);
+        const data = await res.json();
+        if (data.success && data.history && data.history.length > 0) {
+            const receipt = data.history.find(h => h.batch_no || h.expiry_date);
+            if (receipt) {
+                if (receipt.batch_no) tr.querySelector('.dp-batch-no').value = receipt.batch_no;
+                if (receipt.expiry_date) tr.querySelector('.dp-expiry-date').value = receipt.expiry_date;
+            }
+        }
+    } catch (e) {
+        // Silently fail - fields remain empty for manual entry
+    }
+}
+
+async function populateItems(rrId) {
     const req = allRequests.find(r => r.id === rrId);
     if (!req || !req.items || req.items.length === 0) {
-        document.getElementById('dispatchItemsBody').innerHTML = '<tr><td colspan="4" class="text-center text-muted py-3">No items in this request</td></tr>';
+        document.getElementById('dispatchItemsBody').innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">No items in this request</td></tr>';
         return;
     }
     const whId = parseInt(document.getElementById('dp_warehouse_id').value);
@@ -198,16 +227,11 @@ function populateItems(rrId) {
         return;
     }
     const tbody = document.getElementById('dispatchItemsBody');
-    tbody.innerHTML = req.items.map(item => {
+    tbody.innerHTML = '';
+    for (const item of req.items) {
         const avail = inventoryMap[item.item_id] || 0;
-        return `<tr>
-            <td><input type="text" class="form-control form-control-sm" value="${item.item_name}" readonly>
-                <input type="hidden" class="dp-item-id" value="${item.item_id}"></td>
-            <td><input type="number" class="form-control form-control-sm dp-avail-qty" value="${avail}" readonly></td>
-            <td><input type="number" class="form-control form-control-sm dp-dispatch-qty" value="0" min="0" max="${avail}" onchange="validateQty(this)"></td>
-            <td><input type="text" class="form-control form-control-sm dp-unit" value="${item.unit || 'pcs'}" readonly></td>
-        </tr>`;
-    }).join('');
+        await addItemRow(item, avail);
+    }
 }
 
 function validateQty(input) {
@@ -266,10 +290,11 @@ async function viewDispatch(id) {
     const d = await r.json();
     if (!d.success) { showToast('danger', d.message); return; }
     const dp = d.dispatch;
-    let itemsHtml = '<table class="table table-sm mb-0"><thead><tr><th>Item</th><th>Qty</th><th>Unit</th></tr></thead><tbody>';
+    let itemsHtml = '<table class="table table-sm mb-0"><thead><tr><th>Item</th><th>Qty</th><th>Unit</th><th>Batch No</th><th>Expiry Date</th></tr></thead><tbody>';
     if (dp.items && dp.items.length > 0) {
         dp.items.forEach(item => {
-            itemsHtml += `<tr><td>${item.item_name}</td><td>${item.quantity}</td><td>${item.unit || '-'}</td></tr>`;
+            const expiry = item.expiry_date ? new Date(item.expiry_date).toLocaleDateString() : '-';
+            itemsHtml += `<tr><td>${item.item_name}</td><td>${item.quantity}</td><td>${item.unit || '-'}</td><td>${item.batch_no || '-'}</td><td>${expiry}</td></tr>`;
         });
     }
     itemsHtml += '</tbody></table>';
@@ -303,17 +328,23 @@ function resetDispatchForm() {
     document.getElementById('dispatchForm').reset();
     document.getElementById('dp_dispatch_number').value = 'DSP-' + String(Date.now()).slice(-4);
     document.getElementById('dp_date').value = new Date().toISOString().split('T')[0];
-    document.getElementById('dispatchItemsBody').innerHTML = '<tr><td colspan="4" class="text-center text-muted py-3">Select a relief request to load items</td></tr>';
+    document.getElementById('dispatchItemsBody').innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">Select a relief request to load items</td></tr>';
 }
 
 async function saveDispatch() {
     const items = Array.from(document.querySelectorAll('#dispatchItemsBody tr')).map(tr => {
-        const inputs = tr.querySelectorAll('input');
-        if (inputs.length < 4) return null;
+        const itemIdEl = tr.querySelector('.dp-item-id');
+        const qtyEl = tr.querySelector('.dp-dispatch-qty');
+        const unitEl = tr.querySelector('.dp-unit');
+        const batchEl = tr.querySelector('.dp-batch-no');
+        const expiryEl = tr.querySelector('.dp-expiry-date');
+        if (!itemIdEl || !qtyEl) return null;
         return {
-            item_id: parseInt(inputs[0].value),
-            quantity: parseInt(inputs[2].value) || 0,
-            unit: inputs[3].value
+            item_id: parseInt(itemIdEl.value),
+            quantity: parseInt(qtyEl.value) || 0,
+            unit: unitEl ? unitEl.value : '',
+            batch_no: batchEl ? batchEl.value : '',
+            expiry_date: expiryEl ? expiryEl.value : ''
         };
     }).filter(i => i && i.quantity > 0);
 

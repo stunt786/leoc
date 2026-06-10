@@ -1573,3 +1573,74 @@ FROM warehouse]
 2026-06-10 07:31:05,033 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:96]
 2026-06-10 07:31:57,572 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:96]
 2026-06-10 07:33:24,064 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:96]
+2026-06-10 07:59:15,243 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:96]
+2026-06-10 07:59:20,628 ERROR: Exception on /login [POST] [in /home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py:825]
+Traceback (most recent call last):
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+sqlite3.OperationalError: attempt to write a readonly database
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py", line 1455, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py", line 869, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py", line 867, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py", line 852, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/app.py", line 664, in login
+    'created_at': self.created_at.strftime('%Y-%m-%d') if self.created_at else None
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/orm/scoping.py", line 765, in execute
+    return self._proxied.execute(
+           ^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 2351, in execute
+    return self._execute_internal(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 2258, in _execute_internal
+    result = conn.execute(
+             ^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1419, in execute
+    return meth(
+           ^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/sql/elements.py", line 527, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1641, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1846, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1986, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 2363, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+sqlalchemy.exc.OperationalError: (sqlite3.OperationalError) attempt to write a readonly database
+[SQL: UPDATE "user" SET last_login = ? WHERE id = ?]
+[parameters: (datetime.datetime(2026, 6, 10, 2, 14, 20, 627739), 1)]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2026-06-10 07:59:50,835 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:96]
+2026-06-10 08:06:33,765 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:96]
+2026-06-10 08:19:41,308 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:96]
+2026-06-10 08:20:26,797 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:96]
+2026-06-10 08:21:22,854 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:96]
+2026-06-10 08:22:54,982 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:96]
+2026-06-10 08:24:12,292 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:96]
+2026-06-10 08:24:54,535 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:96]
+2026-06-10 08:25:28,344 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:96]
+2026-06-10 08:29:22,651 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:96]
+2026-06-10 08:30:33,834 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:96]
+2026-06-10 13:26:51,006 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:96]

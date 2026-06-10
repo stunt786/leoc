@@ -1,12 +1,4 @@
-# MASTER PROMPT – ITEM MASTER & STOCK TRACKING MODULE FOR SIMPLE EOC WAREHOUSE MANAGEMENT SYSTEM
 
-Implement a complete **Item Master and Stock Tracking System** for a small Emergency Operations Centre (EOC) Warehouse Management System.
-
-The design should focus on **simplicity**, **traceability**, and **inventory accountability**, avoiding unnecessary enterprise warehouse complexity.
-
-The system should maintain one **Item Master** table and one **Stock Receipt** transaction table, where every stock movement updates the Inventory automatically.
-
----
 
 # ITEM MASTER
 

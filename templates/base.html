@@ -87,11 +87,40 @@
                     <span class="nav-label">Distribution</span>
                 </a>
 
+                <div class="sidebar-divider">Finance</div>
+
+                <a href="{{ url_for('cash_funds_page') }}" class="nav-item {% if request.path == '/cash-funds' %}active{% endif %}">
+                    <i class="bi bi-wallet2"></i>
+                    <span class="nav-label">Cash Funds</span>
+                </a>
+
+                <a href="{{ url_for('cash_receipts_page') }}" class="nav-item {% if request.path == '/cash-receipts' %}active{% endif %}">
+                    <i class="bi bi-cash-coin"></i>
+                    <span class="nav-label">Cash Receipts</span>
+                </a>
+
+                <a href="{{ url_for('cash_requests_page') }}" class="nav-item {% if request.path == '/cash-requests' %}active{% endif %}">
+                    <i class="bi bi-send-exclamation"></i>
+                    <span class="nav-label">Cash Requests</span>
+                </a>
+
+                <a href="{{ url_for('cash_distributions_page') }}" class="nav-item {% if request.path == '/cash-distributions' %}active{% endif %}">
+                    <i class="bi bi-cash-stack"></i>
+                    <span class="nav-label">Cash Distribution</span>
+                </a>
+
                 <div class="sidebar-divider">Disaster</div>
 
                 <a href="{{ url_for('disaster_reports_page') }}" class="nav-item {% if request.path == '/disaster-reports' %}active{% endif %}">
                     <i class="bi bi-exclamation-triangle-fill"></i>
                     <span class="nav-label">Disaster Reports</span>
+                </a>
+
+                <div class="sidebar-divider">People</div>
+
+                <a href="{{ url_for('beneficiaries_page') }}" class="nav-item {% if request.path == '/beneficiaries' %}active{% endif %}">
+                    <i class="bi bi-people-fill"></i>
+                    <span class="nav-label">Beneficiaries</span>
                 </a>
 
                 <div class="sidebar-divider">Analytics</div>

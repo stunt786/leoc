@@ -39,11 +39,6 @@
                     <label class="form-label">Source Type *</label>
                     <select class="form-select" id="receipt_source_type" required>
                         <option value="">Select Source</option>
-                        <option value="Government">Government</option>
-                        <option value="Donation">Donation</option>
-                        <option value="NGO">NGO</option>
-                        <option value="Transfer">Transfer</option>
-                        <option value="Purchase">Purchase</option>
                     </select>
                 </div>
                 <div class="col-md-4">
@@ -56,15 +51,77 @@
                 </div>
             </div>
 
+            <div class="card bg-light mb-3">
+                <div class="card-body py-2">
+                    <h6 class="mb-2"><i class="bi bi-person-lines-fill me-2"></i>Source Details</h6>
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <label class="form-label">Contact Person</label>
+                            <input type="text" class="form-control" id="receipt_source_contact" placeholder="Contact person">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Phone</label>
+                            <input type="text" class="form-control" id="receipt_phone" placeholder="Phone number">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Email</label>
+                            <input type="email" class="form-control" id="receipt_email" placeholder="Email address">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Address</label>
+                            <textarea class="form-control" id="receipt_address" rows="1" placeholder="Address"></textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card bg-light mb-3">
+                <div class="card-body py-2">
+                    <h6 class="mb-2"><i class="bi bi-file-text me-2"></i>Document Info</h6>
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <label class="form-label">Reference No</label>
+                            <input type="text" class="form-control" id="receipt_ref_number" placeholder="Reference number">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Invoice No</label>
+                            <input type="text" class="form-control" id="receipt_invoice_no" placeholder="Invoice number">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Invoice Date</label>
+                            <input type="date" class="form-control" id="receipt_invoice_date">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Delivery Note</label>
+                            <input type="text" class="form-control" id="receipt_delivery_note" placeholder="Delivery note">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Vehicle No</label>
+                            <input type="text" class="form-control" id="receipt_vehicle_no" placeholder="Vehicle number">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Verified By</label>
+                            <input type="text" class="form-control" id="receipt_verified_by" placeholder="Verified by">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <hr>
             <h6 class="mb-3"><i class="bi bi-box me-2"></i>Received Items</h6>
             <div class="table-responsive mb-3">
                 <table class="table table-bordered" id="itemsTable">
                     <thead class="table-light">
                         <tr>
-                            <th style="min-width:200px">Item *</th>
-                            <th style="min-width:100px">Unit</th>
-                            <th style="min-width:120px">Quantity *</th>
+                            <th style="min-width:160px">Item *</th>
+                            <th style="min-width:80px">Unit</th>
+                            <th style="min-width:100px">Quantity *</th>
+                            <th style="min-width:100px">Batch No</th>
+                            <th style="min-width:100px">Serial No</th>
+                            <th style="min-width:110px">Mfg Date</th>
+                            <th style="min-width:110px">Expiry Date</th>
+                            <th style="min-width:100px">Unit Cost</th>
+                            <th style="min-width:100px">Total Cost</th>
                             <th style="width:50px"></th>
                         </tr>
                     </thead>
@@ -144,6 +201,9 @@ async function loadFormData() {
     const whSelect = document.getElementById('receipt_warehouse_id');
     whSelect.innerHTML = '<option value="">Select Warehouse</option>' +
         warehouses.map(w => `<option value="${w.id}">${w.name} (${w.code})</option>`).join('');
+    const stSelect = document.getElementById('receipt_source_type');
+    stSelect.innerHTML = '<option value="">Select Source</option>' +
+        (d.source_types || []).map(s => `<option value="${s}">${s}</option>`).join('');
     loadReceipts();
 }
 
@@ -192,25 +252,50 @@ function resetReceiptForm() {
     document.getElementById('itemsBody').innerHTML = '';
 }
 
-let itemRowIndex = 0;
+function lookupLastUnitCost(itemId) {
+    for (let i = receipts.length - 1; i >= 0; i--) {
+        const r = receipts[i];
+        if (r.items) {
+            for (let j = r.items.length - 1; j >= 0; j--) {
+                if (r.items[j].item_id == itemId && r.items[j].unit_cost) {
+                    return r.items[j].unit_cost;
+                }
+            }
+        }
+    }
+    return 0;
+}
 
-function addItemRow(itemId = '', unit = '', qty = '') {
+function calcRowTotal(row) {
+    const qty = parseFloat(row.querySelector('.receipt-qty').value) || 0;
+    const cost = parseFloat(row.querySelector('.receipt-unit-cost').value) || 0;
+    row.querySelector('.receipt-total-cost').value = (qty * cost).toFixed(2);
+}
+
+function addItemRow(itemId = '', unit = '', qty = '', batchNo = '', serialNo = '', mfgDate = '', expiryDate = '', unitCost = '') {
     const tr = document.createElement('tr');
     const itemOpts = itemsList.map(i =>
         `<option value="${i.id}" data-unit="${i.unit || ''}" ${i.id == itemId ? 'selected' : ''}>${i.item_code ? i.item_code + ' - ' : ''}${i.name}</option>`
     ).join('');
     tr.innerHTML = `
         <td>
-            <select class="form-select form-select-sm receipt-item" onchange="updateItemUnit(this)">
+            <select class="form-select form-select-sm receipt-item" onchange="updateItemUnit(this); autoFillUnitCost(this);">
                 <option value="">Select Item</option>
                 ${itemOpts}
             </select>
         </td>
         <td><input type="text" class="form-control form-control-sm receipt-unit" value="${unit}" readonly></td>
-        <td><input type="number" class="form-control form-control-sm receipt-qty" value="${qty}" min="1" step="1"></td>
+        <td><input type="number" class="form-control form-control-sm receipt-qty" value="${qty}" min="1" step="1" oninput="calcRowTotal(this.closest('tr'))"></td>
+        <td><input type="text" class="form-control form-control-sm receipt-batch-no" value="${batchNo}" placeholder="Batch"></td>
+        <td><input type="text" class="form-control form-control-sm receipt-serial-no" value="${serialNo}" placeholder="Serial"></td>
+        <td><input type="date" class="form-control form-control-sm receipt-mfg-date" value="${mfgDate}"></td>
+        <td><input type="date" class="form-control form-control-sm receipt-expiry-date" value="${expiryDate}"></td>
+        <td><input type="number" class="form-control form-control-sm receipt-unit-cost" value="${unitCost}" min="0" step="0.01" oninput="calcRowTotal(this.closest('tr'))"></td>
+        <td><input type="text" class="form-control form-control-sm receipt-total-cost" value="" readonly></td>
         <td><button class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove()"><i class="bi bi-x"></i></button></td>
     `;
     document.getElementById('itemsBody').appendChild(tr);
+    calcRowTotal(tr);
 }
 
 function updateItemUnit(select) {
@@ -219,12 +304,26 @@ function updateItemUnit(select) {
     select.closest('tr').querySelector('.receipt-unit').value = unit;
 }
 
+function autoFillUnitCost(select) {
+    const itemId = parseInt(select.value);
+    if (!itemId) return;
+    const cost = lookupLastUnitCost(itemId);
+    const tr = select.closest('tr');
+    tr.querySelector('.receipt-unit-cost').value = cost;
+    calcRowTotal(tr);
+}
+
 async function saveReceipt() {
     const itemRows = document.querySelectorAll('#itemsBody tr');
     const items = Array.from(itemRows).map(tr => ({
         item_id: parseInt(tr.querySelector('.receipt-item').value),
         quantity: parseInt(tr.querySelector('.receipt-qty').value) || 0,
-        unit: tr.querySelector('.receipt-unit').value
+        unit: tr.querySelector('.receipt-unit').value,
+        batch_no: tr.querySelector('.receipt-batch-no').value,
+        serial_no: tr.querySelector('.receipt-serial-no').value,
+        mfg_date: tr.querySelector('.receipt-mfg-date').value,
+        expiry_date: tr.querySelector('.receipt-expiry-date').value,
+        unit_cost: parseFloat(tr.querySelector('.receipt-unit-cost').value) || 0
     })).filter(i => i.item_id && i.quantity > 0);
 
     if (items.length === 0) { showToast('danger', 'Add at least one item with quantity'); return; }
@@ -235,6 +334,16 @@ async function saveReceipt() {
         warehouse_id: parseInt(document.getElementById('receipt_warehouse_id').value),
         source_type: document.getElementById('receipt_source_type').value,
         source_name: document.getElementById('receipt_source_name').value,
+        source_contact: document.getElementById('receipt_source_contact').value,
+        phone: document.getElementById('receipt_phone').value,
+        email: document.getElementById('receipt_email').value,
+        address: document.getElementById('receipt_address').value,
+        ref_number: document.getElementById('receipt_ref_number').value,
+        invoice_no: document.getElementById('receipt_invoice_no').value,
+        invoice_date: document.getElementById('receipt_invoice_date').value,
+        delivery_note: document.getElementById('receipt_delivery_note').value,
+        vehicle_no: document.getElementById('receipt_vehicle_no').value,
+        verified_by: document.getElementById('receipt_verified_by').value,
         remarks: document.getElementById('receipt_remarks').value,
         items: items
     };
@@ -271,7 +380,13 @@ async function viewReceipt(id) {
             <td>${i.item_name || '-'}</td>
             <td>${i.quantity || 0}</td>
             <td>${i.unit || '-'}</td>
-        </tr>`).join('') || '<tr><td colspan="3" class="text-center text-muted">No items</td></tr>';
+            <td>${i.batch_no || '-'}</td>
+            <td>${i.serial_no || '-'}</td>
+            <td>${i.mfg_date || '-'}</td>
+            <td>${i.expiry_date || '-'}</td>
+            <td class="text-end">${i.unit_cost != null ? Number(i.unit_cost).toFixed(2) : '-'}</td>
+            <td class="text-end">${i.total_cost != null ? Number(i.total_cost).toFixed(2) : '-'}</td>
+        </tr>`).join('') || '<tr><td colspan="9" class="text-center text-muted">No items</td></tr>';
 
         document.getElementById('receiptDetailBody').innerHTML = `
             <div class="row g-3 mb-3">
@@ -280,13 +395,23 @@ async function viewReceipt(id) {
                 <div class="col-md-4"><strong>Warehouse:</strong><br>${whName}</div>
                 <div class="col-md-4"><strong>Source Type:</strong><br>${rc.source_type || '-'}</div>
                 <div class="col-md-4"><strong>Source Name:</strong><br>${rc.source_name || '-'}</div>
+                <div class="col-md-4"><strong>Source Contact:</strong><br>${rc.source_contact || '-'}</div>
+                <div class="col-md-4"><strong>Phone:</strong><br>${rc.phone || '-'}</div>
+                <div class="col-md-4"><strong>Email:</strong><br>${rc.email || '-'}</div>
+                <div class="col-md-4"><strong>Address:</strong><br>${rc.address || '-'}</div>
+                <div class="col-md-4"><strong>Ref Number:</strong><br>${rc.ref_number || '-'}</div>
+                <div class="col-md-4"><strong>Invoice No:</strong><br>${rc.invoice_no || '-'}</div>
+                <div class="col-md-4"><strong>Invoice Date:</strong><br>${rc.invoice_date || '-'}</div>
+                <div class="col-md-4"><strong>Delivery Note:</strong><br>${rc.delivery_note || '-'}</div>
+                <div class="col-md-4"><strong>Vehicle No:</strong><br>${rc.vehicle_no || '-'}</div>
+                <div class="col-md-4"><strong>Verified By:</strong><br>${rc.verified_by || '-'}</div>
                 <div class="col-md-4"><strong>Remarks:</strong><br>${rc.remarks || '-'}</div>
             </div>
             <hr>
             <h6>Items Received</h6>
             <div class="table-responsive">
                 <table class="table table-sm">
-                    <thead><tr><th>Item</th><th>Quantity</th><th>Unit</th></tr></thead>
+                    <thead><tr><th>Item</th><th>Qty</th><th>Unit</th><th>Batch</th><th>Serial</th><th>Mfg</th><th>Expiry</th><th class="text-end">Unit Cost</th><th class="text-end">Total Cost</th></tr></thead>
                     <tbody>${itemsHtml}</tbody>
                 </table>
             </div>
