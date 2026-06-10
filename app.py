@@ -503,6 +503,9 @@ class ReliefRequest(db.Model):
     requester_name = db.Column(db.String(200))
     phone = db.Column(db.String(50))
     priority = db.Column(db.String(20), default='Medium', index=True)
+    requested_cash_amount = db.Column(db.Float, default=0)
+    distributed_cash_amount = db.Column(db.Float, default=0)
+    cash_purpose = db.Column(db.String(100))
     remarks = db.Column(db.Text)
     status = db.Column(db.String(20), default='Pending', index=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -516,8 +519,13 @@ class ReliefRequest(db.Model):
             'incident_id': self.incident_id,
             'incident_name': self.incident.incident_name if self.incident else None,
             'organization': self.organization, 'requester_name': self.requester_name,
-            'phone': self.phone, 'priority': self.priority, 'remarks': self.remarks,
-            'status': self.status, 'items': [i.to_dict() for i in self.items]
+            'phone': self.phone, 'priority': self.priority,
+            'requested_cash_amount': self.requested_cash_amount,
+            'distributed_cash_amount': self.distributed_cash_amount,
+            'cash_purpose': self.cash_purpose,
+            'cash_remaining': max(0, self.requested_cash_amount - self.distributed_cash_amount),
+            'remarks': self.remarks, 'status': self.status,
+            'items': [i.to_dict() for i in self.items]
         }
 
 class ReliefRequestItem(db.Model):
@@ -807,7 +815,8 @@ class CashDistribution(db.Model):
     distribution_date = db.Column(db.Date, nullable=False, default=date.today)
     fund_id = db.Column(db.Integer, db.ForeignKey('cash_fund.id'), nullable=False, index=True)
     incident_id = db.Column(db.Integer, db.ForeignKey('incident.id'), nullable=False, index=True)
-    cash_request_id = db.Column(db.Integer, db.ForeignKey('cash_request.id'), nullable=False, index=True)
+    cash_request_id = db.Column(db.Integer, db.ForeignKey('cash_request.id'), nullable=True, index=True)
+    relief_request_id = db.Column(db.Integer, db.ForeignKey('relief_request.id'), nullable=True, index=True)
     distribution_type = db.Column(db.String(20), default='Individual')
     total_amount = db.Column(db.Float, nullable=False, default=0)
     officer = db.Column(db.String(200))
@@ -816,6 +825,7 @@ class CashDistribution(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     incident = db.relationship('Incident', backref=db.backref('cash_distributions', lazy=True))
     cash_request = db.relationship('CashRequest', backref=db.backref('cash_distributions', lazy=True))
+    relief_request = db.relationship('ReliefRequest', backref=db.backref('cash_distributions_ref', lazy=True))
     beneficiaries = db.relationship('CashDistributionBeneficiary', backref='distribution', lazy=True, cascade='all,delete-orphan')
 
     def to_dict(self):
@@ -827,6 +837,8 @@ class CashDistribution(db.Model):
             'incident_name': self.incident.incident_name if self.incident else None,
             'cash_request_id': self.cash_request_id,
             'request_number': self.cash_request.request_number if self.cash_request else None,
+            'relief_request_id': self.relief_request_id,
+            'relief_request_number': self.relief_request.request_number if self.relief_request else None,
             'distribution_type': self.distribution_type, 'total_amount': self.total_amount,
             'officer': self.officer, 'remarks': self.remarks,
             'beneficiaries': [b.to_dict() for b in self.beneficiaries]
@@ -1487,7 +1499,10 @@ def handle_relief_requests():
             request_date=datetime.strptime(data['request_date'], '%Y-%m-%d').date() if data.get('request_date') else date.today(),
             incident_id=data['incident_id'], organization=data.get('organization'),
             requester_name=data.get('requester_name'), phone=data.get('phone'),
-            priority=data.get('priority', 'Medium'), remarks=data.get('remarks')
+            priority=data.get('priority', 'Medium'),
+            requested_cash_amount=float(data.get('requested_cash_amount', 0)),
+            cash_purpose=data.get('cash_purpose'),
+            remarks=data.get('remarks')
         )
         db.session.add(req)
         db.session.flush()
@@ -1515,7 +1530,8 @@ def manage_relief_request(id):
             db.session.commit()
             return jsonify({'success': True, 'message': 'Relief request deleted'})
         data = request.get_json()
-        for field in ['incident_id', 'organization', 'requester_name', 'phone', 'priority', 'remarks', 'status']:
+        for field in ['incident_id', 'organization', 'requester_name', 'phone', 'priority', 'remarks', 'status',
+                       'requested_cash_amount', 'cash_purpose']:
             if field in data:
                 setattr(req, field, data[field])
         if data.get('request_date'):
@@ -1581,15 +1597,23 @@ def handle_dispatches():
                               unit=item_data.get('unit'), batch_no=batch, expiry_date=expiry)
             db.session.add(di)
             inv.quantity -= qty
+            if data.get('relief_request_id'):
+                rr_items = ReliefRequestItem.query.filter_by(request_id=data['relief_request_id'], item_id=item_id).all()
+                for rr_item in rr_items:
+                    rr_item.quantity_dispatched = (rr_item.quantity_dispatched or 0) + qty
         if data.get('relief_request_id'):
             req = ReliefRequest.query.get(data['relief_request_id'])
             if req:
-                all_dispatched = True
-                for ri in req.items:
-                    if ri.quantity_dispatched < ri.quantity_requested:
-                        all_dispatched = False
-                        break
-                req.status = 'Completed' if all_dispatched else 'Partial'
+                if req.items:
+                    all_dispatched = all(ri.quantity_dispatched >= ri.quantity_requested for ri in req.items)
+                else:
+                    all_dispatched = True
+                cash_done = req.distributed_cash_amount >= req.requested_cash_amount if req.requested_cash_amount > 0 else True
+                anything_done = any(ri.quantity_dispatched > 0 for ri in req.items) if req.items else False
+                if all_dispatched and cash_done:
+                    req.status = 'Completed'
+                elif anything_done or req.distributed_cash_amount > 0:
+                    req.status = 'Partial'
         db.session.commit()
         return jsonify({'success': True, 'message': 'Dispatch created', 'data': dispatch.to_dict()}), 201
     except Exception as e:
@@ -1916,24 +1940,39 @@ def handle_cash_distributions():
         query = CashDistribution.query.order_by(CashDistribution.distribution_date.desc())
         incident_id = request.args.get('incident_id', type=int)
         fund_id = request.args.get('fund_id', type=int)
+        relief_request_id = request.args.get('relief_request_id', type=int)
         if incident_id:
             query = query.filter(CashDistribution.incident_id == incident_id)
         if fund_id:
             query = query.filter(CashDistribution.fund_id == fund_id)
+        if relief_request_id:
+            query = query.filter(CashDistribution.relief_request_id == relief_request_id)
         dists = query.all()
         return jsonify({'success': True, 'distributions': [d.to_dict() for d in dists]})
     try:
         data = request.get_json()
-        if not data.get('fund_id') or not data.get('incident_id') or not data.get('cash_request_id'):
-            return jsonify({'success': False, 'message': 'Fund, incident, and cash request are required'}), 400
-        cash_req = CashRequest.query.get(data['cash_request_id'])
-        if not cash_req:
-            return jsonify({'success': False, 'message': 'Cash request not found'}), 404
+        if not data.get('fund_id') or not data.get('incident_id'):
+            return jsonify({'success': False, 'message': 'Fund and incident are required'}), 400
+        if not data.get('cash_request_id') and not data.get('relief_request_id'):
+            return jsonify({'success': False, 'message': 'Cash request or relief request is required'}), 400
+        cash_req = None
+        relief_req = None
+        max_amount = float('inf')
+        if data.get('cash_request_id'):
+            cash_req = CashRequest.query.get(data['cash_request_id'])
+            if not cash_req:
+                return jsonify({'success': False, 'message': 'Cash request not found'}), 404
+            max_amount = cash_req.requested_amount
+        if data.get('relief_request_id'):
+            relief_req = ReliefRequest.query.get(data['relief_request_id'])
+            if not relief_req:
+                return jsonify({'success': False, 'message': 'Relief request not found'}), 404
+            max_amount = min(max_amount, relief_req.requested_cash_amount - relief_req.distributed_cash_amount)
         total = sum(float(b.get('amount', 0)) for b in data.get('beneficiaries', []))
         if total <= 0:
             return jsonify({'success': False, 'message': 'At least one beneficiary with amount > 0 is required'}), 400
-        if total > cash_req.requested_amount:
-            return jsonify({'success': False, 'message': f'Total amount ({total}) exceeds cash request amount ({cash_req.requested_amount})'}), 400
+        if total > max_amount:
+            return jsonify({'success': False, 'message': f'Total amount ({total}) exceeds available amount ({max_amount})'}), 400
         fund = CashFund.query.get(data['fund_id'])
         if not fund:
             return jsonify({'success': False, 'message': 'Fund not found'}), 404
@@ -1943,7 +1982,8 @@ def handle_cash_distributions():
             distribution_no=data.get('distribution_no') or generate_cash_distribution_no(),
             distribution_date=datetime.strptime(data['distribution_date'], '%Y-%m-%d').date() if data.get('distribution_date') else date.today(),
             fund_id=data['fund_id'], incident_id=data['incident_id'],
-            cash_request_id=data['cash_request_id'],
+            cash_request_id=data.get('cash_request_id'),
+            relief_request_id=data.get('relief_request_id'),
             distribution_type=data.get('distribution_type', 'Individual'),
             total_amount=total, officer=data.get('officer'), remarks=data.get('remarks'),
             created_by=current_user.id
@@ -1959,13 +1999,24 @@ def handle_cash_distributions():
             )
             db.session.add(ben)
         fund.current_balance -= total
-        total_distributed = db.session.query(db.func.coalesce(db.func.sum(CashDistributionBeneficiary.amount), 0)).join(
-            CashDistribution, CashDistributionBeneficiary.distribution_id == CashDistribution.id
-        ).filter(CashDistribution.cash_request_id == cash_req.id).scalar()
-        if total_distributed >= cash_req.requested_amount:
-            cash_req.status = 'Completed'
-        else:
-            cash_req.status = 'Partial'
+        if cash_req:
+            total_distributed = db.session.query(db.func.coalesce(db.func.sum(CashDistributionBeneficiary.amount), 0)).join(
+                CashDistribution, CashDistributionBeneficiary.distribution_id == CashDistribution.id
+            ).filter(CashDistribution.cash_request_id == cash_req.id).scalar()
+            if total_distributed >= cash_req.requested_amount:
+                cash_req.status = 'Completed'
+            else:
+                cash_req.status = 'Partial'
+        if relief_req:
+            relief_req.distributed_cash_amount += total
+            all_items_done = all(
+                ri.quantity_dispatched >= ri.quantity_requested for ri in relief_req.items
+            ) if relief_req.items else True
+            cash_done = relief_req.distributed_cash_amount >= relief_req.requested_cash_amount if relief_req.requested_cash_amount > 0 else True
+            if all_items_done and cash_done:
+                relief_req.status = 'Completed'
+            elif relief_req.distributed_cash_amount > 0 or any(ri.quantity_dispatched > 0 for ri in relief_req.items):
+                relief_req.status = 'Partial'
         db.session.commit()
         return jsonify({'success': True, 'message': 'Cash distribution recorded', 'data': dist.to_dict()}), 201
     except Exception as e:

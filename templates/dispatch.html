@@ -308,6 +308,7 @@ async function viewDispatch(id) {
                 <div class="col-md-4"><strong>Warehouse:</strong> ${dp.warehouse_name || '-'}</div>
                 <div class="col-md-4"><strong>Incident:</strong> ${dp.incident_name || '-'}</div>
                 <div class="col-md-4"><strong>Relief Request:</strong> ${dp.request_number || '-'}</div>
+                <div class="col-12" id="cashInfo_${dp.id}"></div>
                 <div class="col-md-4"><strong>Destination:</strong> ${dp.destination || '-'}</div>
                 <div class="col-md-4"><strong>Receiver:</strong> ${dp.receiver || '-'}</div>
                 <div class="col-md-4"><strong>Phone:</strong> ${dp.phone || '-'}</div>
@@ -321,6 +322,21 @@ async function viewDispatch(id) {
     const bsModal = new bootstrap.Modal(modal);
     modal.addEventListener('hidden.bs.modal', () => modal.remove());
     bsModal.show();
+    if (dp.relief_request_id) {
+        fetch('/api/relief-requests/' + dp.relief_request_id).then(r => r.json()).then(d => {
+            if (d.success && d.relief_request && d.relief_request.requested_cash_amount > 0) {
+                const rr = d.relief_request;
+                const pct = Math.min(100, (rr.distributed_cash_amount / rr.requested_cash_amount) * 100);
+                document.getElementById('cashInfo_' + dp.id).innerHTML = `<hr><h6>Cash Assistance</h6>
+                <div class="row g-2">
+                    <div class="col-md-4"><strong>Cash Requested:</strong> ${Number(rr.requested_cash_amount).toLocaleString()}</div>
+                    <div class="col-md-4"><strong>Cash Distributed:</strong> ${Number(rr.distributed_cash_amount).toLocaleString()}</div>
+                    <div class="col-md-4"><strong>Purpose:</strong> ${rr.cash_purpose || '-'}</div>
+                    <div class="col-12"><div class="progress" style="height:6px"><div class="progress-bar bg-success" style="width:${pct}%"></div></div></div>
+                </div>`;
+            }
+        }).catch(() => {});
+    }
 }
 
 function resetDispatchForm() {
