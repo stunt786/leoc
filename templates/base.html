@@ -48,6 +48,11 @@
                     <span class="nav-label">Items</span>
                 </a>
 
+                <a href="{{ url_for('suppliers_page') }}" class="nav-item {% if request.path == '/suppliers' %}active{% endif %}">
+                    <i class="bi bi-building"></i>
+                    <span class="nav-label">Suppliers</span>
+                </a>
+
                 <div class="sidebar-divider">Inventory</div>
 
                 <a href="{{ url_for('stock_receipts_page') }}" class="nav-item {% if request.path == '/stock-receipts' %}active{% endif %}">
@@ -58,6 +63,11 @@
                 <a href="{{ url_for('inventory_page') }}" class="nav-item {% if request.path == '/inventory' %}active{% endif %}">
                     <i class="bi bi-box-seam-fill"></i>
                     <span class="nav-label">Inventory</span>
+                </a>
+
+                <a href="{{ url_for('stock_transfers_page') }}" class="nav-item {% if request.path == '/stock-transfers' %}active{% endif %}">
+                    <i class="bi bi-arrow-left-right"></i>
+                    <span class="nav-label">Stock Transfers</span>
                 </a>
 
                 <a href="{{ url_for('adjustments_page') }}" class="nav-item {% if request.path == '/adjustments' %}active{% endif %}">
@@ -132,6 +142,11 @@
                 </a>
 
                 <div class="sidebar-divider">System</div>
+
+                <a href="{{ url_for('users_page') }}" class="nav-item {% if request.path == '/users' %}active{% endif %}">
+                    <i class="bi bi-shield-lock-fill"></i>
+                    <span class="nav-label">Users</span>
+                </a>
 
                 <a href="{{ url_for('settings') }}" class="nav-item {% if request.path == '/settings' %}active{% endif %}">
                     <i class="bi bi-gear-fill"></i>

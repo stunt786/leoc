@@ -61,17 +61,18 @@
             <table class="table table-hover mb-0">
                 <thead>
                     <tr>
+                        <th style="width:40px"></th>
                         <th>Item Code</th>
                         <th>Name</th>
                         <th>Category</th>
                         <th>Unit</th>
-                        <th>Min Stock</th>
+                        <th>Type</th>
                         <th>Status</th>
                         <th class="text-end">Actions</th>
                     </tr>
                 </thead>
                 <tbody id="itemTableBody">
-                    <tr><td colspan="7" class="text-center py-4"><div class="spinner-border text-primary"></div></td></tr>
+                    <tr><td colspan="8" class="text-center py-4"><div class="spinner-border text-primary"></div></td></tr>
                 </tbody>
             </table>
         </div>
@@ -166,10 +167,17 @@
                                         <option value="">Select Storage</option>
                                     </select>
                                 </div>
-                                <div class="col-md-6 d-flex align-items-end">
+                                <div class="col-md-3 d-flex align-items-end">
                                     <div class="form-check form-switch mb-2">
                                         <input class="form-check-input" type="checkbox" id="item_is_consumable">
-                                        <label class="form-check-label" for="item_is_consumable">Is Consumable</label>
+                                        <label class="form-check-label" for="item_is_consumable">Consumable</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-3 d-flex align-items-end">
+                                    <div class="form-check form-switch mb-2">
+                                        <input class="form-check-input" type="checkbox" id="item_is_distributable" checked>
+                                        <label class="form-check-label" for="item_is_distributable">Distributable</label>
+                                        <small class="d-block text-muted" style="font-size:10px">Uncheck for equipment that is transfer-only</small>
                                     </div>
                                 </div>
                             </div>
@@ -214,8 +222,21 @@
                                     </select>
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label">Photo (file path)</label>
-                                    <input type="text" class="form-control" id="item_photo" placeholder="Path to photo file">
+                                    <label class="form-label">Item Icon / Photo</label>
+                                    <div class="d-flex align-items-start gap-3">
+                                        <div id="itemPhotoPreview" class="border rounded overflow-hidden d-flex align-items-center justify-content-center" style="width:80px;height:80px;background:#f8f9fa;flex-shrink:0">
+                                            <img id="itemPhotoImg" src="" alt="Preview" style="max-width:100%;max-height:100%;display:none">
+                                            <i id="itemPhotoPlaceholder" class="bi bi-image text-muted" style="font-size:1.8rem"></i>
+                                        </div>
+                                        <div class="flex-grow-1">
+                                            <input type="file" class="form-control form-control-sm" id="item_photo_file" accept="image/*">
+                                            <input type="hidden" id="item_photo" value="">
+                                            <small class="text-muted d-block mt-1">Upload PNG, JPG, GIF, SVG, or WEBP. Max 16MB.</small>
+                                            <button type="button" class="btn btn-sm btn-outline-danger mt-1" id="itemPhotoRemoveBtn" style="display:none" onclick="removeItemPhoto()">
+                                                <i class="bi bi-trash me-1"></i>Remove
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div class="col-12">
                                     <label class="form-label">QR Code Data</label>
@@ -319,15 +340,18 @@ function filterItems() {
 function renderItems(data) {
     const tbody = document.getElementById('itemTableBody');
     if (data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-muted">No items found</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-muted">No items found</td></tr>';
         return;
     }
     tbody.innerHTML = data.map(i => `<tr>
+        <td class="text-center">
+            ${i.photo ? `<img src="${i.photo}" alt="" style="width:30px;height:30px;object-fit:cover;border-radius:4px">` : `<i class="bi bi-image text-muted" style="font-size:1.1rem"></i>`}
+        </td>
         <td><strong>${i.item_code || '-'}</strong></td>
         <td>${i.local_name ? i.name + ' (' + i.local_name + ')' : i.name}</td>
         <td>${i.category_name || '-'}</td>
         <td>${i.unit || '-'}</td>
-        <td>${i.minimum_stock ?? '-'}</td>
+        <td>${i.is_distributable !== false ? '<span class="badge bg-success-subtle text-success">Distributable</span>' : '<span class="badge bg-warning-subtle text-warning">Transfer Only</span>'}</td>
         <td><span class="badge ${i.status === 'Inactive' ? 'bg-secondary' : 'bg-success'}">${i.status || 'Active'}</span></td>
         <td class="text-end">
             <button class="btn btn-sm btn-outline-info" onclick="showHistory(${i.id})" title="History"><i class="bi bi-clock-history"></i></button>
@@ -343,6 +367,57 @@ function resetForm() {
     document.getElementById('itemForm').reset();
     document.getElementById('item_code').value = '';
     document.getElementById('item_status').value = 'Active';
+    document.getElementById('item_is_distributable').checked = true;
+    resetPhotoPreview();
+}
+
+function resetPhotoPreview() {
+    document.getElementById('item_photo').value = '';
+    document.getElementById('item_photo_file').value = '';
+    const img = document.getElementById('itemPhotoImg');
+    const placeholder = document.getElementById('itemPhotoPlaceholder');
+    const removeBtn = document.getElementById('itemPhotoRemoveBtn');
+    img.style.display = 'none';
+    img.src = '';
+    placeholder.style.display = 'inline-block';
+    removeBtn.style.display = 'none';
+}
+
+function removeItemPhoto() {
+    resetPhotoPreview();
+}
+
+document.getElementById('item_photo_file').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (file.size > 16 * 1024 * 1024) {
+        showToast('danger', 'File too large. Maximum 16MB.');
+        this.value = '';
+        return;
+    }
+    const reader = new FileReader();
+    reader.onload = function(ev) {
+        const img = document.getElementById('itemPhotoImg');
+        const placeholder = document.getElementById('itemPhotoPlaceholder');
+        img.src = ev.target.result;
+        img.style.display = 'block';
+        placeholder.style.display = 'none';
+        document.getElementById('itemPhotoRemoveBtn').style.display = 'inline-block';
+    };
+    reader.readAsDataURL(file);
+});
+
+async function uploadItemPhoto(file) {
+    const formData = new FormData();
+    formData.append('file', file);
+    const r = await fetch('/api/upload/item-photo', {
+        method: 'POST',
+        headers: {'X-CSRFToken': csrf},
+        body: formData
+    });
+    const d = await r.json();
+    if (!d.success) throw new Error(d.message);
+    return d.data.url;
 }
 
 async function editItem(id) {
@@ -362,17 +437,44 @@ async function editItem(id) {
     document.getElementById('item_storage_life_days').value = i.storage_life_days ?? '';
     document.getElementById('item_storage_requirement').value = i.storage_requirement || '';
     document.getElementById('item_is_consumable').checked = !!i.is_consumable;
+    document.getElementById('item_is_distributable').checked = i.is_distributable !== false;
     document.getElementById('item_expiry_tracking').checked = !!i.expiry_tracking;
     document.getElementById('item_batch_tracking').checked = !!i.batch_tracking;
     document.getElementById('item_serial_tracking').checked = !!i.serial_tracking;
     document.getElementById('item_photo').value = i.photo || '';
     document.getElementById('item_qr_code').value = i.qr_code || '';
     document.getElementById('item_status').value = i.status || 'Active';
+    if (i.photo) {
+        const img = document.getElementById('itemPhotoImg');
+        const placeholder = document.getElementById('itemPhotoPlaceholder');
+        img.src = i.photo.startsWith('http') ? i.photo : i.photo;
+        img.style.display = 'block';
+        placeholder.style.display = 'none';
+        document.getElementById('itemPhotoRemoveBtn').style.display = 'inline-block';
+    } else {
+        resetPhotoPreview();
+    }
     new bootstrap.Modal(document.getElementById('itemModal')).show();
 }
 
 async function saveItem() {
     const id = document.getElementById('item_id').value;
+    const photoFile = document.getElementById('item_photo_file').files[0];
+    let photoUrl = document.getElementById('item_photo').value;
+
+    if (photoFile) {
+        try {
+            const photoBtn = document.querySelector('button[onclick="saveItem()"]');
+            if (photoBtn) { photoBtn.disabled = true; photoBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Uploading photo...'; }
+            photoUrl = await uploadItemPhoto(photoFile);
+        } catch(e) {
+            showToast('danger', 'Photo upload failed: ' + e.message);
+            const btn2 = document.querySelector('button[onclick="saveItem()"]');
+            if (btn2) { btn2.disabled = false; btn2.innerHTML = '<i class="bi bi-check-lg"></i> Save'; }
+            return;
+        }
+    }
+
     const body = {
         item_code: document.getElementById('item_code').value,
         barcode: document.getElementById('item_barcode').value,
@@ -386,10 +488,11 @@ async function saveItem() {
         storage_life_days: parseInt(document.getElementById('item_storage_life_days').value) || 0,
         storage_requirement: document.getElementById('item_storage_requirement').value,
         is_consumable: document.getElementById('item_is_consumable').checked,
+        is_distributable: document.getElementById('item_is_distributable').checked,
         expiry_tracking: document.getElementById('item_expiry_tracking').checked,
         batch_tracking: document.getElementById('item_batch_tracking').checked,
         serial_tracking: document.getElementById('item_serial_tracking').checked,
-        photo: document.getElementById('item_photo').value,
+        photo: photoUrl,
         qr_code: document.getElementById('item_qr_code').value,
         status: document.getElementById('item_status').value
     };

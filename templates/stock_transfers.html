@@ -1,0 +1,339 @@
+{% extends "base.html" %}
+{% block title %}Stock Transfers - LEOC{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('index') }}"><i class="bi bi-house-fill"></i></a></li>
+<li class="breadcrumb-item"><a href="#">Inventory</a></li>
+<li class="breadcrumb-item active">Stock Transfers</li>
+{% endblock %}
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center">
+    <div>
+        <h4><i class="bi bi-arrow-left-right me-2"></i>Stock Transfers</h4>
+        <p>Transfer stock between warehouses</p>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header">
+        <span><i class="bi bi-plus-circle me-2 text-primary"></i>New Transfer</span>
+    </div>
+    <div class="card-body">
+        <form id="transferForm">
+            <div class="row g-3 mb-3">
+                <div class="col-md-3">
+                    <label class="form-label">Transfer No</label>
+                    <input type="text" class="form-control" id="transfer_no" readonly>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Transfer Date *</label>
+                    <input type="date" class="form-control" id="transfer_date" required>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">From Warehouse *</label>
+                    <select class="form-select" id="from_warehouse_id" required>
+                        <option value="">Select Warehouse</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">To Warehouse *</label>
+                    <select class="form-select" id="to_warehouse_id" required>
+                        <option value="">Select Warehouse</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Reason *</label>
+                    <select class="form-select" id="transfer_reason" required>
+                        <option value="">Select Reason</option>
+                        <option value="Stock Replenishment">Stock Replenishment</option>
+                        <option value="Emergency Transfer">Emergency Transfer</option>
+                        <option value="Warehouse Consolidation">Warehouse Consolidation</option>
+                        <option value="Distribution Preparation">Distribution Preparation</option>
+                        <option value="Relocation">Relocation</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Approved By</label>
+                    <input type="text" class="form-control" id="approved_by" placeholder="Name of approver">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Remarks</label>
+                    <textarea class="form-control" id="transfer_remarks" rows="1" placeholder="Additional notes"></textarea>
+                </div>
+            </div>
+
+            <hr>
+            <h6 class="mb-3"><i class="bi bi-box me-2"></i>Transfer Items</h6>
+            <div class="table-responsive mb-3">
+                <table class="table table-bordered" id="itemsTable">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="min-width:200px">Item *</th>
+                            <th style="min-width:100px">Quantity *</th>
+                            <th style="min-width:80px">Unit</th>
+                            <th style="min-width:120px">Batch No</th>
+                            <th style="width:50px"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="itemsBody"></tbody>
+                </table>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-primary" onclick="addItemRow()">
+                <i class="bi bi-plus-lg me-1"></i>Add Item
+            </button>
+
+            <div class="mt-4">
+                <button type="button" class="btn btn-primary" onclick="saveTransfer()"><i class="bi bi-check-lg me-1"></i>Save Transfer</button>
+                <button type="button" class="btn btn-secondary" onclick="resetForm()"><i class="bi bi-arrow-counterclockwise me-1"></i>Reset</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-list-check me-2 text-primary"></i>Recent Transfers</span>
+        <input type="text" class="form-control form-control-sm" style="width:200px" id="transferSearch" placeholder="Search by transfer no..." oninput="filterTransfers()">
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Transfer #</th>
+                        <th>Date</th>
+                        <th>From</th>
+                        <th>To</th>
+                        <th>Items</th>
+                        <th>Status</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="transferTableBody">
+                    <tr><td colspan="7" class="text-center py-4"><div class="spinner-border text-primary"></div></td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Transfer Detail Modal -->
+<div class="modal fade" id="transferDetailModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-arrow-left-right me-2"></i>Transfer Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="transferDetailBody">
+                <div class="text-center py-4"><div class="spinner-border text-primary"></div></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+let transfers = [];
+let warehouses = [];
+let itemsList = [];
+
+async function loadFormData() {
+    try {
+        const r = await fetch('/api/data');
+        const d = await r.json();
+        if (!d.success) { showToast('danger', d.message); return; }
+        warehouses = d.warehouses || [];
+        itemsList = d.items || [];
+        const fromSel = document.getElementById('from_warehouse_id');
+        const toSel = document.getElementById('to_warehouse_id');
+        const opts = warehouses.map(w => `<option value="${w.id}">${w.name} (${w.code || ''})</option>`).join('');
+        fromSel.innerHTML = '<option value="">Select Warehouse</option>' + opts;
+        toSel.innerHTML = '<option value="">Select Warehouse</option>' + opts;
+        loadTransfers();
+    } catch (e) { showToast('danger', 'Error loading form data: ' + e.message); }
+}
+
+function resetForm() {
+    document.getElementById('transferForm').reset();
+    document.getElementById('transfer_no').value = 'TRF-' + String(Date.now()).slice(-6);
+    document.getElementById('transfer_date').value = new Date().toISOString().split('T')[0];
+    document.getElementById('itemsBody').innerHTML = '';
+}
+
+function addItemRow(itemId = '', qty = '', unit = '', batchNo = '') {
+    const tr = document.createElement('tr');
+    const itemOpts = itemsList.map(i =>
+        `<option value="${i.id}" data-unit="${i.unit || ''}" ${i.id == itemId ? 'selected' : ''}>${i.item_code ? i.item_code + ' - ' : ''}${i.name}</option>`
+    ).join('');
+    tr.innerHTML = `
+        <td>
+            <select class="form-select form-select-sm transfer-item" onchange="updateItemUnit(this)">
+                <option value="">Select Item</option>
+                ${itemOpts}
+            </select>
+        </td>
+        <td><input type="number" class="form-control form-control-sm transfer-qty" value="${qty}" min="1" step="1" required></td>
+        <td><input type="text" class="form-control form-control-sm transfer-unit" value="${unit}" readonly></td>
+        <td><input type="text" class="form-control form-control-sm transfer-batch" value="${batchNo}" placeholder="Batch No"></td>
+        <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove()"><i class="bi bi-x"></i></button></td>
+    `;
+    document.getElementById('itemsBody').appendChild(tr);
+}
+
+function updateItemUnit(select) {
+    const opt = select.options[select.selectedIndex];
+    const unit = opt ? opt.getAttribute('data-unit') : '';
+    select.closest('tr').querySelector('.transfer-unit').value = unit;
+}
+
+async function loadTransfers() {
+    try {
+        const r = await fetch('/api/stock-transfers');
+        const d = await r.json();
+        if (!d.success) { showToast('danger', d.message); return; }
+        transfers = d.transfers || [];
+        renderTransfers(transfers);
+    } catch (e) { showToast('danger', 'Error loading transfers: ' + e.message); }
+}
+
+function renderTransfers(data) {
+    const tbody = document.getElementById('transferTableBody');
+    if (data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-muted">No transfers found</td></tr>';
+        return;
+    }
+    tbody.innerHTML = data.map(t => {
+        const itemCount = t.items ? t.items.length : 0;
+        return `<tr>
+            <td><strong>${t.transfer_no}</strong></td>
+            <td>${t.transfer_date || t.date || '-'}</td>
+            <td>${t.from_warehouse_name || '-'}</td>
+            <td>${t.to_warehouse_name || '-'}</td>
+            <td><span class="badge bg-dark">${itemCount} item${itemCount !== 1 ? 's' : ''}</span></td>
+            <td>${statusBadge(t.status || 'Pending')}</td>
+            <td class="text-end">
+                <button class="btn btn-sm btn-outline-info" onclick="viewTransfer(${t.id})"><i class="bi bi-eye"></i></button>
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+function statusBadge(status) {
+    const map = {
+        'Pending': '<span class="badge bg-warning text-dark">Pending</span>',
+        'Completed': '<span class="badge bg-success">Completed</span>',
+        'Cancelled': '<span class="badge bg-danger">Cancelled</span>',
+        'Draft': '<span class="badge bg-secondary">Draft</span>'
+    };
+    return map[status] || `<span class="badge bg-secondary">${status}</span>`;
+}
+
+function filterTransfers() {
+    const q = document.getElementById('transferSearch').value.toLowerCase();
+    const filtered = transfers.filter(t => t.transfer_no.toLowerCase().includes(q));
+    renderTransfers(filtered);
+}
+
+async function saveTransfer() {
+    const itemRows = document.querySelectorAll('#itemsBody tr');
+    const items = Array.from(itemRows).map(tr => ({
+        item_id: parseInt(tr.querySelector('.transfer-item').value),
+        quantity: parseInt(tr.querySelector('.transfer-qty').value) || 0,
+        unit: tr.querySelector('.transfer-unit').value,
+        batch_no: tr.querySelector('.transfer-batch').value
+    })).filter(i => i.item_id && i.quantity > 0);
+
+    if (items.length === 0) { showToast('danger', 'Add at least one item with quantity'); return; }
+
+    const fromWh = parseInt(document.getElementById('from_warehouse_id').value);
+    const toWh = parseInt(document.getElementById('to_warehouse_id').value);
+
+    if (!fromWh) { showToast('danger', 'Please select source warehouse'); return; }
+    if (!toWh) { showToast('danger', 'Please select destination warehouse'); return; }
+    if (fromWh === toWh) { showToast('danger', 'Source and destination warehouses must be different'); return; }
+
+    const body = {
+        transfer_no: document.getElementById('transfer_no').value,
+        transfer_date: document.getElementById('transfer_date').value,
+        from_warehouse_id: fromWh,
+        to_warehouse_id: toWh,
+        reason: document.getElementById('transfer_reason').value,
+        remarks: document.getElementById('transfer_remarks').value,
+        approved_by: document.getElementById('approved_by').value,
+        items: items
+    };
+
+    if (!body.transfer_date) { showToast('danger', 'Transfer date is required'); return; }
+    if (!body.reason) { showToast('danger', 'Reason is required'); return; }
+
+    try {
+        const r = await fetch('/api/stock-transfers', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json','X-CSRFToken':csrf},
+            body: JSON.stringify(body)
+        });
+        const d = await r.json();
+        if (d.success) {
+            showToast('success', 'Stock transfer recorded');
+            resetForm();
+            loadTransfers();
+        } else {
+            showToast('danger', d.message);
+        }
+    } catch (e) { showToast('danger', 'Error: ' + e.message); }
+}
+
+async function viewTransfer(id) {
+    const modal = new bootstrap.Modal(document.getElementById('transferDetailModal'));
+    document.getElementById('transferDetailBody').innerHTML = '<div class="text-center py-4"><div class="spinner-border text-primary"></div></div>';
+    modal.show();
+
+    try {
+        const r = await fetch('/api/stock-transfers/' + id);
+        const d = await r.json();
+        if (!d.success) { document.getElementById('transferDetailBody').innerHTML = '<p class="text-danger">Failed to load details</p>'; return; }
+        const t = d.transfer;
+        const itemsHtml = (t.items || []).map(i => `<tr>
+            <td>${i.item_name || '-'}</td>
+            <td>${i.quantity || 0}</td>
+            <td>${i.unit || '-'}</td>
+            <td>${i.batch_no || '-'}</td>
+        </tr>`).join('') || '<tr><td colspan="4" class="text-center text-muted">No items</td></tr>';
+
+        document.getElementById('transferDetailBody').innerHTML = `
+            <div class="row g-3 mb-3">
+                <div class="col-md-4"><strong>Transfer No:</strong><br>${t.transfer_no}</div>
+                <div class="col-md-4"><strong>Date:</strong><br>${t.transfer_date || t.date || '-'}</div>
+                <div class="col-md-4"><strong>Status:</strong><br>${statusBadge(t.status || 'Pending')}</div>
+                <div class="col-md-4"><strong>From Warehouse:</strong><br>${t.from_warehouse_name || '-'}</div>
+                <div class="col-md-4"><strong>To Warehouse:</strong><br>${t.to_warehouse_name || '-'}</div>
+                <div class="col-md-4"><strong>Reason:</strong><br>${t.reason || '-'}</div>
+                <div class="col-md-4"><strong>Approved By:</strong><br>${t.approved_by || '-'}</div>
+                <div class="col-md-8"><strong>Remarks:</strong><br>${t.remarks || '-'}</div>
+            </div>
+            <hr>
+            <h6>Transferred Items</h6>
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    <thead><tr><th>Item</th><th>Qty</th><th>Unit</th><th>Batch No</th></tr></thead>
+                    <tbody>${itemsHtml}</tbody>
+                </table>
+            </div>
+        `;
+    } catch(e) {
+        document.getElementById('transferDetailBody').innerHTML = '<p class="text-danger">Error loading details</p>';
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    resetForm();
+    loadFormData();
+});
+</script>
+{% endblock %}

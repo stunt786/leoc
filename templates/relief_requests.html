@@ -47,7 +47,7 @@
                     </tr>
                 </thead>
                 <tbody id="rrTableBody">
-                    <tr><td colspan="9" class="text-center py-4"><div class="spinner-border text-primary"></div></td></tr>
+                    <tr><td colspan="10" class="text-center py-4"><div class="spinner-border text-primary"></div></td></tr>
                 </tbody>
             </table>
         </div>
@@ -136,9 +136,17 @@
                             <label class="form-label">Distributed Amount</label>
                             <input type="text" class="form-control" id="rr_cash_distributed" readonly>
                         </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Available Fund Balance</label>
+                            <input type="text" class="form-control" id="rr_fund_balance" readonly>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Remaining Amount</label>
+                            <input type="text" class="form-control" id="rr_cash_remaining" readonly>
+                        </div>
                         <div class="col-12">
                             <table class="table table-sm" id="rrItemsTable">
-                                <thead><tr><th style="width:45%">Item</th><th style="width:15%">Unit</th><th style="width:20%">Requested Qty</th><th style="width:20%"></th></tr></thead>
+                                <thead><tr><th style="width:35%">Item</th><th style="width:10%">Unit</th><th style="width:15%">In Stock</th><th style="width:15%">Requested</th><th style="width:15%">Remaining</th><th style="width:10%"></th></tr></thead>
                                 <tbody id="rrItemsBody"></tbody>
                             </table>
                             <button type="button" class="btn btn-sm btn-outline-primary" onclick="addRRItem()">+ Add Item</button>
@@ -161,16 +169,25 @@ const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('con
 let reliefRequests = [];
 let itemsData = [];
 let incidentsData = [];
+let inventoryAvailable = {};
+let totalFundBalance = 0;
+
+function getItemStock(itemId) {
+    return inventoryAvailable[itemId] || 0;
+}
 
 function addRRItem(itemId='', unit='', qty='') {
     const tr = document.createElement('tr');
     const opts = itemsData.map(i =>
         `<option value="${i.id}" data-unit="${i.unit}" ${String(i.id) === String(itemId) ? 'selected' : ''}>${i.name}${i.item_code ? ' (' + i.item_code + ')' : ''}</option>`
     ).join('');
+    const stock = getItemStock(itemId);
     tr.innerHTML = `
-        <td><select class="form-select form-select-sm item-select">${opts}</select></td>
+        <td><select class="form-select form-select-sm item-select" onchange="updateRRStock(this)">${opts}</select></td>
         <td><input type="text" class="form-control form-control-sm item-unit" value="${unit}" readonly></td>
+        <td><input type="number" class="form-control form-control-sm item-stock" value="${stock}" readonly></td>
         <td><input type="number" class="form-control form-control-sm item-qty" value="${qty}" min="1"></td>
+        <td><input type="number" class="form-control form-control-sm item-remaining" value="" readonly></td>
         <td><button class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove()"><i class="bi bi-x"></i></button></td>
     `;
     tr.querySelector('.item-select').addEventListener('change', function() {
@@ -178,25 +195,46 @@ function addRRItem(itemId='', unit='', qty='') {
         tr.querySelector('.item-unit').value = opt ? opt.dataset.unit : '';
     });
     document.getElementById('rrItemsBody').appendChild(tr);
+    updateRRRemaining(tr.querySelector('.item-qty'));
+}
+
+function updateRRStock(select) {
+    const tr = select.closest('tr');
+    const itemId = parseInt(select.value);
+    tr.querySelector('.item-stock').value = getItemStock(itemId);
+    updateRRRemaining(tr.querySelector('.item-qty'));
+}
+
+function updateRRRemaining(input) {
+    const tr = input.closest('tr');
+    const qty = parseInt(tr.querySelector('.item-qty').value) || 0;
+    const stock = parseInt(tr.querySelector('.item-stock').value) || 0;
+    tr.querySelector('.item-remaining').value = Math.max(0, stock - qty);
 }
 
 async function loadRR() {
-    const statusFilter = document.getElementById('rrStatusFilter').value;
-    let url = '/api/relief-requests';
-    const params = [];
-    if (statusFilter) params.push('status=' + statusFilter);
-    if (params.length) url += '?' + params.join('&');
-    const r = await fetch(url);
-    const d = await r.json();
-    if (!d.success) { showToast('danger', d.message); return; }
-    reliefRequests = d.relief_requests;
-    renderRR(reliefRequests);
+    try {
+        const statusFilter = document.getElementById('rrStatusFilter').value;
+        let url = '/api/relief-requests';
+        const params = [];
+        if (statusFilter) params.push('status=' + statusFilter);
+        if (params.length) url += '?' + params.join('&');
+        const r = await fetch(url);
+        if (!r.ok) { showToast('danger', 'Failed to load requests (' + r.status + ')'); renderRR([]); return; }
+        const d = await r.json();
+        if (!d.success) { showToast('danger', d.message); renderRR([]); return; }
+        reliefRequests = d.relief_requests;
+        renderRR(reliefRequests);
+    } catch(e) {
+        showToast('danger', 'Error loading requests: ' + e.message);
+        renderRR([]);
+    }
 }
 
 function renderRR(data) {
     const tbody = document.getElementById('rrTableBody');
     if (data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9" class="text-center py-4 text-muted">No relief requests found</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="10" class="text-center py-4 text-muted">No relief requests found</td></tr>';
         return;
     }
     tbody.innerHTML = data.map(r => {
@@ -217,6 +255,7 @@ function renderRR(data) {
             <td><span class="badge bg-${statusColors[r.status] || 'secondary'}">${r.status}</span></td>
             <td class="text-end" onclick="event.stopPropagation()">
                 <button class="btn btn-sm btn-outline-primary" onclick="editRR(${r.id})"><i class="bi bi-pencil"></i></button>
+                <button class="btn btn-sm btn-outline-secondary" onclick='window.open("/api/relief-requests/' + r.id + '/print","_blank")' title="Print"><i class="bi bi-printer"></i></button>
                 <button class="btn btn-sm btn-outline-danger" onclick="deleteRR(${r.id})"><i class="bi bi-trash"></i></button>
             </td>
         </tr>`;
@@ -234,15 +273,29 @@ function filterRR() {
     renderRR(filtered);
 }
 
+function updateFundBalanceDisplay() {
+    const el = document.getElementById('rr_fund_balance');
+    if (el) el.value = Number(totalFundBalance).toLocaleString();
+}
+
 async function loadFormData() {
-    const r = await fetch('/api/data');
-    const d = await r.json();
-    if (!d.success) return;
-    itemsData = d.items || [];
-    incidentsData = d.incidents || [];
-    const incidentSelect = document.getElementById('rr_incident_id');
-    incidentSelect.innerHTML = '<option value="">Select Incident</option>' +
-        incidentsData.map(i => `<option value="${i.id}">${i.incident_name}</option>`).join('');
+    try {
+        const r = await fetch('/api/data');
+        if (!r.ok) { showToast('danger', 'Failed to load form data'); return; }
+        const d = await r.json();
+        if (!d.success) return;
+        itemsData = (d.items || []).filter(i => i.is_distributable !== false);
+        inventoryAvailable = d.inventory_available || {};
+        totalFundBalance = d.total_fund_balance || 0;
+        updateFundBalanceDisplay();
+        incidentsData = d.incidents || [];
+        const activeIncidents = incidentsData.filter(i => i.status === 'Active');
+        const incidentSelect = document.getElementById('rr_incident_id');
+        incidentSelect.innerHTML = '<option value="">Select Incident</option>' +
+            activeIncidents.map(i => `<option value="${i.id}">${i.incident_name}</option>`).join('');
+    } catch(e) {
+        showToast('danger', 'Error loading form data: ' + e.message);
+    }
 }
 
 function resetRRForm() {
@@ -253,8 +306,10 @@ function resetRRForm() {
     document.getElementById('rr_request_date').value = new Date().toISOString().split('T')[0];
     document.getElementById('rr_status').value = 'Pending';
     document.getElementById('rr_cash_distributed').value = '0';
+    document.getElementById('rr_cash_remaining').value = '0';
     document.getElementById('rr_cash_purpose').disabled = true;
     document.getElementById('rrItemsBody').innerHTML = '';
+    updateFundBalanceDisplay();
 }
 
 async function editRR(id) {
@@ -289,11 +344,13 @@ function editRRFromData(r) {
     document.getElementById('rr_cash_amount').value = r.requested_cash_amount || 0;
     document.getElementById('rr_cash_purpose').value = r.cash_purpose || '';
     document.getElementById('rr_cash_distributed').value = r.distributed_cash_amount ? Number(r.distributed_cash_amount).toLocaleString() : '0';
+    document.getElementById('rr_cash_remaining').value = r.distributed_cash_amount ? Math.max(0, (r.requested_cash_amount || 0) - r.distributed_cash_amount).toLocaleString() : (r.requested_cash_amount || 0).toLocaleString();
     document.getElementById('rr_cash_purpose').disabled = !(r.requested_cash_amount > 0);
     document.getElementById('rrItemsBody').innerHTML = '';
     if (r.items && Array.isArray(r.items)) {
         r.items.forEach(item => addRRItem(item.item_id, item.unit, item.quantity_requested));
     }
+    updateFundBalanceDisplay();
     new bootstrap.Modal(document.getElementById('reliefRequestModal')).show();
 }
 
@@ -323,13 +380,18 @@ async function saveRR() {
     if (items.length === 0 && cashAmt <= 0) { showToast('danger', 'At least one item or cash amount is required'); return; }
     const url = id ? '/api/relief-requests/' + id : '/api/relief-requests';
     const method = id ? 'PUT' : 'POST';
-    const r = await fetch(url, {method, headers:{'Content-Type':'application/json','X-CSRFToken':csrf}, body: JSON.stringify(body)});
-    const d = await r.json();
-    if (d.success) {
-        showToast('success', id ? 'Relief request updated' : 'Relief request created');
-        bootstrap.Modal.getInstance(document.getElementById('reliefRequestModal')).hide();
-        loadRR();
-    } else { showToast('danger', d.message); }
+    try {
+        const r = await fetch(url, {method, headers:{'Content-Type':'application/json','X-CSRFToken':csrf}, body: JSON.stringify(body)});
+        const d = await r.json();
+        if (d.success) {
+            showToast('success', id ? 'Relief request updated' : 'Relief request created');
+            const modal = bootstrap.Modal.getInstance(document.getElementById('reliefRequestModal'));
+            if (modal) modal.hide();
+            loadRR();
+        } else { showToast('danger', d.message); }
+    } catch(e) {
+        showToast('danger', 'Error saving request: ' + e.message);
+    }
 }
 
 async function deleteRR(id) {
@@ -340,8 +402,8 @@ async function deleteRR(id) {
     else showToast('danger', d.message);
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-    loadFormData();
+document.addEventListener('DOMContentLoaded', async () => {
+    await loadFormData();
     loadRR();
 });
 </script>

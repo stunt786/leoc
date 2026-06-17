@@ -11,6 +11,10 @@
         <h4><i class="bi bi-box-seam-fill me-2"></i>Current Stock</h4>
         <p>System-generated inventory view — updates automatically from Stock Receipt, Dispatch, and Adjustments.</p>
     </div>
+    <div class="d-flex gap-2 align-items-start">
+        <button class="btn btn-sm btn-outline-secondary" onclick="printBinCard()"><i class="bi bi-card-list me-1"></i>Bin Card</button>
+        <button class="btn btn-sm btn-outline-secondary" onclick="printStockBook()"><i class="bi bi-book me-1"></i>Stock Book</button>
+    </div>
 </div>
 
 <div class="row g-3 mb-4" id="summaryCards">
@@ -64,30 +68,77 @@
 <div class="card mb-4">
     <div class="card-body">
         <div class="row g-2 align-items-end">
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <label class="form-label">Warehouse</label>
                 <select class="form-select" id="filterWarehouse" onchange="loadInventory()">
                     <option value="">All Warehouses</option>
                 </select>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <label class="form-label">Category</label>
                 <select class="form-select" id="filterCategory" onchange="loadInventory()">
                     <option value="">All Categories</option>
                 </select>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <label class="form-label">Status</label>
                 <select class="form-select" id="filterStatus" onchange="loadInventory()">
                     <option value="">All Status</option>
                     <option value="available">Available</option>
                     <option value="low_stock">Low Stock</option>
                     <option value="out_of_stock">Out of Stock</option>
+                    <option value="expired">Expired Items</option>
                 </select>
             </div>
             <div class="col-md-3">
                 <label class="form-label">Search</label>
                 <input type="text" class="form-control" id="filterSearch" placeholder="Search item name..." oninput="debounceSearch()">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Item (for Bin Card)</label>
+                <select class="form-select" id="filterItem">
+                    <option value="">Select item...</option>
+                </select>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card mb-4 border-info">
+    <div class="card-header bg-info bg-opacity-10">
+        <i class="bi bi-printer me-2 text-info"></i>Print Options
+    </div>
+    <div class="card-body">
+        <div class="row g-2 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label">Warehouse <span class="text-danger">*</span></label>
+                <select class="form-select" id="printWarehouse">
+                    <option value="">Select warehouse...</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Item <span class="text-danger">*</span></label>
+                <select class="form-select" id="printItem">
+                    <option value="">Select item...</option>
+                </select>
+            </div>
+            <div class="col-md-2 d-grid">
+                <button class="btn btn-outline-primary" onclick="printBinCard()">
+                    <i class="bi bi-card-list me-1"></i>Print Bin Card
+                </button>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">From Date</label>
+                <input type="date" class="form-control" id="stockBookFrom">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">To Date</label>
+                <input type="date" class="form-control" id="stockBookTo">
+            </div>
+            <div class="col-md-2 d-grid">
+                <button class="btn btn-outline-success" onclick="printStockBook()">
+                    <i class="bi bi-book me-1"></i>Print Stock Book
+                </button>
             </div>
         </div>
     </div>
@@ -133,12 +184,15 @@
 <script>
 const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 let refreshInterval;
+let items = [];
+let warehouses = [];
 
 function statusBadge(status) {
     const map = {
         'available': '<span class="badge bg-success">Available</span>',
         'low_stock': '<span class="badge bg-warning text-dark">Low Stock</span>',
-        'out_of_stock': '<span class="badge bg-danger">Out of Stock</span>'
+        'out_of_stock': '<span class="badge bg-danger">Out of Stock</span>',
+        'expired': '<span class="badge bg-dark">Expired</span>'
     };
     return map[status] || `<span class="badge bg-secondary">${status}</span>`;
 }
@@ -148,13 +202,27 @@ async function loadFormData() {
         const r = await fetch('/api/data');
         const d = await r.json();
         if (!d.success) return;
+        warehouses = d.warehouses || [];
+        items = d.items || [];
+
         const warehouseSel = document.getElementById('filterWarehouse');
-        d.warehouses.forEach(w => {
+        const printWarehouseSel = document.getElementById('printWarehouse');
+        warehouses.forEach(w => {
             warehouseSel.innerHTML += `<option value="${w.id}">${w.name}</option>`;
+            printWarehouseSel.innerHTML += `<option value="${w.id}">${w.name}</option>`;
         });
+
         const catSel = document.getElementById('filterCategory');
         d.categories.forEach(c => {
             catSel.innerHTML += `<option value="${c.id}">${c.name}</option>`;
+        });
+
+        const itemSel = document.getElementById('filterItem');
+        const printItemSel = document.getElementById('printItem');
+        items.forEach(i => {
+            const label = `${i.name} ${i.item_code ? '('+i.item_code+')' : ''}`;
+            itemSel.innerHTML += `<option value="${i.id}">${label}</option>`;
+            printItemSel.innerHTML += `<option value="${i.id}">${label}</option>`;
         });
     } catch (e) { console.error('Error loading form data:', e); }
 }
@@ -219,6 +287,30 @@ let searchTimeout;
 function debounceSearch() {
     clearTimeout(searchTimeout);
     searchTimeout = setTimeout(loadInventory, 400);
+}
+
+function printBinCard() {
+    const itemId = document.getElementById('printItem').value;
+    const warehouseId = document.getElementById('printWarehouse').value;
+    if (!itemId || !warehouseId) {
+        showToast('warning', 'Please select both an item and a warehouse to print bin card');
+        return;
+    }
+    window.open(`/api/inventory/bin-card?item_id=${itemId}&warehouse_id=${warehouseId}`, '_blank');
+}
+
+function printStockBook() {
+    const warehouseId = document.getElementById('printWarehouse').value;
+    if (!warehouseId) {
+        showToast('warning', 'Please select a warehouse to print stock book');
+        return;
+    }
+    const fromDate = document.getElementById('stockBookFrom').value;
+    const toDate = document.getElementById('stockBookTo').value;
+    let url = `/api/inventory/stock-book?warehouse_id=${warehouseId}`;
+    if (fromDate) url += `&from_date=${fromDate}`;
+    if (toDate) url += `&to_date=${toDate}`;
+    window.open(url, '_blank');
 }
 
 document.addEventListener('DOMContentLoaded', () => {

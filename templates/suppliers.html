@@ -1,0 +1,255 @@
+{% extends "base.html" %}
+{% block title %}Suppliers - LEOC{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('index') }}"><i class="bi bi-house-fill"></i></a></li>
+<li class="breadcrumb-item">Master Data</li>
+<li class="breadcrumb-item active">Suppliers</li>
+{% endblock %}
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center">
+    <div>
+        <h4><i class="bi bi-truck me-2"></i>Supplier Management</h4>
+        <p>Manage vendors, suppliers, and partner organizations</p>
+    </div>
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#supplierModal" onclick="resetSupplierForm()">
+        <i class="bi bi-plus-lg me-1"></i>New Supplier
+    </button>
+</div>
+
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <span><i class="bi bi-list-check me-2 text-primary"></i>All Suppliers</span>
+        <div class="d-flex gap-2">
+            <select class="form-select form-select-sm" style="width:auto" id="typeFilter" onchange="filterSuppliers()">
+                <option value="">All Types</option>
+                <option value="Government">Government</option>
+                <option value="NGO">NGO</option>
+                <option value="Private">Private</option>
+                <option value="Individual">Individual</option>
+                <option value="Other">Other</option>
+            </select>
+            <select class="form-select form-select-sm" style="width:auto" id="statusFilter" onchange="filterSuppliers()">
+                <option value="">All Status</option>
+                <option value="Active">Active</option>
+                <option value="Inactive">Inactive</option>
+            </select>
+            <input type="text" class="form-control form-control-sm" style="width:220px" id="supplierSearch" placeholder="Search by name, contact, phone..." oninput="filterSuppliers()">
+        </div>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Contact Person</th>
+                        <th>Phone</th>
+                        <th>Email</th>
+                        <th>Type</th>
+                        <th>Status</th>
+                        <th>Receipts</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="supplierTableBody">
+                    <tr><td colspan="8" class="text-center py-4"><div class="spinner-border text-primary"></div></td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Supplier Modal -->
+<div class="modal fade" id="supplierModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="supplierModalTitle"><i class="bi bi-truck me-2"></i>New Supplier</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="supplierForm">
+                    <input type="hidden" id="supplier_id">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Name *</label>
+                            <input type="text" class="form-control" id="sup_name" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Contact Person</label>
+                            <input type="text" class="form-control" id="sup_contact_person">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Phone</label>
+                            <input type="text" class="form-control" id="sup_phone">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Email</label>
+                            <input type="email" class="form-control" id="sup_email">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Supplier Type</label>
+                            <select class="form-select" id="sup_type">
+                                <option value="">Select Type</option>
+                                <option value="Government">Government</option>
+                                <option value="NGO">NGO</option>
+                                <option value="Private">Private</option>
+                                <option value="Individual">Individual</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Status</label>
+                            <select class="form-select" id="sup_status">
+                                <option value="Active">Active</option>
+                                <option value="Inactive">Inactive</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Address</label>
+                            <input type="text" class="form-control" id="sup_address">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Remarks</label>
+                            <textarea class="form-control" id="sup_remarks" rows="2"></textarea>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveSupplier()"><i class="bi bi-check-lg"></i> Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+let suppliers = [];
+let receiptCounts = {};
+
+async function loadSuppliers() {
+    try {
+        const [supRes, recRes] = await Promise.all([
+            fetch('/api/suppliers'),
+            fetch('/api/stock-receipts')
+        ]);
+        const supData = await supRes.json();
+        const recData = await recRes.json();
+        if (!supData.success) { showToast('danger', supData.message); return; }
+        suppliers = supData.suppliers || [];
+        receiptCounts = {};
+        (recData.receipts || []).forEach(r => {
+            if (r.supplier_id) {
+                receiptCounts[r.supplier_id] = (receiptCounts[r.supplier_id] || 0) + 1;
+            }
+        });
+        renderSuppliers(suppliers);
+    } catch (e) { showToast('danger', 'Error loading suppliers: ' + e.message);
+    }
+}
+
+function renderSuppliers(data) {
+    const tbody = document.getElementById('supplierTableBody');
+    if (data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-muted">No suppliers found</td></tr>';
+        return;
+    }
+    tbody.innerHTML = data.map(s => `<tr>
+        <td><strong>${s.name}</strong></td>
+        <td>${s.contact_person || '-'}</td>
+        <td>${s.phone || '-'}</td>
+        <td>${s.email || '-'}</td>
+        <td><span class="badge bg-info text-dark">${s.supplier_type || '-'}</span></td>
+        <td>${s.status === 'Inactive' ? '<span class="badge bg-secondary">Inactive</span>' : '<span class="badge bg-success">Active</span>'}</td>
+        <td><span class="badge ${(receiptCounts[s.id] || 0) > 0 ? 'bg-primary' : 'bg-secondary'}">${receiptCounts[s.id] || 0}</span></td>
+        <td class="text-end">
+            <button class="btn btn-sm btn-outline-primary" onclick="editSupplier(${s.id})"><i class="bi bi-pencil"></i></button>
+            <button class="btn btn-sm btn-outline-danger" onclick="deleteSupplier(${s.id})"><i class="bi bi-trash"></i></button>
+        </td>
+    </tr>`).join('');
+}
+
+function filterSuppliers() {
+    const q = document.getElementById('supplierSearch').value.toLowerCase();
+    const type = document.getElementById('typeFilter').value;
+    const status = document.getElementById('statusFilter').value;
+    let filtered = suppliers;
+    if (type) filtered = filtered.filter(s => s.supplier_type === type);
+    if (status) filtered = filtered.filter(s => s.status === status);
+    if (q) filtered = filtered.filter(s =>
+        s.name.toLowerCase().includes(q) ||
+        (s.contact_person && s.contact_person.toLowerCase().includes(q)) ||
+        (s.phone && s.phone.includes(q)) ||
+        (s.email && s.email.toLowerCase().includes(q))
+    );
+    renderSuppliers(filtered);
+}
+
+function resetSupplierForm() {
+    document.getElementById('supplierModalTitle').innerHTML = '<i class="bi bi-truck me-2"></i>New Supplier';
+    document.getElementById('supplier_id').value = '';
+    document.getElementById('supplierForm').reset();
+    document.getElementById('sup_status').value = 'Active';
+}
+
+async function editSupplier(id) {
+    const s = suppliers.find(x => x.id === id);
+    if (!s) return;
+    document.getElementById('supplierModalTitle').innerHTML = '<i class="bi bi-pencil me-2"></i>Edit Supplier';
+    document.getElementById('supplier_id').value = s.id;
+    document.getElementById('sup_name').value = s.name || '';
+    document.getElementById('sup_contact_person').value = s.contact_person || '';
+    document.getElementById('sup_phone').value = s.phone || '';
+    document.getElementById('sup_email').value = s.email || '';
+    document.getElementById('sup_type').value = s.supplier_type || '';
+    document.getElementById('sup_status').value = s.status || 'Active';
+    document.getElementById('sup_address').value = s.address || '';
+    document.getElementById('sup_remarks').value = s.remarks || '';
+    new bootstrap.Modal(document.getElementById('supplierModal')).show();
+}
+
+async function saveSupplier() {
+    const id = document.getElementById('supplier_id').value;
+    const body = {
+        name: document.getElementById('sup_name').value,
+        contact_person: document.getElementById('sup_contact_person').value,
+        phone: document.getElementById('sup_phone').value,
+        email: document.getElementById('sup_email').value,
+        supplier_type: document.getElementById('sup_type').value,
+        status: document.getElementById('sup_status').value,
+        address: document.getElementById('sup_address').value,
+        remarks: document.getElementById('sup_remarks').value
+    };
+    if (!body.name) { showToast('danger', 'Supplier name is required'); return; }
+    const url = id ? '/api/suppliers/' + id : '/api/suppliers';
+    const method = id ? 'PUT' : 'POST';
+    try {
+        const r = await fetch(url, {method, headers:{'Content-Type':'application/json','X-CSRFToken':csrf}, body: JSON.stringify(body)});
+        const d = await r.json();
+        if (d.success) {
+            showToast('success', id ? 'Supplier updated' : 'Supplier created');
+            bootstrap.Modal.getInstance(document.getElementById('supplierModal')).hide();
+            loadSuppliers();
+        } else {
+            showToast('danger', d.message);
+        }
+    } catch (e) { showToast('danger', 'Error: ' + e.message); }
+}
+
+async function deleteSupplier(id) {
+    if (!confirm('Delete this supplier?')) return;
+    try {
+        const r = await fetch('/api/suppliers/' + id, {method:'DELETE', headers:{'X-CSRFToken':csrf}});
+        const d = await r.json();
+        if (d.success) { showToast('success', 'Supplier deleted'); loadSuppliers(); }
+        else showToast('danger', d.message);
+    } catch (e) { showToast('danger', 'Error: ' + e.message); }
+}
+
+document.addEventListener('DOMContentLoaded', loadSuppliers);
+</script>
+{% endblock %}

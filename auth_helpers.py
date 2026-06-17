@@ -88,10 +88,10 @@ def role_required(*roles):
 
 def permission_required(action):
     role_permissions = {
-        'view': ['viewer', 'editor', 'operator', 'finance', 'admin'],
-        'create': ['editor', 'operator', 'finance', 'admin'],
-        'edit': ['editor', 'operator', 'finance', 'admin'],
-        'delete': ['admin', 'operator'],
+        'view': ['viewer', 'data_entry', 'warehouse_manager', 'editor', 'operator', 'finance', 'admin'],
+        'create': ['data_entry', 'warehouse_manager', 'editor', 'operator', 'finance', 'admin'],
+        'edit': ['data_entry', 'warehouse_manager', 'editor', 'operator', 'finance', 'admin'],
+        'delete': ['warehouse_manager', 'admin', 'operator'],
         'manage_users': ['admin'],
         'manage_funds': ['admin', 'finance'],
     }

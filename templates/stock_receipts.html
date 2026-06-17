@@ -42,10 +42,17 @@
                     </select>
                 </div>
                 <div class="col-md-4">
+                    <label class="form-label">Supplier</label>
+                    <select class="form-select" id="receipt_supplier_id" onchange="onSupplierChange()">
+                        <option value="">None (Manual Entry)</option>
+                    </select>
+                    <input type="hidden" id="receipt_supplier_name">
+                </div>
+                <div class="col-md-4">
                     <label class="form-label">Source Name</label>
                     <input type="text" class="form-control" id="receipt_source_name" placeholder="e.g. Organization name">
                 </div>
-                <div class="col-md-8">
+                <div class="col-md-4">
                     <label class="form-label">Remarks</label>
                     <textarea class="form-control" id="receipt_remarks" rows="1"></textarea>
                 </div>
@@ -133,7 +140,7 @@
             </button>
 
             <div class="mt-4">
-                <button type="button" class="btn btn-primary" onclick="saveReceipt()"><i class="bi bi-check-lg me-1"></i>Save Receipt</button>
+                <button type="button" class="btn btn-primary" id="saveReceiptBtn" onclick="saveReceipt()"><i class="bi bi-check-lg me-1"></i>Save Receipt</button>
                 <button type="button" class="btn btn-secondary" onclick="resetReceiptForm()"><i class="bi bi-arrow-counterclockwise me-1"></i>Reset</button>
             </div>
         </form>
@@ -191,20 +198,36 @@ const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('con
 let receipts = [];
 let warehouses = [];
 let itemsList = [];
+let suppliers = [];
 
 async function loadFormData() {
-    const r = await fetch('/api/data');
-    const d = await r.json();
-    if (!d.success) { showToast('danger', d.message); return; }
-    warehouses = d.warehouses || [];
-    itemsList = d.items || [];
-    const whSelect = document.getElementById('receipt_warehouse_id');
-    whSelect.innerHTML = '<option value="">Select Warehouse</option>' +
-        warehouses.map(w => `<option value="${w.id}">${w.name} (${w.code})</option>`).join('');
-    const stSelect = document.getElementById('receipt_source_type');
-    stSelect.innerHTML = '<option value="">Select Source</option>' +
-        (d.source_types || []).map(s => `<option value="${s}">${s}</option>`).join('');
-    loadReceipts();
+    try {
+        const r = await fetch('/api/data', { cache: 'no-cache' });
+        if (!r.ok) { showToast('danger', 'API error: ' + r.status); return; }
+        const d = await r.json();
+        if (!d.success) { showToast('danger', d.message); return; }
+        warehouses = d.warehouses || [];
+        itemsList = d.items || [];
+        const whSelect = document.getElementById('receipt_warehouse_id');
+        if (whSelect) {
+            whSelect.innerHTML = '<option value="">Select Warehouse</option>' +
+                (warehouses.length ? warehouses.map(w => `<option value="${w.id}">${w.name} (${w.code})</option>`).join('') : '<option value="" disabled>No warehouses available</option>');
+        }
+        const stSelect = document.getElementById('receipt_source_type');
+        if (stSelect) {
+            stSelect.innerHTML = '<option value="">Select Source</option>' +
+                (d.source_types || []).map(s => `<option value="${s}">${s}</option>`).join('');
+        }
+        suppliers = d.suppliers || [];
+        const supSelect = document.getElementById('receipt_supplier_id');
+        if (supSelect) {
+            supSelect.innerHTML = '<option value="">None (Manual Entry)</option>' +
+                suppliers.map(s => `<option value="${s.id}">${s.name}${s.supplier_type ? ' (' + s.supplier_type + ')' : ''}</option>`).join('');
+        }
+        loadReceipts();
+    } catch(e) {
+        showToast('danger', 'Failed to load form data: ' + e.message);
+    }
 }
 
 function loadReceipts() {
@@ -225,14 +248,16 @@ function renderReceipts(data) {
     }
     tbody.innerHTML = data.map(r => {
         const itemCount = r.items ? r.items.length : 0;
-        return `<tr style="cursor:pointer" onclick="viewReceipt(${r.id})">
+        return `<tr>
             <td><strong>${r.receipt_no}</strong></td>
             <td>${r.date || '-'}</td>
             <td>${r.warehouse_name || '-'}</td>
-            <td>${r.source_type}${r.source_name ? ' - ' + r.source_name : ''}</td>
+            <td>${r.source_type}${r.supplier_name ? ' - ' + r.supplier_name : (r.source_name ? ' - ' + r.source_name : '')}</td>
             <td><span class="badge bg-dark">${itemCount} item${itemCount !== 1 ? 's' : ''}</span></td>
             <td class="text-end" onclick="event.stopPropagation()">
-                <button class="btn btn-sm btn-outline-info" onclick='viewReceipt(${r.id})'><i class="bi bi-eye"></i></button>
+                <button class="btn btn-sm btn-outline-info" onclick='viewReceipt(${r.id})' title="View"><i class="bi bi-eye"></i></button>
+                <button class="btn btn-sm btn-outline-primary" onclick='editReceipt(${r.id})' title="Edit"><i class="bi bi-pencil"></i></button>
+                <button class="btn btn-sm btn-outline-secondary" onclick='window.open("/api/stock-receipts/${r.id}/print","_blank")' title="Print"><i class="bi bi-printer"></i></button>
             </td>
         </tr>`;
     }).join('');
@@ -250,6 +275,24 @@ function resetReceiptForm() {
     document.getElementById('receipt_no').value = 'RCPT-' + String(Date.now()).slice(-6);
     document.getElementById('receipt_date').value = new Date().toISOString().split('T')[0];
     document.getElementById('itemsBody').innerHTML = '';
+    document.getElementById('saveReceiptBtn').innerHTML = '<i class="bi bi-check-lg me-1"></i>Save Receipt';
+}
+
+function onSupplierChange() {
+    const supId = parseInt(document.getElementById('receipt_supplier_id').value);
+    const sup = suppliers.find(s => s.id === supId);
+    if (sup) {
+        if (!document.getElementById('receipt_source_name').value)
+            document.getElementById('receipt_source_name').value = sup.name || '';
+        if (!document.getElementById('receipt_source_contact').value)
+            document.getElementById('receipt_source_contact').value = sup.contact_person || '';
+        if (!document.getElementById('receipt_phone').value)
+            document.getElementById('receipt_phone').value = sup.phone || '';
+        if (!document.getElementById('receipt_email').value)
+            document.getElementById('receipt_email').value = sup.email || '';
+        if (!document.getElementById('receipt_address').value)
+            document.getElementById('receipt_address').value = sup.address || '';
+    }
 }
 
 function lookupLastUnitCost(itemId) {
@@ -332,6 +375,7 @@ async function saveReceipt() {
         receipt_no: document.getElementById('receipt_no').value,
         date: document.getElementById('receipt_date').value,
         warehouse_id: parseInt(document.getElementById('receipt_warehouse_id').value),
+        supplier_id: parseInt(document.getElementById('receipt_supplier_id').value) || null,
         source_type: document.getElementById('receipt_source_type').value,
         source_name: document.getElementById('receipt_source_name').value,
         source_contact: document.getElementById('receipt_source_contact').value,
@@ -352,17 +396,67 @@ async function saveReceipt() {
     if (!body.source_type) { showToast('danger', 'Source type is required'); return; }
     if (!body.date) { showToast('danger', 'Date is required'); return; }
 
-    const r = await fetch('/api/stock-receipts', {
-        method: 'POST',
+    const receiptId = document.getElementById('receipt_id').value;
+    const method = receiptId ? 'PUT' : 'POST';
+    const url = receiptId ? `/api/stock-receipts/${receiptId}` : '/api/stock-receipts';
+
+    const r = await fetch(url, {
+        method: method,
         headers: {'Content-Type':'application/json','X-CSRFToken':csrf},
         body: JSON.stringify(body)
     });
     const d = await r.json();
     if (d.success) {
-        showToast('success', 'Stock receipt recorded');
+        showToast('success', receiptId ? 'Stock receipt updated' : 'Stock receipt recorded');
         resetReceiptForm();
         loadReceipts();
     } else { showToast('danger', d.message); }
+}
+
+async function editReceipt(id) {
+    try {
+        const r = await fetch('/api/stock-receipts/' + id);
+        const d = await r.json();
+        if (!d.success) { showToast('danger', d.message); return; }
+        const rc = d.receipt;
+        document.getElementById('receipt_id').value = rc.id;
+        document.getElementById('receipt_no').value = rc.receipt_no;
+        document.getElementById('receipt_date').value = rc.date || '';
+        document.getElementById('receipt_warehouse_id').value = rc.warehouse_id || '';
+        document.getElementById('receipt_supplier_id').value = rc.supplier_id || '';
+        document.getElementById('receipt_source_type').value = rc.source_type || '';
+        document.getElementById('receipt_source_name').value = rc.source_name || '';
+        document.getElementById('receipt_source_contact').value = rc.source_contact || '';
+        document.getElementById('receipt_phone').value = rc.phone || '';
+        document.getElementById('receipt_email').value = rc.email || '';
+        document.getElementById('receipt_address').value = rc.address || '';
+        document.getElementById('receipt_ref_number').value = rc.ref_number || '';
+        document.getElementById('receipt_invoice_no').value = rc.invoice_no || '';
+        document.getElementById('receipt_invoice_date').value = rc.invoice_date || '';
+        document.getElementById('receipt_delivery_note').value = rc.delivery_note || '';
+        document.getElementById('receipt_vehicle_no').value = rc.vehicle_no || '';
+        document.getElementById('receipt_verified_by').value = rc.verified_by || '';
+        document.getElementById('receipt_remarks').value = rc.remarks || '';
+
+        document.getElementById('itemsBody').innerHTML = '';
+        const rcpts = Array.isArray(rc.items) ? rc.items : [];
+        for (const item of rcpts) {
+            addItemRow(
+                item.item_id || '',
+                item.unit || '',
+                item.quantity || '',
+                item.batch_no || '',
+                item.serial_no || '',
+                item.mfg_date || '',
+                item.expiry_date || '',
+                item.unit_cost || ''
+            );
+        }
+        document.getElementById('saveReceiptBtn').innerHTML = '<i class="bi bi-check-lg me-1"></i>Update Receipt';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch(e) {
+        showToast('danger', 'Error loading receipt: ' + e.message);
+    }
 }
 
 async function viewReceipt(id) {
@@ -393,6 +487,7 @@ async function viewReceipt(id) {
                 <div class="col-md-4"><strong>Receipt No:</strong><br>${rc.receipt_no}</div>
                 <div class="col-md-4"><strong>Date:</strong><br>${rc.date || '-'}</div>
                 <div class="col-md-4"><strong>Warehouse:</strong><br>${whName}</div>
+                <div class="col-md-4"><strong>Supplier:</strong><br>${rc.supplier_name || '-'}</div>
                 <div class="col-md-4"><strong>Source Type:</strong><br>${rc.source_type || '-'}</div>
                 <div class="col-md-4"><strong>Source Name:</strong><br>${rc.source_name || '-'}</div>
                 <div class="col-md-4"><strong>Source Contact:</strong><br>${rc.source_contact || '-'}</div>

@@ -94,9 +94,9 @@ async function loadWarehouses() {
 }
 
 function editWarehouse(id) {
-    const resp = fetch('/api/warehouses').then(r => r.json()).then(data => {
-        const w = data.warehouses.find(x => x.id === id);
-        if (!w) return;
+    fetch(`/api/warehouses/${id}`).then(r => r.json()).then(resp => {
+        if (!resp.success) { showToast('danger', resp.message); return; }
+        const w = resp.warehouse;
         editId = id;
         document.getElementById('modalTitle').textContent = 'Edit Warehouse';
         document.getElementById('code').value = w.code || '';
@@ -107,7 +107,7 @@ function editWarehouse(id) {
         document.getElementById('capacity').value = w.capacity || '';
         document.getElementById('remarks').value = w.remarks || '';
         new bootstrap.Modal(document.getElementById('warehouseModal')).show();
-    });
+    }).catch(e => showToast('danger', 'Error: ' + e.message));
 }
 
 function saveWarehouse() {

@@ -286,14 +286,18 @@ class AppSettings(db.Model):
         setting = AppSettings.query.filter_by(setting_key=key).first()
         if not setting:
             setting = AppSettings(setting_key=key)
-        setting.setting_value = json.dumps(value) if isinstance(value, (list, dict)) else str(value)
+        setting.setting_value = json.dumps(value, ensure_ascii=False) if isinstance(value, (list, dict)) else str(value)
         db.session.add(setting)
         db.session.commit()
 
     def to_dict(self):
+        try:
+            parsed = json.loads(self.setting_value)
+        except (json.JSONDecodeError, TypeError):
+            parsed = self.setting_value
         return {
             'id': self.id, 'setting_key': self.setting_key,
-            'setting_value': json.loads(self.setting_value) if self.setting_value.startswith('[') or self.setting_value.startswith('{') else self.setting_value,
+            'setting_value': parsed,
             'updated_at': self.updated_at.strftime('%Y-%m-%d')
         }
 
@@ -316,6 +320,47 @@ class Warehouse(db.Model):
             'address': self.address, 'contact_person': self.contact_person,
             'phone': self.phone, 'capacity': self.capacity, 'remarks': self.remarks,
             'created_at': self.created_at.strftime('%Y-%m-%d')
+        }
+
+# ============ SUPPLIER/VENDOR MODEL ============
+class Supplier(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(200), nullable=False, index=True)
+    contact_person = db.Column(db.String(200))
+    phone = db.Column(db.String(50))
+    email = db.Column(db.String(100))
+    address = db.Column(db.String(300))
+    supplier_type = db.Column(db.String(50), default='Other')
+    status = db.Column(db.String(20), default='Active')
+    remarks = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=utc_now)
+    updated_at = db.Column(db.DateTime, default=utc_now, onupdate=utc_now)
+
+    def to_dict(self):
+        return {
+            'id': self.id, 'name': self.name, 'contact_person': self.contact_person,
+            'phone': self.phone, 'email': self.email, 'address': self.address,
+            'supplier_type': self.supplier_type, 'status': self.status,
+            'remarks': self.remarks, 'created_at': self.created_at.strftime('%Y-%m-%d')
+        }
+
+# ============ WAREHOUSE ZONE/LOCATION MODEL ============
+class WarehouseZone(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    warehouse_id = db.Column(db.Integer, db.ForeignKey('warehouse.id'), nullable=False, index=True)
+    name = db.Column(db.String(200), nullable=False)
+    code = db.Column(db.String(50))
+    capacity = db.Column(db.Float, default=0)
+    description = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=utc_now)
+    warehouse = db.relationship('Warehouse', backref=db.backref('zones', lazy=True))
+
+    def to_dict(self):
+        return {
+            'id': self.id, 'warehouse_id': self.warehouse_id,
+            'warehouse_name': self.warehouse.name if self.warehouse else None,
+            'name': self.name, 'code': self.code,
+            'capacity': self.capacity, 'description': self.description
         }
 
 # ============ CATEGORY MODEL (Module 4) ============
@@ -347,6 +392,7 @@ class Item(db.Model):
     batch_tracking = db.Column(db.Boolean, default=False)
     serial_tracking = db.Column(db.Boolean, default=False)
     is_consumable = db.Column(db.Boolean, default=True)
+    is_distributable = db.Column(db.Boolean, default=True)
     storage_requirement = db.Column(db.String(50), default='Normal')
     photo = db.Column(db.String(500))
     status = db.Column(db.String(20), default='Active')
@@ -370,6 +416,7 @@ class Item(db.Model):
             'batch_tracking': self.batch_tracking,
             'serial_tracking': self.serial_tracking,
             'is_consumable': self.is_consumable,
+            'is_distributable': self.is_distributable,
             'storage_requirement': self.storage_requirement,
             'photo': self.photo, 'status': self.status,
         }
@@ -380,6 +427,7 @@ class StockReceipt(db.Model):
     receipt_no = db.Column(db.String(50), unique=True, nullable=False, index=True)
     date = db.Column(db.Date, nullable=False, default=date.today)
     warehouse_id = db.Column(db.Integer, db.ForeignKey('warehouse.id'), nullable=False, index=True)
+    supplier_id = db.Column(db.Integer, db.ForeignKey('supplier.id'), index=True)
     source_type = db.Column(db.String(50), nullable=False)
     source_name = db.Column(db.String(200))
     source_contact = db.Column(db.String(200))
@@ -397,6 +445,7 @@ class StockReceipt(db.Model):
     created_by = db.Column(db.Integer)
     created_at = db.Column(db.DateTime, default=utc_now)
     warehouse = db.relationship('Warehouse', backref=db.backref('receipts', lazy=True))
+    supplier = db.relationship('Supplier', backref=db.backref('receipts', lazy=True))
     items = db.relationship('StockReceiptItem', backref='receipt', lazy=True, cascade='all,delete-orphan')
     attachments = db.relationship('StockReceiptAttachment', backref='receipt', lazy=True, cascade='all,delete-orphan')
 
@@ -405,6 +454,8 @@ class StockReceipt(db.Model):
             'id': self.id, 'receipt_no': self.receipt_no,
             'date': self.date.strftime('%Y-%m-%d') if self.date else None,
             'warehouse_id': self.warehouse_id, 'warehouse_name': self.warehouse.name if self.warehouse else None,
+            'supplier_id': self.supplier_id,
+            'supplier_name': self.supplier.name if self.supplier else None,
             'source_type': self.source_type, 'source_name': self.source_name,
             'source_contact': self.source_contact, 'phone': self.phone,
             'email': self.email, 'address': self.address,
@@ -791,6 +842,52 @@ class DistributionBeneficiary(db.Model):
             'beneficiary_name': self.beneficiary.name if self.beneficiary else None
         }
 
+# ============ STOCK TRANSFER MODEL ============
+class StockTransfer(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    transfer_no = db.Column(db.String(50), unique=True, nullable=False, index=True)
+    from_warehouse_id = db.Column(db.Integer, db.ForeignKey('warehouse.id'), nullable=False, index=True)
+    to_warehouse_id = db.Column(db.Integer, db.ForeignKey('warehouse.id'), nullable=False, index=True)
+    transfer_date = db.Column(db.Date, nullable=False, default=date.today)
+    reason = db.Column(db.String(300))
+    remarks = db.Column(db.Text)
+    approved_by = db.Column(db.String(200))
+    status = db.Column(db.String(20), default='Completed')
+    created_by = db.Column(db.Integer)
+    created_at = db.Column(db.DateTime, default=utc_now)
+    from_warehouse = db.relationship('Warehouse', foreign_keys=[from_warehouse_id], backref=db.backref('transfers_out', lazy=True))
+    to_warehouse = db.relationship('Warehouse', foreign_keys=[to_warehouse_id], backref=db.backref('transfers_in', lazy=True))
+    items = db.relationship('StockTransferItem', backref='transfer', lazy=True, cascade='all,delete-orphan')
+
+    def to_dict(self):
+        return {
+            'id': self.id, 'transfer_no': self.transfer_no,
+            'from_warehouse_id': self.from_warehouse_id,
+            'from_warehouse_name': self.from_warehouse.name if self.from_warehouse else None,
+            'to_warehouse_id': self.to_warehouse_id,
+            'to_warehouse_name': self.to_warehouse.name if self.to_warehouse else None,
+            'transfer_date': self.transfer_date.strftime('%Y-%m-%d') if self.transfer_date else None,
+            'reason': self.reason, 'remarks': self.remarks,
+            'approved_by': self.approved_by, 'status': self.status,
+            'items': [i.to_dict() for i in self.items]
+        }
+
+class StockTransferItem(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    transfer_id = db.Column(db.Integer, db.ForeignKey('stock_transfer.id'), nullable=False, index=True)
+    item_id = db.Column(db.Integer, db.ForeignKey('item.id'), nullable=False)
+    quantity = db.Column(db.Integer, nullable=False)
+    unit = db.Column(db.String(20))
+    batch_no = db.Column(db.String(100))
+    item = db.relationship('Item', backref=db.backref('transfer_items', lazy=True))
+
+    def to_dict(self):
+        return {
+            'id': self.id, 'transfer_id': self.transfer_id,
+            'item_id': self.item_id, 'item_name': self.item.name if self.item else None,
+            'quantity': self.quantity, 'unit': self.unit, 'batch_no': self.batch_no or ''
+        }
+
 # ============ CASH FUND MODEL ============
 class CashFund(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -1040,6 +1137,11 @@ def items_page():
 def stock_receipts_page():
     return render_template('stock_receipts.html')
 
+@app.route('/users')
+@login_required
+def users_page():
+    return render_template('users.html')
+
 @app.route('/inventory')
 @login_required
 def inventory_page():
@@ -1105,6 +1207,16 @@ def cash_distributions_page():
 def beneficiaries_page():
     return render_template('beneficiaries.html')
 
+@app.route('/suppliers')
+@login_required
+def suppliers_page():
+    return render_template('suppliers.html')
+
+@app.route('/stock-transfers')
+@login_required
+def stock_transfers_page():
+    return render_template('stock_transfers.html')
+
 # ============ SETTINGS API ============
 @app.route('/api/settings', methods=['GET'])
 @login_required
@@ -1141,7 +1253,7 @@ def handle_setting(key):
         if not setting:
             setting = AppSettings(setting_key=key)
         value = data.get('value')
-        setting.setting_value = json.dumps(value)
+        setting.setting_value = json.dumps(value, ensure_ascii=False)
         db.session.add(setting)
         db.session.commit()
         return jsonify({'success': True, 'message': f'Setting {key} updated'})
@@ -1181,17 +1293,31 @@ def handle_warehouses():
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 500
 
-@app.route('/api/warehouses/<int:id>', methods=['PUT', 'DELETE'])
+@app.route('/api/warehouses/<int:id>', methods=['GET', 'PUT', 'DELETE'])
 @permission_required('edit')
 def manage_warehouse(id):
     wh = db_get(Warehouse, id)
     if not wh:
         return jsonify({'success': False, 'message': 'Warehouse not found'}), 404
     try:
+        if request.method == 'GET':
+            return jsonify({'success': True, 'warehouse': wh.to_dict()})
+
         if request.method == 'DELETE':
+            related_zones = WarehouseZone.query.filter_by(warehouse_id=wh.id).count()
+            related_inventory = Inventory.query.filter_by(warehouse_id=wh.id).count()
+            related_receipts = StockReceipt.query.filter_by(warehouse_id=wh.id).count()
+            related_adjustments = ManualAdjustment.query.filter_by(warehouse_id=wh.id).count()
+            related_dispatches = Dispatch.query.filter_by(warehouse_id=wh.id).count()
+            related_transfers = StockTransfer.query.filter(
+                db.or_(StockTransfer.from_warehouse_id == wh.id, StockTransfer.to_warehouse_id == wh.id)
+            ).count()
+            if any([related_zones, related_inventory, related_receipts, related_adjustments, related_dispatches, related_transfers]):
+                return jsonify({'success': False, 'message': f'Cannot delete: Warehouse has {related_inventory} inventory record(s), {related_receipts} receipt(s), {related_dispatches} dispatch(es), {related_adjustments} adjustment(s), {related_transfers} transfer(s), and {related_zones} zone(s). Remove all related records first.'}), 400
             db.session.delete(wh)
             db.session.commit()
             return jsonify({'success': True, 'message': 'Warehouse deleted'})
+
         data = request.get_json()
         if 'name' in data:
             name = (data.get('name') or '').strip()
@@ -1321,6 +1447,7 @@ def handle_items():
             batch_tracking=bool(data.get('batch_tracking', False)),
             serial_tracking=bool(data.get('serial_tracking', False)),
             is_consumable=bool(data.get('is_consumable', True)),
+            is_distributable=bool(data.get('is_distributable', True)),
             storage_requirement=data.get('storage_requirement', 'Normal'),
             photo=data.get('photo'), status=data.get('status', 'Active'),
             created_by=current_user.id
@@ -1378,6 +1505,8 @@ def manage_item(id):
             item.serial_tracking = parse_bool_field(data, 'serial_tracking', default=item.serial_tracking)
         if 'is_consumable' in data:
             item.is_consumable = parse_bool_field(data, 'is_consumable', default=item.is_consumable)
+        if 'is_distributable' in data:
+            item.is_distributable = parse_bool_field(data, 'is_distributable', default=item.is_distributable)
         for field in ['item_code', 'barcode', 'qr_code', 'local_name', 'description',
                        'storage_requirement', 'photo', 'status']:
             if field in data:
@@ -1391,6 +1520,162 @@ def manage_item(id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 500
+
+# ============ SUPPLIER API ============
+@app.route('/api/suppliers', methods=['GET', 'POST'])
+@permission_required('edit')
+def handle_suppliers():
+    if request.method == 'GET':
+        suppliers = Supplier.query.order_by(Supplier.name).all()
+        return jsonify({'success': True, 'suppliers': [s.to_dict() for s in suppliers]})
+    try:
+        data = request.get_json()
+        if not data.get('name'):
+            return jsonify({'success': False, 'message': 'Supplier name is required'}), 400
+        sup = Supplier(name=data['name'], contact_person=data.get('contact_person'),
+                       phone=data.get('phone'), email=data.get('email'),
+                       address=data.get('address'), supplier_type=data.get('supplier_type', 'Other'),
+                       status=data.get('status', 'Active'), remarks=data.get('remarks'))
+        db.session.add(sup)
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Supplier created', 'data': sup.to_dict()}), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/suppliers/<int:id>', methods=['PUT', 'DELETE'])
+@permission_required('edit')
+def manage_supplier(id):
+    sup = db_get(Supplier, id)
+    if not sup:
+        return jsonify({'success': False, 'message': 'Supplier not found'}), 404
+    try:
+        if request.method == 'DELETE':
+            db.session.delete(sup)
+            db.session.commit()
+            return jsonify({'success': True, 'message': 'Supplier deleted'})
+        data = request.get_json()
+        for field in ['name', 'contact_person', 'phone', 'email', 'address', 'supplier_type', 'status', 'remarks']:
+            if field in data:
+                setattr(sup, field, data[field])
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Supplier updated', 'data': sup.to_dict()})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+# ============ WAREHOUSE ZONE API ============
+@app.route('/api/warehouse-zones', methods=['GET', 'POST'])
+@permission_required('edit')
+def handle_warehouse_zones():
+    if request.method == 'GET':
+        warehouse_id = request.args.get('warehouse_id', type=int)
+        q = WarehouseZone.query
+        if warehouse_id:
+            q = q.filter(WarehouseZone.warehouse_id == warehouse_id)
+        zones = q.order_by(WarehouseZone.name).all()
+        return jsonify({'success': True, 'zones': [z.to_dict() for z in zones]})
+    try:
+        data = request.get_json()
+        if not data.get('name') or not data.get('warehouse_id'):
+            return jsonify({'success': False, 'message': 'Zone name and warehouse are required'}), 400
+        zone = WarehouseZone(warehouse_id=data['warehouse_id'], name=data['name'],
+                             code=data.get('code'), capacity=data.get('capacity', 0),
+                             description=data.get('description'))
+        db.session.add(zone)
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Zone created', 'data': zone.to_dict()}), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/warehouse-zones/<int:id>', methods=['PUT', 'DELETE'])
+@permission_required('edit')
+def manage_warehouse_zone(id):
+    zone = db_get(WarehouseZone, id)
+    if not zone:
+        return jsonify({'success': False, 'message': 'Zone not found'}), 404
+    try:
+        if request.method == 'DELETE':
+            db.session.delete(zone)
+            db.session.commit()
+            return jsonify({'success': True, 'message': 'Zone deleted'})
+        data = request.get_json()
+        for field in ['name', 'code', 'capacity', 'description', 'warehouse_id']:
+            if field in data:
+                setattr(zone, field, data[field])
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Zone updated', 'data': zone.to_dict()})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+# ============ STOCK TRANSFER API ============
+def generate_transfer_no():
+    last = StockTransfer.query.order_by(StockTransfer.id.desc()).first()
+    num = (last.id + 1) if last else 1
+    return f"TRF-{num:04d}"
+
+@app.route('/api/stock-transfers', methods=['GET', 'POST'])
+@permission_required('edit')
+def handle_stock_transfers():
+    if request.method == 'GET':
+        transfers = StockTransfer.query.order_by(StockTransfer.transfer_date.desc()).all()
+        return jsonify({'success': True, 'transfers': [t.to_dict() for t in transfers]})
+    try:
+        data = request.get_json()
+        from_wh = data.get('from_warehouse_id')
+        to_wh = data.get('to_warehouse_id')
+        if not from_wh or not to_wh:
+            return jsonify({'success': False, 'message': 'Source and destination warehouses are required'}), 400
+        if from_wh == to_wh:
+            return jsonify({'success': False, 'message': 'Source and destination warehouses must be different'}), 400
+        items_data = data.get('items', [])
+        if not items_data:
+            return jsonify({'success': False, 'message': 'At least one item is required'}), 400
+        transfer = StockTransfer(
+            transfer_no=data.get('transfer_no') or generate_transfer_no(),
+            from_warehouse_id=from_wh, to_warehouse_id=to_wh,
+            transfer_date=parse_date_field({'transfer_date': data.get('transfer_date')}, 'transfer_date', default=date.today()),
+            reason=data.get('reason'), remarks=data.get('remarks'),
+            approved_by=data.get('approved_by'), status=data.get('status', 'Completed'),
+            created_by=current_user.id
+        )
+        db.session.add(transfer)
+        db.session.flush()
+        for item_data in items_data:
+            item_id = item_data.get('item_id')
+            qty = parse_int_field(item_data, 'quantity', minimum=1)
+            if not item_id:
+                return jsonify({'success': False, 'message': 'Item ID is required for each item'}), 400
+            from_inv = Inventory.query.filter_by(item_id=item_id, warehouse_id=from_wh).first()
+            if not from_inv or from_inv.available_quantity < qty:
+                item = db_get(Item, item_id)
+                item_name = item.name if item else 'Unknown'
+                return jsonify({'success': False, 'message': f'Insufficient stock for {item_name} in source warehouse. Available: {from_inv.available_quantity if from_inv else 0}'}), 400
+            ti = StockTransferItem(transfer_id=transfer.id, item_id=item_id, quantity=qty,
+                                   unit=item_data.get('unit'), batch_no=item_data.get('batch_no'))
+            db.session.add(ti)
+            from_inv.quantity -= qty
+            to_inv = Inventory.query.filter_by(item_id=item_id, warehouse_id=to_wh).first()
+            if to_inv:
+                to_inv.quantity += qty
+            else:
+                to_inv = Inventory(item_id=item_id, warehouse_id=to_wh, quantity=qty)
+                db.session.add(to_inv)
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Stock transfer completed', 'data': transfer.to_dict()}), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/stock-transfers/<int:id>', methods=['GET'])
+@login_required
+def get_stock_transfer(id):
+    transfer = db_get(StockTransfer, id)
+    if not transfer:
+        return jsonify({'success': False, 'message': 'Transfer not found'}), 404
+    return jsonify({'success': True, 'transfer': transfer.to_dict()})
 
 # ============ STOCK RECEIPT API ============
 def generate_receipt_no():
@@ -1453,13 +1738,36 @@ def handle_stock_receipts():
         invoice_date = None
         if data.get('invoice_date'):
             invoice_date = parse_date_field({'invoice_date': data['invoice_date']}, 'invoice_date')
+        supplier_id = data.get('supplier_id')
+        if supplier_id is not None:
+            supplier_id = int(supplier_id)
+        source_name = data.get('source_name')
+        source_contact = data.get('source_contact')
+        phone = data.get('phone')
+        email = data.get('email')
+        address = data.get('address')
+        if supplier_id:
+            supplier = db_get(Supplier, supplier_id)
+            if not supplier:
+                return jsonify({'success': False, 'message': 'Supplier not found'}), 404
+            if not source_name:
+                source_name = supplier.name
+            if not source_contact:
+                source_contact = supplier.contact_person
+            if not phone:
+                phone = supplier.phone
+            if not email:
+                email = supplier.email
+            if not address:
+                address = supplier.address
         receipt = StockReceipt(
             receipt_no=data.get('receipt_no') or generate_receipt_no(),
             date=parse_date_field({'date': data.get('date')}, 'date', default=date.today()),
-            warehouse_id=data['warehouse_id'], source_type=data['source_type'],
-            source_name=data.get('source_name'),
-            source_contact=data.get('source_contact'), phone=data.get('phone'),
-            email=data.get('email'), address=data.get('address'),
+            warehouse_id=data['warehouse_id'], supplier_id=supplier_id,
+            source_type=data['source_type'],
+            source_name=source_name,
+            source_contact=source_contact, phone=phone,
+            email=email, address=address,
             ref_number=data.get('ref_number'), invoice_no=data.get('invoice_no'),
             invoice_date=invoice_date, delivery_note=data.get('delivery_note'),
             vehicle_no=data.get('vehicle_no'),
@@ -1512,6 +1820,92 @@ def get_stock_receipt(id):
         return jsonify({'success': False, 'message': 'Stock receipt not found'}), 404
     return jsonify({'success': True, 'receipt': receipt.to_dict()})
 
+@app.route('/api/stock-receipts/<int:id>', methods=['PUT'])
+@permission_required('edit')
+def update_stock_receipt(id):
+    try:
+        receipt = db_get(StockReceipt, id)
+        if not receipt:
+            return jsonify({'success': False, 'message': 'Stock receipt not found'}), 404
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'message': 'No data provided'}), 400
+
+        for ri in receipt.items[:]:
+            update_inventory(ri.item_id, receipt.warehouse_id, -ri.quantity)
+            db.session.delete(ri)
+
+        receipt.date = parse_date_field({'date': data.get('date')}, 'date', default=receipt.date)
+        if 'supplier_id' in data:
+            sid = data.get('supplier_id', type=int)
+            if sid:
+                supplier = db_get(Supplier, sid)
+                if not supplier:
+                    return jsonify({'success': False, 'message': 'Supplier not found'}), 404
+                receipt.supplier_id = sid
+                receipt.source_name = receipt.source_name or supplier.name
+                receipt.source_contact = receipt.source_contact or supplier.contact_person
+                receipt.phone = receipt.phone or supplier.phone
+                receipt.email = receipt.email or supplier.email
+                receipt.address = receipt.address or supplier.address
+            else:
+                receipt.supplier_id = None
+        receipt.source_type = data.get('source_type', receipt.source_type)
+        receipt.source_name = data.get('source_name', receipt.source_name)
+        receipt.source_contact = data.get('source_contact', receipt.source_contact)
+        receipt.phone = data.get('phone', receipt.phone)
+        receipt.email = data.get('email', receipt.email)
+        receipt.address = data.get('address', receipt.address)
+        receipt.ref_number = data.get('ref_number', receipt.ref_number)
+        receipt.invoice_no = data.get('invoice_no', receipt.invoice_no)
+        if data.get('invoice_date'):
+            receipt.invoice_date = parse_date_field({'invoice_date': data['invoice_date']}, 'invoice_date')
+        else:
+            receipt.invoice_date = None
+        receipt.delivery_note = data.get('delivery_note', receipt.delivery_note)
+        receipt.vehicle_no = data.get('vehicle_no', receipt.vehicle_no)
+        receipt.verified_by = data.get('verified_by', receipt.verified_by)
+        receipt.remarks = data.get('remarks', receipt.remarks)
+
+        items_payload = data.get('items', [])
+        if not items_payload:
+            return jsonify({'success': False, 'message': 'At least one item is required'}), 400
+
+        for item_data in items_payload:
+            item = db_get(Item, item_data.get('item_id'))
+            if not item:
+                return jsonify({'success': False, 'message': 'One or more items were not found'}), 404
+            mfg = None
+            exp = None
+            if item_data.get('mfg_date'):
+                mfg = parse_date_field({'mfg_date': item_data['mfg_date']}, 'mfg_date')
+            if item_data.get('expiry_date'):
+                exp = parse_date_field({'expiry_date': item_data['expiry_date']}, 'expiry_date')
+            qty = parse_int_field(item_data, 'quantity', minimum=1)
+            unit_cost = parse_float_field(item_data, 'unit_cost', minimum=0, default=0)
+            if mfg and exp and exp < mfg:
+                return jsonify({'success': False, 'message': 'Expiry date cannot be earlier than manufacturing date'}), 400
+            item_id = item_data.get('item_id')
+            if item_id is None:
+                return jsonify({'success': False, 'message': 'Each receipt item requires an item_id'}), 400
+            ri = StockReceiptItem(
+                receipt_id=receipt.id, item_id=item_id,
+                quantity=qty, unit=item_data.get('unit'),
+                batch_no=item_data.get('batch_no'), serial_no=item_data.get('serial_no'),
+                mfg_date=mfg, expiry_date=exp,
+                unit_cost=unit_cost, total_cost=unit_cost * qty
+            )
+            db.session.add(ri)
+            update_inventory(item_id, receipt.warehouse_id, qty)
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Stock receipt updated', 'data': receipt.to_dict()})
+    except ValueError as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
 # ============ INVENTORY API ============
 @app.route('/api/inventory', methods=['GET'])
 @login_required
@@ -1530,7 +1924,29 @@ def get_inventory():
             query = query.join(Item).filter(Item.name.ilike(f'%{search}%'))
         inventory = query.order_by(Inventory.updated_at.desc()).all()
         results = [inv.to_dict() for inv in inventory]
-        if status == 'low_stock':
+
+        today = date.today()
+        expired_item_ids = set()
+        tracking_ids = [r['item_id'] for r in results if r.get('expiry_tracking')]
+        if tracking_ids:
+            expiry_query = db.session.query(StockReceiptItem.item_id).join(
+                StockReceipt, StockReceiptItem.receipt_id == StockReceipt.id
+            ).filter(
+                StockReceiptItem.item_id.in_(tracking_ids),
+                StockReceiptItem.expiry_date.isnot(None),
+                StockReceiptItem.expiry_date <= today
+            )
+            if warehouse_id:
+                expiry_query = expiry_query.filter(StockReceipt.warehouse_id == warehouse_id)
+            expired_item_ids = {r.item_id for r in expiry_query.all()}
+
+        for r in results:
+            if r.get('expiry_tracking') and r['item_id'] in expired_item_ids:
+                r['status'] = 'expired'
+
+        if status == 'expired':
+            results = [r for r in results if r['status'] == 'expired']
+        elif status == 'low_stock':
             results = [r for r in results if r['status'] == 'low_stock']
         elif status == 'out_of_stock':
             results = [r for r in results if r['status'] == 'out_of_stock']
@@ -1557,21 +1973,42 @@ def get_inventory_summary():
             elif inv.item and inv.item.minimum_stock > 0 and inv.available_quantity <= inv.item.minimum_stock:
                 low_stock_count += 1
         expiring_items = []
-        for item in Item.query.filter(Item.expiry_tracking == True).all():
-            receipts = StockReceiptItem.query.filter(
-                StockReceiptItem.item_id == item.id,
-                StockReceiptItem.expiry_date.isnot(None)
-            ).all()
-            for ri in receipts:
-                if ri.expiry_date and ri.expiry_date <= today:
+        expired_inv_set = set()
+        expiring_30_set = set()
+        expiring_90_set = set()
+        receipt_batches = db.session.query(
+            StockReceiptItem.item_id, StockReceipt.warehouse_id, StockReceiptItem.expiry_date, StockReceiptItem.batch_no, Item.name
+        ).join(
+            StockReceipt, StockReceiptItem.receipt_id == StockReceipt.id
+        ).join(
+            Item, StockReceiptItem.item_id == Item.id
+        ).filter(
+            StockReceiptItem.expiry_date.isnot(None),
+            Item.expiry_tracking == True
+        ).all()
+
+        for item_id, wh_id, expiry_date, batch_no, item_name in receipt_batches:
+            inv = Inventory.query.filter_by(item_id=item_id, warehouse_id=wh_id).first()
+            if not inv or inv.quantity <= 0:
+                continue
+            if expiry_date <= today:
+                key = (item_id, wh_id)
+                if key not in expired_inv_set:
+                    expired_inv_set.add(key)
                     expiring_count += 1
-                    expiring_items.append({'item': item.name, 'batch': ri.batch_no or '', 'expiry': ri.expiry_date.strftime('%Y-%m-%d'), 'status': 'expired'})
-                elif ri.expiry_date and (ri.expiry_date - today).days <= 30:
+                    expiring_items.append({'item': item_name, 'batch': batch_no or '', 'expiry': expiry_date.strftime('%Y-%m-%d'), 'status': 'expired'})
+            elif (expiry_date - today).days <= 30:
+                key = (item_id, wh_id)
+                if key not in expiring_30_set:
+                    expiring_30_set.add(key)
                     expiring_count += 1
-                    expiring_items.append({'item': item.name, 'batch': ri.batch_no or '', 'days': (ri.expiry_date - today).days, 'status': '30_days'})
-                elif ri.expiry_date and (ri.expiry_date - today).days <= 90:
+                    expiring_items.append({'item': item_name, 'batch': batch_no or '', 'days': (expiry_date - today).days, 'status': '30_days'})
+            elif (expiry_date - today).days <= 90:
+                key = (item_id, wh_id)
+                if key not in expiring_90_set:
+                    expiring_90_set.add(key)
                     expiring_count += 1
-                    expiring_items.append({'item': item.name, 'batch': ri.batch_no or '', 'days': (ri.expiry_date - today).days, 'status': '90_days'})
+                    expiring_items.append({'item': item_name, 'batch': batch_no or '', 'days': (expiry_date - today).days, 'status': '90_days'})
         categories = db.session.query(
             Category.name,
             db.func.sum(Inventory.quantity).label('total')
@@ -1871,12 +2308,18 @@ def handle_dispatches():
             return jsonify({'success': False, 'message': 'Warehouse not found'}), 404
         if not incident:
             return jsonify({'success': False, 'message': 'Incident not found'}), 404
+        dispatch_date = parse_date_field({'date': data.get('date')}, 'date', default=date.today())
+        if dispatch_date > date.today():
+            return jsonify({'success': False, 'message': 'Dispatch date cannot be in the future'}), 400
+        phone = data.get('phone', '')
+        if phone and not re.match(r'^[\d\s\+\-\(\)]{7,20}$', phone):
+            return jsonify({'success': False, 'message': 'Phone number format is invalid'}), 400
         items_payload = data.get('items', [])
         if not items_payload:
             return jsonify({'success': False, 'message': 'At least one dispatch item is required'}), 400
         dispatch = Dispatch(
             dispatch_number=data.get('dispatch_number') or generate_dispatch_no(),
-            date=parse_date_field({'date': data.get('date')}, 'date', default=date.today()),
+            date=dispatch_date,
             warehouse_id=warehouse.id, incident_id=incident.id,
             relief_request_id=data.get('relief_request_id'),
             destination=data.get('destination'), receiver=data.get('receiver'),
@@ -1892,6 +2335,9 @@ def handle_dispatches():
             item = db_get(Item, item_id)
             if not item:
                 return jsonify({'success': False, 'message': 'One or more items were not found'}), 404
+            if item.is_distributable is False:
+                db.session.rollback()
+                return jsonify({'success': False, 'message': f'{item.name} is non-distributable equipment and cannot be dispatched. Use stock transfer instead.'}), 400
             inv = Inventory.query.filter_by(item_id=item_id, warehouse_id=warehouse.id).first()
             if not inv or inv.available_quantity < qty:
                 db.session.rollback()
@@ -1928,13 +2374,105 @@ def handle_dispatches():
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 500
 
-@app.route('/api/dispatch/<int:id>', methods=['GET'])
-@login_required
-def get_dispatch(id):
+@app.route('/api/dispatch/<int:id>', methods=['GET', 'PUT'])
+@permission_required('edit')
+def handle_dispatch(id):
     dispatch = db_get(Dispatch, id)
     if not dispatch:
         return jsonify({'success': False, 'message': 'Dispatch not found'}), 404
-    return jsonify({'success': True, 'dispatch': dispatch.to_dict()})
+    if request.method == 'GET':
+        return jsonify({'success': True, 'dispatch': dispatch.to_dict()})
+    try:
+        data = request.get_json()
+        if not isinstance(data, dict):
+            return jsonify({'success': False, 'message': 'Invalid JSON payload'}), 400
+        warehouse_id = data.get('warehouse_id')
+        incident_id = data.get('incident_id')
+        warehouse = db_get(Warehouse, warehouse_id)
+        incident = db_get(Incident, incident_id)
+        if not warehouse:
+            return jsonify({'success': False, 'message': 'Warehouse not found'}), 404
+        if not incident:
+            return jsonify({'success': False, 'message': 'Incident not found'}), 404
+        dispatch_date = parse_date_field({'date': data.get('date')}, 'date', default=date.today())
+        if dispatch_date > date.today():
+            return jsonify({'success': False, 'message': 'Dispatch date cannot be in the future'}), 400
+        phone = data.get('phone', '')
+        if phone and not re.match(r'^[\d\s\+\-\(\)]{7,20}$', phone):
+            return jsonify({'success': False, 'message': 'Phone number format is invalid'}), 400
+        items_payload = data.get('items', [])
+        if not items_payload:
+            return jsonify({'success': False, 'message': 'At least one dispatch item is required'}), 400
+        # Reverse old inventory and relief request quantities
+        for old_item in dispatch.items:
+            inv = Inventory.query.filter_by(item_id=old_item.item_id, warehouse_id=dispatch.warehouse_id).first()
+            if inv:
+                inv.quantity += old_item.quantity
+            if dispatch.relief_request_id:
+                rr_item = ReliefRequestItem.query.filter_by(request_id=dispatch.relief_request_id, item_id=old_item.item_id).first()
+                if rr_item:
+                    rr_item.quantity_dispatched = max(0, (rr_item.quantity_dispatched or 0) - old_item.quantity)
+        # Reset relief request status if old dispatch was linked
+        if dispatch.relief_request_id:
+            old_req = db_get(ReliefRequest, dispatch.relief_request_id)
+            if old_req:
+                old_req.status = 'Pending'
+        # Delete old items
+        DispatchItem.query.filter_by(dispatch_id=dispatch.id).delete()
+        # Create new items and deduct inventory
+        for item_data in items_payload:
+            item_id = item_data.get('item_id')
+            if item_id is None:
+                return jsonify({'success': False, 'message': 'Each dispatch item requires an item_id'}), 400
+            qty = parse_int_field(item_data, 'quantity', minimum=1)
+            item = db_get(Item, item_id)
+            if not item:
+                return jsonify({'success': False, 'message': 'One or more items were not found'}), 404
+            if item.is_distributable is False:
+                db.session.rollback()
+                return jsonify({'success': False, 'message': f'{item.name} is non-distributable equipment and cannot be dispatched. Use stock transfer instead.'}), 400
+            inv = Inventory.query.filter_by(item_id=item_id, warehouse_id=warehouse.id).first()
+            if not inv or inv.quantity < qty:
+                db.session.rollback()
+                item_name = item.name if item else 'Unknown'
+                return jsonify({'success': False, 'message': f'Insufficient stock for {item_name}. Available: {inv.quantity if inv else 0}, Required: {qty}'}), 400
+            batch = item_data.get('batch_no') or ''
+            expiry = None
+            if item_data.get('expiry_date'):
+                expiry = parse_date_field({'expiry_date': item_data['expiry_date']}, 'expiry_date')
+            di = DispatchItem(dispatch_id=dispatch.id, item_id=item_id, quantity=qty,
+                              unit=item_data.get('unit'), batch_no=batch, expiry_date=expiry)
+            db.session.add(di)
+            inv.quantity -= qty
+            if data.get('relief_request_id'):
+                rr_item = ReliefRequestItem.query.filter_by(request_id=data['relief_request_id'], item_id=item_id).first()
+                if rr_item:
+                    rr_item.quantity_dispatched = (rr_item.quantity_dispatched or 0) + qty
+        if data.get('relief_request_id'):
+            req = db_get(ReliefRequest, data['relief_request_id'])
+            if req and req.items:
+                all_dispatched = all(ri.quantity_dispatched >= ri.quantity_requested for ri in req.items)
+                cash_done = req.distributed_cash_amount >= req.requested_cash_amount if req.requested_cash_amount > 0 else True
+                anything_done = any(ri.quantity_dispatched > 0 for ri in req.items)
+                if all_dispatched and cash_done:
+                    req.status = 'Completed'
+                elif anything_done or req.distributed_cash_amount > 0:
+                    req.status = 'Partial'
+        # Update dispatch fields
+        dispatch.dispatch_number = data.get('dispatch_number') or dispatch.dispatch_number
+        dispatch.date = dispatch_date
+        dispatch.warehouse_id = warehouse.id
+        dispatch.incident_id = incident.id
+        dispatch.relief_request_id = data.get('relief_request_id')
+        dispatch.destination = data.get('destination')
+        dispatch.receiver = data.get('receiver')
+        dispatch.phone = phone
+        dispatch.remarks = data.get('remarks')
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Dispatch updated', 'data': dispatch.to_dict()}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 # ============ DISTRIBUTION API ============
 def generate_distribution_no():
@@ -1966,14 +2504,29 @@ def handle_distributions():
         if incident_id and int(incident_id) != dispatch.incident_id:
             return jsonify({'success': False, 'message': 'Incident does not match selected dispatch'}), 400
         allowed_items = {di.item.name for di in dispatch.items if di.item}
+        dispatch_qty_map = {di.item.name: di.quantity for di in dispatch.items if di.item}
         beneficiaries_payload = data.get('beneficiaries', [])
         if not beneficiaries_payload:
             return jsonify({'success': False, 'message': 'At least one beneficiary is required'}), 400
+        dist_date = parse_date_field({'distribution_date': data.get('distribution_date')}, 'distribution_date', default=date.today())
+        if dist_date > date.today():
+            return jsonify({'success': False, 'message': 'Distribution date cannot be in the future'}), 400
+        # Validate total distributed qty per item does not exceed dispatched qty
+        dist_totals = {}
+        for ben_data in beneficiaries_payload:
+            item_name = (ben_data.get('item') or '').strip()
+            qty = parse_int_field(ben_data, 'quantity', minimum=1)
+            if item_name:
+                dist_totals[item_name] = dist_totals.get(item_name, 0) + qty
+        for item_name, total in dist_totals.items():
+            dispatched = dispatch_qty_map.get(item_name, 0)
+            if total > dispatched:
+                return jsonify({'success': False, 'message': f'Distributed quantity for "{item_name}" ({total}) exceeds dispatched quantity ({dispatched})'}), 400
         dist = Distribution(
             distribution_no=data.get('distribution_no') or generate_distribution_no(),
             dispatch_id=dispatch_id, incident_id=dispatch.incident_id,
             location=data.get('location'),
-            distribution_date=parse_date_field({'distribution_date': data.get('distribution_date')}, 'distribution_date', default=date.today()),
+            distribution_date=dist_date,
             officer=data.get('officer'), remarks=data.get('remarks'), created_by=current_user.id
         )
         db.session.add(dist)
@@ -2907,6 +3460,35 @@ def upload_file():
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
 
+@app.route('/api/upload/item-photo', methods=['POST'])
+@login_required
+def upload_item_photo():
+    try:
+        if 'file' not in request.files:
+            return jsonify({'success': False, 'message': 'No file provided'}), 400
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'success': False, 'message': 'No file selected'}), 400
+        ALLOWED_EXTENSIONS = {'jpg', 'jpeg', 'png', 'gif', 'svg', 'webp'}
+        ext = file.filename.rsplit('.', 1)[-1].lower() if '.' in file.filename else ''
+        if ext not in ALLOWED_EXTENSIONS:
+            return jsonify({'success': False, 'message': 'Allowed: JPG, PNG, GIF, SVG, WEBP'}), 400
+        import uuid as uuid_lib
+        safe_name = f"item_{uuid_lib.uuid4().hex}.{ext}"
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], safe_name)
+        file.save(filepath)
+        return jsonify({
+            'success': True,
+            'message': 'Photo uploaded',
+            'data': {
+                'filename': safe_name,
+                'url': f'/uploads/{safe_name}',
+                'file_size': os.path.getsize(filepath)
+            }
+        }), 201
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
 @app.route('/uploads/<filename>')
 def uploaded_file(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
@@ -3107,7 +3689,7 @@ def api_create_user():
             return jsonify({'success': False, 'message': 'Username and password required'}), 400
         if len(password) < 6:
             return jsonify({'success': False, 'message': 'Password must be at least 6 characters'}), 400
-        if role not in {'viewer', 'editor', 'operator', 'finance', 'admin'}:
+        if role not in {'viewer', 'editor', 'operator', 'finance', 'admin', 'warehouse_manager', 'data_entry'}:
             return jsonify({'success': False, 'message': 'Invalid role'}), 400
         existing = get_user_by_username(db, username)
         if existing:
@@ -3138,7 +3720,7 @@ def api_update_user(user_id):
         params = {'id': user_id}
         if 'role' in data:
             role = (data.get('role') or '').strip()
-            if role not in {'viewer', 'editor', 'operator', 'finance', 'admin'}:
+            if role not in {'viewer', 'editor', 'operator', 'finance', 'admin', 'warehouse_manager', 'data_entry'}:
                 return jsonify({'success': False, 'message': 'Invalid role'}), 400
             updates.append("role = :role")
             params['role'] = role
@@ -3256,6 +3838,13 @@ def get_notifications():
         out_count = sum(1 for inv in low_stock if inv.quantity <= 0)
         if out_count > 0:
             notifications.append({'type': 'out_of_stock', 'title': 'Out of Stock', 'message': f'{out_count} item(s) are out of stock', 'url': url_for('inventory_page'), 'created_at': datetime.now(timezone.utc).isoformat()})
+        reorder_count = sum(1 for inv in low_stock if inv.item and inv.item.max_stock > 0 and inv.quantity <= inv.item.max_stock * 0.25)
+        if reorder_count > 0:
+            notifications.append({'type': 'reorder', 'title': 'Reorder Needed', 'message': f'{reorder_count} item(s) at reorder point', 'url': url_for('inventory_page'), 'created_at': datetime.now(timezone.utc).isoformat()})
+        for wh in Warehouse.query.all():
+            total_qty = sum(inv.quantity for inv in Inventory.query.filter_by(warehouse_id=wh.id).all())
+            if wh.capacity > 0 and total_qty > wh.capacity * 0.9:
+                notifications.append({'type': 'capacity', 'title': 'Warehouse Capacity Alert', 'message': f'{wh.name} is at {int(total_qty/wh.capacity*100)}% capacity', 'url': url_for('warehouses_page'), 'created_at': datetime.now(timezone.utc).isoformat()})
         active = Incident.query.filter(Incident.status == 'Active').count()
         if active > 0:
             notifications.append({'type': 'incident', 'title': 'Active Incidents', 'message': f'{active} active incident(s)', 'url': url_for('incidents_page'), 'created_at': datetime.now(timezone.utc).isoformat()})
@@ -3267,20 +3856,32 @@ def get_notifications():
 @app.route('/api/data', methods=['GET'])
 @login_required
 def get_form_data():
+    inv_avail_rows = db.session.query(
+        Inventory.item_id,
+        db.func.sum(Inventory.quantity - Inventory.reserved_quantity)
+    ).group_by(Inventory.item_id).all()
+    inventory_available = {row[0]: row[1] or 0 for row in inv_avail_rows}
+    total_fund_balance = db.session.query(
+        db.func.coalesce(db.func.sum(CashFund.current_balance), 0)
+    ).scalar()
+
     return jsonify({
         'success': True,
         'warehouses': [w.to_dict() for w in Warehouse.query.all()],
         'categories': [c.to_dict() for c in Category.query.all()],
         'items': [i.to_dict() for i in Item.query.all()],
+        'inventory_available': inventory_available,
+        'total_fund_balance': total_fund_balance,
         'incidents': [i.to_dict() for i in Incident.query.all()],
         'requests': [r.to_dict() for r in ReliefRequest.query.all()],
         'dispatches': [d.to_dict() for d in Dispatch.query.all()],
         'assessments': [a.to_dict() for a in DisasterAssessment.query.all()],
-        'source_types': ['Government Supply', 'Donation', 'NGO', 'Local Government', 'Purchase', 'Transfer', 'Other'],
+        'source_types': ['Government Supply', 'Donation', 'NGO', 'Local Government', 'Purchase', 'Supplier', 'Transfer', 'Other'],
         'priorities': ['Low', 'Medium', 'High', 'Urgent'],
         'adjustment_types': ['Increase', 'Decrease', 'Damage', 'Expired', 'Lost', 'Correction', 'Correction_Increase'],
         'adjustment_reasons': ['Damage', 'Loss', 'Physical Count', 'Correction', 'Expired', 'Miscount'],
         'units': ['Kg', 'Gram', 'Packet', 'Piece', 'Box', 'Bottle', 'Roll', 'Set', 'Carton', 'Bundle', 'Litre', 'Meter', 'Sack'],
+        'user_roles': ['admin', 'warehouse_manager', 'data_entry', 'viewer', 'editor', 'operator', 'finance'],
         'storage_requirements': ['Normal', 'Dry Storage', 'Cold Storage', 'Refrigerated', 'Hazardous'],
         'incident_types': AppSettings.get_setting('disaster_types', ['Flood', 'Earthquake', 'Landslide', 'Fire', 'Storm', 'Epidemic', 'Other']),
         'fiscal_years': AppSettings.get_setting('fiscal_years', ['2080/81', '2081/82', '2082/83', '2083/84', '2084/85']),
@@ -3291,6 +3892,9 @@ def get_form_data():
         'cash_funds': [f.to_dict() for f in CashFund.query.all()],
         'cash_requests': [r.to_dict() for r in CashRequest.query.all()],
         'beneficiaries': [b.to_dict() for b in Beneficiary.query.all()],
+        'suppliers': [s.to_dict() for s in Supplier.query.all()],
+        'supplier_types': ['Government', 'NGO', 'Private', 'Individual', 'Other'],
+        'warehouse_zones': [z.to_dict() for z in WarehouseZone.query.all()],
         'funding_sources': ['Federal Government', 'Provincial Government', 'Municipality', 'Disaster Relief Fund', 'Donor Agency', 'NGO', 'Other'],
         'cash_purposes': ['Medical Support', 'Immediate Relief', 'Temporary Shelter', 'Funeral Support', 'Food Assistance', 'Livelihood Support', 'Other'],
         'cash_request_statuses': ['Pending', 'Approved', 'Rejected', 'Partial', 'Completed'],
@@ -3795,6 +4399,305 @@ def report_cash_yearly():
     pdf = make_pdf_report(f'Yearly Cash Report - {year}', headers, rows, [10*mm, 30*mm, 50*mm, 50*mm])
     return make_response(pdf.getvalue(), 200, {'Content-Type': 'application/pdf', 'Content-Disposition': f'attachment; filename=cash_yearly_report_{year}.pdf'})
 
+# ============ PRINT ROUTES ============
+@app.route('/api/distributions/<int:id>/print', methods=['GET'])
+@login_required
+def print_distribution(id):
+    dist = db_get(Distribution, id)
+    if not dist:
+        return jsonify({'success': False, 'message': 'Distribution not found'}), 404
+    office = AppSettings.get_setting('office_name', 'LEOC')
+    address = AppSettings.get_setting('address', '')
+    return render_template('print_distribution.html', dist=dist, office=office, address=address)
+
+@app.route('/api/dispatch/<int:id>/print', methods=['GET'])
+@login_required
+def print_dispatch(id):
+    dispatch = db_get(Dispatch, id)
+    if not dispatch:
+        return jsonify({'success': False, 'message': 'Dispatch not found'}), 404
+    office = AppSettings.get_setting('office_name', 'LEOC')
+    address = AppSettings.get_setting('address', '')
+    return render_template('print_dispatch.html', dispatch=dispatch, office=office, address=address)
+
+@app.route('/api/stock-receipts/<int:id>/print', methods=['GET'])
+@login_required
+def print_receipt(id):
+    receipt = db_get(StockReceipt, id)
+    if not receipt:
+        return jsonify({'success': False, 'message': 'Receipt not found'}), 404
+    office = AppSettings.get_setting('office_name', 'LEOC')
+    address = AppSettings.get_setting('address', '')
+    return render_template('print_receipt.html', receipt=receipt, office=office, address=address)
+
+@app.route('/api/relief-requests/<int:id>/print', methods=['GET'])
+@login_required
+def print_request(id):
+    req = db_get(ReliefRequest, id)
+    if not req:
+        return jsonify({'success': False, 'message': 'Request not found'}), 404
+    office = AppSettings.get_setting('office_name', 'LEOC')
+    address = AppSettings.get_setting('address', '')
+    return render_template('print_request.html', req=req, office=office, address=address)
+
+@app.route('/api/inventory/bin-card', methods=['GET'])
+@login_required
+def print_bin_card():
+    item_id = request.args.get('item_id', type=int)
+    warehouse_id = request.args.get('warehouse_id', type=int)
+    if not item_id or not warehouse_id:
+        return jsonify({'success': False, 'message': 'Item and warehouse are required'}), 400
+    item = db_get(Item, item_id)
+    warehouse = db_get(Warehouse, warehouse_id)
+    if not item or not warehouse:
+        return jsonify({'success': False, 'message': 'Item or warehouse not found'}), 404
+    inv = Inventory.query.filter_by(item_id=item_id, warehouse_id=warehouse_id).first()
+
+    receipts = StockReceiptItem.query.filter_by(item_id=item_id).all()
+    receipts = [r for r in receipts if r.receipt and r.receipt.warehouse_id == warehouse_id]
+    adjustments = ManualAdjustment.query.filter_by(item_id=item_id, warehouse_id=warehouse_id).all()
+    dispatches = DispatchItem.query.filter_by(item_id=item_id).all()
+    dispatches = [d for d in dispatches if d.dispatch and d.dispatch.warehouse_id == warehouse_id]
+    transfers_out = StockTransferItem.query.filter_by(item_id=item_id).all()
+    transfers_out = [t for t in transfers_out if t.transfer and t.transfer.from_warehouse_id == warehouse_id]
+    transfers_in = StockTransferItem.query.filter_by(item_id=item_id).all()
+    transfers_in = [t for t in transfers_in if t.transfer and t.transfer.to_warehouse_id == warehouse_id]
+
+    events = []
+    for r in receipts:
+        events.append({'date': r.receipt.date.strftime('%Y-%m-%d') if r.receipt.date else '',
+                       'type': 'Receipt', 'ref': r.receipt.receipt_no,
+                       'party': r.receipt.source_name or '',
+                       'in': r.quantity, 'out': 0,
+                       'batch': r.batch_no or '', 'remarks': r.receipt.remarks or '',
+                       'sort_key': (r.receipt.date or date.min, r.receipt.id)})
+    for a in adjustments:
+        if a.adjustment_type in ('Increase', 'Correction_Increase'):
+            events.append({'date': a.date.strftime('%Y-%m-%d') if a.date else '',
+                           'type': 'Adjustment (+%s)' % a.reason if a.reason else 'Adjustment (+)',
+                           'ref': a.adjustment_no, 'party': '',
+                           'in': a.adjusted_quantity, 'out': 0, 'batch': '',
+                           'remarks': a.reason or '', 'sort_key': (a.date or date.min, a.id)})
+        else:
+            events.append({'date': a.date.strftime('%Y-%m-%d') if a.date else '',
+                           'type': 'Adjustment (-%s)' % a.reason if a.reason else 'Adjustment (-)',
+                           'ref': a.adjustment_no, 'party': '',
+                           'in': 0, 'out': a.adjusted_quantity, 'batch': '',
+                           'remarks': a.reason or '', 'sort_key': (a.date or date.min, a.id)})
+    for d in dispatches:
+        events.append({'date': d.dispatch.date.strftime('%Y-%m-%d') if d.dispatch.date else '',
+                       'type': 'Dispatch', 'ref': d.dispatch.dispatch_number,
+                       'party': d.dispatch.destination or d.dispatch.receiver or '',
+                       'in': 0, 'out': d.quantity,
+                       'batch': d.batch_no or '', 'remarks': '',
+                       'sort_key': (d.dispatch.date or date.min, d.dispatch.id)})
+    for t in transfers_out:
+        events.append({'date': t.transfer.transfer_date.strftime('%Y-%m-%d') if t.transfer.transfer_date else '',
+                       'type': 'Transfer Out', 'ref': t.transfer.transfer_no,
+                       'party': t.transfer.to_warehouse.name if t.transfer.to_warehouse else '',
+                       'in': 0, 'out': t.quantity,
+                       'batch': t.batch_no or '', 'remarks': t.transfer.reason or '',
+                       'sort_key': (t.transfer.transfer_date or date.min, t.transfer.id)})
+    for t in transfers_in:
+        events.append({'date': t.transfer.transfer_date.strftime('%Y-%m-%d') if t.transfer.transfer_date else '',
+                       'type': 'Transfer In', 'ref': t.transfer.transfer_no,
+                       'party': t.transfer.from_warehouse.name if t.transfer.from_warehouse else '',
+                       'in': t.quantity, 'out': 0,
+                       'batch': t.batch_no or '', 'remarks': t.transfer.reason or '',
+                       'sort_key': (t.transfer.transfer_date or date.min, t.transfer.id)})
+
+    events.sort(key=lambda e: e['sort_key'])
+
+    running = 0
+    seq = 0
+    for e in events:
+        seq += 1
+        e['sno'] = seq
+        if e['type'] in ('Receipt', 'Transfer In') or e['type'].startswith('Adjustment (+'):
+            running += e['in']
+        elif e['type'] in ('Dispatch', 'Transfer Out') or e['type'].startswith('Adjustment (-'):
+            running -= e['out']
+        e['balance'] = running
+
+    office = AppSettings.get_setting('office_name', 'LEOC')
+    address = AppSettings.get_setting('address', '')
+    now_val = datetime.now()
+    return render_template('print_bin_card.html', item=item, warehouse=warehouse, inv=inv,
+                           events=events, office=office, address=address,
+                           current_balance=inv.quantity if inv else 0,
+                           generated_at=now_val.strftime('%Y-%m-%d %H:%M'))
+
+@app.route('/api/inventory/stock-book', methods=['GET'])
+@login_required
+def print_stock_book():
+    warehouse_id = request.args.get('warehouse_id', type=int)
+    from_date_str = request.args.get('from_date')
+    to_date_str = request.args.get('to_date')
+    warehouse = db_get(Warehouse, warehouse_id) if warehouse_id else None
+    if not warehouse:
+        return jsonify({'success': False, 'message': 'Warehouse is required'}), 400
+
+    from_date = None
+    to_date = None
+    try:
+        from_date = datetime.strptime(from_date_str, '%Y-%m-%d').date() if from_date_str else None
+        to_date = datetime.strptime(to_date_str, '%Y-%m-%d').date() if to_date_str else None
+    except (ValueError, TypeError):
+        pass
+
+    all_inv = Inventory.query.filter_by(warehouse_id=warehouse_id).all()
+    rows = []
+    grand_opening = grand_received = grand_dispatched = grand_balance = 0
+
+    for inv in all_inv:
+        if not inv.item:
+            continue
+        item = inv.item
+
+        all_receipts = StockReceiptItem.query.filter_by(item_id=item.id).all()
+        all_receipts = [r for r in all_receipts if r.receipt and r.receipt.warehouse_id == warehouse_id]
+
+        all_dispatches = DispatchItem.query.filter_by(item_id=item.id).all()
+        all_dispatches = [d for d in all_dispatches if d.dispatch and d.dispatch.warehouse_id == warehouse_id]
+
+        all_adjustments = ManualAdjustment.query.filter_by(item_id=item.id, warehouse_id=warehouse_id).all()
+
+        all_transfers_out = StockTransferItem.query.filter_by(item_id=item.id).all()
+        all_transfers_out = [t for t in all_transfers_out if t.transfer and t.transfer.from_warehouse_id == warehouse_id]
+
+        all_transfers_in = StockTransferItem.query.filter_by(item_id=item.id).all()
+        all_transfers_in = [t for t in all_transfers_in if t.transfer and t.transfer.to_warehouse_id == warehouse_id]
+
+        def sum_receipts_before(rcpts, cutoff):
+            return sum(r.quantity for r in rcpts if r.receipt and (cutoff is None or r.receipt.date < cutoff))
+
+        def sum_dispatches_before(dsps, cutoff):
+            return sum(d.quantity for d in dsps if d.dispatch and (cutoff is None or d.dispatch.date < cutoff))
+
+        def sum_adjustments_before(adj, cutoff):
+            total = 0
+            for a in adj:
+                if cutoff is not None and a.date and a.date >= cutoff:
+                    continue
+                if a.adjustment_type in ('Increase', 'Correction_Increase'):
+                    total += a.adjusted_quantity
+                else:
+                    total -= a.adjusted_quantity
+            return total
+
+        def sum_transfers_before(trns, cutoff, is_out=False):
+            total = 0
+            for t in trns:
+                if cutoff is not None and t.transfer and t.transfer.transfer_date and t.transfer.transfer_date >= cutoff:
+                    continue
+                if is_out:
+                    total -= t.quantity
+                else:
+                    total += t.quantity
+            return total
+
+        def sum_receipts_in_range(rcpts, frm, to):
+            total = 0
+            for r in rcpts:
+                if r.receipt and r.receipt.date:
+                    if frm and r.receipt.date < frm:
+                        continue
+                    if to and r.receipt.date > to:
+                        continue
+                    total += r.quantity
+            return total
+
+        def sum_dispatches_in_range(dsps, frm, to):
+            total = 0
+            for d in dsps:
+                if d.dispatch and d.dispatch.date:
+                    if frm and d.dispatch.date < frm:
+                        continue
+                    if to and d.dispatch.date > to:
+                        continue
+                    total += d.quantity
+            return total
+
+        def sum_adjustments_in_range(adj, frm, to):
+            total = 0
+            for a in adj:
+                if a.date:
+                    if frm and a.date < frm:
+                        continue
+                    if to and a.date > to:
+                        continue
+                    if a.adjustment_type in ('Increase', 'Correction_Increase'):
+                        total += a.adjusted_quantity
+                    else:
+                        total -= a.adjusted_quantity
+            return total
+
+        def sum_transfers_in_range(trns, frm, to, is_out=False):
+            total = 0
+            for t in trns:
+                if t.transfer and t.transfer.transfer_date:
+                    if frm and t.transfer.transfer_date < frm:
+                        continue
+                    if to and t.transfer.transfer_date > to:
+                        continue
+                    if is_out:
+                        total -= t.quantity
+                    else:
+                        total += t.quantity
+            return total
+
+        # Opening balance: quantity before from_date
+        opening = inv.quantity
+        if from_date:
+            opening = 0
+            opening += sum_receipts_before(all_receipts, from_date)
+            opening -= sum_dispatches_before(all_dispatches, from_date)
+            opening += sum_adjustments_before(all_adjustments, from_date)
+            opening += sum_transfers_before(all_transfers_in, from_date, is_out=False)
+            opening += sum_transfers_before(all_transfers_out, from_date, is_out=True)
+            opening = max(opening, 0)
+
+        # Period transactions
+        received = sum_receipts_in_range(all_receipts, from_date, to_date)
+        received += sum_transfers_in_range(all_transfers_in, from_date, to_date, is_out=False)
+        adj_in = sum_adjustments_in_range(all_adjustments, from_date, to_date)
+        if adj_in > 0:
+            received += adj_in
+
+        dispatched = sum_dispatches_in_range(all_dispatches, from_date, to_date)
+        dispatched += sum_transfers_in_range(all_transfers_out, from_date, to_date, is_out=True)
+        if adj_in < 0:
+            dispatched += abs(adj_in)
+
+        closing = opening + received - dispatched
+        closing = max(closing, 0)
+
+        rows.append({
+            'item_name': item.name,
+            'item_code': item.item_code or '',
+            'local_name': item.local_name or '',
+            'unit': item.unit or '',
+            'opening': opening,
+            'received': received,
+            'dispatched': dispatched,
+            'balance': closing
+        })
+        grand_opening += opening
+        grand_received += received
+        grand_dispatched += dispatched
+        grand_balance += closing
+
+    office = AppSettings.get_setting('office_name', 'LEOC')
+    address = AppSettings.get_setting('address', '')
+    fiscal_year = AppSettings.get_setting('active_fiscal_year', '')
+    now_val = datetime.now()
+    return render_template('print_stock_book.html', warehouse=warehouse, rows=rows,
+                           office=office, address=address,
+                           from_date=from_date_str or '', to_date=to_date_str or '',
+                           grand_opening=grand_opening, grand_received=grand_received,
+                           grand_dispatched=grand_dispatched, grand_balance=grand_balance,
+                           fiscal_year=fiscal_year, generated_at=now_val.strftime('%Y-%m-%d %H:%M'))
+
 # ============ DATABASE INITIALIZATION ============
 def init_db():
     with app.app_context():
@@ -3824,9 +4727,9 @@ def init_db():
                 db.session.execute(db.text("INSERT INTO \"user\" (username, password_hash, role, full_name, is_active) VALUES (:u, :p, :r, :f, 1)"),
                     {'u': 'admin', 'p': generate_password_hash(admin_password), 'r': 'admin', 'f': 'System Administrator'})
                 db.session.execute(db.text("INSERT INTO \"user\" (username, password_hash, role, full_name, is_active) VALUES (:u, :p, :r, :f, 1)"),
-                    {'u': 'manager', 'p': generate_password_hash('manager123'), 'r': 'manager', 'f': 'Warehouse Manager'})
+                    {'u': 'manager', 'p': generate_password_hash('manager123'), 'r': 'warehouse_manager', 'f': 'Warehouse Manager'})
                 db.session.execute(db.text("INSERT INTO \"user\" (username, password_hash, role, full_name, is_active) VALUES (:u, :p, :r, :f, 1)"),
-                    {'u': 'dataentry', 'p': generate_password_hash('data123'), 'r': 'dataentry', 'f': 'Data Entry Operator'})
+                    {'u': 'dataentry', 'p': generate_password_hash('data123'), 'r': 'data_entry', 'f': 'Data Entry Operator'})
                 db.session.execute(db.text("INSERT INTO \"user\" (username, password_hash, role, full_name, is_active) VALUES (:u, :p, :r, :f, 1)"),
                     {'u': 'viewer', 'p': generate_password_hash('viewer123'), 'r': 'viewer', 'f': 'Read Only User'})
                 db.session.commit()
