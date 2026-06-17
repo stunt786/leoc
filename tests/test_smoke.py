@@ -82,9 +82,6 @@ class SmokeTestCase(unittest.TestCase):
         payload = {
             'incident_name': name or f'Incident-{uuid.uuid4().hex[:8]}',
             'incident_type': incident_type,
-            'province': 'Koshi',
-            'district': 'Bajhang',
-            'municipality': 'Thalara',
             'ward': ward,
             'start_date': '2026-06-10',
             'status': 'Active',

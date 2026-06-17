@@ -254,31 +254,120 @@
         </div>
     </div>
 </div>
-{% endblock %}
-
-<!-- History Modal -->
-<div class="modal fade" id="historyModal" tabindex="-1">
-    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+<!-- ==================== ITEM HISTORY MODAL (Rich UI) ==================== -->
+<div class="modal fade" id="historyModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-fullscreen modal-dialog-scrollable">
         <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title"><i class="bi bi-clock-history me-2"></i>Item History: <span id="historyItemName"></span></h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            <!-- Header -->
+            <div class="modal-header bg-gradient-primary text-white py-3" style="background:linear-gradient(135deg,#1e293b,#334155)">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="rounded-circle bg-white bg-opacity-20 p-2" style="width:42px;height:42px;background:rgba(255,255,255,0.15)">
+                        <i class="bi bi-clock-history text-white fs-5 d-flex align-items-center justify-content-center h-100"></i>
+                    </div>
+                    <div>
+                        <h5 class="mb-0 text-white fw-semibold">Item Movement History</h5>
+                        <small class="text-white-50" id="historyItemSubtitle">Complete transaction trail</small>
+                    </div>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body">
-                <div id="historySummary" class="row g-2 mb-3"></div>
-                <div class="table-responsive">
-                    <table class="table table-sm table-hover">
-                        <thead><tr><th>Date</th><th>Type</th><th>Reference</th><th>Warehouse</th><th>Detail</th><th>Change</th></tr></thead>
-                        <tbody id="historyBody"><tr><td colspan="6" class="text-center text-muted py-3">Loading...</td></tr></tbody>
-                    </table>
+
+            <div class="modal-body p-0">
+                <!-- Item Info Bar -->
+                <div class="px-4 py-3 border-bottom bg-light" id="historyItemInfo" style="display:none">
+                    <div class="d-flex align-items-center gap-3 flex-wrap">
+                        <div class="rounded border overflow-hidden d-flex align-items-center justify-content-center" style="width:48px;height:48px;background:#fff;flex-shrink:0">
+                            <img id="historyItemPhoto" src="" alt="" style="max-width:100%;max-height:100%;display:none">
+                            <i id="historyItemPhotoPlaceholder" class="bi bi-box text-muted fs-4"></i>
+                        </div>
+                        <div>
+                            <strong id="historyItemName" class="fs-6"></strong>
+                            <div class="d-flex gap-3 mt-1 text-muted small flex-wrap">
+                                <span><i class="bi bi-upc-scan me-1"></i>Code: <span id="historyItemCode" class="fw-medium"></span></span>
+                                <span><i class="bi bi-tag me-1"></i>Category: <span id="historyItemCategory" class="fw-medium"></span></span>
+                                <span><i class="bi bi-rulers me-1"></i>Unit: <span id="historyItemUnit" class="fw-medium"></span></span>
+                                <span><i class="bi bi-check-circle me-1"></i>Status: <span id="historyItemStatus" class="fw-medium"></span></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Summary Stats -->
+                <div class="px-4 pt-3 pb-2" id="historyStatsSection" style="display:none">
+                    <div class="row g-2" id="historySummary"></div>
+                </div>
+
+                <!-- Filters -->
+                <div class="px-4 py-2 border-top border-bottom" id="historyFilterSection" style="display:none">
+                    <div class="d-flex flex-wrap gap-2 align-items-center">
+                        <div class="d-flex align-items-center gap-1">
+                            <i class="bi bi-funnel text-muted small"></i>
+                            <select class="form-select form-select-sm" style="width:auto;min-width:140px" id="historyTypeFilter" onchange="filterHistoryEvents()">
+                                <option value="">All Event Types</option>
+                            </select>
+                        </div>
+                        <div class="d-flex align-items-center gap-1">
+                            <i class="bi bi-geo-alt text-muted small"></i>
+                            <select class="form-select form-select-sm" style="width:auto;min-width:140px" id="historyWarehouseFilter" onchange="filterHistoryEvents()">
+                                <option value="">All Warehouses</option>
+                            </select>
+                        </div>
+                        <div class="d-flex align-items-center gap-1">
+                            <i class="bi bi-calendar text-muted small"></i>
+                            <input type="date" class="form-control form-control-sm" style="width:auto;min-width:130px" id="historyDateFrom" onchange="filterHistoryEvents()" placeholder="From">
+                            <span class="text-muted small">→</span>
+                            <input type="date" class="form-control form-control-sm" style="width:auto;min-width:130px" id="historyDateTo" onchange="filterHistoryEvents()" placeholder="To">
+                        </div>
+                        <div class="ms-auto">
+                            <span class="text-muted small" id="historyCountBadge"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Events Table -->
+                <div class="px-4 py-3">
+                    <div id="historyLoading" class="text-center py-5">
+                        <div class="spinner-border text-primary mb-2" role="status"></div>
+                        <div class="text-muted small">Loading transaction history...</div>
+                    </div>
+                    <div id="historyContent" style="display:none">
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0" id="historyTable" style="font-size:0.875rem">
+                                <thead class="table-light small text-uppercase text-muted">
+                                    <tr>
+                                        <th style="width:110px">Date</th>
+                                        <th style="width:140px">Event Type</th>
+                                        <th style="width:140px">Reference</th>
+                                        <th>Details</th>
+                                        <th style="width:130px">Warehouse</th>
+                                        <th style="width:90px" class="text-center">Qty Change</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="historyBody"></tbody>
+                            </table>
+                        </div>
+                        <div id="historyEmpty" class="text-center py-5 text-muted" style="display:none">
+                            <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+                            <span>No matching history events found</span>
+                        </div>
+                    </div>
                 </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+
+            <div class="modal-footer border-top d-flex justify-content-between">
+                <div>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="refreshHistory()">
+                        <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+                    </button>
+                </div>
+                <div>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
             </div>
         </div>
     </div>
 </div>
+{% endblock %}
 
 {% block extra_js %}
 <script>
@@ -510,44 +599,216 @@ async function saveItem() {
     } else { showToast('danger', d.message); }
 }
 
+let _historyData = null;
+let _historyAllEvents = [];
+let _activeHistoryItemId = null;
+
+function getEventBadge(type, sub_type) {
+    const map = {
+        'Receipt': '<span class="badge bg-success-subtle text-success border border-success-subtle"><i class="bi bi-box-arrow-in-down me-1"></i>Receipt</span>',
+        'Dispatch': '<span class="badge bg-danger-subtle text-danger border border-danger-subtle"><i class="bi bi-truck me-1"></i>Dispatch</span>',
+        'Adjustment': '<span class="badge bg-warning-subtle text-warning border border-warning-subtle"><i class="bi bi-sliders me-1"></i>Adjustment</span>',
+        'Transfer Out': '<span class="badge bg-info-subtle text-info border border-info-subtle"><i class="bi bi-arrow-right me-1"></i>Transfer Out</span>',
+        'Transfer In': '<span class="badge bg-primary-subtle text-primary border border-primary-subtle"><i class="bi bi-arrow-left me-1"></i>Transfer In</span>',
+        'Distribution': '<span class="badge" style="background:#f3e8ff;color:#7c3aed;border:1px solid #d8b4fe"><i class="bi bi-people me-1"></i>Distribution</span>',
+    };
+    return map[type] || `<span class="badge bg-secondary-subtle text-secondary border">${type}</span>`;
+}
+
+function getQtyBadge(qty_change) {
+    if (qty_change.startsWith('+')) {
+        return `<span class="badge bg-success px-2 py-1 fs-6 fw-semibold">+${qty_change.substring(1)}</span>`;
+    }
+    return `<span class="badge bg-danger px-2 py-1 fs-6 fw-semibold">${qty_change}</span>`;
+}
+
 async function showHistory(id) {
+    _activeHistoryItemId = id;
     const item = items.find(x => x.id === id);
     if (!item) return;
-    document.getElementById('historyItemName').textContent = item.name;
-    document.getElementById('historyBody').innerHTML = '<tr><td colspan="6" class="text-center py-3"><div class="spinner-border spinner-border-sm"></div> Loading...</td></tr>';
+
+    // Reset UI
+    document.getElementById('historyLoading').style.display = 'block';
+    document.getElementById('historyContent').style.display = 'none';
+    document.getElementById('historyStatsSection').style.display = 'none';
+    document.getElementById('historyFilterSection').style.display = 'none';
+    document.getElementById('historyItemInfo').style.display = 'none';
+
+    // Set item header info
+    document.getElementById('historyItemName').textContent = item.name || '';
+    document.getElementById('historyItemSubtitle').textContent = `Complete transaction trail for ${item.item_code ? item.item_code + ' - ' : ''}${item.name || ''}`;
+    document.getElementById('historyItemCode').textContent = item.item_code || '-';
+    document.getElementById('historyItemCategory').textContent = item.category_name || '-';
+    document.getElementById('historyItemUnit').textContent = item.unit || '-';
+    document.getElementById('historyItemStatus').textContent = item.status || 'Active';
+
+    const photoImg = document.getElementById('historyItemPhoto');
+    const photoPlaceholder = document.getElementById('historyItemPhotoPlaceholder');
+    if (item.photo) {
+        photoImg.src = item.photo;
+        photoImg.style.display = 'block';
+        photoPlaceholder.style.display = 'none';
+    } else {
+        photoImg.style.display = 'none';
+        photoPlaceholder.style.display = 'inline-block';
+    }
+
     const modal = new bootstrap.Modal(document.getElementById('historyModal'));
     modal.show();
+
     try {
         const r = await fetch(`/api/items/${id}/history`);
         const d = await r.json();
-        if (!d.success) { document.getElementById('historyBody').innerHTML = '<tr><td colspan="6" class="text-danger">Failed to load</td></tr>'; return; }
-        const s = d.summary;
-        document.getElementById('historySummary').innerHTML = `
-            <div class="col-3"><div class="p-2 bg-light rounded text-center"><small class="text-muted">Received</small><br><strong class="text-success">${s.total_received}</strong></div></div>
-            <div class="col-3"><div class="p-2 bg-light rounded text-center"><small class="text-muted">Dispatched</small><br><strong class="text-danger">${s.total_dispatched}</strong></div></div>
-            <div class="col-3"><div class="p-2 bg-light rounded text-center"><small class="text-muted">Current Stock</small><br><strong class="text-primary">${s.current_stock}</strong></div></div>
-            <div class="col-3"><div class="p-2 bg-light rounded text-center"><small class="text-muted">Warehouse</small><br><strong>${s.warehouse}</strong></div></div>
-        `;
-        const events = d.events || [];
-        if (events.length === 0) {
-            document.getElementById('historyBody').innerHTML = '<tr><td colspan="6" class="text-center text-muted">No history yet</td></tr>';
+        if (!d.success) {
+            document.getElementById('historyLoading').innerHTML = `<div class="text-danger py-4"><i class="bi bi-exclamation-triangle fs-3 d-block mb-2"></i>${d.message}</div>`;
             return;
         }
-        document.getElementById('historyBody').innerHTML = events.map(e => {
-            const cls = e.type === 'Receipt' ? 'text-success' : e.type === 'Dispatch' ? 'text-danger' : 'text-warning';
-            const icon = e.type === 'Receipt' ? 'bi bi-box-arrow-in-down' : e.type === 'Dispatch' ? 'bi bi-box-arrow-up' : 'bi bi-sliders';
-            return `<tr>
-                <td>${e.date}</td>
-                <td><span class="${cls}"><i class="${icon} me-1"></i>${e.type}</span></td>
-                <td>${e.ref}</td>
-                <td>${e.warehouse}</td>
-                <td>${e.detail}</td>
-                <td class="fw-bold ${e.qty_change.startsWith('+') ? 'text-success' : 'text-danger'}">${e.qty_change}</td>
-            </tr>`;
-        }).join('');
+
+        _historyData = d;
+        const s = d.summary;
+        const events = d.events || [];
+        _historyAllEvents = events;
+
+        // Item info bar
+        document.getElementById('historyItemInfo').style.display = 'block';
+
+        // Stats cards
+        document.getElementById('historyStatsSection').style.display = 'block';
+        document.getElementById('historySummary').innerHTML = `
+            <div class="col-md-3 col-6">
+                <div class="card border-0 bg-success bg-opacity-10 h-100">
+                    <div class="card-body p-2 text-center">
+                        <small class="text-muted text-uppercase fs-xs">Received</small>
+                        <div class="fw-bold fs-5 text-success">${s.total_received || 0}</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 col-6">
+                <div class="card border-0 bg-danger bg-opacity-10 h-100">
+                    <div class="card-body p-2 text-center">
+                        <small class="text-muted text-uppercase fs-xs">Dispatched</small>
+                        <div class="fw-bold fs-5 text-danger">${s.total_dispatched || 0}</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 col-6">
+                <div class="card border-0 bg-info bg-opacity-10 h-100">
+                    <div class="card-body p-2 text-center">
+                        <small class="text-muted text-uppercase fs-xs">Transferred</small>
+                        <div class="fw-bold fs-5 text-info">${(s.total_transferred_out || 0) + (s.total_transferred_in || 0)}</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 col-6">
+                <div class="card border-0 bg-primary bg-opacity-10 h-100">
+                    <div class="card-body p-2 text-center">
+                        <small class="text-muted text-uppercase fs-xs">Current Stock</small>
+                        <div class="fw-bold fs-5 text-primary">${s.current_stock || 0}</div>
+                    </div>
+                </div>
+            </div>
+            ${s.total_distinct_beneficiaries ? `
+            <div class="col-md-3 col-6">
+                <div class="card border-0" style="background:#f3e8ff">
+                    <div class="card-body p-2 text-center">
+                        <small class="text-muted text-uppercase fs-xs">Beneficiaries</small>
+                        <div class="fw-bold fs-5" style="color:#7c3aed">${s.total_distinct_beneficiaries}</div>
+                        <small class="text-muted" style="font-size:9px">${s.total_distributed_qty} qty distributed</small>
+                    </div>
+                </div>
+            </div>` : ''}
+            ${s.total_damaged ? `
+            <div class="col-md-3 col-6">
+                <div class="card border-0 bg-warning bg-opacity-10 h-100">
+                    <div class="card-body p-2 text-center">
+                        <small class="text-muted text-uppercase fs-xs">Damaged</small>
+                        <div class="fw-bold fs-5 text-warning">${s.total_damaged}</div>
+                    </div>
+                </div>
+            </div>` : ''}
+            ${s.total_expired ? `
+            <div class="col-md-3 col-6">
+                <div class="card border-0 bg-secondary bg-opacity-10 h-100">
+                    <div class="card-body p-2 text-center">
+                        <small class="text-muted text-uppercase fs-xs">Expired</small>
+                        <div class="fw-bold fs-5 text-secondary">${s.total_expired}</div>
+                    </div>
+                </div>
+            </div>` : ''}
+        `;
+
+        // Populate filters
+        const typeSet = new Set(events.map(e => e.type));
+        const whSet = new Set(events.map(e => e.warehouse).filter(w => w));
+        const typeFilter = document.getElementById('historyTypeFilter');
+        typeFilter.innerHTML = '<option value="">All Event Types</option>' +
+            Array.from(typeSet).sort().map(t => `<option value="${t}">${t}</option>`).join('');
+        const whFilter = document.getElementById('historyWarehouseFilter');
+        whFilter.innerHTML = '<option value="">All Warehouses</option>' +
+            Array.from(whSet).sort().map(w => `<option value="${w}">${w}</option>`).join('');
+
+        // Show filters and content
+        document.getElementById('historyFilterSection').style.display = 'block';
+        document.getElementById('historyLoading').style.display = 'none';
+        document.getElementById('historyContent').style.display = 'block';
+
+        renderHistoryEvents(events);
     } catch(e) {
-        document.getElementById('historyBody').innerHTML = `<tr><td colspan="6" class="text-danger">Error: ${e.message}</td></tr>`;
+        document.getElementById('historyLoading').innerHTML = `<div class="text-danger py-4"><i class="bi bi-exclamation-triangle fs-3 d-block mb-2"></i>Error: ${e.message}</div>`;
     }
+}
+
+function renderHistoryEvents(events) {
+    const tbody = document.getElementById('historyBody');
+    const emptyEl = document.getElementById('historyEmpty');
+    const countEl = document.getElementById('historyCountBadge');
+
+    countEl.textContent = `${events.length} event${events.length !== 1 ? 's' : ''}`;
+
+    if (events.length === 0) {
+        tbody.innerHTML = '';
+        emptyEl.style.display = 'block';
+        return;
+    }
+    emptyEl.style.display = 'none';
+
+    tbody.innerHTML = events.map((e, idx) => {
+        const qtyUp = e.qty_change && !e.qty_change.startsWith('-');
+        const qtyCls = qtyUp ? 'text-success' : 'text-danger';
+        return `<tr class="history-row" style="${idx % 2 === 0 ? '' : 'background:#f8fafc'}">
+            <td class="text-nowrap small">${e.date || '-'}</td>
+            <td>${getEventBadge(e.type, e.sub_type)}</td>
+            <td>
+                <span class="fw-medium small">${e.ref || '-'}</span>
+                ${e.sub_type ? '<br><small class="text-muted">' + e.sub_type + '</small>' : ''}
+            </td>
+            <td>
+                <span class="small">${e.detail || ''}</span>
+                ${e.source ? '<br><small class="text-muted"><i class="bi bi-person me-1"></i>' + e.source + '</small>' : ''}
+            </td>
+            <td class="small">${e.warehouse || '-'}</td>
+            <td class="text-center">${getQtyBadge(e.qty_change)}</td>
+        </tr>`;
+    }).join('');
+}
+
+function filterHistoryEvents() {
+    const typeVal = document.getElementById('historyTypeFilter').value;
+    const whVal = document.getElementById('historyWarehouseFilter').value;
+    const fromVal = document.getElementById('historyDateFrom').value;
+    const toVal = document.getElementById('historyDateTo').value;
+
+    let filtered = _historyAllEvents;
+    if (typeVal) filtered = filtered.filter(e => e.type === typeVal);
+    if (whVal) filtered = filtered.filter(e => e.warehouse === whVal);
+    if (fromVal) filtered = filtered.filter(e => e.date >= fromVal);
+    if (toVal) filtered = filtered.filter(e => e.date <= toVal);
+
+    renderHistoryEvents(filtered);
+}
+
+function refreshHistory() {
+    if (_activeHistoryItemId) showHistory(_activeHistoryItemId);
 }
 
 async function deleteItem(id) {

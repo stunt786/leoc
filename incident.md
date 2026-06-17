@@ -1,0 +1,3022 @@
+{% extends 'base.html' %}
+
+{% block title %}दैनिक विपद् घटना रिपोर्टिङ - LEOC{% endblock %}
+
+{% block extra_css %}
+<style>
+    body {
+        background-color: #f8f9fa;
+    }
+
+    .card {
+        border: none;
+        border-radius: 10px;
+        box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+        transition: box-shadow 0.15s ease-in-out;
+    }
+
+    .card:hover {
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    }
+
+    .stat-card {
+        text-align: center;
+        padding: 1.5rem;
+        border: none;
+        border-radius: 15px !important;
+        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        color: white;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .stat-card::before {
+        content: '';
+        position: absolute;
+        top: -50%;
+        left: -50%;
+        width: 200%;
+        height: 200%;
+        background: radial-gradient(circle, rgba(255, 255, 255, 0.2) 0%, transparent 70%);
+        transform: rotate(45deg);
+        transition: all 0.6s ease;
+        opacity: 0;
+    }
+
+    .stat-card:hover {
+        transform: scale(1.05) translateY(-5px);
+        box-shadow: 0 12px 25px rgba(0, 0, 0, 0.2) !important;
+    }
+
+    .stat-card:hover::before {
+        opacity: 1;
+        transform: rotate(45deg) translate(10%, 10%);
+    }
+
+    .stat-card .icon {
+        font-size: 2.8rem;
+        margin-bottom: 0.5rem;
+        opacity: 0.9;
+    }
+
+    .stat-card .number {
+        font-size: 2.5rem;
+        font-weight: 800;
+        margin: 0.2rem 0;
+        letter-spacing: -1px;
+    }
+
+    .stat-card .label {
+        font-size: 0.95rem;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        opacity: 0.8;
+    }
+
+    .bg-gradient-blue {
+        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    }
+
+    .bg-gradient-red {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    }
+
+    .bg-gradient-orange {
+        background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
+    }
+
+    .bg-gradient-green {
+        background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+    }
+
+    .bg-gradient-purple {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    .chart-container {
+        position: relative;
+        height: 200px;
+        margin-bottom: 1rem;
+    }
+
+    .incident-table th {
+        background-color: #e9ecef;
+    }
+
+    .ward-badge {
+        font-size: 0.8em;
+    }
+
+    .disaster-type-badge {
+        font-size: 0.8em;
+    }
+
+    .navbar-brand {
+        font-weight: bold;
+    }
+
+    /* Modern Tab Styling - Centralized in style.css */
+    #overview-tab.active {
+
+        #overview-tab.active {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%) !important;
+        }
+
+        #event-log-tab.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+        }
+
+        #situation-report-tab.active {
+            background: linear-gradient(135deg, #4481eb 0%, #04befe 100%) !important;
+        }
+
+        #human-impact-tab.active {
+            background: linear-gradient(135deg, #ff0844 0%, #ffb199 100%) !important;
+        }
+
+        #damage-assessment-tab.active {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%) !important;
+        }
+
+        #livestock-damage-tab.active {
+            background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%) !important;
+        }
+
+        #public-info-tab.active {
+            background: linear-gradient(135deg, #37ecba 0%, #72afd3 100%) !important;
+        }
+
+        #input-form-tab.active {
+            background: linear-gradient(135deg, #8e2de2 0%, #4a00e0 100%) !important;
+        }
+
+
+        /* Reduce white space in assessment tabs */
+        #damage-assessment .row.mb-3,
+        #livestock-damage .row.mb-3,
+        #human-impact .row.mb-3,
+        #overview .row.mb-3 {
+            margin-bottom: 0.5rem !important;
+            /* Reduced from default 1rem */
+        }
+
+        /* Improved styling for multi-select dropdown */
+        .multi-select-container {
+            position: relative;
+        }
+
+        .multi-select-container select[multiple] {
+            height: auto;
+            min-height: 40px;
+            padding: 0.375rem 0.75rem;
+        }
+
+        .multi-select-container .form-text {
+            margin-top: 0.25rem;
+            font-size: 0.875em;
+        }
+
+        /* Better styling for form sections */
+        .form-section-card {
+            border: 1px solid #dee2e6;
+            border-radius: 0.375rem;
+            margin-bottom: 1rem;
+        }
+
+        .form-section-card .card-header {
+            background-color: #f8f9fa;
+            border-bottom: 1px solid #dee2e6;
+            padding: 0.75rem 1rem;
+        }
+
+        .form-section-card .card-body {
+            padding: 1.25rem;
+        }
+
+        /* Custom dropdown styling */
+        #wardDropdownMenu {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        #wardDropdownMenu .dropdown-item {
+            cursor: pointer;
+            padding: 0.5rem 1rem;
+        }
+
+        #wardDropdownMenu .dropdown-item:hover {
+            background-color: #f8f9fa;
+        }
+
+        #wardDropdownMenu .dropdown-item.active {
+            background-color: #0d6efd;
+            color: white;
+        }
+
+        /* Ensure label text is visible on stat cards */
+        .stat-card .label {
+            color: inherit;
+        }
+
+        /* Specific overrides for better visibility */
+        .stat-card[style*="ffc107"],
+        .stat-card[style*="e0a800"],
+        .stat-card[style*="fd7e14"],
+        .stat-card[style*="e66100"] {
+            color: #212529 !important;
+        }
+
+        .stat-card[style*="ffc107"] .label,
+        .stat-card[style*="e0a800"] .label,
+        .stat-card[style*="fd7e14"] .label,
+        .stat-card[style*="e66100"] .label {
+            color: #212529 !important;
+        }
+
+        /* Validation error styles */
+        .validation-error {
+            color: #dc3545;
+            font-size: 0.875rem;
+            margin-top: 0.25rem;
+        }
+
+        .is-invalid {
+            border-color: #dc3545 !important;
+        }
+
+        /* Livestock grid layout */
+        .livestock-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1rem;
+        }
+
+        @media (max-width: 992px) {
+            .livestock-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 576px) {
+            .livestock-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .livestock-type-card {
+            border: 1px solid #dee2e6;
+            border-radius: 0.375rem;
+            padding: 1rem;
+            background-color: #f8f9fa;
+        }
+
+        .livestock-type-card h6 {
+            margin-bottom: 0.75rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid #dee2e6;
+            color: #495057;
+        }
+
+        /* Premium Chart Card */
+        .chart-card {
+            background: white;
+            border-radius: 20px;
+            border: none;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+            overflow: hidden;
+            transition: transform 0.3s ease;
+        }
+
+        .chart-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .chart-card .card-header {
+            background: transparent !important;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+            padding: 1.5rem;
+        }
+
+        .chart-card .card-header h5 {
+            color: #2d3748;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .chart-card .card-header i {
+            color: #667eea;
+        }
+
+        .chart-card .card-body {
+            padding: 2rem;
+        }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2 class="mb-0"><i class="bi bi-exclamation-triangle text-danger"></i> दैनिक विपद् घटना रिपोर्टिङ
+                </h2>
+                <div class="btn-group">
+                    <a href="/daily-report-preview" target="_blank" class="btn btn-outline-primary">
+                        <i class="bi bi-printer"></i> प्रिन्ट प्रिभ्यू
+                    </a>
+                    <a href="/api/generate-daily-report" class="btn btn-outline-danger">
+                        <i class="bi bi-file-earmark-pdf"></i> PDF डाउनलोड
+                    </a>
+                </div>
+            </div>
+
+            <!-- Navigation Tabs -->
+            <ul class="nav nav-tabs mb-4" id="disasterTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="overview-tab" data-bs-toggle="tab" data-bs-target="#overview"
+                        type="button" role="tab"><i class="bi bi-grid-1x2"></i> सारांश (Overview)</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="event-log-tab" data-bs-toggle="tab" data-bs-target="#event-log"
+                        type="button" role="tab"><i class="bi bi-journal-text"></i> घटना लग (Event Log)</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="situation-report-tab" data-bs-toggle="tab"
+                        data-bs-target="#situation-report" type="button" role="tab"><i class="bi bi-clipboard-data"></i>
+                        स्थिति रिपोर्ट (SitRep)</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="human-impact-tab" data-bs-toggle="tab" data-bs-target="#human-impact"
+                        type="button" role="tab"><i class="bi bi-people"></i> मानवीय प्रभाव</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="damage-assessment-tab" data-bs-toggle="tab"
+                        data-bs-target="#damage-assessment" type="button" role="tab"><i
+                            class="bi bi-house-exclamation"></i> क्षति मूल्याङ्कन</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="livestock-damage-tab" data-bs-toggle="tab"
+                        data-bs-target="#livestock-damage" type="button" role="tab"><i class="bi bi-bug"></i> पशुचौपाया
+                        क्षति</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="public-info-tab" data-bs-toggle="tab" data-bs-target="#public-info"
+                        type="button" role="tab"><i class="bi bi-megaphone"></i> सार्वजनिक जानकारी</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="input-form-tab" data-bs-toggle="tab" data-bs-target="#input-form"
+                        type="button" role="tab"><i class="bi bi-clipboard-plus"></i> डाटा प्रविष्टि</button>
+                </li>
+            </ul>
+
+            <!-- Tab Content -->
+            <div class="tab-content" id="disasterTabsContent">
+                <!-- Overview Tab -->
+                <div class="tab-pane fade show active" id="overview" role="tabpanel">
+                    <div class="row mb-3">
+                        <div class="col-md-3 mb-3">
+                            <div class="card stat-card bg-gradient-blue">
+                                <div class="icon">
+                                    <i class="bi bi-exclamation-circle-fill"></i>
+                                </div>
+                                <div class="number" id="total-incidents">०</div>
+                                <div class="label">जम्मा घटनाहरू</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="card stat-card bg-gradient-red">
+                                <div class="icon">
+                                    <i class="bi bi-people-fill"></i>
+                                </div>
+                                <div class="number" id="affected-people">०</div>
+                                <div class="label">प्रभावित व्यक्तिहरू</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="card stat-card bg-gradient-orange text-dark">
+                                <div class="icon">
+                                    <i class="bi bi-house-door-fill"></i>
+                                </div>
+                                <div class="number" id="damaged-houses">०</div>
+                                <div class="label">क्षतिग्रस्त घरहरू</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="card stat-card bg-gradient-green text-dark">
+                                <div class="icon">
+                                    <i class="bi bi-shield-check"></i>
+                                </div>
+                                <div class="number" id="relief-actions">०</div>
+                                <div class="label">राहात कार्यहरू</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-8 mb-4">
+                            <div class="card h-100">
+                                <div class="card-header bg-primary text-white">
+                                    <h5 class="mb-0"><i class="bi bi-graph-up"></i> प्रकार अनुसार घटनाहरू</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="chart-container">
+                                        <canvas id="incidentsByTypeChart"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-4">
+                            <div class="card h-100">
+                                <div class="card-header bg-primary text-white">
+                                    <h5 class="mb-0"><i class="bi bi-geo-alt"></i> वडा अनुसार घटनाहरू</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="chart-container">
+                                        <canvas id="incidentsByWardChart"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0"><i class="bi bi-list-ul"></i> हालैका घटनाहरू</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-hover incident-table">
+                                    <thead>
+                                        <tr>
+                                            <th>मिति</th>
+                                            <th>समय</th>
+                                            <th>विपद्को प्रकार</th>
+                                            <th>वडा नम्बर</th>
+                                            <th>स्थान</th>
+                                            <th>अनुमानित क्षति</th>
+                                            <th>गम्भीरता</th>
+                                            <th>कार्य</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="recent-incidents-body">
+                                        <!-- Data will be populated by JavaScript -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Event Action Log Tab -->
+                <div class="tab-pane fade" id="event-log" role="tabpanel">
+                    <div class="card">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0"><i class="bi bi-journal-text"></i> घटना सूचना लग</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-hover incident-table">
+                                    <thead>
+                                        <tr>
+                                            <th>समय</th>
+                                            <th>घटनाको प्रकार</th>
+                                            <th>विवरण</th>
+                                            <th>स्थान</th>
+                                            <th>जिम्मेवार इकाई</th>
+                                            <th>स्थिति</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="event-log-body">
+                                        <!-- Data will be populated by JavaScript -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Situation Report Tab -->
+                <div class="tab-pane fade" id="situation-report" role="tabpanel">
+                    <div class="card">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0"><i class="bi bi-clipboard-plus"></i> नयाँ घटना विवरण प्रविष्टि</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="card mb-3">
+                                        <div class="card-body">
+                                            <h6 class="card-title">वर्तमान स्थितिको सारांश</h6>
+                                            <p id="situation-summary">हालसम्म कुनै रिपोर्ट प्राप्त भएको छैन।</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="card mb-3">
+                                        <div class="card-body">
+                                            <h6 class="card-title">मौसमको अवस्था</h6>
+                                            <p id="weather-conditions">मौसम विवरण उपलब्ध छैन।</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-12">
+                                    <div class="card">
+                                        <div class="card-body">
+                                            <h6 class="card-title">विस्तृत रिपोर्ट</h6>
+                                            <div id="detailed-report">विस्तृत रिपोर्ट उपलब्ध छैन।</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Situation Report Form Section -->
+                    <div class="card mt-3">
+                        <div
+                            class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0"><i class="bi bi-plus-circle"></i> नयाँ स्थिति रिपोर्ट थप्नुहोस्</h5>
+                            <button class="btn btn-warning btn-sm" id="unlockSituationReportBtn"
+                                onclick="unlockDisasterForm('situationReportForm', 'unlockSituationReportBtn')">
+                                <i class="bi bi-unlock-fill"></i> अनलक
+                            </button>
+                        </div>
+                        <div class="card-body">
+                            <form id="situationReportForm">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="situationSummary" class="form-label">वर्तमान स्थितिको
+                                                सारांश</label>
+                                            <textarea class="form-control" id="situationSummary" rows="2"
+                                                required></textarea>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="weatherConditions" class="form-label">मौसमको अवस्था</label>
+                                            <textarea class="form-control" id="weatherConditions" rows="2"
+                                                required></textarea>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="detailedReport" class="form-label">विस्तृत रिपोर्ट</label>
+                                    <textarea class="form-control" id="detailedReport" rows="3" required></textarea>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="resourcesDeployed" class="form-label">परिचालन गरिएका
+                                                जनशक्ति/श्रोत</label>
+                                            <input type="text" class="form-control" id="resourcesDeployed"
+                                                placeholder="उदा: ३ आपतकालीन टोली, २ एम्बुलेन्स">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="nextUpdateTime" class="form-label">अर्को अपडेट समय</label>
+                                            <input type="text" class="form-control" id="nextUpdateTime"
+                                                placeholder="उदा: १८:०० बजे">
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                                    <button type="button" class="btn btn-secondary me-md-2"
+                                        id="resetSituationReportForm">रिसेट</button>
+                                    <button type="submit" class="btn btn-success">रिपोर्ट थप्नुहोस्</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Human Impact Tab -->
+                <div class="tab-pane fade" id="human-impact" role="tabpanel">
+                    <div class="row mb-3">
+                        <div class="col-md-3 mb-3">
+                            <div class="card stat-card bg-gradient-red">
+                                <div class="icon">
+                                    <i class="bi bi-emoji-frown-fill"></i>
+                                </div>
+                                <div class="number" id="casualties">०</div>
+                                <div class="label">मृतक</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="card stat-card bg-gradient-orange text-dark">
+                                <div class="icon">
+                                    <i class="bi bi-person-fill-exclamation"></i>
+                                </div>
+                                <div class="number" id="injured">०</div>
+                                <div class="label">घाइते</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="card stat-card bg-gradient-blue">
+                                <div class="icon">
+                                    <i class="bi bi-people-fill"></i>
+                                </div>
+                                <div class="number" id="displaced">०</div>
+                                <div class="label">विस्थापित</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="card stat-card bg-gradient-green text-dark">
+                                <div class="icon">
+                                    <i class="bi bi-heart-pulse-fill"></i>
+                                </div>
+                                <div class="number" id="rescued">०</div>
+                                <div class="label">उद्धार गरिएको</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0"><i class="bi bi-people"></i> जनसांख्यिकीय विवरण अनुसार मानवीय प्रभाव</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="chart-container">
+                                <canvas id="humanImpactChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Damage Assessment Tab -->
+                <div class="tab-pane fade" id="damage-assessment" role="tabpanel">
+                    <div class="row mb-3">
+                        <div class="col-md-3 mb-3">
+                            <div class="card stat-card bg-gradient-orange text-dark">
+                                <div class="icon">
+                                    <i class="bi bi-house-dash-fill"></i>
+                                </div>
+                                <div class="number" id="destroyed-houses">०</div>
+                                <div class="label">पूर्ण क्षति (घर)</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="card stat-card bg-gradient-red">
+                                <div class="icon">
+                                    <i class="bi bi-building-fill-dash"></i>
+                                </div>
+                                <div class="number" id="damaged-buildings">०</div>
+                                <div class="label">आंशिक क्षति (भवन)</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="card stat-card bg-gradient-blue">
+                                <div class="icon">
+                                    <i class="bi bi-cone-striped"></i>
+                                </div>
+                                <div class="number" id="infrastructure-damage">०</div>
+                                <div class="label">पूर्वाधार क्षति</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="card stat-card bg-gradient-purple">
+                                <div class="icon">
+                                    <i class="bi bi-cash-stack"></i>
+                                </div>
+                                <div class="number" id="estimated-loss">०</div>
+                                <div class="label">अनुमानित क्षति (रु.)</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0"><i class="bi bi-bar-chart"></i> विधा अनुसार क्षति मूल्याङ्कन</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="chart-container">
+                                <canvas id="damageAssessmentChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Livestock Damage Tab -->
+                <div class="tab-pane fade" id="livestock-damage" role="tabpanel">
+                    <div class="row mb-3">
+                        <div class="col-md-3 mb-3">
+                            <div class="card stat-card bg-gradient-red">
+                                <div class="icon">
+                                    <i class="bi bi-activity"></i>
+                                </div>
+                                <div class="number" id="cattle-lost">०</div>
+                                <div class="label">ठूला पशुचौपाया क्षति</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="card stat-card bg-gradient-orange text-dark">
+                                <div class="icon">
+                                    <i class="bi bi-bug-fill"></i>
+                                </div>
+                                <div class="number" id="small-livestock-lost">०</div>
+                                <div class="label">साधारण पशुचौपाया क्षति</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="card stat-card bg-gradient-blue">
+                                <div class="icon">
+                                    <i class="bi bi-egg-fill"></i>
+                                </div>
+                                <div class="number" id="poultry-lost">०</div>
+                                <div class="label">पशुपन्छी क्षति</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="card stat-card bg-gradient-purple">
+                                <div class="icon">
+                                    <i class="bi bi-grid-3x3-gap-fill"></i>
+                                </div>
+                                <div class="number" id="livestock-loss">०</div>
+                                <div class="label">अन्य</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card chart-card">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="bi bi-pie-chart-fill"></i> पशुचौपाया क्षति विवरण</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="chart-container" style="height: 300px;">
+                                <canvas id="livestockDamageChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Public Info Tab -->
+                <div class="tab-pane fade" id="public-info" role="tabpanel">
+                    <div class="card">
+                        <div
+                            class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0"><i class="bi bi-megaphone"></i> सार्वजनिक जानकारी र निर्देशनहरू</h5>
+                            <button class="btn btn-warning btn-sm" id="unlockPublicInfoBtn"
+                                onclick="unlockDisasterForm('publicInfoForm', 'unlockPublicInfoBtn')">
+                                <i class="bi bi-unlock-fill"></i> अनलक
+                            </button>
+                        </div>
+                        <div class="card-body">
+                            <form id="publicInfoForm">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="publicInfoTitle" class="form-label">शीर्षक</label>
+                                            <input type="text" class="form-control" id="publicInfoTitle" required>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="publicInfoType" class="form-label">प्रकार</label>
+                                            <select class="form-control" id="publicInfoType">
+                                                <option value="General">सामान्य</option>
+                                                <option value="Weather Advisory">मौसम सल्लाहकार</option>
+                                                <option value="Emergency Contact">आपतकालीन सम्पर्क</option>
+                                                <option value="Safety Instruction">सुरक्षा निर्देशन</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="publicInfoPriority" class="form-label">प्राथमिकता</label>
+                                            <select class="form-control" id="publicInfoPriority">
+                                                <option value="Low">न्यून (Low)</option>
+                                                <option value="Normal">सामान्य (Normal)</option>
+                                                <option value="High">उच्च (High)</option>
+                                                <option value="Critical">अत्यन्त जरुरी (Critical)</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3 form-check mt-4">
+                                            <input type="checkbox" class="form-check-input" id="publicInfoActive"
+                                                checked>
+                                            <label class="form-check-label" for="publicInfoActive">Active</label>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="publicInfoContent" class="form-label">सन्देश विवरण</label>
+                                    <textarea class="form-control" id="publicInfoContent" rows="3" required></textarea>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="publicInfoValidFromBS" class="form-label">मान्य मिति देखि
+                                                (BS)</label>
+                                            <input type="text" class="form-control" id="publicInfoValidFromBS"
+                                                placeholder="YYYY-MM-DD (e.g., 2081-10-18)" pattern="\d{4}-\d{2}-\d{2}">
+                                            <div class="form-text">Enter date in YYYY-MM-DD format (e.g., 2081-10-18)
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="publicInfoValidUntilBS" class="form-label">मान्य मिति सम्म
+                                                (BS)</label>
+                                            <input type="text" class="form-control" id="publicInfoValidUntilBS"
+                                                placeholder="YYYY-MM-DD (e.g., 2081-10-18)" pattern="\d{4}-\d{2}-\d{2}">
+                                            <div class="form-text">Enter date in YYYY-MM-DD format (e.g., 2081-10-18)
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                                    <button type="button" class="btn btn-secondary me-md-2"
+                                        id="resetPublicInfoForm">रिसेट</button>
+                                    <button type="submit" class="btn btn-success">सन्देश जारी गर्नुहोस्</button>
+                                </div>
+                            </form>
+
+                            <hr class="my-4">
+                            <h6><i class="bi bi-info-circle"></i> हालका सक्रिय सल्लाहहरू</h6>
+                            <div id="advisories-list" class="mt-3">
+                                <p class="text-muted">Loading advisories...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Input Form Tab -->
+<div class="tab-pane fade" id="input-form" role="tabpanel">
+    <div class="card">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0"><i class="bi bi-clipboard-plus"></i> दैनिक विपद् डाटा प्रविष्टि विवरण</h5>
+            <button class="btn btn-warning btn-sm" id="unlockDisasterReportBtn"
+                onclick="unlockDisasterForm('disasterReportForm', 'unlockDisasterReportBtn')">
+                <i class="bi bi-unlock-fill"></i> विवरण भर्नका लागि अनलक गर्नुहोस्
+            </button>
+        </div>
+        <div class="card-body">
+            <form id="disasterReportForm">
+                <!-- Basic Incident Information -->
+                <div class="card mb-3 form-section-card">
+                    <div class="card-header bg-light">
+                        <h6 class="mb-0"><i class="bi bi-info-circle"></i> आधारभूत घटना विवरण</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="disasterDateBS" class="form-label">मिति (वि.सं.) <span
+                                            class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" id="disasterDateBS" name="disaster_date_bs"
+                                        required placeholder="YYYY-MM-DD (e.g., २०८१-१०-१८)"
+                                        pattern="\d{4}-\d{2}-\d{2}">
+                                    <div class="form-text">YYYY-MM-DD ढाँचामा मिति प्रविष्ट गर्नुहोस् (उदा: २०८१-१०-१८)
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="disasterTime" class="form-label">समय <span
+                                            class="text-danger">*</span></label>
+                                    <input type="time" class="form-control" id="disasterTime" name="disaster_time"
+                                        required>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="disasterType" class="form-label">विपद्को प्रकार <span
+                                            class="text-danger">*</span></label>
+                                    <select class="form-control" id="disasterType" name="disaster_type" required>
+                                        <option value="">विपद्को प्रकार छान्नुहोस्</option>
+                                        <!-- Options will be populated dynamically from settings -->
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">वडा <span class="text-danger">*</span></label>
+                                    <div class="position-relative">
+                                        <button class="btn btn-outline-secondary w-100 text-start" type="button"
+                                            id="wardDropdownToggle">
+                                            वडा छान्नुहोस्
+                                        </button>
+                                        <div class="position-absolute w-100 bg-white border rounded shadow"
+                                            id="wardDropdownMenu"
+                                            style="display: none; z-index: 1000; max-height: 200px; overflow-y: auto;">
+                                            <a class="dropdown-item p-2" href="#" data-value="1">वडा १</a>
+                                            <a class="dropdown-item p-2" href="#" data-value="2">वडा २</a>
+                                            <a class="dropdown-item p-2" href="#" data-value="3">वडा ३</a>
+                                            <a class="dropdown-item p-2" href="#" data-value="4">वडा ४</a>
+                                            <a class="dropdown-item p-2" href="#" data-value="5">वडा ५</a>
+                                            <a class="dropdown-item p-2" href="#" data-value="6">वडा ६</a>
+                                            <a class="dropdown-item p-2" href="#" data-value="7">वडा ७</a>
+                                            <a class="dropdown-item p-2" href="#" data-value="8">वडा ८</a>
+                                            <a class="dropdown-item p-2" href="#" data-value="9">वडा ९</a>
+                                        </div>
+                                        <input type="hidden" id="ward" name="ward" required>
+                                    </div>
+                                    <div class="mt-2">
+                                        <div id="selectedWards" class="d-flex flex-wrap gap-1"></div>
+                                    </div>
+                                    <small class="form-text text-muted">धेरै वडाहरू छान्न क्लिक गर्नुहोस्</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="coordinates" class="form-label">निर्देशांक (अक्षांश,
+                                        देशान्तर)</label>
+                                    <input type="text" class="form-control" id="coordinates" name="coordinates"
+                                        placeholder="e.g., 27.7172, 85.3240"
+                                        pattern="^\s*-?\d+\.?\d*\s*,\s*-?\d+\.?\d*\s*$">
+                                    <small class="form-text text-muted">ढाँचा: latitude, longitude (e.g., 27.7172,
+                                        85.3240)</small>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="location" class="form-label">स्थान/टोल <span
+                                            class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" id="location" name="tole"
+                                        placeholder="निर्दिष्ट स्थान प्रविष्ट गर्नुहोस्" required>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="description" class="form-label">विवरण</label>
+                            <textarea class="form-control" id="description" name="description" rows="3"
+                                placeholder="घटनाको विस्तृत विवरण दिनुहोस्"></textarea>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label for="severity" class="form-label">गम्भीरता</label>
+                                    <select class="form-control" id="severity" name="severity">
+                                        <option value="low">कम (Low)</option>
+                                        <option value="medium" selected>मध्यम (Medium)</option>
+                                        <option value="high">उच्च (High)</option>
+                                        <option value="critical">अति गम्भीर (Critical)</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label for="weatherStatus" class="form-label">मौसमको अवस्था</label>
+                                    <input type="text" class="form-control" id="weatherStatus" name="weather_status"
+                                        placeholder="e.g., Heavy Rain, Storm">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Human Impact -->
+                <div class="card mb-3 form-section-card">
+                    <div class="card-header bg-light">
+                        <h6 class="mb-0"><i class="bi bi-people"></i> मानवीय प्रभाव</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label for="affectedPeople" class="form-label">प्रभावित व्यक्तिहरू <span
+                                            class="text-danger">*</span></label>
+                                    <input type="number" class="form-control" id="affectedPeople" name="affected_people"
+                                        min="0" value="0" required>
+                                    <div class="validation-error" id="affectedPeopleError" style="display: none;"></div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label for="injuredCount" class="form-label">घाइते</label>
+                                    <input type="number" class="form-control" id="injuredCount" name="injured" min="0"
+                                        value="0">
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label for="casualtiesCount" class="form-label">हताहत</label>
+                                    <input type="number" class="form-control" id="casualtiesCount" name="casualties"
+                                        min="0" value="0">
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label for="deaths" class="form-label">मृतक</label>
+                                    <input type="number" class="form-control" id="deaths" name="deaths" min="0"
+                                        value="0">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label for="missingPersons" class="form-label">बेपत्ता व्यक्तिहरू</label>
+                                    <input type="number" class="form-control" id="missingPersons" name="missing_persons"
+                                        min="0" value="0">
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label for="affectedPeopleMale" class="form-label">प्रभावित पुरुष <span
+                                            class="text-danger">*</span></label>
+                                    <input type="number" class="form-control" id="affectedPeopleMale"
+                                        name="affected_people_male" min="0" value="0" required>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label for="affectedPeopleFemale" class="form-label">प्रभावित महिला <span
+                                            class="text-danger">*</span></label>
+                                    <input type="number" class="form-control" id="affectedPeopleFemale"
+                                        name="affected_people_female" min="0" value="0" required>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label class="form-label">गणना गरिएको कुल</label>
+                                    <div class="form-control bg-light" id="calculatedTotal">0</div>
+                                    <small class="form-text" id="validationMessage"></small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Property Damage -->
+                <div class="card mb-3 form-section-card">
+                    <div class="card-header bg-light">
+                        <h6 class="mb-0"><i class="bi bi-house"></i> भौतिक क्षति</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label for="housesDamaged" class="form-label">आंशिक क्षति (घर)</label>
+                                    <input type="number" class="form-control" id="housesDamaged" name="houses_damaged"
+                                        min="0" value="0">
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label for="housesDestroyed" class="form-label">पूर्ण क्षति (घर)</label>
+                                    <input type="number" class="form-control" id="housesDestroyed"
+                                        name="houses_destroyed" min="0" value="0">
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label for="publicBuildingDestruction" class="form-label">पूर्ण क्षति (सार्वजनिक
+                                        भवन)</label>
+                                    <input type="number" class="form-control" id="publicBuildingDestruction"
+                                        name="public_building_destruction" min="0" value="0">
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label for="publicBuildingDamage" class="form-label">आंशिक क्षति (सार्वजनिक
+                                        भवन)</label>
+                                    <input type="number" class="form-control" id="publicBuildingDamage"
+                                        name="public_building_damage" min="0" value="0">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label for="estimatedLoss" class="form-label">अनुमानित नोक्सानी (रु.)</label>
+                                    <input type="number" class="form-control" id="estimatedLoss" name="estimated_loss"
+                                        min="0" value="0">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="agricultureCropDamage" class="form-label">कृषि बाली
+                                        क्षति</label>
+                                    <input type="text" class="form-control" id="agricultureCropDamage"
+                                        name="agriculture_crop_damage" placeholder="संक्षिप्त विवरण">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Livestock Impact -->
+                <div class="card mb-3 form-section-card">
+                    <div class="card-header bg-light">
+                        <h6 class="mb-0"><i class="bi bi-cow"></i> पशुचौपाया क्षति</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="livestock-grid">
+                            <!-- Cattle -->
+                            <div class="livestock-type-card">
+                                <h6><i class="bi bi-cow"></i> गाईवस्तु (ठूला)</h6>
+                                <div class="row">
+                                    <div class="col-6">
+                                        <div class="mb-2">
+                                            <label for="cattleLost" class="form-label small">नोक्सानी</label>
+                                            <input type="number" class="form-control form-control-sm" id="cattleLost"
+                                                name="cattle_lost" min="0" value="0">
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="mb-2">
+                                            <label for="cattleInjured" class="form-label small">घाइते</label>
+                                            <input type="number" class="form-control form-control-sm" id="cattleInjured"
+                                                name="cattle_injured" min="0" value="0">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Poultry -->
+                            <div class="livestock-type-card">
+                                <h6><i class="bi bi-egg"></i> पशुपन्छी</h6>
+                                <div class="row">
+                                    <div class="col-6">
+                                        <div class="mb-2">
+                                            <label for="poultryLost" class="form-label small">नोक्सानी</label>
+                                            <input type="number" class="form-control form-control-sm" id="poultryLost"
+                                                name="poultry_lost" min="0" value="0">
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="mb-2">
+                                            <label for="poultryInjured" class="form-label small">घाइते</label>
+                                            <input type="number" class="form-control form-control-sm"
+                                                id="poultryInjured" name="poultry_injured" min="0" value="0">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Goats/Sheep -->
+                            <div class="livestock-type-card">
+                                <h6><i class="bi bi-bug"></i> बाख्रा/भेडा</h6>
+                                <div class="row">
+                                    <div class="col-6">
+                                        <div class="mb-2">
+                                            <label for="goatsSheepLost" class="form-label small">नोक्सानी</label>
+                                            <input type="number" class="form-control form-control-sm"
+                                                id="goatsSheepLost" name="goats_sheep_lost" min="0" value="0">
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="mb-2">
+                                            <label for="goatsSheepInjured" class="form-label small">घाइते</label>
+                                            <input type="number" class="form-control form-control-sm"
+                                                id="goatsSheepInjured" name="goats_sheep_injured" min="0" value="0">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Others -->
+                            <div class="livestock-type-card">
+                                <h6><i class="bi bi-question-circle"></i> अन्य</h6>
+                                <div class="row">
+                                    <div class="col-6">
+                                        <div class="mb-2">
+                                            <label for="otherLivestockLost" class="form-label small">नोक्सानी</label>
+                                            <input type="number" class="form-control form-control-sm"
+                                                id="otherLivestockLost" name="other_livestock_lost" min="0" value="0">
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="mb-2">
+                                            <label for="otherLivestockInjured" class="form-label small">घाइते</label>
+                                            <input type="number" class="form-control form-control-sm"
+                                                id="otherLivestockInjured" name="other_livestock_injured" min="0"
+                                                value="0">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Legacy fields (hidden) for backward compatibility -->
+                        <input type="hidden" id="livestockLost" name="livestock_lost" value="0">
+                        <input type="hidden" id="livestockInjured" name="livestock_injured" value="0">
+                        <input type="hidden" id="livestockDeath" name="livestock_death" value="0">
+                    </div>
+                </div>
+
+                <!-- Infrastructure Impact -->
+                <div class="card mb-3 form-section-card">
+                    <div class="card-header bg-light">
+                        <h6 class="mb-0"><i class="bi bi-signpost-split"></i> पूर्वाधार क्षति (Infrastructure Impact)
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="form-check mb-3">
+                                    <input type="checkbox" class="form-check-input" id="roadBlocked"
+                                        name="road_blocked_status">
+                                    <label class="form-check-label" for="roadBlocked">सडक अवरुद्ध (Road Blocked)</label>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="form-check mb-3">
+                                    <input type="checkbox" class="form-check-input" id="electricityBlocked"
+                                        name="electricity_blocked_status">
+                                    <label class="form-check-label" for="electricityBlocked">विद्युत अवरुद्ध
+                                        (Electricity
+                                        Blocked)</label>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="form-check mb-3">
+                                    <input type="checkbox" class="form-check-input" id="communicationBlocked"
+                                        name="communication_blocked_status">
+                                    <label class="form-check-label" for="communicationBlocked">सञ्चार अवरुद्ध
+                                        (Communication
+                                        Blocked)</label>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="form-check mb-3">
+                                    <input type="checkbox" class="form-check-input" id="drinkingWaterDisrupted"
+                                        name="drinking_water_status">
+                                    <label class="form-check-label" for="drinkingWaterDisrupted">खानेपानी अवरुद्ध
+                                        (Drinking Water
+                                        Disrupted)</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Additional Information -->
+                <div class="card mb-3 form-section-card">
+                    <div class="card-header bg-light">
+                        <h6 class="mb-0"><i class="bi bi-clipboard"></i> थप जानकारी (Additional Information)</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="rescueOperations" class="form-label">उद्धार कार्यहरू (Rescue Operations)</label>
+                            <textarea class="form-control" id="rescueOperations" name="rescue_operations" rows="2"
+                                placeholder="गरिएका उद्धार तथा राहत कार्यहरूको विवरण दिनुहोस्"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                    <button type="button" class="btn btn-secondary me-md-2" id="resetForm">रिसेट (Reset)</button>
+                    <button type="button" class="btn btn-warning me-md-2" id="noIncidentsBtn">No Incidents
+                        Today</button>
+                    <button type="submit" class="btn btn-primary">पेश गर्नुहोस् (Submit Report)</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<!-- Success/Error Alert -->
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index: 11">
+    <div id="toastPlaceholder"></div>
+</div>
+
+<!-- Incident Details Modal -->
+<div class="modal fade" id="incidentDetailsModal" tabindex="-1" aria-labelledby="incidentDetailsModalLabel"
+    aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="incidentDetailsModalLabel"><i class="bi bi-exclamation-triangle"></i>
+                    Incident Details</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                    aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="incidentModalContent">
+                <!-- Content will be populated dynamically -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    // Global variables
+    let incidentsByTypeChart = null;
+    let incidentsByWardChart = null;
+    let humanImpactChart = null;
+    let damageAssessmentChart = null;
+    let livestockDamageChart = null;
+
+    // Load disaster types from settings
+    async function loadDisasterTypes() {
+        const disasterTypeSelect = document.getElementById('disasterType');
+
+        try {
+            const response = await fetch('/api/settings/disaster_types');
+            const data = await response.json();
+
+            // Clear existing options except the first one
+            disasterTypeSelect.innerHTML = '<option value="">Select Disaster Type</option>';
+
+            let disasterTypes = [];
+
+            if (data.success && data.value && Array.isArray(data.value)) {
+                disasterTypes = data.value;
+            } else {
+                // Fallback to default disaster types
+                disasterTypes = [
+                    'Earthquake',
+                    'Flood',
+                    'Landslide',
+                    'Storm',
+                    'Fire',
+                    'Drought',
+                    'Avalanche',
+                    'Cold Wave',
+                    'Heat Wave',
+                    'Other'
+                ];
+            }
+
+            // Populate dropdown
+            disasterTypes.forEach(type => {
+                const option = document.createElement('option');
+                option.value = type.toLowerCase().replace(/\s+/g, '_');
+                option.textContent = type;
+                disasterTypeSelect.appendChild(option);
+            });
+        } catch (error) {
+            console.error('Error loading disaster types:', error);
+
+            // Fallback to default disaster types on error
+            disasterTypeSelect.innerHTML = '<option value="">Select Disaster Type</option>';
+            const defaultTypes = [
+                'Earthquake',
+                'Flood',
+                'Landslide',
+                'Storm',
+                'Fire',
+                'Drought',
+                'Avalanche',
+                'Cold Wave',
+                'Heat Wave',
+                'Other'
+            ];
+
+            defaultTypes.forEach(type => {
+                const option = document.createElement('option');
+                option.value = type.toLowerCase().replace(/\s+/g, '_');
+                option.textContent = type;
+                disasterTypeSelect.appendChild(option);
+            });
+        }
+    }
+
+    // Parse coordinates from input
+    function parseCoordinates(coordString) {
+        if (!coordString || coordString.trim() === '') {
+            return { latitude: null, longitude: null };
+        }
+
+        const parts = coordString.split(',').map(p => p.trim());
+        if (parts.length !== 2) {
+            return { latitude: null, longitude: null };
+        }
+
+        const latitude = parseFloat(parts[0]);
+        const longitude = parseFloat(parts[1]);
+
+        if (isNaN(latitude) || isNaN(longitude)) {
+            return { latitude: null, longitude: null };
+        }
+
+        return { latitude, longitude };
+    }
+
+    // Validate affected people
+    function validateAffectedPeople() {
+        const affectedPeople = parseInt(document.getElementById('affectedPeople').value) || 0;
+        const affectedMale = parseInt(document.getElementById('affectedPeopleMale').value) || 0;
+        const affectedFemale = parseInt(document.getElementById('affectedPeopleFemale').value) || 0;
+
+        const calculatedTotal = affectedMale + affectedFemale;
+        const calculatedTotalEl = document.getElementById('calculatedTotal');
+        const validationMessageEl = document.getElementById('validationMessage');
+        const affectedPeopleInput = document.getElementById('affectedPeople');
+
+        calculatedTotalEl.textContent = calculatedTotal;
+
+        if (calculatedTotal !== affectedPeople) {
+            calculatedTotalEl.classList.add('text-danger');
+            calculatedTotalEl.classList.remove('text-success');
+            validationMessageEl.textContent = `Warning: Should equal ${affectedPeople} (Affected People)`;
+            validationMessageEl.classList.add('text-danger');
+            affectedPeopleInput.classList.add('is-invalid');
+            return false;
+        } else {
+            calculatedTotalEl.classList.remove('text-danger');
+            calculatedTotalEl.classList.add('text-success');
+            validationMessageEl.textContent = '✓ Valid';
+            validationMessageEl.classList.remove('text-danger');
+            validationMessageEl.classList.add('text-success');
+            affectedPeopleInput.classList.remove('is-invalid');
+            return true;
+        }
+    }
+
+    // Calculate total livestock
+    function calculateTotalLivestock() {
+        const cattleLost = parseInt(document.getElementById('cattleLost').value) || 0;
+        const poultryLost = parseInt(document.getElementById('poultryLost').value) || 0;
+        const goatsSheepLost = parseInt(document.getElementById('goatsSheepLost').value) || 0;
+        const otherLost = parseInt(document.getElementById('otherLivestockLost').value) || 0;
+
+        const cattleInjured = parseInt(document.getElementById('cattleInjured').value) || 0;
+        const poultryInjured = parseInt(document.getElementById('poultryInjured').value) || 0;
+        const goatsSheepInjured = parseInt(document.getElementById('goatsSheepInjured').value) || 0;
+        const otherInjured = parseInt(document.getElementById('otherLivestockInjured').value) || 0;
+
+        const totalLost = cattleLost + poultryLost + goatsSheepLost + otherLost;
+        const totalInjured = cattleInjured + poultryInjured + goatsSheepInjured + otherInjured;
+
+        // Update legacy hidden fields
+        document.getElementById('livestockLost').value = totalLost;
+        document.getElementById('livestockInjured').value = totalInjured;
+        document.getElementById('livestockDeath').value = totalLost;
+    }
+
+    // Initialize the page when DOM is loaded
+    document.addEventListener('DOMContentLoaded', function () {
+        // Load data and initialize charts
+        loadData();
+
+        // Load disaster types
+        loadDisasterTypes();
+
+        // Set current time as default
+        const now = new Date();
+        const currentTime = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
+        document.getElementById('disasterTime').value = currentTime;
+
+        // Setup form submission
+        document.getElementById('disasterReportForm').addEventListener('submit', submitDisasterReport);
+
+        // Setup public info form submission
+        document.getElementById('publicInfoForm').addEventListener('submit', submitPublicInfo);
+
+        // Setup situation report form submission
+        document.getElementById('situationReportForm').addEventListener('submit', submitSituationReport);
+
+        // Setup reset buttons
+        document.getElementById('resetForm').addEventListener('click', resetForm);
+        document.getElementById('resetPublicInfoForm').addEventListener('click', resetPublicInfoForm);
+        document.getElementById('resetSituationReportForm').addEventListener('click', resetSituationReportForm);
+
+        // Setup affected people validation
+        document.getElementById('affectedPeople').addEventListener('input', validateAffectedPeople);
+        document.getElementById('affectedPeopleMale').addEventListener('input', validateAffectedPeople);
+        document.getElementById('affectedPeopleFemale').addEventListener('input', validateAffectedPeople);
+
+        // Setup livestock calculation
+        const livestockInputs = [
+            'cattleLost', 'cattleInjured',
+            'poultryLost', 'poultryInjured',
+            'goatsSheepLost', 'goatsSheepInjured',
+            'otherLivestockLost', 'otherLivestockInjured'
+        ];
+
+        livestockInputs.forEach(id => {
+            document.getElementById(id).addEventListener('input', calculateTotalLivestock);
+        });
+
+        // Set today's date in BS format as default
+        setTodayBsDate();
+
+        // Initialize ward dropdown
+        initWardDropdown();
+    });
+
+    // Initialize ward dropdown functionality
+    function initWardDropdown() {
+        const wardDropdownToggle = document.getElementById('wardDropdownToggle');
+        const wardDropdownMenu = document.getElementById('wardDropdownMenu');
+        const selectedWards = new Set();
+
+        // Toggle dropdown visibility
+        wardDropdownToggle.addEventListener('click', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            const isVisible = wardDropdownMenu.style.display === 'block';
+            wardDropdownMenu.style.display = isVisible ? 'none' : 'block';
+        });
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function (e) {
+            if (!wardDropdownToggle.contains(e.target) && !wardDropdownMenu.contains(e.target)) {
+                wardDropdownMenu.style.display = 'none';
+            }
+        });
+
+        // Handle ward selection
+        const dropdownItems = wardDropdownMenu.querySelectorAll('.dropdown-item');
+        dropdownItems.forEach(function (item) {
+            item.addEventListener('click', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+
+                const wardValue = this.getAttribute('data-value');
+                const wardText = this.textContent;
+
+                if (selectedWards.has(wardValue)) {
+                    selectedWards.delete(wardValue);
+                    this.classList.remove('active');
+                } else {
+                    selectedWards.add(wardValue);
+                    this.classList.add('active');
+                }
+
+                updateSelectedWardsDisplay();
+            });
+        });
+
+        // Update the display of selected wards
+        function updateSelectedWardsDisplay() {
+            const selectedWardsContainer = document.getElementById('selectedWards');
+            const wardInput = document.getElementById('ward');
+
+            selectedWardsContainer.innerHTML = '';
+
+            if (selectedWards.size === 0) {
+                wardDropdownToggle.textContent = 'Select Ward(s)';
+                wardInput.value = '';
+            } else {
+                const wardArray = Array.from(selectedWards);
+                wardInput.value = wardArray.join(',');
+
+                wardDropdownToggle.textContent = wardArray.length === 1 ?
+                    'Ward ' + wardArray[0] + ' selected' :
+                    wardArray.length + ' wards selected';
+
+                // Show ward badges
+                wardArray.forEach(function (ward) {
+                    const badge = document.createElement('span');
+                    badge.className = 'badge bg-primary me-1';
+                    badge.textContent = 'Ward ' + ward;
+                    badge.style.cursor = 'pointer';
+                    badge.addEventListener('click', function (e) {
+                        e.stopPropagation();
+                        // Deselect this ward
+                        selectedWards.delete(ward);
+                        // Update dropdown item
+                        const dropdownItem = wardDropdownMenu.querySelector('[data-value="' + ward + '"]');
+                        if (dropdownItem) {
+                            dropdownItem.classList.remove('active');
+                        }
+                        updateSelectedWardsDisplay();
+                    });
+                    selectedWardsContainer.appendChild(badge);
+                });
+            }
+        }
+
+        // Make update function available globally for resetForm
+        window.updateSelectedWardsDisplay = updateSelectedWardsDisplay;
+        window.selectedWards = selectedWards;
+    }
+
+    // Show toast notification
+    function showToast(message, type) {
+        const toastPlaceholder = document.getElementById('toastPlaceholder');
+
+        const toastEl = document.createElement('div');
+        toastEl.className = 'toast align-items-center text-white bg-' + type + ' border-0 show';
+        toastEl.setAttribute('role', 'alert');
+        toastEl.setAttribute('aria-live', 'assertive');
+        toastEl.setAttribute('aria-atomic', 'true');
+        toastEl.style.marginBottom = '0.5rem';
+
+        toastEl.innerHTML = '<div class="d-flex"><div class="toast-body">' + message + '</div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button></div>';
+
+        toastPlaceholder.appendChild(toastEl);
+
+        // Auto remove after 4 seconds
+        setTimeout(function () {
+            toastEl.remove();
+        }, 4000);
+
+        // Close button functionality
+        const closeBtn = toastEl.querySelector('.btn-close');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', function () {
+                toastEl.remove();
+            });
+        }
+    }
+
+    // Set today's date in BS format (simple approximation)
+    function setTodayBsDate() {
+        // Get today's AD date in local timezone
+        const today = new Date();
+        const adYear = today.getFullYear();
+        const adMonth = today.getMonth() + 1;
+        const adDay = today.getDate();
+
+        // Simple conversion reference: 2025-02-01 AD = 2081-10-18 BS
+        // This is a rough approximation - users can adjust as needed
+        const conversionData = [
+            { ad: '2025-01-01', bs: '2081-09-17' },
+            { ad: '2025-02-01', bs: '2081-10-18' },
+            { ad: '2025-03-01', bs: '2081-11-17' },
+            { ad: '2025-04-01', bs: '2081-12-19' },
+            { ad: '2025-05-01', bs: '2082-01-18' },
+            { ad: '2025-06-01', bs: '2082-02-18' },
+            { ad: '2025-07-01', bs: '2082-03-17' },
+            { ad: '2025-08-01', bs: '2082-04-16' },
+            { ad: '2025-09-01', bs: '2082-05-17' },
+            { ad: '2025-10-01', bs: '2082-06-15' },
+            { ad: '2025-11-01', bs: '2082-07-16' },
+            { ad: '2025-12-01', bs: '2082-08-16' },
+            { ad: '2026-01-01', bs: '2082-09-17' },
+        ];
+
+        // Find the closest reference point
+        const currentAd = `${adYear}-${String(adMonth).padStart(2, '0')}-${String(adDay).padStart(2, '0')}`;
+        let closestRef = conversionData[0];
+        let minDiff = Infinity;
+
+        for (const ref of conversionData) {
+            const refDate = new Date(ref.ad);
+            const currentDate = new Date(currentAd);
+            const diff = Math.abs(currentDate - refDate);
+            if (diff < minDiff) {
+                minDiff = diff;
+                closestRef = ref;
+            }
+        }
+
+        // Parse the closest BS reference
+        const bsParts = closestRef.bs.split('-');
+        let bsYear = parseInt(bsParts[0]);
+        let bsMonth = parseInt(bsParts[1]);
+        let bsDay = parseInt(bsParts[2]);
+
+        // Calculate days difference
+        const refAdDate = new Date(closestRef.ad);
+        const currentAdDate = new Date(currentAd);
+        const daysDiff = Math.round((currentAdDate - refAdDate) / (1000 * 60 * 60 * 24));
+
+        // Days in each BS month (approximate)
+        const daysInBsMonth = [31, 31, 31, 32, 31, 31, 30, 29, 30, 29, 30, 30];
+
+        // Adjust BS date by days difference
+        let newBsDay = bsDay + daysDiff;
+        let newBsMonth = bsMonth;
+        let newBsYear = bsYear;
+
+        // Adjust for month/year boundaries
+        while (newBsDay > daysInBsMonth[newBsMonth - 1]) {
+            newBsDay -= daysInBsMonth[newBsMonth - 1];
+            newBsMonth++;
+            if (newBsMonth > 12) {
+                newBsMonth = 1;
+                newBsYear++;
+            }
+        }
+
+        while (newBsDay < 1) {
+            newBsMonth--;
+            if (newBsMonth < 1) {
+                newBsMonth = 12;
+                newBsYear--;
+            }
+            newBsDay += daysInBsMonth[newBsMonth - 1];
+        }
+
+        const bsDateStr = `${newBsYear}-${String(newBsMonth).padStart(2, '0')}-${String(newBsDay).padStart(2, '0')}`;
+        document.getElementById('disasterDateBS').value = bsDateStr;
+    }
+
+    // Load data from API
+    async function loadData() {
+        try {
+            // Load disaster statistics
+            const statsResponse = await fetch('/api/disaster-statistics');
+            const statsData = await statsResponse.json();
+
+            // Update UI with statistics
+            updateStatsUI(statsData);
+
+            // Load disaster data for recent incidents and charts
+            const response = await fetch('/api/disasters');
+            const data = await response.json();
+
+            if (data.disasters) {
+                renderRecentIncidents(data.disasters);
+                renderCharts(data.disasters, statsData);
+            }
+
+            // Load situation report data
+            loadSituationReport();
+        } catch (error) {
+            console.error('Error loading data:', error);
+            showToast('Error loading data. Please try again.', 'danger');
+        }
+    }
+
+    // New function to load just disaster statistics (used by tab listeners)
+    async function loadDisasterStatistics() {
+        try {
+            const statsResponse = await fetch('/api/disaster-statistics');
+            const statsData = await statsResponse.json();
+            updateStatsUI(statsData);
+
+            // Re-render charts as they may depend on statsData
+            const response = await fetch('/api/disasters');
+            const data = await response.json();
+            if (data.disasters) {
+                renderCharts(data.disasters, statsData);
+            }
+        } catch (error) {
+            console.error('Error loading disaster statistics:', error);
+        }
+    }
+
+    // Update statistics cards UI
+    function updateStatsUI(statsData) {
+        // Main Overview Stats
+        const totalIncidentsEl = document.getElementById('total-incidents');
+        if (totalIncidentsEl) totalIncidentsEl.textContent = statsData.total_disasters || 0;
+
+        const affectedPeopleEl = document.getElementById('affected-people');
+        if (affectedPeopleEl) affectedPeopleEl.textContent = statsData.total_affected_people || 0;
+
+        const casualtiesEl = document.getElementById('casualties');
+        if (casualtiesEl) casualtiesEl.textContent = statsData.total_deaths || 0;
+
+        const displacedEl = document.getElementById('displaced');
+        if (displacedEl) displacedEl.textContent = statsData.total_affected_people || 0; // Proxy
+
+        const injuredEl = document.getElementById('injured');
+        if (injuredEl) injuredEl.textContent = 0; // Not in model yet
+
+        const rescuedEl = document.getElementById('rescued');
+        if (rescuedEl) rescuedEl.textContent = (statsData.total_affected_people || 0) - (statsData.total_deaths || 0); // Proxy
+
+        const reliefActionsEl = document.getElementById('relief-actions');
+        if (reliefActionsEl) reliefActionsEl.textContent = '0'; // Placeholder
+
+        // Damage Assessment Stats
+        const destroyedHousesEl = document.getElementById('destroyed-houses');
+        if (destroyedHousesEl) destroyedHousesEl.textContent = statsData.total_affected_households || 0;
+
+        const damagedBuildingsEl = document.getElementById('damaged-buildings');
+        if (damagedBuildingsEl) damagedBuildingsEl.textContent = statsData.total_public_buildings_damaged || 0;
+
+        const infrastructureDamageEl = document.getElementById('infrastructure-damage');
+        if (infrastructureDamageEl) infrastructureDamageEl.textContent = statsData.total_public_buildings_destroyed || 0;
+
+        const estimatedLossEl = document.getElementById('estimated-loss');
+        if (estimatedLossEl) {
+            const lossValue = statsData.total_estimated_loss || 0;
+            estimatedLossEl.textContent = lossValue.toLocaleString();
+        }
+
+        // Livestock Damage Stats
+        const cattleLostEl = document.getElementById('cattle-lost');
+        if (cattleLostEl) cattleLostEl.textContent = (statsData.total_cattle_lost || 0) + ' (Inj: ' + (statsData.total_cattle_injured || 0) + ')';
+
+        const smallLivestockLostEl = document.getElementById('small-livestock-lost');
+        if (smallLivestockLostEl) smallLivestockLostEl.textContent = (statsData.total_goats_sheep_lost || 0) + ' (Inj: ' + (statsData.total_goats_sheep_injured || 0) + ')';
+
+        const poultryLostEl = document.getElementById('poultry-lost');
+        if (poultryLostEl) poultryLostEl.textContent = (statsData.total_poultry_lost || 0) + ' (Inj: ' + (statsData.total_poultry_injured || 0) + ')';
+
+        const livestockLossEl = document.getElementById('livestock-loss');
+        if (livestockLossEl) livestockLossEl.textContent = (statsData.total_other_livestock_lost || 0) + ' (Inj: ' + (statsData.total_other_livestock_injured || 0) + ')';
+    }
+
+
+    // Update statistics cards
+    function updateStats(disasters) {
+        // Total incidents today
+        document.getElementById('total-incidents').textContent = disasters.length;
+
+        // Affected people
+        const totalAffected = disasters.reduce((sum, incident) => sum + incident.affected_people, 0);
+        document.getElementById('affected-people').textContent = totalAffected;
+
+        // Damaged houses (we'll use affected households as proxy)
+        const totalHouses = disasters.reduce((sum, incident) => sum + incident.affected_households, 0);
+        document.getElementById('damaged-houses').textContent = totalHouses;
+
+        // Relief actions (placeholder - would come from relief distribution data)
+        document.getElementById('relief-actions').textContent = '0';
+
+        // Human impact stats
+        document.getElementById('casualties').textContent = '0'; // Placeholder
+        document.getElementById('injured').textContent = '0'; // Placeholder
+        document.getElementById('displaced').textContent = totalAffected; // Using affected as displaced
+        document.getElementById('rescued').textContent = '0'; // Placeholder
+
+        // Damage assessment stats
+        document.getElementById('destroyed-houses').textContent = '0'; // Placeholder
+        document.getElementById('damaged-buildings').textContent = totalHouses; // Using affected as damaged
+        document.getElementById('infrastructure-damage').textContent = '0'; // Placeholder
+        document.getElementById('estimated-loss').textContent = '0'; // Placeholder
+
+        // Livestock damage stats
+        document.getElementById('cattle-lost').textContent = '0'; // Placeholder
+        document.getElementById('small-livestock-lost').textContent = '0'; // Placeholder
+        document.getElementById('poultry-lost').textContent = '0'; // Placeholder
+        document.getElementById('livestock-loss').textContent = '0'; // Placeholder
+    }
+
+    // Render recent incidents table
+    function renderRecentIncidents(disasters) {
+        const tbody = document.getElementById('recent-incidents-body');
+        tbody.innerHTML = '';
+
+        // Sort by date (most recent first) and take the last 10
+        const recent = disasters.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 10);
+
+        recent.forEach(incident => {
+            const row = document.createElement('tr');
+
+            // Format date - use BS date (disaster_date_bs) if available, otherwise fall back to AD date
+            const formattedDate = incident.disaster_date_bs || (incident.disaster_date ? incident.disaster_date : 'N/A');
+            const formattedTime = incident.disaster_time || (incident.created_at ? new Date(incident.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A');
+
+            // Format estimated loss
+            const estimatedLoss = incident.estimated_loss ? `Rs. ${parseInt(incident.estimated_loss).toLocaleString()}` : 'N/A';
+
+            row.innerHTML = `
+                    <td>${formattedDate}</td>
+                    <td>${formattedTime}</td>
+                    <td><span class="badge bg-warning disaster-type-badge">${incident.disaster_type}</span></td>
+                    <td><span class="badge bg-info ward-badge">Ward ${incident.ward}</span></td>
+                    <td>${incident.tole || incident.location || 'N/A'}</td>
+                    <td>${estimatedLoss}</td>
+                    <td><span class="badge bg-${getSeverityClass(incident.description || '')}">${getSeverityLabel(incident.description || '')}</span></td>
+                    <td>
+                        <div class="btn-group btn-group-sm">
+                            <button class="btn btn-outline-primary" onclick="viewIncidentDetails(${incident.id})" title="View Details">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                            <button class="btn ${incident.is_locked ? 'btn-warning' : 'btn-secondary'}" onclick="toggleLock(${incident.id}, ${incident.is_locked})" title="${incident.is_locked ? 'Unlock record' : 'Lock record'}">
+                                <i class="bi bi-${incident.is_locked ? 'unlock-fill' : 'lock'}"></i>
+                            </button>
+                            <button class="btn btn-outline-danger" onclick="deleteIncident(${incident.id}, ${incident.is_locked})" title="घटना हटाउनुहोस्" ${incident.is_locked ? 'disabled' : ''}>
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                `;
+
+            tbody.appendChild(row);
+        });
+
+        if (recent.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center">No incidents reported</td></tr>';
+        }
+    }
+
+    // Helper function to determine severity class
+    function getSeverityClass(description) {
+        if (description.toLowerCase().includes('critical') || description.toLowerCase().includes('severe')) {
+            return 'danger';
+        } else if (description.toLowerCase().includes('moderate') || description.toLowerCase().includes('medium')) {
+            return 'warning';
+        } else {
+            return 'info';
+        }
+    }
+
+    // Helper function to determine severity label
+    function getSeverityLabel(description) {
+        if (description.toLowerCase().includes('critical') || description.toLowerCase().includes('severe')) {
+            return 'Critical';
+        } else if (description.toLowerCase().includes('moderate') || description.toLowerCase().includes('medium')) {
+            return 'Medium';
+        } else {
+            return 'Low';
+        }
+    }
+
+    // Render charts
+    function renderCharts(disasters, statsData) {
+        // Chart 1: Incidents by type
+        // Use the statistics data if available
+        let typeLabels = [];
+        let typeData = [];
+
+        if (statsData && statsData.disaster_type_distribution) {
+            typeLabels = statsData.disaster_type_distribution.map(item => item.disaster_type);
+            typeData = statsData.disaster_type_distribution.map(item => item.count);
+        } else {
+            // Fallback to calculating from disasters data
+            const typeCounts = {};
+            disasters.forEach(incident => {
+                const type = incident.disaster_type;
+                typeCounts[type] = (typeCounts[type] || 0) + 1;
+            });
+
+            typeLabels = Object.keys(typeCounts);
+            typeData = Object.values(typeCounts);
+        }
+
+        const typeCtx = document.getElementById('incidentsByTypeChart').getContext('2d');
+        if (incidentsByTypeChart) {
+            incidentsByTypeChart.destroy();
+        }
+        incidentsByTypeChart = new Chart(typeCtx, {
+            type: 'bar',
+            data: {
+                labels: typeLabels,
+                datasets: [{
+                    label: 'Number of Incidents',
+                    data: typeData,
+                    backgroundColor: [
+                        'rgba(255, 99, 132, 0.7)',
+                        'rgba(54, 162, 235, 0.7)',
+                        'rgba(255, 206, 86, 0.7)',
+                        'rgba(75, 192, 192, 0.7)',
+                        'rgba(153, 102, 255, 0.7)',
+                        'rgba(255, 159, 64, 0.7)'
+                    ],
+                    borderColor: [
+                        'rgba(255, 99, 132, 1)',
+                        'rgba(54, 162, 235, 1)',
+                        'rgba(255, 206, 86, 1)',
+                        'rgba(75, 192, 192, 1)',
+                        'rgba(153, 102, 255, 1)',
+                        'rgba(255, 159, 64, 1)'
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+
+        // Chart 2: Incidents by ward
+        let wardLabels = [];
+        let wardData = [];
+
+        if (statsData && statsData.ward_distribution) {
+            wardLabels = statsData.ward_distribution.map(item => `Ward ${item.ward}`);
+            wardData = statsData.ward_distribution.map(item => item.count);
+        } else {
+            // Fallback to calculating from disasters data
+            const wardCounts = {};
+            disasters.forEach(incident => {
+                const ward = `Ward ${incident.ward}`;
+                wardCounts[ward] = (wardCounts[ward] || 0) + 1;
+            });
+
+            wardLabels = Object.keys(wardCounts);
+            wardData = Object.values(wardCounts);
+        }
+
+        const wardCtx = document.getElementById('incidentsByWardChart').getContext('2d');
+        if (incidentsByWardChart) {
+            incidentsByWardChart.destroy();
+        }
+        incidentsByWardChart = new Chart(wardCtx, {
+            type: 'doughnut',
+            data: {
+                labels: wardLabels,
+                datasets: [{
+                    data: wardData,
+                    backgroundColor: [
+                        'rgba(255, 99, 132, 0.7)',
+                        'rgba(54, 162, 235, 0.7)',
+                        'rgba(255, 206, 86, 0.7)',
+                        'rgba(75, 192, 192, 0.7)',
+                        'rgba(153, 102, 255, 0.7)',
+                        'rgba(255, 159, 64, 0.7)',
+                        'rgba(199, 192, 192, 0.7)',
+                        'rgba(83, 102, 255, 0.7)',
+                        'rgba(255, 95, 64, 0.7)'
+                    ],
+                    borderColor: [
+                        'rgba(255, 99, 132, 1)',
+                        'rgba(54, 162, 235, 1)',
+                        'rgba(255, 206, 86, 1)',
+                        'rgba(75, 192, 192, 1)',
+                        'rgba(153, 102, 255, 1)',
+                        'rgba(255, 159, 64, 1)',
+                        'rgba(199, 192, 192, 1)',
+                        'rgba(83, 102, 255, 1)',
+                        'rgba(255, 95, 64, 1)'
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'right'
+                    }
+                }
+            }
+        });
+
+        // Human Impact Chart
+        if (statsData) {
+            renderHumanImpactChart(statsData);
+        } else {
+            renderPlaceholderChart('humanImpactChart', 'Human Impact by Demographics', ['Men', 'Women', 'Children', 'Elderly'], [12, 19, 9, 5]);
+        }
+
+        // Damage Assessment Chart
+        if (statsData) {
+            renderDamageAssessmentChart(statsData);
+        } else {
+            renderPlaceholderChart('damageAssessmentChart', 'Damage Assessment by Category', ['Houses', 'Buildings', 'Infrastructure', 'Agriculture'], [8, 3, 5, 7]);
+        }
+
+        // Livestock Damage Chart
+        if (statsData) {
+            renderLivestockDamageChart(statsData);
+        } else {
+            renderPlaceholderChart('livestockDamageChart', 'Livestock Damage by Type', ['Cattle', 'Goats/Sheep', 'Poultry', 'Others'], [4, 12, 25, 3]);
+        }
+    }
+
+    // Render Human Impact Chart
+    function renderHumanImpactChart(statsData) {
+        const ctx = document.getElementById('humanImpactChart').getContext('2d');
+        if (humanImpactChart) humanImpactChart.destroy();
+
+        humanImpactChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['Males', 'Females', 'Deaths', 'Missing'],
+                datasets: [{
+                    label: 'Human Impact',
+                    data: [
+                        statsData.total_affected_males || 0,
+                        statsData.total_affected_females || 0,
+                        statsData.total_deaths || 0,
+                        statsData.total_missing || 0
+                    ],
+                    backgroundColor: [
+                        'rgba(54, 162, 235, 0.7)',
+                        'rgba(255, 99, 132, 0.7)',
+                        'rgba(255, 159, 64, 0.7)',
+                        'rgba(153, 102, 255, 0.7)'
+                    ],
+                    borderColor: [
+                        'rgba(54, 162, 235, 1)',
+                        'rgba(255, 99, 132, 1)',
+                        'rgba(255, 159, 64, 1)',
+                        'rgba(153, 102, 255, 1)'
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    }
+
+    // Render Damage Assessment Chart
+    function renderDamageAssessmentChart(statsData) {
+        const ctx = document.getElementById('damageAssessmentChart').getContext('2d');
+        if (damageAssessmentChart) damageAssessmentChart.destroy();
+
+        damageAssessmentChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['Houses', 'Buildings', 'Infrastructure', 'Agriculture'],
+                datasets: [{
+                    label: 'Damage Assessment',
+                    data: [
+                        statsData.total_affected_households || 0,
+                        statsData.total_public_buildings_damaged || 0,
+                        statsData.total_public_buildings_destroyed || 0,
+                        statsData.total_affected_people || 0  // Placeholder for agriculture
+                    ],
+                    backgroundColor: [
+                        'rgba(255, 99, 132, 0.7)',
+                        'rgba(54, 162, 235, 0.7)',
+                        'rgba(255, 206, 86, 0.7)',
+                        'rgba(75, 192, 192, 0.7)'
+                    ],
+                    borderColor: [
+                        'rgba(255, 99, 132, 1)',
+                        'rgba(54, 162, 235, 1)',
+                        'rgba(255, 206, 86, 1)',
+                        'rgba(75, 192, 192, 1)'
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    }
+
+    // Render Livestock Damage Chart
+    function renderLivestockDamageChart(statsData) {
+        const ctx = document.getElementById('livestockDamageChart').getContext('2d');
+        if (livestockDamageChart) livestockDamageChart.destroy();
+
+        livestockDamageChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Cattle', 'Goats/Sheep', 'Poultry', 'Others'],
+                datasets: [{
+                    data: [
+                        statsData.total_livestock_death || 0,
+                        statsData.total_livestock_injured || 0,
+                        statsData.total_affected_people || 0,
+                        statsData.total_deaths || 0
+                    ],
+                    backgroundColor: [
+                        '#667eea', // Indigo
+                        '#764ba2', // Purple
+                        '#f6d365', // Gold
+                        '#fda085'  // Peach
+                    ],
+                    borderWidth: 0,
+                    hoverOffset: 20
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '70%',
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            padding: 20,
+                            usePointStyle: true,
+                            font: {
+                                size: 12,
+                                weight: '500'
+                            }
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                        titleColor: '#2d3748',
+                        bodyColor: '#4a5568',
+                        borderColor: '#e2e8f0',
+                        borderWidth: 1,
+                        padding: 12,
+                        boxPadding: 6,
+                        displayColors: true,
+                        usePointStyle: true
+                    }
+                },
+                animation: {
+                    animateScale: true,
+                    animateRotate: true
+                }
+            }
+        });
+    }
+
+    // Render placeholder chart
+    function renderPlaceholderChart(canvasId, label, labels, data) {
+        const ctx = document.getElementById(canvasId).getContext('2d');
+        let chartInstance;
+
+        switch (canvasId) {
+            case 'humanImpactChart':
+                if (humanImpactChart) humanImpactChart.destroy();
+                humanImpactChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: label,
+                            data: data,
+                            backgroundColor: 'rgba(54, 162, 235, 0.7)',
+                            borderColor: 'rgba(54, 162, 235, 1)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true
+                            }
+                        }
+                    }
+                });
+                break;
+
+            case 'damageAssessmentChart':
+                if (damageAssessmentChart) damageAssessmentChart.destroy();
+                damageAssessmentChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: label,
+                            data: data,
+                            backgroundColor: [
+                                'rgba(255, 99, 132, 0.7)',
+                                'rgba(54, 162, 235, 0.7)',
+                                'rgba(255, 206, 86, 0.7)',
+                                'rgba(75, 192, 192, 0.7)'
+                            ],
+                            borderColor: [
+                                'rgba(255, 99, 132, 1)',
+                                'rgba(54, 162, 235, 1)',
+                                'rgba(255, 206, 86, 1)',
+                                'rgba(75, 192, 192, 1)'
+                            ],
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true
+                            }
+                        }
+                    }
+                });
+                break;
+
+            case 'livestockDamageChart':
+                if (livestockDamageChart) livestockDamageChart.destroy();
+                livestockDamageChart = new Chart(ctx, {
+                    type: 'pie',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            data: data,
+                            backgroundColor: [
+                                'rgba(255, 99, 132, 0.7)',
+                                'rgba(54, 162, 235, 0.7)',
+                                'rgba(255, 206, 86, 0.7)',
+                                'rgba(75, 192, 192, 0.7)'
+                            ],
+                            borderColor: [
+                                'rgba(255, 99, 132, 1)',
+                                'rgba(54, 162, 235, 1)',
+                                'rgba(255, 206, 86, 1)',
+                                'rgba(75, 192, 192, 1)'
+                            ],
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false
+                    }
+                });
+                break;
+        }
+    }
+
+    // Load situation report data
+    async function loadSituationReport() {
+        try {
+            const response = await fetch('/api/situation-reports?page=1&per_page=1'); // Get most recent report
+            const data = await response.json();
+
+            if (data.success && data.situation_reports && data.situation_reports.length > 0) {
+                // Get the most recent report
+                const report = data.situation_reports[0];
+
+                document.getElementById('situation-summary').textContent = report.current_situation_summary || 'No situation summary available.';
+                document.getElementById('weather-conditions').textContent = report.weather_conditions || 'Weather data not available.';
+                document.getElementById('detailed-report').innerHTML = `
+                        <p><strong>Current Status:</strong> ${report.detailed_report || 'No detailed report available.'}</p>
+                        <p><strong>Resources Deployed:</strong> ${report.resources_deployed || 'No resource deployment information.'}</p>
+                        <p><strong>Next Update:</strong> ${report.next_update_time || 'Update time not specified.'}</p>
+                    `;
+            } else {
+                // If no reports are available, show default message
+                document.getElementById('situation-summary').textContent = 'No situation reports available.';
+                document.getElementById('weather-conditions').textContent = 'Weather data not available.';
+                document.getElementById('detailed-report').innerHTML = `
+                        <p><strong>Current Status:</strong> No situation reports available.</p>
+                        <p><strong>Resources Deployed:</strong> No resource deployment information.</p>
+                        <p><strong>Next Update:</strong> No update time specified.</p>
+                    `;
+            }
+        } catch (error) {
+            console.error('Error loading situation report:', error);
+            document.getElementById('situation-summary').textContent = 'Error loading situation report.';
+            document.getElementById('weather-conditions').textContent = 'Error loading weather conditions.';
+            document.getElementById('detailed-report').innerHTML = '<p>Error loading detailed report.</p>';
+        }
+
+        // Load public advisories
+        loadPublicAdvisories();
+    }
+
+    // Load event log data
+    async function loadEventLog() {
+        try {
+            // Fetch event logs from the correct API endpoint
+            const response = await fetch('/api/event-logs');
+            const data = await response.json();
+
+            const eventLogBody = document.getElementById('event-log-body');
+            eventLogBody.innerHTML = '';
+
+            if (data.success && data.event_logs && data.event_logs.length > 0) {
+                // Sort by timestamp (most recent first)
+                const sortedEvents = data.event_logs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+                sortedEvents.forEach(event => {
+                    const row = document.createElement('tr');
+                    const timestamp = event.timestamp ? new Date(event.timestamp).toLocaleString() : 'N/A';
+                    const location = event.location || 'N/A';
+                    const eventType = event.event_type || 'N/A';
+                    const description = event.description || 'N/A';
+                    const responsibleUnit = event.responsible_unit || 'LEOC';
+                    const status = event.status || 'Active';
+
+                    // Determine badge class based on status
+                    const statusBadgeClass = getStatusBadgeClass(status);
+
+                    row.innerHTML = `
+                            <td>${timestamp}</td>
+                            <td>${eventType}</td>
+                            <td>${description}</td>
+                            <td>${location}</td>
+                            <td>${responsibleUnit}</td>
+                            <td><span class="badge bg-${statusBadgeClass}">${status}</span></td>
+                        `;
+                    eventLogBody.appendChild(row);
+                });
+            } else {
+                // Show message when no event logs exist
+                eventLogBody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No event logs available.</td></tr>';
+            }
+        } catch (error) {
+            console.error('Error loading event log:', error);
+            const eventLogBody = document.getElementById('event-log-body');
+            eventLogBody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Error loading event logs. Please try again.</td></tr>';
+            showToast('Error loading event log. Please try again.', 'danger');
+        }
+    }
+
+    // Helper function to determine badge class based on status
+    function getStatusBadgeClass(status) {
+        switch (status.toLowerCase()) {
+            case 'active':
+                return 'info';
+            case 'completed':
+                return 'success';
+            case 'pending':
+                return 'warning';
+            case 'critical':
+                return 'danger';
+            default:
+                return 'secondary';
+        }
+    }
+
+    // Load public advisories
+    async function loadPublicAdvisories() {
+        try {
+            const response = await fetch('/api/public-information');
+            const data = await response.json();
+
+            if (data.success && data.public_information) {
+                const advisoriesList = document.getElementById('advisories-list');
+                advisoriesList.innerHTML = '';
+
+                // Filter active public information
+                const activeInfos = data.public_information.filter(info => info.is_active);
+
+                if (activeInfos.length > 0) {
+                    activeInfos.forEach(info => {
+                        const alertDiv = document.createElement('div');
+
+                        // Determine alert type based on priority
+                        let alertType = 'info';
+                        switch (info.priority.toLowerCase()) {
+                            case 'critical':
+                                alertType = 'danger';
+                                break;
+                            case 'high':
+                                alertType = 'warning';
+                                break;
+                            case 'normal':
+                                alertType = 'info';
+                                break;
+                            case 'low':
+                                alertType = 'secondary';
+                                break;
+                        }
+
+                        alertDiv.className = `alert alert-${alertType}`;
+                        alertDiv.innerHTML = `
+                                <strong>${info.title}:</strong> ${info.content}
+                            `;
+
+                        advisoriesList.appendChild(alertDiv);
+                    });
+                } else {
+                    advisoriesList.innerHTML = '<p>No current advisories.</p>';
+                }
+            }
+        } catch (error) {
+            console.error('Error loading public advisories:', error);
+            const advisoriesList = document.getElementById('advisories-list');
+            advisoriesList.innerHTML = '<p>Error loading public advisories.</p>';
+        }
+    }
+
+    // Submit disaster report
+    async function submitDisasterReport(event) {
+        event.preventDefault();
+
+        // Validate affected people
+        if (!validateAffectedPeople()) {
+            showToast('Error: Affected people count must equal the sum of affected males and females.', 'danger');
+            return;
+        }
+
+        // Parse coordinates
+        const coords = parseCoordinates(document.getElementById('coordinates').value);
+
+        // Calculate total livestock before submission
+        calculateTotalLivestock();
+
+        // Get form values
+        const formData = {
+            disaster_date_bs: document.getElementById('disasterDateBS').value,
+            disaster_time: document.getElementById('disasterTime').value,
+            disaster_type: document.getElementById('disasterType').value,
+            ward: document.getElementById('ward').value,
+            tole: document.getElementById('location').value,
+            latitude: coords.latitude,
+            longitude: coords.longitude,
+            description: document.getElementById('description').value,
+            severity: document.getElementById('severity').value,
+            affected_people: parseInt(document.getElementById('affectedPeople').value) || 0,
+            injured: parseInt(document.getElementById('injuredCount').value) || 0,
+            casualties: parseInt(document.getElementById('casualtiesCount').value) || 0,
+            affected_households: parseInt(document.getElementById('housesDamaged').value) || 0,
+            destroyed_houses: parseInt(document.getElementById('housesDestroyed').value) || 0,
+            livestock_lost: parseInt(document.getElementById('livestockLost').value) || 0,
+            estimated_loss: parseInt(document.getElementById('estimatedLoss').value) || 0,
+            deaths: parseInt(document.getElementById('deaths').value) || 0,
+            missing_persons: parseInt(document.getElementById('missingPersons').value) || 0,
+            affected_people_male: parseInt(document.getElementById('affectedPeopleMale').value) || 0,
+            affected_people_female: parseInt(document.getElementById('affectedPeopleFemale').value) || 0,
+            livestock_injured: parseInt(document.getElementById('livestockInjured').value) || 0,
+            livestock_death: parseInt(document.getElementById('livestockDeath').value) || 0,
+            cattle_lost: parseInt(document.getElementById('cattleLost').value) || 0,
+            cattle_injured: parseInt(document.getElementById('cattleInjured').value) || 0,
+            poultry_lost: parseInt(document.getElementById('poultryLost').value) || 0,
+            poultry_injured: parseInt(document.getElementById('poultryInjured').value) || 0,
+            goats_sheep_lost: parseInt(document.getElementById('goatsSheepLost').value) || 0,
+            goats_sheep_injured: parseInt(document.getElementById('goatsSheepInjured').value) || 0,
+            other_livestock_lost: parseInt(document.getElementById('otherLivestockLost').value) || 0,
+            other_livestock_injured: parseInt(document.getElementById('otherLivestockInjured').value) || 0,
+            public_building_destruction: parseInt(document.getElementById('publicBuildingDestruction').value) || 0,
+            public_building_damage: parseInt(document.getElementById('publicBuildingDamage').value) || 0,
+            road_blocked_status: document.getElementById('roadBlocked').checked,
+            electricity_blocked_status: document.getElementById('electricityBlocked').checked,
+            communication_blocked_status: document.getElementById('communicationBlocked').checked,
+            drinking_water_status: document.getElementById('drinkingWaterDisrupted').checked,
+            agriculture_crop_damage: document.getElementById('agricultureCropDamage').value,
+            rescue_operations: document.getElementById('rescueOperations').value
+        };
+
+        try {
+            const response = await fetch('/api/disaster-reports', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                },
+                body: JSON.stringify(formData)
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                showToast('Disaster report submitted successfully!', 'success');
+                resetForm();
+                loadData(); // Refresh data
+
+                // Switch to overview tab
+                const overviewTab = document.getElementById('overview-tab');
+                const tab = new bootstrap.Tab(overviewTab);
+                tab.show();
+            } else {
+                showToast('Error submitting report: ' + result.message, 'danger');
+            }
+        } catch (error) {
+            showToast('Error submitting report: ' + error.message, 'danger');
+        }
+    }
+
+    // Submit public information
+    async function submitPublicInfo(event) {
+        event.preventDefault();
+
+        // Get form values
+        const title = document.getElementById('publicInfoTitle').value.trim();
+        const content = document.getElementById('publicInfoContent').value.trim();
+
+        // Client-side validation
+        if (!title) {
+            showToast('Error: Title is required', 'danger');
+            document.getElementById('publicInfoTitle').focus();
+            return;
+        }
+        if (!content) {
+            showToast('Error: Content is required', 'danger');
+            document.getElementById('publicInfoContent').focus();
+            return;
+        }
+
+        const publicInfoData = {
+            title: title,
+            content: content,
+            info_type: document.getElementById('publicInfoType').value || 'General',
+            priority: document.getElementById('publicInfoPriority').value || 'Normal',
+            is_active: document.getElementById('publicInfoActive').checked,
+            valid_from_bs: document.getElementById('publicInfoValidFromBS').value || null,
+            valid_until_bs: document.getElementById('publicInfoValidUntilBS').value || null
+        };
+
+        try {
+            const response = await fetch('/api/public-information', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                },
+                body: JSON.stringify(publicInfoData)
+            });
+
+            const result = await response.json();
+
+            if (response.ok && result.success) {
+                showToast('Public information added successfully!', 'success');
+                document.getElementById('publicInfoForm').reset();
+                document.getElementById('publicInfoActive').checked = true; // Reset checkbox to checked
+                loadPublicAdvisories(); // Refresh public info
+            } else {
+                showToast('Error adding public info: ' + (result.message || 'Unknown error'), 'danger');
+            }
+        } catch (error) {
+            showToast('Error adding public info: ' + error.message, 'danger');
+            console.error('Error submitting public info:', error);
+        }
+    }
+
+    // Reset public information form
+    function resetPublicInfoForm() {
+        document.getElementById('publicInfoForm').reset();
+        document.getElementById('publicInfoActive').checked = true; // Reset checkbox to checked
+        showToast('Public information form reset.', 'info');
+    }
+
+    // Submit situation report
+    async function submitSituationReport(event) {
+        event.preventDefault();
+
+        // Get form values
+        const situationReportData = {
+            current_situation_summary: document.getElementById('situationSummary').value || '',
+            weather_conditions: document.getElementById('weatherConditions').value || '',
+            detailed_report: document.getElementById('detailedReport').value || '',
+            resources_deployed: document.getElementById('resourcesDeployed').value || '',
+            next_update_time: document.getElementById('nextUpdateTime').value || ''
+        };
+
+        try {
+            const response = await fetch('/api/situation-reports', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                },
+                body: JSON.stringify(situationReportData)
+            });
+
+            // Check if response is OK before parsing JSON
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const result = await response.json();
+
+            if (result.success) {
+                showToast('Situation report added successfully!', 'success');
+                document.getElementById('situationReportForm').reset();
+                loadSituationReport(); // Refresh situation report
+            } else {
+                showToast('Error adding situation report: ' + result.message, 'danger');
+            }
+        } catch (error) {
+            // Check if it's a JSON parsing error
+            if (error instanceof SyntaxError) {
+                showToast('Error: Server returned invalid response. Please try again.', 'danger');
+            } else {
+                showToast('Error adding situation report: ' + error.message, 'danger');
+            }
+            console.error('Error submitting situation report:', error);
+        }
+    }
+
+    // Reset situation report form
+    function resetSituationReportForm() {
+        document.getElementById('situationReportForm').reset();
+        showToast('Situation report form reset.', 'info');
+    }
+
+    // Reset form
+    function resetForm() {
+        document.getElementById('disasterReportForm').reset();
+
+        // Reset to today's BS date and current time
+        setTodayBsDate();
+
+        const now = new Date();
+        const currentTime = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
+        document.getElementById('disasterTime').value = currentTime;
+
+        // Reset custom ward selection
+        selectedWards.clear();
+        window.updateSelectedWardsDisplay();
+
+        // Hide the dropdown menu
+        document.getElementById('wardDropdownMenu').style.display = 'none';
+
+        // Remove active classes from dropdown items
+        const dropdownItems = document.querySelectorAll('#wardDropdownMenu .dropdown-item');
+        dropdownItems.forEach(item => item.classList.remove('active'));
+
+        // Reset validation display
+        document.getElementById('calculatedTotal').textContent = '0';
+        document.getElementById('calculatedTotal').classList.remove('text-danger', 'text-success');
+        document.getElementById('validationMessage').textContent = '';
+        document.getElementById('affectedPeople').classList.remove('is-invalid');
+    }
+
+    // Set all fields to zero for "No Incidents Today"
+    document.getElementById('noIncidentsBtn').addEventListener('click', function () {
+        // Set all numeric fields to 0
+        document.getElementById('affectedPeople').value = 0;
+        document.getElementById('injuredCount').value = 0;
+        document.getElementById('casualtiesCount').value = 0;
+        document.getElementById('housesDamaged').value = 0;
+        document.getElementById('housesDestroyed').value = 0;
+        document.getElementById('deaths').value = 0;
+        document.getElementById('missingPersons').value = 0;
+        document.getElementById('affectedPeopleMale').value = 0;
+        document.getElementById('affectedPeopleFemale').value = 0;
+        document.getElementById('estimatedLoss').value = 0;
+        document.getElementById('publicBuildingDestruction').value = 0;
+        document.getElementById('publicBuildingDamage').value = 0;
+
+        // Reset livestock fields
+        document.getElementById('cattleLost').value = 0;
+        document.getElementById('cattleInjured').value = 0;
+        document.getElementById('poultryLost').value = 0;
+        document.getElementById('poultryInjured').value = 0;
+        document.getElementById('goatsSheepLost').value = 0;
+        document.getElementById('goatsSheepInjured').value = 0;
+        document.getElementById('otherLivestockLost').value = 0;
+        document.getElementById('otherLivestockInjured').value = 0;
+
+        // Uncheck all checkboxes
+        document.getElementById('roadBlocked').checked = false;
+        document.getElementById('electricityBlocked').checked = false;
+        document.getElementById('communicationBlocked').checked = false;
+        document.getElementById('drinkingWaterDisrupted').checked = false;
+
+        // Clear text areas
+        document.getElementById('agricultureCropDamage').value = '';
+        document.getElementById('rescueOperations').value = '';
+        document.getElementById('coordinates').value = '';
+
+        // Set disaster type to "No Incident" or similar
+        const disasterTypeSelect = document.getElementById('disasterType');
+        if (!disasterTypeSelect.querySelector('option[value="no_incident"]')) {
+            const noIncidentOption = document.createElement('option');
+            noIncidentOption.value = 'no_incident';
+            noIncidentOption.textContent = 'No Incident';
+            disasterTypeSelect.appendChild(noIncidentOption);
+        }
+        disasterTypeSelect.value = 'no_incident';
+
+        // Set location to "No Specific Location"
+        document.getElementById('location').value = 'No incidents reported today';
+
+        // Update validation display
+        validateAffectedPeople();
+
+        showToast('All fields set to zero for "No Incidents Today"', 'info');
+    });
+
+    // View incident details
+    async function viewIncidentDetails(id) {
+        try {
+            const response = await fetch(`/api/disasters/${id}`);
+            const result = await response.json();
+
+            if (result.success && result.data) {
+                const incident = result.data;
+                const modalContent = document.getElementById('incidentModalContent');
+
+                modalContent.innerHTML = `
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6 class="text-primary">Basic Information</h6>
+                            <table class="table table-sm table-borderless">
+                                <tr><td><strong>ID:</strong></td><td>#${incident.id}</td></tr>
+                                <tr><td><strong>Disaster Type:</strong></td><td><span class="badge bg-warning">${incident.disaster_type}</span></td></tr>
+                                <tr><td><strong>Date (BS):</strong></td><td>${incident.disaster_date_bs || 'N/A'}</td></tr>
+                                <tr><td><strong>Ward:</strong></td><td><span class="badge bg-info">Ward ${incident.ward}</span></td></tr>
+                                <tr><td><strong>Location:</strong></td><td>${incident.tole || 'N/A'}</td></tr>
+                            </table>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="text-primary">Human Impact</h6>
+                            <table class="table table-sm table-borderless">
+                                <tr><td><strong>Affected People:</strong></td><td>${incident.affected_people || 0}</td></tr>
+                                <tr><td><strong>Males:</strong></td><td>${incident.affected_people_male || 0}</td></tr>
+                                <tr><td><strong>Females:</strong></td><td>${incident.affected_people_female || 0}</td></tr>
+                                <tr><td><strong>Deaths:</strong></td><td><span class="text-danger">${incident.deaths || 0}</span></td></tr>
+                                <tr><td><strong>Missing:</strong></td><td>${incident.missing_persons || 0}</td></tr>
+                            </table>
+                        </div>
+                    </div>
+                    <hr>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6 class="text-primary">Property Damage</h6>
+                            <table class="table table-sm table-borderless">
+                                <tr><td><strong>Affected Households:</strong></td><td>${incident.affected_households || 0}</td></tr>
+                                <tr><td><strong>Public Buildings Damaged:</strong></td><td>${incident.public_building_damage || 0}</td></tr>
+                                <tr><td><strong>Public Buildings Destroyed:</strong></td><td>${incident.public_building_destruction || 0}</td></tr>
+                                <tr><td><strong>Estimated Loss:</strong></td><td>${incident.estimated_loss ? 'Rs. ' + parseInt(incident.estimated_loss).toLocaleString() : 'N/A'}</td></tr>
+                            </table>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="text-primary">Livestock Breakdown</h6>
+                            <table class="table table-sm table-borderless">
+                                <tr><td><strong>Cattle:</strong></td><td>Lost: ${incident.cattle_lost || 0}, Injured: ${incident.cattle_injured || 0}</td></tr>
+                                <tr><td><strong>Poultry:</strong></td><td>Lost: ${incident.poultry_lost || 0}, Injured: ${incident.poultry_injured || 0}</td></tr>
+                                <tr><td><strong>Goats/Sheep:</strong></td><td>Lost: ${incident.goats_sheep_lost || 0}, Injured: ${incident.goats_sheep_injured || 0}</td></tr>
+                                <tr><td><strong>Others:</strong></td><td>Lost: ${incident.other_livestock_lost || 0}, Injured: ${incident.other_livestock_injured || 0}</td></tr>
+                                <tr><td colspan="2"><hr class="my-1"></td></tr>
+                                <tr><td><strong>Infrastructure:</strong></td><td></td></tr>
+                                <tr><td><strong>Road Blocked:</strong></td><td>${incident.road_blocked_status ? '<span class="badge bg-danger">Yes</span>' : '<span class="badge bg-success">No</span>'}</td></tr>
+                                <tr><td><strong>Electricity Blocked:</strong></td><td>${incident.electricity_blocked_status ? '<span class="badge bg-danger">Yes</span>' : '<span class="badge bg-success">No</span>'}</td></tr>
+                                <tr><td><strong>Communication:</strong></td><td>${incident.communication_blocked_status ? '<span class="badge bg-danger">Blocked</span>' : '<span class="badge bg-success">Clear</span>'}</td></tr>
+                                <tr><td><strong>Water:</strong></td><td>${incident.drinking_water_status ? '<span class="badge bg-danger">Disrupted</span>' : '<span class="badge bg-success">Normal</span>'}</td></tr>
+                            </table>
+                        </div>
+                    </div>
+                    ${incident.description ? `
+                    <hr>
+                    <div class="row">
+                        <div class="col-12">
+                            <h6 class="text-primary">Description</h6>
+                            <p>${incident.description}</p>
+                        </div>
+                    </div>
+                    ` : ''}
+                    ${incident.agriculture_crop_damage ? `
+                    <div class="row">
+                        <div class="col-12">
+                            <h6 class="text-primary">Agriculture/Crop Damage</h6>
+                            <p>${incident.agriculture_crop_damage}</p>
+                        </div>
+                    </div>
+                    ` : ''}
+                `;
+
+                const modal = new bootstrap.Modal(document.getElementById('incidentDetailsModal'));
+                modal.show();
+            } else {
+                showToast('Error loading incident details', 'danger');
+            }
+        } catch (error) {
+            console.error('Error viewing incident details:', error);
+            showToast('Error loading incident details', 'danger');
+        }
+    }
+
+    // Toggle lock status for an incident
+    async function toggleLock(id, isCurrentlyLocked) {
+        // Prompt for unlock key
+        const unlockKey = prompt(`Enter unlock key to ${isCurrentlyLocked ? 'unlock' : 'lock'} this record:`);
+
+        if (!unlockKey) {
+            return; // User cancelled
+        }
+
+        try {
+            const response = await fetch(`/api/disasters/${id}/lock`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                },
+                body: JSON.stringify({ unlock_key: unlockKey })
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                showToast(`Record ${result.is_locked ? 'locked' : 'unlocked'} successfully`, 'success');
+                loadData(); // Refresh the data
+            } else {
+                showToast('Error: ' + result.message, 'danger');
+            }
+        } catch (error) {
+            console.error('Error toggling lock:', error);
+            showToast('Error toggling lock status', 'danger');
+        }
+    }
+
+    // Delete incident
+    async function deleteIncident(id, isLocked) {
+        if (isLocked) {
+            showToast('Record is locked and cannot be deleted.', 'warning');
+            return;
+        }
+
+        if (!confirm('Are you sure you want to delete this incident? This action cannot be undone.')) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/disasters/${id}`, {
+                method: 'DELETE',
+                headers: {
+                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                }
+            });
+            const data = await response.json();
+
+            if (data.success) {
+                showToast('घटना सफलतापूर्वक हटाइयो', 'success');
+                loadData();
+            } else {
+                showToast('Failed to delete incident: ' + data.message, 'danger');
+            }
+        } catch (error) {
+            console.error('Error deleting incident:', error);
+            showToast('Failed to delete incident', 'danger');
+        }
+    }
+
+    // Lock forms initially
+    function lockDisasterForms() {
+        const formsToLock = ['disasterReportForm', 'situationReportForm', 'publicInfoForm'];
+
+        formsToLock.forEach(formId => {
+            const form = document.getElementById(formId);
+            if (form) {
+                const elements = form.querySelectorAll('input, select, textarea, button');
+                elements.forEach(el => {
+                    // Don't disable submit/reset buttons completely if we want to show they exist, 
+                    // but standard practice is to disable everything until unlocked.
+                    // Exception: we don't disable the unlock buttons which are outside the form usually, 
+                    // but checking if any button inside needs to stay active? No.
+                    el.disabled = true;
+                });
+
+                // Show a small hint or just rely on the unlock button
+            }
+        });
+    }
+
+    // Unlock form
+    function unlockDisasterForm(formId, buttonId) {
+        const password = prompt("Enter unlock key to enable editing:");
+        if (!password) return;
+
+        if (password === 'admin123') { // Simple default check
+            const form = document.getElementById(formId);
+            if (form) {
+                const elements = form.querySelectorAll('input, select, textarea, button');
+                elements.forEach(el => el.disabled = false);
+            }
+
+            const btn = document.getElementById(buttonId);
+            if (btn) btn.style.display = 'none';
+
+            showToast('Form unlocked for data entry.', 'success');
+        } else {
+            alert('Invalid unlock key');
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        lockDisasterForms();
+        // Load data when Human Impact tab is shown
+        const humanImpactTab = document.querySelector('#disasterTabs a[data-bs-target="#human-impact"]');
+        if (humanImpactTab) {
+            humanImpactTab.addEventListener('shown.bs.tab', function () {
+                // Load disaster statistics for human impact
+                loadDisasterStatistics();
+            });
+        }
+
+        // Load data when Damage Assessment tab is shown
+        const damageAssessmentTab = document.querySelector('#disasterTabs a[data-bs-target="#damage-assessment"]');
+        if (damageAssessmentTab) {
+            damageAssessmentTab.addEventListener('shown.bs.tab', function () {
+                // Load disaster statistics for damage assessment
+                loadDisasterStatistics();
+            });
+        }
+
+        // Load data when Livestock Damage tab is shown
+        const livestockDamageTab = document.querySelector('#disasterTabs a[data-bs-target="#livestock-damage"]');
+        if (livestockDamageTab) {
+            livestockDamageTab.addEventListener('shown.bs.tab', function () {
+                // Load disaster statistics for livestock damage
+                loadDisasterStatistics();
+            });
+        }
+
+        // Load data when Public Info tab is shown
+        const publicInfoTab = document.querySelector('#disasterTabs a[data-bs-target="#public-info"]');
+        if (publicInfoTab) {
+            publicInfoTab.addEventListener('shown.bs.tab', function () {
+                // Load public information
+                loadPublicAdvisories();
+            });
+        }
+
+        // Load data when Event Log tab is shown
+        const eventLogTab = document.querySelector('#disasterTabs a[data-bs-target="#event-log"]');
+        if (eventLogTab) {
+            eventLogTab.addEventListener('shown.bs.tab', function () {
+                // Load event log data when tab is shown
+                loadEventLog();
+            });
+        }
+    });
+
+    //
+</script>
+</body>
+
+</html>
+{% endblock %}

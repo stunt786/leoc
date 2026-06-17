@@ -42,9 +42,6 @@
                         <th>ID</th>
                         <th>Name</th>
                         <th>Type</th>
-                        <th>Province</th>
-                        <th>District</th>
-                        <th>Municipality</th>
                         <th>Ward</th>
                         <th>Start Date</th>
                         <th>Status</th>
@@ -52,7 +49,7 @@
                     </tr>
                 </thead>
                 <tbody id="incidentTableBody">
-                    <tr><td colspan="10" class="text-center py-4"><div class="spinner-border text-primary"></div></td></tr>
+                    <tr><td colspan="7" class="text-center py-4"><div class="spinner-border text-primary"></div></td></tr>
                 </tbody>
             </table>
         </div>
@@ -60,8 +57,8 @@
 </div>
 
 <!-- Incident Modal -->
-<div class="modal fade" id="incidentModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
+<div class="modal fade" id="incidentModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="incidentModalTitle"><i class="bi bi-lightning-charge-fill me-2"></i>Add Incident</h5>
@@ -70,72 +67,256 @@
             <div class="modal-body">
                 <form id="incidentForm">
                     <input type="hidden" id="inc_id">
-                    <div class="row g-3">
-                        <div class="col-md-6">
-                            <label class="form-label">Incident Name *</label>
-                            <input type="text" class="form-control" id="inc_incident_name" required>
+
+                    <!-- Section 1: Basic Incident Information -->
+                    <div class="card mb-3 border">
+                        <div class="card-header bg-light py-2">
+                            <h6 class="mb-0"><i class="bi bi-info-circle me-1"></i>Basic Incident Information</h6>
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Incident Type *</label>
-                            <select class="form-select" id="inc_incident_type">
-                                <option value="">Select Type</option>
-                                <option value="Flood">Flood</option>
-                                <option value="Earthquake">Earthquake</option>
-                                <option value="Landslide">Landslide</option>
-                                <option value="Fire">Fire</option>
-                                <option value="Storm">Storm</option>
-                                <option value="Epidemic">Epidemic</option>
-                                <option value="Other">Other</option>
-                            </select>
+                        <div class="card-body">
+                            <div class="row g-3">
+                                <div class="col-md-4">
+                                    <label class="form-label">Incident Name *</label>
+                                    <input type="text" class="form-control" id="inc_incident_name" required>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Incident Type *</label>
+                                    <select class="form-select" id="inc_incident_type" onchange="autoGenerateName()">
+                                        <option value="">Select Type</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Ward *</label>
+                                    <select class="form-select" id="inc_ward" onchange="autoGenerateName()">
+                                        <option value="">Select Ward</option>
+                                        <option value="1">Ward 1</option>
+                                        <option value="2">Ward 2</option>
+                                        <option value="3">Ward 3</option>
+                                        <option value="4">Ward 4</option>
+                                        <option value="5">Ward 5</option>
+                                        <option value="6">Ward 6</option>
+                                        <option value="7">Ward 7</option>
+                                        <option value="8">Ward 8</option>
+                                        <option value="9">Ward 9</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Date (BS)</label>
+                                    <input type="text" class="form-control" id="inc_disaster_date_bs" placeholder="YYYY-MM-DD">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Time</label>
+                                    <input type="time" class="form-control" id="inc_incident_time">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Start Date (AD)</label>
+                                    <input type="date" class="form-control" id="inc_start_date" onchange="autoGenerateName()">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Status</label>
+                                    <select class="form-select" id="inc_status">
+                                        <option value="Active">Active</option>
+                                        <option value="Closed">Closed</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Coordinates</label>
+                                    <input type="text" class="form-control" id="inc_coordinates" placeholder="lat, lng">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Tole / Location</label>
+                                    <input type="text" class="form-control" id="inc_tole" placeholder="Specific location">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Severity</label>
+                                    <select class="form-select" id="inc_severity">
+                                        <option value="low">Low</option>
+                                        <option value="medium" selected>Medium</option>
+                                        <option value="high">High</option>
+                                        <option value="critical">Critical</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Weather Status</label>
+                                    <input type="text" class="form-control" id="inc_weather_status" placeholder="e.g. Heavy Rain">
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label">Description</label>
+                                    <textarea class="form-control" id="inc_description" rows="2"></textarea>
+                                </div>
+                            </div>
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Province</label>
-                            <input type="text" class="form-control" id="inc_province">
+                    </div>
+
+                    <!-- Section 2: Human Impact -->
+                    <div class="card mb-3 border">
+                        <div class="card-header bg-light py-2">
+                            <h6 class="mb-0"><i class="bi bi-people me-1"></i>Human Impact</h6>
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label">District</label>
-                            <input type="text" class="form-control" id="inc_district">
+                        <div class="card-body">
+                            <div class="row g-3">
+                                <div class="col-md-3">
+                                    <label class="form-label">Affected People</label>
+                                    <input type="number" class="form-control" id="inc_affected_people" min="0" value="0">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Affected Households</label>
+                                    <input type="number" class="form-control" id="inc_affected_households" min="0" value="0">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Male</label>
+                                    <input type="number" class="form-control" id="inc_affected_people_male" min="0" value="0">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Female</label>
+                                    <input type="number" class="form-control" id="inc_affected_people_female" min="0" value="0">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Deaths</label>
+                                    <input type="number" class="form-control" id="inc_deaths" min="0" value="0">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Injured</label>
+                                    <input type="number" class="form-control" id="inc_injured" min="0" value="0">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Missing Persons</label>
+                                    <input type="number" class="form-control" id="inc_missing_persons" min="0" value="0">
+                                </div>
+                            </div>
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Municipality</label>
-                            <input type="text" class="form-control" id="inc_municipality">
+                    </div>
+
+                    <!-- Section 3: Property Damage -->
+                    <div class="card mb-3 border">
+                        <div class="card-header bg-light py-2">
+                            <h6 class="mb-0"><i class="bi bi-house me-1"></i>Property Damage</h6>
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Ward</label>
-                            <select class="form-select" id="inc_ward">
-                                <option value="">Select Ward</option>
-                                <option value="1">Ward 1</option>
-                                <option value="2">Ward 2</option>
-                                <option value="3">Ward 3</option>
-                                <option value="4">Ward 4</option>
-                                <option value="5">Ward 5</option>
-                                <option value="6">Ward 6</option>
-                                <option value="7">Ward 7</option>
-                                <option value="8">Ward 8</option>
-                                <option value="9">Ward 9</option>
-                            </select>
+                        <div class="card-body">
+                            <div class="row g-3">
+                                <div class="col-md-3">
+                                    <label class="form-label">Houses Destroyed</label>
+                                    <input type="number" class="form-control" id="inc_house_destroyed" min="0" value="0">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Houses Damaged</label>
+                                    <input type="number" class="form-control" id="inc_house_damaged" min="0" value="0">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Public Bldg Destroyed</label>
+                                    <input type="number" class="form-control" id="inc_public_building_destroyed" min="0" value="0">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Public Bldg Damaged</label>
+                                    <input type="number" class="form-control" id="inc_public_building_damaged" min="0" value="0">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Estimated Loss (Rs.)</label>
+                                    <input type="number" class="form-control" id="inc_estimated_loss" min="0" value="0" step="0.01">
+                                </div>
+                                <div class="col-md-8">
+                                    <label class="form-label">Agriculture / Crop Damage</label>
+                                    <input type="text" class="form-control" id="inc_agriculture_crop_damage" placeholder="Brief description">
+                                </div>
+                            </div>
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Start Date</label>
-                            <input type="date" class="form-control" id="inc_start_date">
+                    </div>
+
+                    <!-- Section 4: Livestock Impact -->
+                    <div class="card mb-3 border">
+                        <div class="card-header bg-light py-2">
+                            <h6 class="mb-0"><i class="bi bi-cow me-1"></i>Livestock Impact</h6>
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Status</label>
-                            <select class="form-select" id="inc_status">
-                                <option value="Active">Active</option>
-                                <option value="Closed">Closed</option>
-                            </select>
+                        <div class="card-body">
+                            <div class="row g-3">
+                                <div class="col-md-3">
+                                    <label class="form-label">Cattle Lost</label>
+                                    <input type="number" class="form-control" id="inc_cattle_lost" min="0" value="0">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Cattle Injured</label>
+                                    <input type="number" class="form-control" id="inc_cattle_injured" min="0" value="0">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Poultry Lost</label>
+                                    <input type="number" class="form-control" id="inc_poultry_lost" min="0" value="0">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Poultry Injured</label>
+                                    <input type="number" class="form-control" id="inc_poultry_injured" min="0" value="0">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Goats/Sheep Lost</label>
+                                    <input type="number" class="form-control" id="inc_goats_sheep_lost" min="0" value="0">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Goats/Sheep Injured</label>
+                                    <input type="number" class="form-control" id="inc_goats_sheep_injured" min="0" value="0">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Other Livestock Lost</label>
+                                    <input type="number" class="form-control" id="inc_other_livestock_lost" min="0" value="0">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Other Livestock Injured</label>
+                                    <input type="number" class="form-control" id="inc_other_livestock_injured" min="0" value="0">
+                                </div>
+                            </div>
                         </div>
-                        <div class="col-12">
-                            <label class="form-label">Description</label>
-                            <textarea class="form-control" id="inc_description" rows="3"></textarea>
+                    </div>
+
+                    <!-- Section 5: Infrastructure Impact -->
+                    <div class="card mb-3 border">
+                        <div class="card-header bg-light py-2">
+                            <h6 class="mb-0"><i class="bi bi-signpost-split me-1"></i>Infrastructure Impact</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-3">
+                                <div class="col-md-3">
+                                    <div class="form-check">
+                                        <input type="checkbox" class="form-check-input" id="inc_road_blocked">
+                                        <label class="form-check-label" for="inc_road_blocked">Road Blocked</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="form-check">
+                                        <input type="checkbox" class="form-check-input" id="inc_electricity_blocked">
+                                        <label class="form-check-label" for="inc_electricity_blocked">Electricity Blocked</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="form-check">
+                                        <input type="checkbox" class="form-check-input" id="inc_communication_blocked">
+                                        <label class="form-check-label" for="inc_communication_blocked">Communication Blocked</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="form-check">
+                                        <input type="checkbox" class="form-check-input" id="inc_drinking_water_disrupted">
+                                        <label class="form-check-label" for="inc_drinking_water_disrupted">Drinking Water Disrupted</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Section 6: Additional Information -->
+                    <div class="card mb-3 border">
+                        <div class="card-header bg-light py-2">
+                            <h6 class="mb-0"><i class="bi bi-clipboard me-1"></i>Additional Information</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label class="form-label">Rescue Operations</label>
+                                <textarea class="form-control" id="inc_rescue_operations" rows="2" placeholder="Details of rescue and relief operations conducted"></textarea>
+                            </div>
                         </div>
                     </div>
                 </form>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" onclick="saveIncident()"><i class="bi bi-check-lg"></i> Save</button>
+                <button type="button" class="btn btn-primary" onclick="saveIncident()"><i class="bi bi-check-lg"></i> Save Incident</button>
             </div>
         </div>
     </div>
@@ -146,6 +327,39 @@
 <script>
 const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 let incidents = [];
+let incidentTypes = [];
+
+async function loadIncidentTypes() {
+    try {
+        const r = await fetch('/api/settings/disaster_types');
+        const d = await r.json();
+        incidentTypes = Array.isArray(d.value) ? d.value : [];
+    } catch(e) {
+        incidentTypes = ['Flood', 'Earthquake', 'Landslide', 'Fire', 'Storm', 'Other'];
+    }
+    const sel = document.getElementById('inc_incident_type');
+    sel.innerHTML = '<option value="">Select Type</option>' +
+        incidentTypes.map(t => `<option value="${t}">${t}</option>`).join('');
+}
+
+function getTypeOptions(selected) {
+    return '<option value="">Select Type</option>' +
+        incidentTypes.map(t => `<option value="${t}" ${t === selected ? 'selected' : ''}>${t}</option>`).join('');
+}
+
+function autoGenerateName() {
+    const type = document.getElementById('inc_incident_type').value;
+    const ward = document.getElementById('inc_ward').value;
+    const date = document.getElementById('inc_start_date').value;
+    const nameField = document.getElementById('inc_incident_name');
+    if (type && ward && date && !nameField.dataset.userEdited) {
+        nameField.value = `${type} - Ward ${ward} - ${date}`;
+    }
+}
+
+document.getElementById('inc_incident_name').addEventListener('input', function() {
+    this.dataset.userEdited = '1';
+});
 
 async function loadIncidents() {
     const statusFilter = document.getElementById('statusFilter').value;
@@ -157,10 +371,13 @@ async function loadIncidents() {
     renderIncidents(incidents);
 }
 
+function getVal(i, f) { return i[f] !== undefined && i[f] !== null && i[f] !== '' ? i[f] : 0; }
+function getText(i, f) { return i[f] || ''; }
+
 function renderIncidents(data) {
     const tbody = document.getElementById('incidentTableBody');
     if (data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="10" class="text-center py-4 text-muted">No incidents found</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-muted">No incidents found</td></tr>';
         return;
     }
     tbody.innerHTML = data.map(i => {
@@ -169,9 +386,6 @@ function renderIncidents(data) {
             <td>${i.id}</td>
             <td><strong>${i.incident_name}</strong></td>
             <td><span class="badge bg-info">${i.incident_type}</span></td>
-            <td>${i.province || '-'}</td>
-            <td>${i.district || '-'}</td>
-            <td>${i.municipality || '-'}</td>
             <td>${i.ward ? 'Ward ' + i.ward : '-'}</td>
             <td>${i.start_date || '-'}</td>
             <td><span class="badge bg-${statusColor}">${i.status}</span></td>
@@ -187,21 +401,69 @@ function filterIncidents() {
     const q = document.getElementById('incidentSearch').value.toLowerCase();
     const filtered = incidents.filter(i =>
         (i.incident_name && i.incident_name.toLowerCase().includes(q)) ||
-        (i.incident_type && i.incident_type.toLowerCase().includes(q)) ||
-        (i.province && i.province.toLowerCase().includes(q)) ||
-        (i.district && i.district.toLowerCase().includes(q)) ||
-        (i.municipality && i.municipality.toLowerCase().includes(q))
+        (i.incident_type && i.incident_type.toLowerCase().includes(q))
     );
     renderIncidents(filtered);
 }
 
 document.getElementById('statusFilter').addEventListener('change', loadIncidents);
 
+const FIELD_MAP = [
+    'incident_name', 'incident_type', 'ward', 'start_date', 'status', 'description',
+    'disaster_date_bs', 'incident_time', 'coordinates', 'tole', 'severity', 'weather_status',
+    'affected_people', 'injured', 'deaths', 'missing_persons', 'affected_people_male',
+    'affected_people_female', 'affected_households', 'house_damaged', 'house_destroyed',
+    'public_building_damaged', 'public_building_destroyed', 'estimated_loss',
+    'agriculture_crop_damage', 'road_blocked', 'electricity_blocked', 'communication_blocked',
+    'drinking_water_disrupted', 'cattle_lost', 'cattle_injured', 'poultry_lost', 'poultry_injured',
+    'goats_sheep_lost', 'goats_sheep_injured', 'other_livestock_lost', 'other_livestock_injured',
+    'rescue_operations',
+];
+
+function fieldId(f) { return 'inc_' + f; }
+
+function serializeForm() {
+    const body = {};
+    FIELD_MAP.forEach(f => {
+        const el = document.getElementById(fieldId(f));
+        if (!el) return;
+        if (el.type === 'checkbox') {
+            body[f] = el.checked;
+        } else if (el.type === 'number') {
+            body[f] = parseFloat(el.value) || 0;
+        } else {
+            body[f] = el.value;
+        }
+    });
+    body.ward = parseInt(document.getElementById('inc_ward').value) || null;
+    return body;
+}
+
+function deserializeForm(i) {
+    FIELD_MAP.forEach(f => {
+        const el = document.getElementById(fieldId(f));
+        if (!el) return;
+        if (el.type === 'checkbox') {
+            el.checked = !!i[f];
+        } else if (el.type === 'number') {
+            el.value = i[f] !== undefined && i[f] !== null ? i[f] : 0;
+        } else {
+            el.value = i[f] !== undefined && i[f] !== null ? i[f] : '';
+        }
+    });
+    document.getElementById('inc_ward').value = i.ward || '';
+}
+
 function resetIncidentForm() {
     document.getElementById('incidentModalTitle').textContent = 'Add Incident';
     document.getElementById('inc_id').value = '';
     document.getElementById('incidentForm').reset();
     document.getElementById('inc_status').value = 'Active';
+    document.getElementById('inc_severity').value = 'medium';
+    document.getElementById('inc_incident_type').innerHTML = getTypeOptions('');
+    delete document.getElementById('inc_incident_name').dataset.userEdited;
+    // Zero out all number fields
+    document.querySelectorAll('#incidentForm input[type="number"]').forEach(el => el.value = 0);
 }
 
 async function editIncident(id) {
@@ -209,33 +471,18 @@ async function editIncident(id) {
     if (!i) return;
     document.getElementById('incidentModalTitle').textContent = 'Edit Incident';
     document.getElementById('inc_id').value = i.id;
-    document.getElementById('inc_incident_name').value = i.incident_name;
-    document.getElementById('inc_incident_type').value = i.incident_type;
-    document.getElementById('inc_province').value = i.province || '';
-    document.getElementById('inc_district').value = i.district || '';
-    document.getElementById('inc_municipality').value = i.municipality || '';
-    document.getElementById('inc_ward').value = i.ward || '';
-    document.getElementById('inc_start_date').value = i.start_date || '';
-    document.getElementById('inc_status').value = i.status || 'Active';
-    document.getElementById('inc_description').value = i.description || '';
+    document.getElementById('inc_incident_type').innerHTML = getTypeOptions(i.incident_type);
+    deserializeForm(i);
+    document.getElementById('inc_incident_name').dataset.userEdited = '1';
     new bootstrap.Modal(document.getElementById('incidentModal')).show();
 }
 
 async function saveIncident() {
     const id = document.getElementById('inc_id').value;
-    const body = {
-        incident_name: document.getElementById('inc_incident_name').value,
-        incident_type: document.getElementById('inc_incident_type').value,
-        province: document.getElementById('inc_province').value,
-        district: document.getElementById('inc_district').value,
-        municipality: document.getElementById('inc_municipality').value,
-        ward: parseInt(document.getElementById('inc_ward').value) || null,
-        start_date: document.getElementById('inc_start_date').value || null,
-        status: document.getElementById('inc_status').value,
-        description: document.getElementById('inc_description').value
-    };
+    const body = serializeForm();
     if (!body.incident_name) { showToast('danger', 'Incident name is required'); return; }
     if (!body.incident_type) { showToast('danger', 'Incident type is required'); return; }
+    if (!body.ward) { showToast('danger', 'Ward is required'); return; }
     const url = id ? '/api/incidents/' + id : '/api/incidents';
     const method = id ? 'PUT' : 'POST';
     const r = await fetch(url, {method, headers:{'Content-Type':'application/json','X-CSRFToken':csrf}, body: JSON.stringify(body)});
@@ -255,6 +502,9 @@ async function deleteIncident(id) {
     else showToast('danger', d.message);
 }
 
-document.addEventListener('DOMContentLoaded', loadIncidents);
+document.addEventListener('DOMContentLoaded', () => {
+    loadIncidentTypes();
+    loadIncidents();
+});
 </script>
 {% endblock %}

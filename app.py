@@ -588,24 +588,97 @@ class Incident(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     incident_name = db.Column(db.String(200), nullable=False)
     incident_type = db.Column(db.String(100), nullable=False, index=True)
-    province = db.Column(db.String(100))
-    district = db.Column(db.String(100))
-    municipality = db.Column(db.String(200))
     ward = db.Column(db.Integer)
     start_date = db.Column(db.Date, nullable=False, default=date.today)
     status = db.Column(db.String(50), default='Active', index=True)
     description = db.Column(db.Text)
+
+    # Reference form fields
+    disaster_date_bs = db.Column(db.String(10))
+    incident_time = db.Column(db.String(10))
+    coordinates = db.Column(db.String(100))
+    tole = db.Column(db.String(200))
+    severity = db.Column(db.String(20), default='medium')
+    weather_status = db.Column(db.String(100))
+
+    # Human Impact
+    affected_people = db.Column(db.Integer, default=0)
+    injured = db.Column(db.Integer, default=0)
+    deaths = db.Column(db.Integer, default=0)
+    missing_persons = db.Column(db.Integer, default=0)
+    affected_people_male = db.Column(db.Integer, default=0)
+    affected_people_female = db.Column(db.Integer, default=0)
+    affected_households = db.Column(db.Integer, default=0)
+
+    # Property Damage
+    house_damaged = db.Column(db.Integer, default=0)
+    house_destroyed = db.Column(db.Integer, default=0)
+    public_building_damaged = db.Column(db.Integer, default=0)
+    public_building_destroyed = db.Column(db.Integer, default=0)
+    estimated_loss = db.Column(db.Float, default=0.0)
+    agriculture_crop_damage = db.Column(db.Text)
+
+    # Infrastructure Impact
+    road_blocked = db.Column(db.Boolean, default=False)
+    electricity_blocked = db.Column(db.Boolean, default=False)
+    communication_blocked = db.Column(db.Boolean, default=False)
+    drinking_water_disrupted = db.Column(db.Boolean, default=False)
+
+    # Livestock Impact
+    cattle_lost = db.Column(db.Integer, default=0)
+    cattle_injured = db.Column(db.Integer, default=0)
+    poultry_lost = db.Column(db.Integer, default=0)
+    poultry_injured = db.Column(db.Integer, default=0)
+    goats_sheep_lost = db.Column(db.Integer, default=0)
+    goats_sheep_injured = db.Column(db.Integer, default=0)
+    other_livestock_lost = db.Column(db.Integer, default=0)
+    other_livestock_injured = db.Column(db.Integer, default=0)
+
+    # Additional
+    rescue_operations = db.Column(db.Text)
+
     created_at = db.Column(db.DateTime, default=utc_now)
     updated_at = db.Column(db.DateTime, default=utc_now, onupdate=utc_now)
 
     def to_dict(self):
         return {
             'id': self.id, 'incident_name': self.incident_name,
-            'incident_type': self.incident_type, 'province': self.province,
-            'district': self.district, 'municipality': self.municipality,
+            'incident_type': self.incident_type,
             'ward': self.ward,
             'start_date': self.start_date.strftime('%Y-%m-%d') if self.start_date else None,
-            'status': self.status, 'description': self.description
+            'status': self.status, 'description': self.description,
+            'disaster_date_bs': self.disaster_date_bs,
+            'incident_time': self.incident_time,
+            'coordinates': self.coordinates,
+            'tole': self.tole,
+            'severity': self.severity,
+            'weather_status': self.weather_status,
+            'affected_people': self.affected_people,
+            'injured': self.injured,
+            'deaths': self.deaths,
+            'missing_persons': self.missing_persons,
+            'affected_people_male': self.affected_people_male,
+            'affected_people_female': self.affected_people_female,
+            'affected_households': self.affected_households,
+            'house_damaged': self.house_damaged,
+            'house_destroyed': self.house_destroyed,
+            'public_building_damaged': self.public_building_damaged,
+            'public_building_destroyed': self.public_building_destroyed,
+            'estimated_loss': self.estimated_loss,
+            'agriculture_crop_damage': self.agriculture_crop_damage,
+            'road_blocked': self.road_blocked,
+            'electricity_blocked': self.electricity_blocked,
+            'communication_blocked': self.communication_blocked,
+            'drinking_water_disrupted': self.drinking_water_disrupted,
+            'cattle_lost': self.cattle_lost,
+            'cattle_injured': self.cattle_injured,
+            'poultry_lost': self.poultry_lost,
+            'poultry_injured': self.poultry_injured,
+            'goats_sheep_lost': self.goats_sheep_lost,
+            'goats_sheep_injured': self.goats_sheep_injured,
+            'other_livestock_lost': self.other_livestock_lost,
+            'other_livestock_injured': self.other_livestock_injured,
+            'rescue_operations': self.rescue_operations,
         }
 
 # ============ RELIEF REQUEST MODEL (Module 10) ============
@@ -2085,6 +2158,22 @@ def handle_adjustments():
         return jsonify({'success': False, 'message': str(e)}), 500
 
 # ============ INCIDENT API ============
+INCIDENT_FIELDS = [
+    'disaster_date_bs', 'incident_time', 'coordinates', 'tole', 'severity', 'weather_status',
+    'affected_people', 'injured', 'deaths', 'missing_persons', 'affected_people_male',
+    'affected_people_female', 'affected_households', 'house_damaged', 'house_destroyed',
+    'public_building_damaged', 'public_building_destroyed', 'estimated_loss',
+    'agriculture_crop_damage', 'road_blocked', 'electricity_blocked', 'communication_blocked',
+    'drinking_water_disrupted', 'cattle_lost', 'cattle_injured', 'poultry_lost', 'poultry_injured',
+    'goats_sheep_lost', 'goats_sheep_injured', 'other_livestock_lost', 'other_livestock_injured',
+    'rescue_operations',
+]
+
+def _apply_incident_fields(incident, data):
+    for field in INCIDENT_FIELDS:
+        if field in data:
+            setattr(incident, field, data[field])
+
 @app.route('/api/incidents', methods=['GET', 'POST'])
 @permission_required('edit')
 def handle_incidents():
@@ -2108,11 +2197,11 @@ def handle_incidents():
             return jsonify({'success': False, 'message': 'Ward must be between 1 and 9'}), 400
         incident = Incident(
             incident_name=incident_name, incident_type=incident_type,
-            province=data.get('province'), district=data.get('district'),
-            municipality=data.get('municipality'), ward=ward,
+            ward=ward,
             start_date=parse_date_field(data, 'start_date', default=date.today()),
             status=data.get('status', 'Active'), description=data.get('description')
         )
+        _apply_incident_fields(incident, data)
         db.session.add(incident)
         db.session.commit()
         return jsonify({'success': True, 'message': 'Incident created', 'data': incident.to_dict()}), 201
@@ -2150,11 +2239,12 @@ def manage_incident(id):
             if ward is not None and ward not in range(1, 10):
                 return jsonify({'success': False, 'message': 'Ward must be between 1 and 9'}), 400
             incident.ward = ward
-        for field in ['province', 'district', 'municipality', 'status', 'description']:
+        for field in ['status', 'description']:
             if field in data:
                 setattr(incident, field, data[field])
         if data.get('start_date'):
             incident.start_date = parse_date_field(data, 'start_date', default=incident.start_date)
+        _apply_incident_fields(incident, data)
         db.session.commit()
         return jsonify({'success': True, 'message': 'Incident updated', 'data': incident.to_dict()})
     except ValueError as e:
@@ -3505,7 +3595,6 @@ def get_item_history(id):
 
         receipts = StockReceiptItem.query.filter_by(item_id=id).all()
         if warehouse_id:
-            receipt_ids = [r.id for r in receipts]
             receipts = [r for r in receipts if r.receipt and r.receipt.warehouse_id == warehouse_id]
 
         adjustments = ManualAdjustment.query.filter_by(item_id=id).all()
@@ -3516,44 +3605,132 @@ def get_item_history(id):
         if warehouse_id:
             dispatches = [d for d in dispatches if d.dispatch and d.dispatch.warehouse_id == warehouse_id]
 
+        transfers_out = []
+        transfers_in = []
+        all_transfers = StockTransferItem.query.filter_by(item_id=id).all()
+        for ti in all_transfers:
+            if ti.transfer:
+                if warehouse_id:
+                    if ti.transfer.from_warehouse_id == warehouse_id or ti.transfer.to_warehouse_id == warehouse_id:
+                        if ti.transfer.from_warehouse_id == warehouse_id:
+                            transfers_out.append(ti)
+                        if ti.transfer.to_warehouse_id == warehouse_id:
+                            transfers_in.append(ti)
+                else:
+                    transfers_out.append(ti)
+                    transfers_in.append(ti)
+        transfers_out = list(set(transfers_out))
+        transfers_in = list(set(transfers_in))
+
         total_received = sum(r.quantity for r in receipts)
         total_dispatched = sum(d.quantity for d in dispatches)
         total_adjusted = sum(a.adjusted_quantity for a in adjustments if a.adjustment_type in ('Increase', 'Correction_Increase'))
         total_damaged = sum(a.adjusted_quantity for a in adjustments if a.adjustment_type == 'Damage')
         total_expired = sum(a.adjusted_quantity for a in adjustments if a.adjustment_type == 'Expired')
+        total_transferred_out = sum(ti.quantity for ti in transfers_out)
+        total_transferred_in = sum(ti.quantity for ti in transfers_in)
 
-        inv = None
+        inv_query = Inventory.query.filter_by(item_id=id)
         if warehouse_id:
-            inv = Inventory.query.filter_by(item_id=id, warehouse_id=warehouse_id).first()
-        else:
-            inv = Inventory.query.filter_by(item_id=id).first()
+            inv_query = inv_query.filter_by(warehouse_id=warehouse_id)
+        inventory_records = inv_query.all()
+        total_current_stock = sum(inv.quantity for inv in inventory_records)
+        warehouse_names = [inv.warehouse.name for inv in inventory_records if inv.warehouse]
 
         events = []
         for r in receipts:
             events.append({
                 'date': r.receipt.date.strftime('%Y-%m-%d') if r.receipt and r.receipt.date else '',
                 'type': 'Receipt', 'ref': r.receipt.receipt_no if r.receipt else '',
-                'detail': f"Qty: {r.quantity} {r.unit or ''} Batch: {r.batch_no or '-'} Exp: {r.expiry_date.strftime('%Y-%m-%d') if r.expiry_date else '-'}",
-                'qty_change': f"+{r.quantity}", 'warehouse': r.receipt.warehouse.name if r.receipt and r.receipt.warehouse else '',
+                'detail': f"Qty: {r.quantity} {r.unit or ''} Batch: {r.batch_no or '-'}",
+                'qty_change': f"+{r.quantity}",
+                'warehouse': r.receipt.warehouse.name if r.receipt and r.receipt.warehouse else '',
+                'source': r.receipt.source_name if r.receipt else '',
+                'sub_type': 'Stock Receipt',
+                'icon': 'bi-box-arrow-in-down',
             })
         for a in adjustments:
             sign = '+' if a.adjustment_type in ('Increase', 'Correction_Increase') else '-'
             events.append({
                 'date': a.date.strftime('%Y-%m-%d') if a.date else '',
                 'type': 'Adjustment', 'ref': a.adjustment_no,
-                'detail': f"{a.adjustment_type}: {a.reason or ''} ({a.adjusted_quantity})",
+                'detail': f"{a.adjustment_type}" + (f": {a.reason}" if a.reason else ''),
                 'qty_change': f"{sign}{a.adjusted_quantity}",
                 'warehouse': a.warehouse.name if a.warehouse else '',
+                'source': a.reason or '',
+                'sub_type': a.adjustment_type,
+                'icon': 'bi-sliders',
             })
         for d in dispatches:
             events.append({
                 'date': d.dispatch.date.strftime('%Y-%m-%d') if d.dispatch and d.dispatch.date else '',
                 'type': 'Dispatch', 'ref': d.dispatch.dispatch_number if d.dispatch else '',
-                'detail': f"Qty: {d.quantity} {d.unit or ''} To: {d.dispatch.destination if d.dispatch else ''}",
+                'detail': f"Qty: {d.quantity} {d.unit or ''}" + (f" → {d.dispatch.destination}" if d.dispatch and d.dispatch.destination else ''),
                 'qty_change': f"-{d.quantity}",
                 'warehouse': d.dispatch.warehouse.name if d.dispatch and d.dispatch.warehouse else '',
+                'source': d.dispatch.incident.incident_name if d.dispatch and d.dispatch.incident else '',
+                'sub_type': 'Relief Dispatch',
+                'icon': 'bi-truck',
             })
+        for ti in transfers_out:
+            events.append({
+                'date': ti.transfer.transfer_date.strftime('%Y-%m-%d') if ti.transfer and ti.transfer.transfer_date else '',
+                'type': 'Transfer Out', 'ref': ti.transfer.transfer_no if ti.transfer else '',
+                'detail': f"Qty: {ti.quantity} {ti.unit or ''} → {ti.transfer.to_warehouse.name if ti.transfer and ti.transfer.to_warehouse else 'N/A'}",
+                'qty_change': f"-{ti.quantity}",
+                'warehouse': ti.transfer.from_warehouse.name if ti.transfer and ti.transfer.from_warehouse else '',
+                'source': ti.transfer.reason if ti.transfer else '',
+                'sub_type': 'Stock Transfer',
+                'icon': 'bi-arrow-right',
+            })
+        for ti in transfers_in:
+            events.append({
+                'date': ti.transfer.transfer_date.strftime('%Y-%m-%d') if ti.transfer and ti.transfer.transfer_date else '',
+                'type': 'Transfer In', 'ref': ti.transfer.transfer_no if ti.transfer else '',
+                'detail': f"Qty: {ti.quantity} {ti.unit or ''} ← {ti.transfer.from_warehouse.name if ti.transfer and ti.transfer.from_warehouse else 'N/A'}",
+                'qty_change': f"+{ti.quantity}",
+                'warehouse': ti.transfer.to_warehouse.name if ti.transfer and ti.transfer.to_warehouse else '',
+                'source': ti.transfer.reason if ti.transfer else '',
+                'sub_type': 'Stock Transfer',
+                'icon': 'bi-arrow-left',
+            })
+        # Distribution to Beneficiary events (for distributable items)
+        total_distributed_qty = 0
+        total_distinct_beneficiaries = 0
+        seen_beneficiaries = set()
+        for d in dispatches:
+            if not d.dispatch:
+                continue
+            for dist in d.dispatch.distributions:
+                for dbene in dist.beneficiaries:
+                    item_name_match = dbene.item and item.name and dbene.item.strip().lower() == item.name.strip().lower()
+                    if not item_name_match:
+                        continue
+                    ben_name = dbene.family_name or ''
+                    ben_id_no = dbene.id_number or ''
+                    identifier = f"{ben_name}|{ben_id_no}"
+                    if identifier not in seen_beneficiaries:
+                        seen_beneficiaries.add(identifier)
+                        total_distinct_beneficiaries += 1
+                    total_distributed_qty += dbene.quantity
+                    location_info = dist.location or ''
+                    events.append({
+                        'date': dist.distribution_date.strftime('%Y-%m-%d') if dist.distribution_date else '',
+                        'type': 'Distribution',
+                        'ref': dist.distribution_no or '',
+                        'detail': f"{dbene.quantity} × {dbene.item}" + (f" at {location_info}" if location_info else ''),
+                        'qty_change': f"-{dbene.quantity}",
+                        'warehouse': d.dispatch.warehouse.name if d.dispatch.warehouse else '',
+                        'source': f"Beneficiary: {ben_name}" + (f" ({ben_id_no})" if ben_id_no else "") + (f" | Family: {dbene.members}" if dbene.members else ''),
+                        'sub_type': 'Beneficiary Distribution',
+                        'icon': 'bi-people',
+                    })
+
         events.sort(key=lambda e: e['date'], reverse=True)
+
+        type_counts = {}
+        for e in events:
+            type_counts[e['type']] = type_counts.get(e['type'], 0) + 1
 
         return jsonify({
             'success': True,
@@ -3564,8 +3741,14 @@ def get_item_history(id):
                 'total_adjusted': total_adjusted,
                 'total_damaged': total_damaged,
                 'total_expired': total_expired,
-                'current_stock': inv.quantity if inv else 0,
-                'warehouse': inv.warehouse.name if inv and inv.warehouse else 'N/A',
+                'total_transferred_out': total_transferred_out,
+                'total_transferred_in': total_transferred_in,
+                'total_distributed_qty': total_distributed_qty,
+                'total_distinct_beneficiaries': total_distinct_beneficiaries,
+                'total_events': len(events),
+                'current_stock': total_current_stock,
+                'warehouse': ', '.join(warehouse_names) if warehouse_names else 'N/A',
+                'inventory_count': len(inventory_records),
             },
             'events': events
         })
@@ -3994,10 +4177,10 @@ def report_incidents():
     if status:
         q = q.filter(Incident.status == status)
     incidents = q.all()
-    headers = ['#', 'Name', 'Type', 'District', 'Ward', 'Date', 'Status']
-    rows = [[i+1, inc.incident_name, inc.incident_type, inc.district or '', inc.ward or '',
+    headers = ['#', 'Name', 'Type', 'Ward', 'Date', 'Status']
+    rows = [[i+1, inc.incident_name, inc.incident_type, inc.ward or '',
              inc.start_date.strftime('%Y-%m-%d') if inc.start_date else '', inc.status] for i, inc in enumerate(incidents)]
-    pdf = make_pdf_report('Incident Report', headers, rows, [10*mm, 35*mm, 25*mm, 25*mm, 12*mm, 25*mm, 20*mm])
+    pdf = make_pdf_report('Incident Report', headers, rows, [10*mm, 35*mm, 25*mm, 12*mm, 25*mm, 20*mm])
     return make_response(pdf.getvalue(), 200, {'Content-Type': 'application/pdf', 'Content-Disposition': 'attachment; filename=incidents_report.pdf'})
 
 @app.route('/api/reports/requests', methods=['GET'])
@@ -4151,8 +4334,8 @@ def reports_data_json(report_type):
             q = Incident.query.order_by(Incident.start_date.desc())
             if status: q = q.filter(Incident.status == status)
             q = apply_date_filter(q, Incident.start_date)
-            headers = ['Name', 'Type', 'District', 'Ward', 'Date', 'Status']
-            rows = [[inc.incident_name, inc.incident_type, inc.district or '', inc.ward or '',
+            headers = ['Name', 'Type', 'Ward', 'Date', 'Status']
+            rows = [[inc.incident_name, inc.incident_type, inc.ward or '',
                      inc.start_date.strftime('%Y-%m-%d') if inc.start_date else '', inc.status] for inc in q.all()]
         elif report_type == 'requests':
             status = request.args.get('status')
@@ -4709,6 +4892,48 @@ def init_db():
                 cols = [c['name'] for c in inspector.get_columns('distribution_beneficiary')]
                 if 'beneficiary_id' not in cols:
                     db.session.execute(db.text("ALTER TABLE distribution_beneficiary ADD COLUMN beneficiary_id INTEGER REFERENCES beneficiary(id)"))
+                    db.session.commit()
+            if 'incident' in inspector.get_table_names():
+                inc_cols = [c['name'] for c in inspector.get_columns('incident')]
+                mig = []
+                if 'disaster_date_bs' not in inc_cols: mig.append("disaster_date_bs VARCHAR(10)")
+                if 'incident_time' not in inc_cols: mig.append("incident_time VARCHAR(10)")
+                if 'coordinates' not in inc_cols: mig.append("coordinates VARCHAR(100)")
+                if 'tole' not in inc_cols: mig.append("tole VARCHAR(200)")
+                if 'severity' not in inc_cols: mig.append("severity VARCHAR(20) DEFAULT 'medium'")
+                if 'weather_status' not in inc_cols: mig.append("weather_status VARCHAR(100)")
+                if 'affected_people' not in inc_cols: mig.append("affected_people INTEGER DEFAULT 0")
+                if 'injured' not in inc_cols: mig.append("injured INTEGER DEFAULT 0")
+                if 'deaths' not in inc_cols: mig.append("deaths INTEGER DEFAULT 0")
+                if 'missing_persons' not in inc_cols: mig.append("missing_persons INTEGER DEFAULT 0")
+                if 'affected_people_male' not in inc_cols: mig.append("affected_people_male INTEGER DEFAULT 0")
+                if 'affected_people_female' not in inc_cols: mig.append("affected_people_female INTEGER DEFAULT 0")
+                if 'affected_households' not in inc_cols: mig.append("affected_households INTEGER DEFAULT 0")
+                if 'house_damaged' not in inc_cols: mig.append("house_damaged INTEGER DEFAULT 0")
+                if 'house_destroyed' not in inc_cols: mig.append("house_destroyed INTEGER DEFAULT 0")
+                if 'public_building_damaged' not in inc_cols: mig.append("public_building_damaged INTEGER DEFAULT 0")
+                if 'public_building_destroyed' not in inc_cols: mig.append("public_building_destroyed INTEGER DEFAULT 0")
+                if 'estimated_loss' not in inc_cols: mig.append("estimated_loss FLOAT DEFAULT 0.0")
+                if 'agriculture_crop_damage' not in inc_cols: mig.append("agriculture_crop_damage TEXT")
+                if 'road_blocked' not in inc_cols: mig.append("road_blocked BOOLEAN DEFAULT 0")
+                if 'electricity_blocked' not in inc_cols: mig.append("electricity_blocked BOOLEAN DEFAULT 0")
+                if 'communication_blocked' not in inc_cols: mig.append("communication_blocked BOOLEAN DEFAULT 0")
+                if 'drinking_water_disrupted' not in inc_cols: mig.append("drinking_water_disrupted BOOLEAN DEFAULT 0")
+                if 'cattle_lost' not in inc_cols: mig.append("cattle_lost INTEGER DEFAULT 0")
+                if 'cattle_injured' not in inc_cols: mig.append("cattle_injured INTEGER DEFAULT 0")
+                if 'poultry_lost' not in inc_cols: mig.append("poultry_lost INTEGER DEFAULT 0")
+                if 'poultry_injured' not in inc_cols: mig.append("poultry_injured INTEGER DEFAULT 0")
+                if 'goats_sheep_lost' not in inc_cols: mig.append("goats_sheep_lost INTEGER DEFAULT 0")
+                if 'goats_sheep_injured' not in inc_cols: mig.append("goats_sheep_injured INTEGER DEFAULT 0")
+                if 'other_livestock_lost' not in inc_cols: mig.append("other_livestock_lost INTEGER DEFAULT 0")
+                if 'other_livestock_injured' not in inc_cols: mig.append("other_livestock_injured INTEGER DEFAULT 0")
+                if 'rescue_operations' not in inc_cols: mig.append("rescue_operations TEXT")
+                for col in mig:
+                    try:
+                        db.session.execute(db.text(f"ALTER TABLE incident ADD COLUMN {col}"))
+                    except Exception:
+                        pass
+                if mig:
                     db.session.commit()
             if 'user' not in inspector.get_table_names():
                 db.session.execute(db.text("""
