@@ -119,6 +119,10 @@
                                         <option value="Closed">Closed</option>
                                     </select>
                                 </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Fiscal Year</label>
+                                    <select class="form-select" id="inc_fiscal_year"></select>
+                                </div>
                                 <div class="col-md-4">
                                     <label class="form-label">Coordinates</label>
                                     <input type="text" class="form-control" id="inc_coordinates" placeholder="lat, lng">
@@ -135,10 +139,6 @@
                                         <option value="high">High</option>
                                         <option value="critical">Critical</option>
                                     </select>
-                                </div>
-                                <div class="col-md-4">
-                                    <label class="form-label">Weather Status</label>
-                                    <input type="text" class="form-control" id="inc_weather_status" placeholder="e.g. Heavy Rain">
                                 </div>
                                 <div class="col-12">
                                     <label class="form-label">Description</label>
@@ -340,6 +340,20 @@ async function loadIncidentTypes() {
     const sel = document.getElementById('inc_incident_type');
     sel.innerHTML = '<option value="">Select Type</option>' +
         incidentTypes.map(t => `<option value="${t}">${t}</option>`).join('');
+
+    try {
+        const r2 = await fetch('/api/settings/fiscal_years');
+        const d2 = await r2.json();
+        const years = Array.isArray(d2.value) ? d2.value : [];
+        const r3 = await fetch('/api/settings/active_fiscal_year');
+        const d3 = await r3.json();
+        const active = d3.value || (years.length ? years[years.length-1] : '2081/82');
+        const fySel = document.getElementById('inc_fiscal_year');
+        fySel.innerHTML = years.map(y => `<option value="${y}" ${y === active ? 'selected' : ''}>${y}</option>`).join('');
+    } catch(e) {
+        const fySel = document.getElementById('inc_fiscal_year');
+        fySel.innerHTML = '<option value="2081/82">2081/82</option>';
+    }
 }
 
 function getTypeOptions(selected) {
@@ -409,8 +423,8 @@ function filterIncidents() {
 document.getElementById('statusFilter').addEventListener('change', loadIncidents);
 
 const FIELD_MAP = [
-    'incident_name', 'incident_type', 'ward', 'start_date', 'status', 'description',
-    'disaster_date_bs', 'incident_time', 'coordinates', 'tole', 'severity', 'weather_status',
+    'incident_name', 'incident_type', 'ward', 'fiscal_year', 'start_date', 'status', 'description',
+    'disaster_date_bs', 'incident_time', 'coordinates', 'tole', 'severity',
     'affected_people', 'injured', 'deaths', 'missing_persons', 'affected_people_male',
     'affected_people_female', 'affected_households', 'house_damaged', 'house_destroyed',
     'public_building_damaged', 'public_building_destroyed', 'estimated_loss',
@@ -464,6 +478,8 @@ function resetIncidentForm() {
     delete document.getElementById('inc_incident_name').dataset.userEdited;
     // Zero out all number fields
     document.querySelectorAll('#incidentForm input[type="number"]').forEach(el => el.value = 0);
+    // Reset fiscal year to active
+    loadIncidentTypes();
 }
 
 async function editIncident(id) {

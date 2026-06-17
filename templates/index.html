@@ -5,11 +5,21 @@
 <li class="breadcrumb-item active">Dashboard</li>
 {% endblock %}
 {% block content %}
-<div class="page-header">
-    <h4><i class="bi bi-grid-1x2-fill me-2"></i>Warehouse Dashboard</h4>
-    <p>Real-time inventory and operations overview</p>
+<div class="page-header d-flex justify-content-between align-items-center">
+    <div>
+        <h4><i class="bi bi-grid-1x2-fill me-2"></i>Dashboard</h4>
+        <p>Real-time overview of operations</p>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+        <label class="form-label mb-0 text-muted small">View:</label>
+        <select class="form-select form-select-sm" style="width:auto" id="dashboardView" onchange="switchDashboardView()">
+            <option value="overview">General Overview</option>
+            <option value="relief">Relief Dashboard</option>
+        </select>
+    </div>
 </div>
 
+<div id="overviewDashboard">
 <div class="row g-3 mb-4" id="statCards">
     <div class="col-md-3 col-6">
         <div class="stat-card stat-card-primary">
@@ -215,13 +225,174 @@
         </div>
     </div>
 </div>
+</div>
+
+<div id="reliefDashboard" style="display:none">
+    <div class="row g-3 mb-4" id="reliefStatCards">
+        <div class="col-md-3 col-6">
+            <div class="stat-card stat-card-primary">
+                <div class="stat-icon"><i class="bi bi-box-seam"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">Total Distributions</div>
+                    <div class="stat-value" id="reliefTotalDistributions">0</div>
+                    <div class="stat-sub small text-muted mt-1">Material: 0 | Cash: 0</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="stat-card stat-card-success">
+                <div class="stat-icon"><i class="bi bi-cubes"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">Total Items Distributed</div>
+                    <div class="stat-value" id="reliefTotalItems">0</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="stat-card stat-card-info">
+                <div class="stat-icon"><i class="bi bi-people"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">Total Beneficiaries</div>
+                    <div class="stat-value" id="reliefTotalBeneficiaries">0</div>
+                    <div class="stat-sub small text-muted mt-1">Material: 0 | Cash: 0</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="stat-card stat-card-warning">
+                <div class="stat-icon"><i class="bi bi-cash-stack"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">Total Cash Distributed</div>
+                    <div class="stat-value" id="reliefTotalCash">0</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="stat-card" style="border-left:4px solid #06b6d4">
+                <div class="stat-icon"><i class="bi bi-cash-coin text-cyan"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">Total Cash Received</div>
+                    <div class="stat-value" id="reliefTotalCashReceived">0</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header">
+                    <span><i class="bi bi-bar-chart-fill me-2 text-primary"></i>Distributed Items</span>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container"><canvas id="reliefItemsChart"></canvas></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header">
+                    <span><i class="bi bi-bar-chart-fill me-2 text-success"></i>Distributions by Ward</span>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container"><canvas id="reliefWardChart"></canvas></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-12">
+            <div class="card h-100">
+                <div class="card-header">
+                    <span><i class="bi bi-bar-chart-fill me-2 text-info"></i>Distributions by Fiscal Year</span>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container"><canvas id="reliefFiscalYearChart"></canvas></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">
+            <span><i class="bi bi-map me-2 text-danger"></i>GIS Map - Incidents & Relief Distribution</span>
+        </div>
+        <div class="card-body p-0">
+            <div id="reliefMap" style="height:500px;width:100%;border-radius:0 0 var(--bs-card-border-radius) var(--bs-card-border-radius)"></div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
+{% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+.incident-marker {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    color: #fff;
+    border-radius: 50%;
+    border: 3px solid #fff;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    background: #dc3545;
+}
+.relief-marker {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    color: #fff;
+    border-radius: 4px 50% 50% 50%;
+    border: 3px solid #fff;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    transform: rotate(45deg);
+    background: #15803d;
+}
+.relief-marker i {
+    transform: rotate(-45deg);
+}
+.ward-label {
+    font-size: 12px;
+    font-weight: 700;
+    color: #1e293b;
+    background: rgba(255,255,255,0.92);
+    padding: 4px 10px;
+    border-radius: 4px;
+    border: 1.5px solid #94a3b8;
+    white-space: nowrap;
+    pointer-events: none;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+    text-align: center;
+}
+.ward-label-marker {
+    background: none !important;
+    border: none !important;
+}
+.leaflet-tooltip.ward-label {
+    background: rgba(255,255,255,0.92);
+    border: 1.5px solid #94a3b8;
+    border-radius: 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+    font-size: 12px;
+    font-weight: 700;
+    color: #1e293b;
+    padding: 4px 10px;
+}
+</style>
+{% endblock %}
 {% block extra_js %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 let categoryChartInstance = null;
 let lowStockChartInstance = null;
+let reliefItemsChartInstance = null;
+let reliefWardChartInstance = null;
+let reliefFiscalYearChartInstance = null;
 let refreshInterval = null;
+let reliefMapInstance = null;
 
 function getPriorityBadge(priority) {
     const map = { 'Urgent': 'danger', 'High': 'warning', 'Medium': 'info', 'Low': 'secondary' };
@@ -231,6 +402,16 @@ function getPriorityBadge(priority) {
 function getStatusBadge(status) {
     const map = { 'Pending': 'warning', 'Approved': 'info', 'In Progress': 'primary', 'Completed': 'success', 'Cancelled': 'secondary' };
     return `<span class="badge bg-${map[status] || 'secondary'}">${status}</span>`;
+}
+
+function switchDashboardView() {
+    const view = document.getElementById('dashboardView').value;
+    document.getElementById('overviewDashboard').style.display = view === 'overview' ? '' : 'none';
+    document.getElementById('reliefDashboard').style.display = view === 'relief' ? '' : 'none';
+    if (view === 'relief') {
+        loadReliefDashboard();
+        setTimeout(() => { if (reliefMapInstance) reliefMapInstance.invalidateSize(); }, 300);
+    }
 }
 
 async function loadDashboard() {
@@ -335,7 +516,270 @@ async function loadDashboard() {
     }
 }
 
+async function loadReliefDashboard() {
+    try {
+        const resp = await fetch('/api/dashboard/relief');
+        const data = await resp.json();
+        if (!data || !data.success) return;
+
+        document.getElementById('reliefTotalDistributions').textContent = data.total_distributions ?? 0;
+        const matDist = data.material_distributions ?? 0;
+        const cashDist = data.cash_distributions ?? 0;
+        const distSub = document.getElementById('reliefTotalDistributions').closest('.stat-content').querySelector('.stat-sub');
+        if (distSub) distSub.textContent = `Material: ${matDist} | Cash: ${cashDist}`;
+
+        document.getElementById('reliefTotalItems').textContent = (data.total_items_distributed ?? 0).toLocaleString();
+
+        document.getElementById('reliefTotalBeneficiaries').textContent = (data.total_beneficiaries ?? 0).toLocaleString();
+        const matBens = data.material_beneficiaries ?? 0;
+        const cashBens = data.cash_beneficiaries ?? 0;
+        const benSub = document.getElementById('reliefTotalBeneficiaries').closest('.stat-content').querySelector('.stat-sub');
+        if (benSub) benSub.textContent = `Material: ${matBens} | Cash: ${cashBens}`;
+
+        document.getElementById('reliefTotalCash').textContent = (data.total_cash_distributed ?? 0).toLocaleString();
+        document.getElementById('reliefTotalCashReceived').textContent = (data.total_cash_received ?? 0).toLocaleString();
+
+        const itemsLabels = data.items_distributed && data.items_distributed.length ? data.items_distributed.map(i => i.item) : ['No data'];
+        const itemsValues = data.items_distributed && data.items_distributed.length ? data.items_distributed.map(i => i.total) : [0];
+        if (reliefItemsChartInstance) reliefItemsChartInstance.destroy();
+        reliefItemsChartInstance = new Chart(document.getElementById('reliefItemsChart'), {
+            type: 'doughnut',
+            data: {
+                labels: itemsLabels,
+                datasets: [{
+                    data: itemsValues,
+                    backgroundColor: itemsLabels.length === 1 && itemsLabels[0] === 'No data' ? ['#e5e7eb'] : ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#f97316', '#14b8a6', '#f43f5e', '#6366f1'],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: { position: 'bottom', labels: { padding: 12, boxWidth: 12 } }
+                }
+            }
+        });
+
+        const wardLabels = data.dist_by_ward && data.dist_by_ward.labels.length ? data.dist_by_ward.labels : ['No data'];
+        const wardCounts = data.dist_by_ward && data.dist_by_ward.labels.length ? data.dist_by_ward.counts : [0];
+        if (reliefWardChartInstance) reliefWardChartInstance.destroy();
+        reliefWardChartInstance = new Chart(document.getElementById('reliefWardChart'), {
+            type: 'bar',
+            data: {
+                labels: wardLabels,
+                datasets: [{
+                    label: 'Distributions',
+                    data: wardCounts,
+                    backgroundColor: wardLabels.length === 1 && wardLabels[0] === 'No data' ? ['#e5e7eb'] : '#10b981',
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    y: { beginAtZero: true, grid: { display: false } },
+                    x: { grid: { display: false } }
+                }
+            }
+        });
+
+        const fyLabels = data.fiscal_year_distributions && data.fiscal_year_distributions.labels.length ? data.fiscal_year_distributions.labels : ['No data'];
+        const fyCounts = data.fiscal_year_distributions && data.fiscal_year_distributions.labels.length ? data.fiscal_year_distributions.counts : [0];
+        if (reliefFiscalYearChartInstance) reliefFiscalYearChartInstance.destroy();
+        reliefFiscalYearChartInstance = new Chart(document.getElementById('reliefFiscalYearChart'), {
+            type: 'bar',
+            data: {
+                labels: fyLabels,
+                datasets: [{
+                    label: 'Distributions',
+                    data: fyCounts,
+                    backgroundColor: fyLabels.length === 1 && fyLabels[0] === 'No data' ? ['#e5e7eb'] : ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#f97316', '#14b8a6', '#f43f5e', '#6366f1'],
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    y: { beginAtZero: true, grid: { display: false } },
+                    x: { grid: { display: false } }
+                }
+            }
+        });
+
+        loadMapData();
+    } catch (e) {
+        console.error('Relief dashboard load error:', e);
+    }
+}
+
+async function loadMapData() {
+    try {
+        const resp = await fetch('/api/map/data');
+        const data = await resp.json();
+        if (!data || !data.success) return;
+
+        const mapEl = document.getElementById('reliefMap');
+        if (!mapEl) return;
+
+        if (reliefMapInstance) {
+            reliefMapInstance.remove();
+            reliefMapInstance = null;
+        }
+
+        let boundaryLayer = null;
+        let boundaryBounds = null;
+        if (data.boundary && data.boundary.features) {
+            boundaryLayer = L.geoJSON(data.boundary, {
+                style: {
+                    color: '#b91c1c',
+                    weight: 3,
+                    fillColor: '#fef2f2',
+                    fillOpacity: 0.15
+                }
+            });
+            boundaryLayer.eachLayer(function(layer) {
+                if (layer.getBounds) {
+                    boundaryBounds = layer.getBounds();
+                }
+            });
+        }
+
+        if (!boundaryBounds) return;
+
+        reliefMapInstance = L.map('reliefMap', {
+            zoomControl: true,
+            scrollWheelZoom: true,
+            dragging: true,
+            maxBounds: boundaryBounds,
+            maxBoundsViscosity: 1.0,
+            zoomSnap: 0.5,
+            zoomDelta: 0.5
+        });
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 18,
+            minZoom: 11,
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+        }).addTo(reliefMapInstance);
+
+        boundaryLayer.addTo(reliefMapInstance);
+
+        if (data.wards && data.wards.features) {
+            const wardColors = [
+                '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
+                '#06b6d4', '#f97316', '#14b8a6', '#6366f1'
+            ];
+            L.geoJSON(data.wards, {
+                style: function(feature) {
+                    const idx = data.wards.features.indexOf(feature) % wardColors.length;
+                    return {
+                        color: '#1e293b',
+                        weight: 2,
+                        fillColor: wardColors[idx],
+                        fillOpacity: 0.08
+                    };
+                },
+                onEachFeature: function(feature, layer) {
+                    if (feature.properties && feature.properties.name) {
+                        layer.bindTooltip(feature.properties.name, {
+                            permanent: true,
+                            direction: 'center',
+                            className: 'ward-label'
+                        });
+                        const centroid = layer.getBounds().getCenter();
+                        L.marker(centroid, {
+                            icon: L.divIcon({
+                                className: 'ward-label-marker',
+                                html: `<div class="ward-label">${feature.properties.name}</div>`,
+                                iconSize: [0, 0]
+                            }),
+                            interactive: false
+                        }).addTo(reliefMapInstance);
+                    }
+                }
+            }).addTo(reliefMapInstance);
+        }
+
+        if (data.incident_markers && data.incident_markers.length) {
+            data.incident_markers.forEach(function(m) {
+                const color = m.severity === 'high' ? '#dc3545' : m.severity === 'medium' ? '#ffc107' : '#0d6efd';
+                const bgColor = m.severity === 'high' ? '#b91c1c' : m.severity === 'medium' ? '#b38600' : '#0369a1';
+                const marker = L.marker([m.lat, m.lng], {
+                    icon: L.divIcon({
+                        className: 'incident-marker',
+                        html: `<i class="bi bi-lightning-charge-fill" style="font-size:14px;color:white"></i>`,
+                        iconSize: [32, 32],
+                        iconAnchor: [16, 16],
+                        popupAnchor: [0, -18]
+                    })
+                }).addTo(reliefMapInstance);
+                marker.bindPopup(`
+                    <div style="min-width:200px">
+                        <h6 style="margin:0 0 6px 0;color:${color};font-weight:700"><i class="bi bi-lightning-charge-fill me-1"></i>${m.name}</h6>
+                        <table style="font-size:12px;width:100%;border-collapse:collapse">
+                            <tr><td style="padding:3px 6px;color:#6c757d;border-bottom:1px solid #f0f0f0">Type</td><td style="padding:3px 6px;font-weight:600;border-bottom:1px solid #f0f0f0">${m.type}</td></tr>
+                            <tr><td style="padding:3px 6px;color:#6c757d;border-bottom:1px solid #f0f0f0">Ward</td><td style="padding:3px 6px;font-weight:600;border-bottom:1px solid #f0f0f0">${m.ward || 'N/A'}</td></tr>
+                            <tr><td style="padding:3px 6px;color:#6c757d;border-bottom:1px solid #f0f0f0">Severity</td><td style="padding:3px 6px;border-bottom:1px solid #f0f0f0"><span class="badge bg-${m.severity === 'high' ? 'danger' : m.severity === 'medium' ? 'warning' : 'info'}">${m.severity}</span></td></tr>
+                            <tr><td style="padding:3px 6px;color:#6c757d">Status</td><td style="padding:3px 6px;font-weight:600">${m.status}</td></tr>
+                        </table>
+                    </div>
+                `);
+            });
+        }
+
+        if (data.relief_markers && data.relief_markers.length) {
+            data.relief_markers.forEach(function(m) {
+                const marker = L.marker([m.lat, m.lng], {
+                    icon: L.divIcon({
+                        className: 'relief-marker',
+                        html: `<i class="bi bi-box-seam-fill" style="font-size:14px;color:white;transform:rotate(-45deg)"></i>`,
+                        iconSize: [32, 32],
+                        iconAnchor: [16, 16],
+                        popupAnchor: [0, -18]
+                    })
+                }).addTo(reliefMapInstance);
+                marker.bindPopup(`
+                    <div style="min-width:200px">
+                        <h6 style="margin:0 0 6px 0;color:#15803d;font-weight:700"><i class="bi bi-box-seam-fill me-1"></i>${m.distribution_no}</h6>
+                        <table style="font-size:12px;width:100%;border-collapse:collapse">
+                            <tr><td style="padding:3px 6px;color:#6c757d;border-bottom:1px solid #f0f0f0">Location</td><td style="padding:3px 6px;font-weight:600;border-bottom:1px solid #f0f0f0">${m.location || 'N/A'}</td></tr>
+                            <tr><td style="padding:3px 6px;color:#6c757d;border-bottom:1px solid #f0f0f0">Date</td><td style="padding:3px 6px;font-weight:600;border-bottom:1px solid #f0f0f0">${m.date || 'N/A'}</td></tr>
+                            <tr><td style="padding:3px 6px;color:#6c757d">Incident</td><td style="padding:3px 6px;font-weight:600">${m.incident_name || 'N/A'}</td></tr>
+                        </table>
+                    </div>
+                `);
+            });
+        }
+
+        reliefMapInstance.fitBounds(boundaryBounds, { padding: [15, 15] });
+        const currentZoom = reliefMapInstance.getZoom();
+        if (currentZoom > 14) {
+            reliefMapInstance.setZoom(14);
+        }
+        reliefMapInstance.setMinZoom(reliefMapInstance.getZoom());
+
+        reliefMapInstance.on('moveend', function() {
+            const center = reliefMapInstance.getCenter();
+            if (!boundaryBounds.contains(center)) {
+                reliefMapInstance.panInsideBounds(boundaryBounds, { animate: true });
+            }
+        });
+    } catch (e) {
+        console.error('Map load error:', e);
+    }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
+    switchDashboardView();
     loadDashboard();
     refreshInterval = setInterval(loadDashboard, 60000);
 });

@@ -17,7 +17,7 @@
             <table class="table table-hover align-middle" id="crqTable">
                 <thead class="table-light"><tr>
                     <th>Req No</th><th>Date</th><th>Incident</th><th>Requester</th>
-                    <th>Amount</th><th>Priority</th><th>Status</th><th>Actions</th>
+                    <th>Requested</th><th>Distributed</th><th>Priority</th><th>Status</th><th>Actions</th>
                 </tr></thead>
                 <tbody id="crqBody"></tbody>
             </table>
@@ -68,19 +68,26 @@ async function loadRequests() {
     const r = await fetch('/api/cash-requests');
     const d = await r.json();
     const t = document.getElementById('crqBody');
-    if (!d.success || d.cash_requests.length === 0) { t.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">No requests found</td></tr>'; return; }
-    t.innerHTML = d.cash_requests.map(cr => `<tr>
+    if (!d.success || d.cash_requests.length === 0) { t.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-3">No requests found</td></tr>'; return; }
+    t.innerHTML = d.cash_requests.map(cr => {
+        const distAmt = cr.distributed_amount || 0;
+        const progress = cr.requested_amount > 0 ? Math.min(100, (distAmt / cr.requested_amount) * 100) : 0;
+        return `<tr>
         <td>${cr.request_number}</td><td>${cr.request_date}</td>
         <td>${cr.incident_name || '-'}</td>
         <td>${cr.requester_name || cr.requesting_office || '-'}</td>
         <td class="fw-bold">${Number(cr.requested_amount).toLocaleString()}</td>
+        <td>
+            <span class="fw-bold text-success">${Number(distAmt).toLocaleString()}</span>
+            <div class="progress mt-1" style="height:3px"><div class="progress-bar ${progress >= 100 ? 'bg-success' : progress > 0 ? 'bg-warning' : ''}" style="width:${progress}%"></div></div>
+        </td>
         <td><span class="badge ${cr.priority === 'Urgent' ? 'bg-danger' : cr.priority === 'High' ? 'bg-warning' : cr.priority === 'Medium' ? 'bg-info' : 'bg-secondary'}">${cr.priority}</span></td>
         <td><span class="badge ${cr.status === 'Completed' ? 'bg-success' : cr.status === 'Approved' ? 'bg-primary' : cr.status === 'Rejected' ? 'bg-danger' : cr.status === 'Partial' ? 'bg-warning' : 'bg-secondary'}">${cr.status}</span></td>
         <td>
             <button class="btn btn-sm btn-outline-primary" onclick="editCrq(${cr.id})"><i class="bi bi-pencil"></i></button>
             <button class="btn btn-sm btn-outline-danger" onclick="deleteCrq(${cr.id})"><i class="bi bi-trash"></i></button>
         </td>
-    </tr>`).join('');
+    </tr>`}).join('');
 }
 
 async function loadData() {

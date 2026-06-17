@@ -39,6 +39,14 @@
                     <label class="form-label">Location</label>
                     <input type="text" class="form-control" id="dist_location">
                 </div>
+                <div class="col-md-2">
+                    <label class="form-label">Latitude</label>
+                    <input type="number" step="any" class="form-control" id="dist_latitude" placeholder="e.g. 29.4479">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Longitude</label>
+                    <input type="number" step="any" class="form-control" id="dist_longitude" placeholder="e.g. 80.9092">
+                </div>
                 <div class="col-md-3">
                     <label class="form-label">Distribution Date</label>
                     <input type="date" class="form-control" id="dist_distribution_date">
@@ -522,8 +530,11 @@ function renderDistributions(data) {
     }
     tbody.innerHTML = data.map(dist => {
         const benCount = dist.beneficiaries ? dist.beneficiaries.length : 0;
+        const cashBadge = dist.cash_distribution
+            ? `<span class="badge bg-success ms-1" title="Cash: ${Number(dist.cash_distribution.total_amount).toLocaleString()}"><i class="bi bi-cash-stack me-1"></i>Cash</span>`
+            : '';
         return `<tr>
-            <td><strong>${dist.distribution_no}</strong></td>
+            <td><strong>${dist.distribution_no}${cashBadge}</strong></td>
             <td>${dist.dispatch_number || '-'}</td>
             <td>${dist.incident_name || '-'}</td>
             <td>${dist.location || '-'}</td>
@@ -732,14 +743,20 @@ async function saveDistribution() {
 
     try {
         let itemsSaved = true;
+        let savedDistNo = null;
         // Save items distribution if there are item beneficiaries
         if (beneficiaries.length > 0) {
+            const lat = document.getElementById('dist_latitude').value;
+            const lon = document.getElementById('dist_longitude').value;
             const body = {
                 distribution_no: document.getElementById('dist_distribution_no').value,
                 dispatch_id: dispatch_id,
                 location: document.getElementById('dist_location').value,
+                latitude: lat ? parseFloat(lat) : null,
+                longitude: lon ? parseFloat(lon) : null,
                 distribution_date: dateVal,
                 officer: document.getElementById('dist_officer').value,
+                status: document.getElementById('dist_status') ? document.getElementById('dist_status').value : 'Completed',
                 remarks: document.getElementById('dist_remarks').value,
                 beneficiaries: beneficiaries
             };
@@ -751,6 +768,7 @@ async function saveDistribution() {
             });
             const d = await r.json();
             itemsSaved = d.success;
+            if (d.success && d.data) savedDistNo = d.data.distribution_no;
             if (!d.success) showToast('danger', d.message);
         }
 
@@ -763,6 +781,11 @@ async function saveDistribution() {
                 const disp = dispatchData.dispatch || {};
                 const rrId = disp.relief_request_id;
 
+                const cashRemarks = [
+                    document.getElementById('dist_remarks').value,
+                    savedDistNo ? 'Source Distribution: ' + savedDistNo : ''
+                ].filter(Boolean).join(' | ');
+
                 const cashBody = {
                     distribution_date: dateVal,
                     fund_id: parseInt(document.getElementById('cdFund').value),
@@ -770,7 +793,7 @@ async function saveDistribution() {
                     distribution_type: document.getElementById('cdType').value,
                     relief_request_id: rrId,
                     officer: document.getElementById('dist_officer').value,
-                    remarks: document.getElementById('dist_remarks').value,
+                    remarks: cashRemarks,
                     beneficiaries: cashBeneficiaries
                 };
 

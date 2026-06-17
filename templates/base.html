@@ -133,6 +133,10 @@
                     <i class="bi bi-people-fill"></i>
                     <span class="nav-label">Beneficiaries</span>
                 </a>
+                <a href="{{ url_for('beneficiary_distributions_page') }}" class="nav-item {% if request.path == '/beneficiaries/distributions' %}active{% endif %}">
+                    <i class="bi bi-table"></i>
+                    <span class="nav-label">Distribution Records</span>
+                </a>
 
                 <div class="sidebar-divider">Analytics</div>
 

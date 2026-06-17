@@ -591,6 +591,7 @@ class Incident(db.Model):
     ward = db.Column(db.Integer)
     start_date = db.Column(db.Date, nullable=False, default=date.today)
     status = db.Column(db.String(50), default='Active', index=True)
+    fiscal_year = db.Column(db.String(20), index=True)
     description = db.Column(db.Text)
 
     # Reference form fields
@@ -599,7 +600,6 @@ class Incident(db.Model):
     coordinates = db.Column(db.String(100))
     tole = db.Column(db.String(200))
     severity = db.Column(db.String(20), default='medium')
-    weather_status = db.Column(db.String(100))
 
     # Human Impact
     affected_people = db.Column(db.Integer, default=0)
@@ -646,13 +646,13 @@ class Incident(db.Model):
             'incident_type': self.incident_type,
             'ward': self.ward,
             'start_date': self.start_date.strftime('%Y-%m-%d') if self.start_date else None,
-            'status': self.status, 'description': self.description,
+            'status': self.status, 'fiscal_year': self.fiscal_year,
+            'description': self.description,
             'disaster_date_bs': self.disaster_date_bs,
             'incident_time': self.incident_time,
             'coordinates': self.coordinates,
             'tole': self.tole,
             'severity': self.severity,
-            'weather_status': self.weather_status,
             'affected_people': self.affected_people,
             'injured': self.injured,
             'deaths': self.deaths,
@@ -872,8 +872,12 @@ class Distribution(db.Model):
     dispatch_id = db.Column(db.Integer, db.ForeignKey('dispatch.id'), nullable=False, index=True)
     incident_id = db.Column(db.Integer, db.ForeignKey('incident.id'), nullable=False, index=True)
     location = db.Column(db.String(300))
+    latitude = db.Column(db.Float)
+    longitude = db.Column(db.Float)
+    fiscal_year = db.Column(db.String(20), index=True)
     distribution_date = db.Column(db.Date, nullable=False, default=date.today)
     officer = db.Column(db.String(200))
+    status = db.Column(db.String(20), default='Completed')
     remarks = db.Column(db.Text)
     created_by = db.Column(db.Integer)
     created_at = db.Column(db.DateTime, default=utc_now)
@@ -882,6 +886,13 @@ class Distribution(db.Model):
     beneficiaries = db.relationship('DistributionBeneficiary', backref='distribution', lazy=True, cascade='all,delete-orphan')
 
     def to_dict(self):
+        cash_info = None
+        if self.dispatch and self.dispatch.relief_request_id:
+            cd = CashDistribution.query.filter(
+                CashDistribution.relief_request_id == self.dispatch.relief_request_id
+            ).first()
+            if cd:
+                cash_info = {'distribution_no': cd.distribution_no, 'total_amount': cd.total_amount}
         return {
             'id': self.id, 'distribution_no': self.distribution_no,
             'dispatch_id': self.dispatch_id,
@@ -889,9 +900,13 @@ class Distribution(db.Model):
             'incident_id': self.incident_id,
             'incident_name': self.incident.incident_name if self.incident else None,
             'location': self.location,
+            'latitude': self.latitude,
+            'longitude': self.longitude,
+            'fiscal_year': self.fiscal_year,
             'distribution_date': self.distribution_date.strftime('%Y-%m-%d') if self.distribution_date else None,
-            'officer': self.officer, 'remarks': self.remarks,
-            'beneficiaries': [b.to_dict() for b in self.beneficiaries]
+            'officer': self.officer, 'status': self.status, 'remarks': self.remarks,
+            'beneficiaries': [b.to_dict() for b in self.beneficiaries],
+            'cash_distribution': cash_info
         }
 
 class DistributionBeneficiary(db.Model):
@@ -903,6 +918,7 @@ class DistributionBeneficiary(db.Model):
     members = db.Column(db.Integer, default=1)
     item = db.Column(db.String(200))
     quantity = db.Column(db.Integer, nullable=False)
+    status = db.Column(db.String(20), default='Received')
 
     beneficiary = db.relationship('Beneficiary', backref=db.backref('distribution_links', lazy=True))
 
@@ -912,7 +928,8 @@ class DistributionBeneficiary(db.Model):
             'id_number': self.id_number, 'members': self.members,
             'item': self.item, 'quantity': self.quantity,
             'beneficiary_id': self.beneficiary_id,
-            'beneficiary_name': self.beneficiary.name if self.beneficiary else None
+            'beneficiary_name': self.beneficiary.name if self.beneficiary else None,
+            'status': self.status
         }
 
 # ============ STOCK TRANSFER MODEL ============
@@ -1058,6 +1075,7 @@ class CashDistribution(db.Model):
     relief_request_id = db.Column(db.Integer, db.ForeignKey('relief_request.id'), nullable=True, index=True)
     distribution_type = db.Column(db.String(20), default='Individual')
     total_amount = db.Column(db.Float, nullable=False, default=0)
+    fiscal_year = db.Column(db.String(20), index=True)
     officer = db.Column(db.String(200))
     remarks = db.Column(db.Text)
     created_by = db.Column(db.Integer)
@@ -1079,6 +1097,7 @@ class CashDistribution(db.Model):
             'relief_request_id': self.relief_request_id,
             'relief_request_number': self.relief_request.request_number if self.relief_request else None,
             'distribution_type': self.distribution_type, 'total_amount': self.total_amount,
+            'fiscal_year': self.fiscal_year,
             'officer': self.officer, 'remarks': self.remarks,
             'beneficiaries': [b.to_dict() for b in self.beneficiaries]
         }
@@ -1279,6 +1298,11 @@ def cash_distributions_page():
 @login_required
 def beneficiaries_page():
     return render_template('beneficiaries.html')
+
+@app.route('/beneficiaries/distributions')
+@login_required
+def beneficiary_distributions_page():
+    return render_template('beneficiary_distributions.html')
 
 @app.route('/suppliers')
 @login_required
@@ -2159,7 +2183,7 @@ def handle_adjustments():
 
 # ============ INCIDENT API ============
 INCIDENT_FIELDS = [
-    'disaster_date_bs', 'incident_time', 'coordinates', 'tole', 'severity', 'weather_status',
+    'disaster_date_bs', 'incident_time', 'coordinates', 'tole', 'severity',
     'affected_people', 'injured', 'deaths', 'missing_persons', 'affected_people_male',
     'affected_people_female', 'affected_households', 'house_damaged', 'house_destroyed',
     'public_building_damaged', 'public_building_destroyed', 'estimated_loss',
@@ -2195,9 +2219,10 @@ def handle_incidents():
         ward = parse_int_field(data, 'ward', minimum=1, default=None)
         if ward is not None and ward not in range(1, 10):
             return jsonify({'success': False, 'message': 'Ward must be between 1 and 9'}), 400
+        fiscal_year = data.get('fiscal_year') or AppSettings.get_setting('active_fiscal_year', '2081/82')
         incident = Incident(
             incident_name=incident_name, incident_type=incident_type,
-            ward=ward,
+            ward=ward, fiscal_year=fiscal_year,
             start_date=parse_date_field(data, 'start_date', default=date.today()),
             status=data.get('status', 'Active'), description=data.get('description')
         )
@@ -2239,7 +2264,7 @@ def manage_incident(id):
             if ward is not None and ward not in range(1, 10):
                 return jsonify({'success': False, 'message': 'Ward must be between 1 and 9'}), 400
             incident.ward = ward
-        for field in ['status', 'description']:
+        for field in ['status', 'description', 'fiscal_year']:
             if field in data:
                 setattr(incident, field, data[field])
         if data.get('start_date'):
@@ -2575,9 +2600,15 @@ def generate_distribution_no():
 def handle_distributions():
     if request.method == 'GET':
         incident_id = request.args.get('incident_id', type=int)
+        fiscal_year = request.args.get('fiscal_year')
+        ward = request.args.get('ward', type=int)
         query = Distribution.query.order_by(Distribution.distribution_date.desc())
         if incident_id:
             query = query.filter(Distribution.incident_id == incident_id)
+        if fiscal_year:
+            query = query.filter(Distribution.fiscal_year == fiscal_year)
+        if ward:
+            query = query.join(Incident).filter(Incident.ward == ward)
         distributions = query.all()
         return jsonify({'success': True, 'distributions': [d.to_dict() for d in distributions]})
     try:
@@ -2612,12 +2643,23 @@ def handle_distributions():
             dispatched = dispatch_qty_map.get(item_name, 0)
             if total > dispatched:
                 return jsonify({'success': False, 'message': f'Distributed quantity for "{item_name}" ({total}) exceeds dispatched quantity ({dispatched})'}), 400
+        fiscal_year = AppSettings.get_setting('active_fiscal_year', '2081/82')
+        lat = None
+        lon = None
+        try:
+            lat = float(data.get('latitude')) if data.get('latitude') else None
+            lon = float(data.get('longitude')) if data.get('longitude') else None
+        except (ValueError, TypeError):
+            pass
         dist = Distribution(
             distribution_no=data.get('distribution_no') or generate_distribution_no(),
             dispatch_id=dispatch_id, incident_id=dispatch.incident_id,
             location=data.get('location'),
+            latitude=lat, longitude=lon,
+            fiscal_year=fiscal_year,
             distribution_date=dist_date,
-            officer=data.get('officer'), remarks=data.get('remarks'), created_by=current_user.id
+            officer=data.get('officer'), status=data.get('status', 'Completed'),
+            remarks=data.get('remarks'), created_by=current_user.id
         )
         db.session.add(dist)
         db.session.flush()
@@ -2633,7 +2675,8 @@ def handle_distributions():
                 distribution_id=dist.id, family_name=family_name,
                 beneficiary_id=ben_data.get('beneficiary_id'),
                 id_number=ben_data.get('id_number'), members=parse_int_field(ben_data, 'members', minimum=1, default=1),
-                item=item_name or None, quantity=qty
+                item=item_name or None, quantity=qty,
+                status=ben_data.get('status', 'Received')
             )
             db.session.add(ben)
         db.session.commit()
@@ -2685,7 +2728,7 @@ def handle_disaster_assessments():
         assessment = DisasterAssessment(
             incident_id=incident_id,
             disaster_type=data.get('disaster_type', incident.incident_type),
-            fiscal_year=data.get('fiscal_year') or AppSettings.get_setting('fiscal_year', '2081/82'),
+            fiscal_year=data.get('fiscal_year') or AppSettings.get_setting('active_fiscal_year', '2081/82'),
             disaster_date_bs=data.get('disaster_date_bs'),
             tole=data.get('tole'),
             deaths=parse_int_field(data, 'deaths', minimum=0, default=0),
@@ -2912,7 +2955,14 @@ def handle_cash_requests():
         if status:
             query = query.filter(CashRequest.status == status)
         cash_reqs = query.all()
-        return jsonify({'success': True, 'cash_requests': [r.to_dict() for r in cash_reqs]})
+        result = []
+        for r in cash_reqs:
+            d = r.to_dict()
+            d['distributed_amount'] = db.session.query(db.func.coalesce(db.func.sum(CashDistribution.total_amount), 0)).filter(
+                CashDistribution.cash_request_id == r.id
+            ).scalar()
+            result.append(d)
+        return jsonify({'success': True, 'cash_requests': result})
     try:
         data = request.get_json()
         incident = db_get(Incident, data.get('incident_id'))
@@ -2989,12 +3039,15 @@ def handle_cash_distributions():
         incident_id = request.args.get('incident_id', type=int)
         fund_id = request.args.get('fund_id', type=int)
         relief_request_id = request.args.get('relief_request_id', type=int)
+        fiscal_year = request.args.get('fiscal_year')
         if incident_id:
             query = query.filter(CashDistribution.incident_id == incident_id)
         if fund_id:
             query = query.filter(CashDistribution.fund_id == fund_id)
         if relief_request_id:
             query = query.filter(CashDistribution.relief_request_id == relief_request_id)
+        if fiscal_year:
+            query = query.filter(CashDistribution.fiscal_year == fiscal_year)
         dists = query.all()
         return jsonify({'success': True, 'distributions': [d.to_dict() for d in dists]})
     try:
@@ -3034,6 +3087,7 @@ def handle_cash_distributions():
             return jsonify({'success': False, 'message': f'Total amount ({total}) exceeds available amount ({max_amount})'}), 400
         if total > fund.current_balance:
             return jsonify({'success': False, 'message': f'Insufficient fund balance. Available: {fund.current_balance}, Required: {total}'}), 400
+        fiscal_year = AppSettings.get_setting('active_fiscal_year', '2081/82')
         dist = CashDistribution(
             distribution_no=data.get('distribution_no') or generate_cash_distribution_no(),
             distribution_date=parse_date_field({'distribution_date': data.get('distribution_date')}, 'distribution_date', default=date.today()),
@@ -3041,7 +3095,8 @@ def handle_cash_distributions():
             cash_request_id=data.get('cash_request_id'),
             relief_request_id=data.get('relief_request_id'),
             distribution_type=data.get('distribution_type', 'Individual'),
-            total_amount=total, officer=data.get('officer'), remarks=data.get('remarks'),
+            total_amount=total, fiscal_year=fiscal_year,
+            officer=data.get('officer'), remarks=data.get('remarks'),
             created_by=current_user.id
         )
         db.session.add(dist)
@@ -3078,6 +3133,22 @@ def handle_cash_distributions():
                 relief_req.status = 'Completed'
             elif relief_req.distributed_cash_amount > 0 or any(ri.quantity_dispatched > 0 for ri in relief_req.items):
                 relief_req.status = 'Partial'
+
+        # Cross-update related CashRequest for same incident
+        if not cash_req and incident:
+            related_cash_req = CashRequest.query.filter(
+                CashRequest.incident_id == incident.id,
+                CashRequest.status.in_(['Pending', 'Approved', 'Partial'])
+            ).first()
+            if related_cash_req:
+                total_distributed = db.session.query(db.func.coalesce(db.func.sum(CashDistributionBeneficiary.amount), 0)).join(
+                    CashDistribution, CashDistributionBeneficiary.distribution_id == CashDistribution.id
+                ).filter(CashDistribution.cash_request_id == related_cash_req.id).scalar()
+                if total_distributed >= related_cash_req.requested_amount:
+                    related_cash_req.status = 'Completed'
+                elif total_distributed > 0:
+                    related_cash_req.status = 'Partial'
+
         db.session.commit()
         return jsonify({'success': True, 'message': 'Cash distribution recorded', 'data': dist.to_dict()}), 201
     except ValueError as e:
@@ -3205,6 +3276,104 @@ def get_beneficiary_history(id):
             'events': events,
             'total_cash': sum(e['amount'] for e in events if e['amount']),
             'total_material_distributions': sum(1 for e in events if e['type'] == 'Material')
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/beneficiaries/distributions', methods=['GET'])
+@login_required
+def get_beneficiary_distributions():
+    try:
+        fiscal_year = request.args.get('fiscal_year')
+        ward = request.args.get('ward', type=int)
+        disaster_type = request.args.get('disaster_type')
+        status_filter = request.args.get('status')
+        search = request.args.get('search')
+
+        query = db.session.query(DistributionBeneficiary).join(
+            Distribution, DistributionBeneficiary.distribution_id == Distribution.id
+        ).join(
+            Incident, Distribution.incident_id == Incident.id
+        ).order_by(Distribution.distribution_date.desc())
+
+        if fiscal_year:
+            query = query.filter(Distribution.fiscal_year == fiscal_year)
+        else:
+            active_fy = AppSettings.get_setting('active_fiscal_year', '2081/82')
+            query = query.filter(Distribution.fiscal_year == active_fy)
+        if ward:
+            query = query.filter(Incident.ward == ward)
+        if disaster_type:
+            query = query.filter(Incident.incident_type == disaster_type)
+        if status_filter:
+            query = query.filter(DistributionBeneficiary.status == status_filter)
+        if search:
+            q = f'%{search}%'
+            query = query.filter(DistributionBeneficiary.family_name.ilike(q))
+
+        results = query.limit(500).all()
+        data = []
+        for db_ben in results:
+            ben_reg = db_get(Beneficiary, db_ben.beneficiary_id) if db_ben.beneficiary_id else None
+            data.append({
+                'id': db_ben.id,
+                'beneficiary_id': db_ben.beneficiary_id,
+                'family_name': db_ben.family_name,
+                'ward': db_ben.distribution.incident.ward if db_ben.distribution and db_ben.distribution.incident else (ben_reg.ward if ben_reg else None),
+                'phone': ben_reg.phone if ben_reg else None,
+                'items_received': f"{db_ben.item} x {db_ben.quantity}" if db_ben.item else '-',
+                'date': db_ben.distribution.distribution_date.strftime('%Y-%m-%d') if db_ben.distribution and db_ben.distribution.distribution_date else None,
+                'cash': None,
+                'status': db_ben.status,
+                'distribution_no': db_ben.distribution.distribution_no if db_ben.distribution else None,
+                'incident_name': db_ben.distribution.incident.incident_name if db_ben.distribution and db_ben.distribution.incident else None,
+                'incident_type': db_ben.distribution.incident.incident_type if db_ben.distribution and db_ben.distribution.incident else None,
+            })
+
+        # Also get cash distributions for same beneficiaries
+        cash_query = db.session.query(CashDistributionBeneficiary).join(
+            CashDistribution, CashDistributionBeneficiary.distribution_id == CashDistribution.id
+        ).join(
+            Incident, CashDistribution.incident_id == Incident.id
+        ).order_by(CashDistribution.distribution_date.desc())
+
+        if fiscal_year:
+            cash_query = cash_query.filter(CashDistribution.fiscal_year == fiscal_year)
+        else:
+            active_fy = AppSettings.get_setting('active_fiscal_year', '2081/82')
+            cash_query = cash_query.filter(CashDistribution.fiscal_year == active_fy)
+        if ward:
+            cash_query = cash_query.filter(Incident.ward == ward)
+        if disaster_type:
+            cash_query = cash_query.filter(Incident.incident_type == disaster_type)
+        if search:
+            q = f'%{search}%'
+            cash_query = cash_query.filter(CashDistributionBeneficiary.name.ilike(q))
+
+        cash_results = cash_query.limit(500).all()
+        for cb in cash_results:
+            ben_reg = db_get(Beneficiary, cb.beneficiary_id) if cb.beneficiary_id else None
+            data.append({
+                'id': cb.id,
+                'beneficiary_id': cb.beneficiary_id,
+                'family_name': cb.name,
+                'ward': cb.distribution.incident.ward if cb.distribution and cb.distribution.incident else (ben_reg.ward if ben_reg else None),
+                'phone': ben_reg.phone if ben_reg else None,
+                'items_received': '-',
+                'date': cb.distribution.distribution_date.strftime('%Y-%m-%d') if cb.distribution and cb.distribution.distribution_date else None,
+                'cash': cb.amount,
+                'status': 'Received',
+                'distribution_no': cb.distribution.distribution_no if cb.distribution else None,
+                'incident_name': cb.distribution.incident.incident_name if cb.distribution and cb.distribution.incident else None,
+                'incident_type': cb.distribution.incident.incident_type if cb.distribution and cb.distribution.incident else None,
+            })
+
+        data.sort(key=lambda x: x['date'] or '', reverse=True)
+
+        return jsonify({
+            'success': True,
+            'distributions': data,
+            'total': len(data)
         })
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
@@ -3842,6 +4011,180 @@ def get_dashboard():
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
 
+# ============ RELIEF DASHBOARD API ============
+@app.route('/api/dashboard/relief', methods=['GET'])
+@login_required
+@cached(timeout=30)
+def get_relief_dashboard():
+    try:
+        active_fy = AppSettings.get_setting('active_fiscal_year', '2081/82')
+
+        # 1. Total distributions: material + cash
+        total_mat_dist = Distribution.query.filter(Distribution.fiscal_year == active_fy).count()
+        total_cash_dist = CashDistribution.query.filter(CashDistribution.fiscal_year == active_fy).count()
+        total_distributions = total_mat_dist + total_cash_dist
+
+        # 2. Total items distributed (material items only)
+        total_items_distributed = db.session.query(db.func.coalesce(db.func.sum(DistributionBeneficiary.quantity), 0)).join(
+            Distribution, DistributionBeneficiary.distribution_id == Distribution.id
+        ).filter(Distribution.fiscal_year == active_fy).scalar()
+
+        # 3. Total beneficiaries: distinct material + distinct cash
+        mat_bens = db.session.query(db.func.count(db.distinct(DistributionBeneficiary.family_name))).join(
+            Distribution, DistributionBeneficiary.distribution_id == Distribution.id
+        ).filter(Distribution.fiscal_year == active_fy).scalar() or 0
+        cash_bens = db.session.query(db.func.count(db.distinct(CashDistributionBeneficiary.name))).join(
+            CashDistribution, CashDistributionBeneficiary.distribution_id == CashDistribution.id
+        ).filter(CashDistribution.fiscal_year == active_fy).scalar() or 0
+        total_beneficiaries = mat_bens + cash_bens
+
+        # 4. Total cash distributed
+        total_cash_distributed = db.session.query(db.func.coalesce(db.func.sum(CashDistribution.total_amount), 0)).filter(
+            CashDistribution.fiscal_year == active_fy
+        ).scalar()
+
+        # 5. Items distributed chart (material only)
+        items_distributed = db.session.query(
+            DistributionBeneficiary.item,
+            db.func.sum(DistributionBeneficiary.quantity)
+        ).join(
+            Distribution, DistributionBeneficiary.distribution_id == Distribution.id
+        ).filter(
+            Distribution.fiscal_year == active_fy,
+            DistributionBeneficiary.item.isnot(None),
+            DistributionBeneficiary.item != ''
+        ).group_by(DistributionBeneficiary.item).order_by(db.func.sum(DistributionBeneficiary.quantity).desc()).limit(10).all()
+
+        # 6. Distributions by ward: UNION of material + cash via incident
+        mat_by_ward = db.session.query(
+            Incident.ward,
+            db.func.count(db.distinct(Distribution.id))
+        ).join(Distribution, Distribution.incident_id == Incident.id
+        ).filter(Distribution.fiscal_year == active_fy
+        ).group_by(Incident.ward).order_by(Incident.ward).all()
+
+        cash_by_ward = db.session.query(
+            Incident.ward,
+            db.func.count(db.distinct(CashDistribution.id))
+        ).join(CashDistribution, CashDistribution.incident_id == Incident.id
+        ).filter(CashDistribution.fiscal_year == active_fy
+        ).group_by(Incident.ward).order_by(Incident.ward).all()
+
+        ward_map = {}
+        for w, c in mat_by_ward:
+            ward_map[w] = ward_map.get(w, 0) + c
+        for w, c in cash_by_ward:
+            ward_map[w] = ward_map.get(w, 0) + c
+        ward_labels = [f"Ward {w}" for w in sorted(ward_map.keys())]
+        ward_counts = [ward_map[w] for w in sorted(ward_map.keys())]
+
+        # 7. Fiscal year distribution: UNION of material + cash
+        fy_mat = db.session.query(
+            Distribution.fiscal_year,
+            db.func.count(db.distinct(Distribution.id))
+        ).filter(Distribution.fiscal_year.isnot(None), Distribution.fiscal_year != ''
+        ).group_by(Distribution.fiscal_year).order_by(Distribution.fiscal_year).all()
+
+        fy_cash = db.session.query(
+            CashDistribution.fiscal_year,
+            db.func.count(db.distinct(CashDistribution.id))
+        ).filter(CashDistribution.fiscal_year.isnot(None), CashDistribution.fiscal_year != ''
+        ).group_by(CashDistribution.fiscal_year).order_by(CashDistribution.fiscal_year).all()
+
+        fy_map = {}
+        for fy, c in fy_mat:
+            fy_map[fy] = fy_map.get(fy, 0) + c
+        for fy, c in fy_cash:
+            fy_map[fy] = fy_map.get(fy, 0) + c
+        fy_labels = sorted(fy_map.keys())
+        fy_counts = [fy_map[fy] for fy in fy_labels]
+
+        total_cash_receipts = CashReceipt.query.filter(
+            db.extract('year', CashReceipt.receipt_date) == int(active_fy.split('/')[0])
+        ).count()
+        total_cash_received = db.session.query(db.func.coalesce(db.func.sum(CashReceipt.amount_received), 0)).filter(
+            db.extract('year', CashReceipt.receipt_date) == int(active_fy.split('/')[0])
+        ).scalar()
+
+        return jsonify({
+            'success': True,
+            'total_distributions': total_distributions,
+            'total_items_distributed': total_items_distributed,
+            'total_beneficiaries': total_beneficiaries,
+            'total_cash_distributed': total_cash_distributed,
+            'items_distributed': [{'item': r[0], 'total': r[1]} for r in items_distributed],
+            'dist_by_ward': {'labels': ward_labels, 'counts': ward_counts},
+            'fiscal_year_distributions': {'labels': fy_labels, 'counts': fy_counts},
+            'fiscal_year': active_fy,
+            'material_distributions': total_mat_dist,
+            'cash_distributions': total_cash_dist,
+            'material_beneficiaries': mat_bens,
+            'cash_beneficiaries': cash_bens,
+            'total_cash_received': total_cash_received,
+            'total_cash_receipts': total_cash_receipts
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+# ============ GIS MAP API ============
+MAP_BOUNDARY_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'thalara_boundary.json')
+MAP_WARDS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'thalara_wards.json')
+
+@app.route('/api/map/data', methods=['GET'])
+@login_required
+def get_map_data():
+    try:
+        boundary = None
+        wards = None
+        if os.path.exists(MAP_BOUNDARY_PATH):
+            with open(MAP_BOUNDARY_PATH) as f:
+                boundary = json.load(f)
+        if os.path.exists(MAP_WARDS_PATH):
+            with open(MAP_WARDS_PATH) as f:
+                wards = json.load(f)
+
+        active_fy = AppSettings.get_setting('active_fiscal_year', '2081/82')
+        incidents = Incident.query.filter(Incident.status == 'Active', Incident.coordinates.isnot(None), Incident.coordinates != '').all()
+        incident_markers = []
+        for inc in incidents:
+            try:
+                parts = inc.coordinates.split(',')
+                if len(parts) == 2:
+                    lat, lng = float(parts[0].strip()), float(parts[1].strip())
+                    incident_markers.append({
+                        'id': inc.id, 'name': inc.incident_name,
+                        'type': inc.incident_type, 'ward': inc.ward,
+                        'lat': lat, 'lng': lng, 'status': inc.status,
+                        'severity': inc.severity
+                    })
+            except (ValueError, IndexError):
+                pass
+
+        distributions = Distribution.query.filter(
+            Distribution.fiscal_year == active_fy,
+            Distribution.latitude.isnot(None),
+            Distribution.longitude.isnot(None)
+        ).all()
+        relief_markers = []
+        for dist in distributions:
+            relief_markers.append({
+                'id': dist.id, 'distribution_no': dist.distribution_no,
+                'location': dist.location,
+                'lat': dist.latitude, 'lng': dist.longitude,
+                'date': dist.distribution_date.strftime('%Y-%m-%d') if dist.distribution_date else None,
+                'incident_name': dist.incident.incident_name if dist.incident else None
+            })
+
+        return jsonify({
+            'success': True,
+            'boundary': boundary,
+            'wards': wards,
+            'incident_markers': incident_markers,
+            'relief_markers': relief_markers
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
 # ============ USER MANAGEMENT API ============
 @app.route('/api/users', methods=['GET'])
 @csrf.exempt
@@ -4083,6 +4426,7 @@ def get_form_data():
         'cash_request_statuses': ['Pending', 'Approved', 'Rejected', 'Partial', 'Completed'],
         'distribution_types': ['Individual', 'Family', 'Community', 'Local Government', 'Organization'],
         'cash_priorities': ['Low', 'Medium', 'High', 'Urgent'],
+        'distribution_statuses': ['Received', 'Pending'],
     })
 
 # ============ REPORTS (PDF) ============
@@ -4927,6 +5271,7 @@ def init_db():
                 if 'goats_sheep_injured' not in inc_cols: mig.append("goats_sheep_injured INTEGER DEFAULT 0")
                 if 'other_livestock_lost' not in inc_cols: mig.append("other_livestock_lost INTEGER DEFAULT 0")
                 if 'other_livestock_injured' not in inc_cols: mig.append("other_livestock_injured INTEGER DEFAULT 0")
+                if 'fiscal_year' not in inc_cols: mig.append("fiscal_year VARCHAR(20)")
                 if 'rescue_operations' not in inc_cols: mig.append("rescue_operations TEXT")
                 for col in mig:
                     try:
@@ -4935,6 +5280,36 @@ def init_db():
                         pass
                 if mig:
                     db.session.commit()
+            if 'distribution' in inspector.get_table_names():
+                dist_cols = [c['name'] for c in inspector.get_columns('distribution')]
+                dist_mig = []
+                if 'latitude' not in dist_cols: dist_mig.append("latitude FLOAT")
+                if 'longitude' not in dist_cols: dist_mig.append("longitude FLOAT")
+                if 'fiscal_year' not in dist_cols: dist_mig.append("fiscal_year VARCHAR(20)")
+                if 'status' not in dist_cols: dist_mig.append("status VARCHAR(20) DEFAULT 'Completed'")
+                for col in dist_mig:
+                    try:
+                        db.session.execute(db.text(f"ALTER TABLE distribution ADD COLUMN {col}"))
+                    except Exception:
+                        pass
+                if dist_mig:
+                    db.session.commit()
+            if 'distribution_beneficiary' in inspector.get_table_names():
+                dbencols = [c['name'] for c in inspector.get_columns('distribution_beneficiary')]
+                if 'status' not in dbencols:
+                    try:
+                        db.session.execute(db.text("ALTER TABLE distribution_beneficiary ADD COLUMN status VARCHAR(20) DEFAULT 'Received'"))
+                        db.session.commit()
+                    except Exception:
+                        pass
+            if 'cash_distribution' in inspector.get_table_names():
+                cdcols = [c['name'] for c in inspector.get_columns('cash_distribution')]
+                if 'fiscal_year' not in cdcols:
+                    try:
+                        db.session.execute(db.text("ALTER TABLE cash_distribution ADD COLUMN fiscal_year VARCHAR(20)"))
+                        db.session.commit()
+                    except Exception:
+                        pass
             if 'user' not in inspector.get_table_names():
                 db.session.execute(db.text("""
                     CREATE TABLE "user" (
@@ -4966,14 +5341,12 @@ def init_db():
                     db.session.commit()
             if not AppSettings.get_setting('office_name'):
                 AppSettings.set_setting('office_name', 'थलारा गाउँपालिका')
-            if not AppSettings.get_setting('fiscal_year'):
-                AppSettings.set_setting('fiscal_year', '2081/82')
-            if not AppSettings.get_setting('default_language'):
-                AppSettings.set_setting('default_language', 'Nepali')
             if not AppSettings.get_setting('fiscal_years'):
                 AppSettings.set_setting('fiscal_years', ['2080/81', '2081/82', '2082/83', '2083/84', '2084/85'])
             if not AppSettings.get_setting('active_fiscal_year'):
                 AppSettings.set_setting('active_fiscal_year', '2081/82')
+            if not AppSettings.get_setting('default_language'):
+                AppSettings.set_setting('default_language', 'Nepali')
             if not AppSettings.get_setting('disaster_types'):
                 AppSettings.set_setting('disaster_types', ['भूकम्प (Earthquake)', 'बाढी (Flood)', 'पहिरो (Landslide)', 'आँधी (Storm)', 'आगलागी (Fire)', 'अन्य (Other)'])
             if not AppSettings.get_setting('ssf_types'):

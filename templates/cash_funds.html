@@ -78,7 +78,7 @@ async function loadData() {
     const r = await fetch('/api/data');
     const d = await r.json();
     if (!d.success) return;
-    document.getElementById('fundFy').innerHTML = '<option value="">Select</option>' + (d.fiscal_years||[]).map(f => `<option value="${f}">${f}</option>`).join('');
+    document.getElementById('fundFy').innerHTML = '<option value="">Select</option>' + (d.fiscal_years||[]).map(f => `<option value="${f}" ${f === d.active_fiscal_year ? 'selected' : ''}>${f}</option>`).join('');
     document.getElementById('fundSource').innerHTML = '<option value="">Select</option>' + (d.funding_sources||[]).map(s => `<option value="${s}">${s}</option>`).join('');
 }
 

@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+{% block title %}Beneficiary Distributions - LEOC{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('index') }}"><i class="bi bi-house-fill"></i></a></li>
+<li class="breadcrumb-item"><a href="{{ url_for('beneficiaries_page') }}">Beneficiaries</a></li>
+<li class="breadcrumb-item active">Distribution Records</li>
+{% endblock %}
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center">
+    <h4><i class="bi bi-table me-2"></i>Beneficiary Distribution Records</h4>
+</div>
+
+<div class="card mb-3">
+    <div class="card-body">
+        <div class="row g-2 align-items-end">
+            <div class="col-md-2">
+                <label class="form-label small">Fiscal Year</label>
+                <select class="form-select form-select-sm" id="filterFiscalYear" onchange="loadData()"></select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small">Disaster Category</label>
+                <select class="form-select form-select-sm" id="filterDisasterType" onchange="loadData()">
+                    <option value="">All</option>
+                </select>
+            </div>
+            <div class="col-md-1">
+                <label class="form-label small">Ward</label>
+                <select class="form-select form-select-sm" id="filterWard" onchange="loadData()">
+                    <option value="">All</option>
+                </select>
+            </div>
+            <div class="col-md-1">
+                <label class="form-label small">Status</label>
+                <select class="form-select form-select-sm" id="filterStatus" onchange="loadData()">
+                    <option value="">All</option>
+                    <option value="Received">Received</option>
+                    <option value="Pending">Pending</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small">Search</label>
+                <input type="text" class="form-control form-control-sm" id="filterSearch" placeholder="Name..." oninput="debounceSearch()">
+            </div>
+            <div class="col-md-1">
+                <label class="form-label small">&nbsp;</label>
+                <button class="btn btn-sm btn-outline-secondary form-control" onclick="resetFilters()"><i class="bi bi-x-circle"></i></button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover table-sm mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>#</th>
+                        <th>Beneficiary Name</th>
+                        <th>Ward</th>
+                        <th>Phone</th>
+                        <th>Items Received</th>
+                        <th>Cash</th>
+                        <th>Date</th>
+                        <th>Status</th>
+                        <th>Incident</th>
+                    </tr>
+                </thead>
+                <tbody id="distTableBody">
+                    <tr><td colspan="9" class="text-center py-4"><div class="spinner-border text-primary"></div></td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div class="card-footer text-muted small" id="tableFooter">Loading...</div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+let searchTimeout = null;
+
+function debounceSearch() {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(loadData, 300);
+}
+
+async function loadFilters() {
+    try {
+        const r = await fetch('/api/data');
+        const d = await r.json();
+        if (!d.success) return;
+
+        const fySel = document.getElementById('filterFiscalYear');
+        const fy = d.fiscal_years || [];
+        const active = d.active_fiscal_year || (fy.length ? fy[fy.length-1] : '');
+        fySel.innerHTML = fy.map(y => `<option value="${y}" ${y === active ? 'selected' : ''}>${y}</option>`).join('');
+
+        const dtSel = document.getElementById('filterDisasterType');
+        const types = d.disaster_types || [];
+        dtSel.innerHTML = '<option value="">All</option>' + types.map(t => `<option value="${t}">${t}</option>`).join('');
+
+        const wSel = document.getElementById('filterWard');
+        const wards = d.wards || [];
+        wSel.innerHTML = '<option value="">All</option>' + wards.map(w => `<option value="${w}">Ward ${w}</option>`).join('');
+    } catch(e) { console.error(e); }
+}
+
+async function loadData() {
+    const fiscalYear = document.getElementById('filterFiscalYear').value;
+    const disasterType = document.getElementById('filterDisasterType').value;
+    const ward = document.getElementById('filterWard').value;
+    const status = document.getElementById('filterStatus').value;
+    const search = document.getElementById('filterSearch').value;
+
+    let url = '/api/beneficiaries/distributions?';
+    if (fiscalYear) url += `fiscal_year=${encodeURIComponent(fiscalYear)}&`;
+    if (disasterType) url += `disaster_type=${encodeURIComponent(disasterType)}&`;
+    if (ward) url += `ward=${ward}&`;
+    if (status) url += `status=${encodeURIComponent(status)}&`;
+    if (search) url += `search=${encodeURIComponent(search)}&`;
+
+    try {
+        const r = await fetch(url);
+        const d = await r.json();
+        const tbody = document.getElementById('distTableBody');
+        const footer = document.getElementById('tableFooter');
+
+        if (!d.success || !d.distributions || d.distributions.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="9" class="text-center py-4 text-muted">No records found</td></tr>';
+            footer.textContent = '0 records';
+            return;
+        }
+
+        tbody.innerHTML = d.distributions.map((row, i) => {
+            const statusBadge = row.status === 'Received' ? 'success' : 'warning';
+            return `<tr>
+                <td>${i+1}</td>
+                <td><strong>${row.family_name}</strong></td>
+                <td>${row.ward ? 'Ward ' + row.ward : '-'}</td>
+                <td>${row.phone || '-'}</td>
+                <td>${row.items_received}</td>
+                <td>${row.cash ? Number(row.cash).toLocaleString() : '-'}</td>
+                <td>${row.date || '-'}</td>
+                <td><span class="badge bg-${statusBadge}">${row.status}</span></td>
+                <td><small>${row.incident_name || '-'}</small></td>
+            </tr>`;
+        }).join('');
+        footer.textContent = `${d.total} record(s)`;
+    } catch(e) {
+        console.error(e);
+        document.getElementById('distTableBody').innerHTML = '<tr><td colspan="9" class="text-center py-4 text-danger">Error loading data</td></tr>';
+    }
+}
+
+function resetFilters() {
+    document.getElementById('filterFiscalYear').value = '';
+    document.getElementById('filterDisasterType').value = '';
+    document.getElementById('filterWard').value = '';
+    document.getElementById('filterStatus').value = '';
+    document.getElementById('filterSearch').value = '';
+    loadData();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    loadFilters().then(loadData);
+});
+</script>
+{% endblock %}
