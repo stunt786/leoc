@@ -305,12 +305,20 @@ function updateFamilyMembersJson() {
 }
 
 function updateFamilyCount() {
-    // Count rows with a non-empty name
     const names = document.querySelectorAll('#familyMembersContainer .family-member-row .fm-name');
     let count = 0;
     names.forEach(el => { if (el.value.trim()) count++; });
     document.getElementById('familyCountBadge').textContent = count + ' member' + (count !== 1 ? 's' : '');
-    document.getElementById('noFamilyMsg').style.display = count > 0 ? 'none' : '';
+    const noFamilyMsg = document.getElementById('noFamilyMsg');
+    if (noFamilyMsg) {
+        noFamilyMsg.style.display = count > 0 ? 'none' : '';
+    } else if (count === 0) {
+        const p = document.createElement('p');
+        p.className = 'text-muted text-center py-3 mb-0';
+        p.id = 'noFamilyMsg';
+        p.innerHTML = '<i class="bi bi-info-circle me-1"></i>No family members added. Click "Add Member" below.';
+        document.getElementById('familyMembersContainer').appendChild(p);
+    }
     document.getElementById('benFamily').value = count || 0;
     updateFamilyMembersJson();
 }
@@ -320,10 +328,10 @@ function addFamilyMember(data) {
     const template = document.getElementById('familyMemberTemplate');
     const clone = template.content.cloneNode(true);
     const row = clone.querySelector('.family-member-row');
-    if (data.name) row.querySelector('.fm-name').value = data.name;
+    if (data.name != null) row.querySelector('.fm-name').value = data.name;
     if (data.id) row.querySelector('.fm-id').value = data.id;
     if (data.relation) row.querySelector('.fm-relation').value = data.relation;
-    if (data.age) row.querySelector('.fm-age').value = data.age;
+    if (data.age != null) row.querySelector('.fm-age').value = data.age;
     if (data.gender) {
         row.querySelector('.fm-gender').value = data.gender;
         if (data.gender === 'Female') {
@@ -350,6 +358,12 @@ document.getElementById('familyMembersContainer').addEventListener('change', fun
             wrapper.style.display = 'none';
             wrapper.querySelector('.fm-pregnant').checked = false;
         }
+    }
+});
+
+document.getElementById('familyMembersContainer').addEventListener('input', function(e) {
+    if (e.target.classList.contains('fm-name')) {
+        updateFamilyCount();
     }
 });
 

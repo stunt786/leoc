@@ -72,6 +72,7 @@
                 <div>
                     <button type="button" class="btn btn-sm btn-outline-primary" onclick="addBeneficiaryRow()"><i class="bi bi-plus-lg"></i> Add Beneficiary</button>
                     <button type="button" class="btn btn-sm btn-outline-info" onclick="openBeneficiaryPicker()"><i class="bi bi-person-lines-fill"></i> Select from Registry</button>
+                    <button type="button" class="btn btn-sm btn-outline-success" onclick="addBeneficiaryFromDispatch()"><i class="bi bi-truck"></i> Add from Dispatch</button>
                 </div>
             </div>
             <div class="table-responsive">
@@ -201,6 +202,7 @@
 const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 let distributions = [];
 let dispatchItemsCache = {};
+let dispatchDetailsCache = {};
 let dispatchRRMap = {};
 let beneficiaries = [];
 let benPickerModal = null;
@@ -283,6 +285,7 @@ document.getElementById('dist_dispatch_id').addEventListener('change', function(
                 document.getElementById('dist_incident').value = dp.incident_name || '';
 
                 dispatchItemsCache[dispatchId] = dp.items || [];
+                dispatchDetailsCache[dispatchId] = dp;
                 updateDispatchSummary(dispatchId);
                 const existingRows = document.querySelectorAll('#beneficiaryBody tr');
                 existingRows.forEach(tr => {
@@ -508,7 +511,8 @@ function fillBenRow(input, ben) {
     tr.querySelector('.ben-members').value = ben.family_members || 1;
 }
 
-function openBeneficiaryPicker() {
+async function openBeneficiaryPicker() {
+    await loadBeneficiaries();
     renderBenPicker(beneficiaries);
     if (!benPickerModal) {
         benPickerModal = new bootstrap.Modal(document.getElementById('benPickerModal'));
@@ -551,11 +555,72 @@ function selectBeneficiaryFromPicker(id) {
     }
 }
 
-function importFromReliefRequest() {
+function addBeneficiaryFromDispatch() {
+    const dispatchId = parseInt(document.getElementById('dist_dispatch_id').value);
+    if (!dispatchId) { showToast('warning', 'Please select a dispatch first'); return; }
+    const dp = dispatchDetailsCache[dispatchId];
+    if (!dp) { showToast('danger', 'Dispatch details not loaded. Please re-select the dispatch.'); return; }
+
+    const rrId = parseInt(document.getElementById('dist_import_rr').value);
+    let rr = null;
+    if (rrId && reliefRequestCashMap[rrId]) {
+        rr = reliefRequestCashMap[rrId];
+    } else if (dp.relief_request_id && reliefRequestCashMap[dp.relief_request_id]) {
+        rr = reliefRequestCashMap[dp.relief_request_id];
+    }
+
+    if (!rr) { showToast('warning', 'No relief request found linked to this dispatch. Select one from the import dropdown or link a relief request to the dispatch.'); return; }
+
+    const benName = rr.requester_name || rr.organization || '';
+    if (!benName) { showToast('warning', 'Relief request has no requester or organization name. Add beneficiaries manually.'); return; }
+
+    const match = beneficiaries.find(b => b.name.toLowerCase() === benName.toLowerCase());
+    const benData = match ? match : { name: benName };
+    addBeneficiaryRow(benData);
+
+    const items = dispatchItemsCache[dispatchId] || [];
+    if (items.length > 0) {
+        const rows = document.querySelectorAll('#beneficiaryBody tr');
+        const lastRow = rows[rows.length - 1];
+        const itemsContainer = lastRow.querySelector('.ben-items-container');
+
+        // Remove the default empty item row, then create one per dispatch item
+        const defaultRow = itemsContainer.querySelector('.ben-item-row');
+        if (defaultRow) defaultRow.remove();
+
+        items.forEach((item) => {
+            const row = document.createElement('div');
+            row.className = 'ben-item-row mb-1';
+            row.innerHTML = `
+                <div class="d-flex gap-1 align-items-center">
+                    <select class="form-select form-select-sm ben-item" onchange="updateDistributedQtySummary()">
+                        <option value="">Select Item</option>
+                        ${items.map(i => `<option value="${i.item_name}">${i.item_name}</option>`).join('')}
+                    </select>
+                    <input type="number" class="form-control form-control-sm ben-qty" style="width:80px" value="${item.quantity || 1}" min="1" oninput="updateDistributedQtySummary()">
+                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeBeneficiaryItem(this)"><i class="bi bi-x"></i></button>
+                </div>
+            `;
+            const select = row.querySelector('.ben-item');
+            if (select) {
+                const option = Array.from(select.options).find(opt =>
+                    opt.value.toLowerCase() === (item.item_name || '').toLowerCase()
+                );
+                if (option) select.value = option.value;
+            }
+            itemsContainer.insertBefore(row, itemsContainer.querySelector('.btn-outline-primary'));
+        });
+        updateDistributedQtySummary();
+    }
+}
+
+async function importFromReliefRequest() {
     const rrId = parseInt(document.getElementById('dist_import_rr').value);
     if (!rrId) { showToast('warning', 'Please select a relief request'); return; }
     const rr = reliefRequestCashMap[rrId];
     if (!rr) { showToast('danger', 'Relief request not found'); return; }
+
+    await loadBeneficiaries();
 
     // Auto-fill basic info from relief request
     if (rr.organization && !document.getElementById('dist_location').value) {
@@ -576,10 +641,54 @@ function importFromReliefRequest() {
         if (dpRRId === rrId) { foundDpId = parseInt(dpId); break; }
     }
 
+    function addBeneficiaryFromRR() {
+        const benName = rr.requester_name || rr.organization || '';
+        if (benName) {
+            const match = beneficiaries.find(b => b.name.toLowerCase() === benName.toLowerCase());
+            const benData = match ? match : { name: benName };
+            addBeneficiaryRow(benData);
+
+            if (foundDpId && rr.items && rr.items.length > 0) {
+                const rows = document.querySelectorAll('#beneficiaryBody tr');
+                const lastRow = rows[rows.length - 1];
+                const itemsContainer = lastRow.querySelector('.ben-items-container');
+                const addBtn = itemsContainer.querySelector('button');
+                const itemRows = itemsContainer.querySelectorAll('.ben-item-row');
+
+                rr.items.forEach((item, idx) => {
+                    const itemRow = idx < itemRows.length ? itemRows[idx] : null;
+                    if (itemRow) {
+                        const select = itemRow.querySelector('.ben-item');
+                        const qty = itemRow.querySelector('.ben-qty');
+                        const option = Array.from(select.options).find(opt =>
+                            opt.value.toLowerCase() === (item.item_name || '').toLowerCase()
+                        );
+                        if (option) select.value = option.value;
+                        qty.value = item.quantity_requested || 1;
+                    } else {
+                        addBeneficiaryItem(addBtn);
+                        const newRows = itemsContainer.querySelectorAll('.ben-item-row');
+                        const newRow = newRows[newRows.length - 1];
+                        const select = newRow.querySelector('.ben-item');
+                        const qty = newRow.querySelector('.ben-qty');
+                        const option = Array.from(select.options).find(opt =>
+                            opt.value.toLowerCase() === (item.item_name || '').toLowerCase()
+                        );
+                        if (option) select.value = option.value;
+                        qty.value = item.quantity_requested || 1;
+                    }
+                });
+                updateDistributedQtySummary();
+            }
+        } else {
+            showToast('info', 'Relief request has no requester or organization name. Add beneficiaries manually.');
+        }
+        openBeneficiaryPicker();
+    }
+
     if (foundDpId) {
         dispatchSel.value = foundDpId;
         dispatchSel.dispatchEvent(new Event('change'));
-        // Fetch dispatch details and open beneficiary picker after items are cached
         fetch('/api/dispatch/' + foundDpId)
             .then(r => r.json())
             .then(d => {
@@ -589,13 +698,13 @@ function importFromReliefRequest() {
                     if (dp.destination) document.getElementById('dist_location').value = dp.destination;
                     if (dp.receiver) document.getElementById('dist_officer').value = dp.receiver;
                 }
-                openBeneficiaryPicker();
+                addBeneficiaryFromRR();
             }).catch(() => {
-                openBeneficiaryPicker();
+                addBeneficiaryFromRR();
             });
     } else {
-        showToast('info', 'No dispatch found for this relief request. Auto-filling basic info.');
-        openBeneficiaryPicker();
+        showToast('info', 'No dispatch found for this relief request. Items will not be auto-populated.');
+        addBeneficiaryFromRR();
     }
 }
 
