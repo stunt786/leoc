@@ -727,7 +727,7 @@ async function loadMapData() {
                         <h6 style="margin:0 0 6px 0;color:${color};font-weight:700"><i class="bi bi-lightning-charge-fill me-1"></i>${m.name}</h6>
                         <table style="font-size:12px;width:100%;border-collapse:collapse">
                             <tr><td style="padding:3px 6px;color:#6c757d;border-bottom:1px solid #f0f0f0">Type</td><td style="padding:3px 6px;font-weight:600;border-bottom:1px solid #f0f0f0">${m.type}</td></tr>
-                            <tr><td style="padding:3px 6px;color:#6c757d;border-bottom:1px solid #f0f0f0">Ward</td><td style="padding:3px 6px;font-weight:600;border-bottom:1px solid #f0f0f0">${m.ward || 'N/A'}</td></tr>
+                            <tr><td style="padding:3px 6px;color:#6c757d;border-bottom:1px solid #f0f0f0">Ward</td><td style="padding:3px 6px;font-weight:600;border-bottom:1px solid #f0f0f0">${m.ward_name || m.ward || 'N/A'}</td></tr>
                             <tr><td style="padding:3px 6px;color:#6c757d;border-bottom:1px solid #f0f0f0">Severity</td><td style="padding:3px 6px;border-bottom:1px solid #f0f0f0"><span class="badge bg-${m.severity === 'high' ? 'danger' : m.severity === 'medium' ? 'warning' : 'info'}">${m.severity}</span></td></tr>
                             <tr><td style="padding:3px 6px;color:#6c757d">Status</td><td style="padding:3px 6px;font-weight:600">${m.status}</td></tr>
                         </table>

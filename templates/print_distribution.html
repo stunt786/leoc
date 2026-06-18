@@ -71,7 +71,7 @@
             <td class="field-label">Fiscal Year:</td><td>{{ inc.fiscal_year if inc else dist.fiscal_year or '' }}</td>
         </tr>
         <tr>
-            <td class="field-label">Ward:</td><td>{{ inc.ward if inc else '' }}</td>
+            <td class="field-label">Ward:</td><td>{{ inc.ward|ward_name if inc else '' }}</td>
             <td class="field-label">Tole:</td><td>{{ inc.tole if inc else '' }}</td>
         </tr>
         <tr>
@@ -122,7 +122,7 @@
                 <td class="field-label">Phone:</td><td>{{ ben_dict.phone if ben_dict else '-' }}</td>
             </tr>
             <tr>
-                <td class="field-label">Ward:</td><td>{{ ben_dict.ward if ben_dict else '-' }}</td>
+                <td class="field-label">Ward:</td><td>{{ ben_dict.ward|ward_name if ben_dict else '-' }}</td>
                 <td class="field-label">Tole:</td><td>{{ ben_dict.tole if ben_dict else '-' }}</td>
             </tr>
             <tr>

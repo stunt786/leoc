@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, send_from_directory, make_response, redirect, url_for, flash
+from flask import Flask, render_template, request, jsonify, send_from_directory, send_file, make_response, redirect, url_for, flash
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf.csrf import CSRFProtect
 from flask_login import login_user, logout_user, login_required as flask_login_required, current_user
@@ -580,6 +580,48 @@ class StockReceiptAttachment(db.Model):
             'file_size': self.file_size,             'uploaded_at': ad_to_bs_date(self.uploaded_at)
         }
 
+# ============ ACTIVITY LOG MODEL ============
+class ActivityLog(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, nullable=True, index=True)
+    username = db.Column(db.String(100), index=True)
+    action = db.Column(db.String(50), nullable=False, index=True)
+    resource = db.Column(db.String(100), index=True)
+    resource_id = db.Column(db.String(50))
+    details = db.Column(db.Text)
+    ip_address = db.Column(db.String(50))
+    created_at = db.Column(db.DateTime, default=utc_now, index=True)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'username': self.username or 'System',
+            'action': self.action,
+            'resource': self.resource,
+            'resource_id': self.resource_id,
+            'details': self.details,
+            'ip_address': self.ip_address,
+            'created_at': ad_to_bs_date(self.created_at) + ' ' + self.created_at.strftime('%H:%M') if self.created_at else '',
+        }
+
+def log_activity(action, resource, resource_id=None, details=None, user=None, ip=None):
+    try:
+        u = user or (current_user if current_user and current_user.is_authenticated else None)
+        user_id = u.id if u and hasattr(u, 'id') else None
+        username = u.username if u and hasattr(u, 'username') else 'System'
+        ip = ip or request.remote_addr if request else None
+        log = ActivityLog(
+            user_id=user_id, username=username,
+            action=action, resource=resource,
+            resource_id=str(resource_id) if resource_id is not None else None,
+            details=details, ip_address=ip
+        )
+        db.session.add(log)
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+
 # ============ MANUAL ADJUSTMENT MODEL (Module 8) ============
 class ManualAdjustment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -717,6 +759,7 @@ class Incident(db.Model):
             'id': self.id, 'incident_name': self.incident_name,
             'incident_type': self.incident_type,
             'ward': self.ward,
+            'ward_name': ward_name_filter(self.ward),
             'start_date': ad_to_bs_date(self.start_date),
             'status': self.status, 'fiscal_year': self.fiscal_year,
             'description': self.description,
@@ -835,6 +878,7 @@ class Dispatch(db.Model):
             'request_number': self.relief_request.request_number if self.relief_request else None,
             'destination': self.destination, 'receiver': self.receiver,
             'phone': self.phone, 'remarks': self.remarks,
+            'has_distribution': Distribution.query.filter_by(dispatch_id=self.id).first() is not None,
             'items': [i.to_dict() for i in self.items]
         }
 
@@ -1311,7 +1355,8 @@ class Beneficiary(db.Model):
             'id': self.id, 'name': self.name, 'national_id': self.national_id,
             'father_name': self.father_name,
             'phone': self.phone, 'address': self.address,
-            'ward': self.ward, 'tole': self.tole,
+            'ward': self.ward,
+            'ward_name': ward_name_filter(self.ward), 'tole': self.tole,
             'current_shelter_location': self.current_shelter_location,
             'coordinates': self.coordinates,
             'family_members': self.family_members,
@@ -1325,17 +1370,21 @@ class Beneficiary(db.Model):
             'remarks': self.remarks
         }
 
+# ============ WARD MODEL ============
+class Ward(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(200), nullable=False)
+    sort_order = db.Column(db.Integer, default=0)
+
+    def to_dict(self):
+        return {'id': self.id, 'name': self.name, 'sort_order': self.sort_order}
+
 # ============ WARD HELPERS ============
 def get_ward_list():
-    n = AppSettings.get_setting('number_of_wards', 9)
-    try:
-        n = int(n)
-    except (ValueError, TypeError):
-        n = 9
-    return list(range(1, n + 1))
+    return Ward.query.order_by(Ward.sort_order).all()
 
 def is_valid_ward(ward):
-    return ward in get_ward_list()
+    return db.session.get(Ward, ward) is not None
 
 # ============ CONTEXT PROCESSORS ============
 @app.context_processor
@@ -1393,6 +1442,81 @@ def nepali_month_name_filter(bs_date_str):
     except (IndexError, ValueError):
         return ''
 
+@app.template_filter('ward_name')
+def ward_name_filter(ward_id):
+    if ward_id is None:
+        return ''
+    ward = db.session.get(Ward, int(ward_id))
+    return ward.name if ward else str(ward_id)
+
+VIEW_ENDPOINTS = {
+    '/api/incidents': 'incidents',
+    '/api/beneficiaries': 'beneficiaries',
+    '/api/distributions': 'distributions',
+    '/api/cash-receipts': 'cash_receipts',
+    '/api/cash-requests': 'cash_requests',
+    '/api/cash-distributions': 'cash_distributions',
+    '/api/warehouses': 'warehouses',
+    '/api/categories': 'categories',
+    '/api/items': 'items',
+    '/api/suppliers': 'suppliers',
+    '/api/stock-receipts': 'stock_receipts',
+    '/api/relief-requests': 'relief_requests',
+    '/api/dispatch': 'dispatch',
+    '/api/adjustments': 'adjustments',
+    '/api/beneficiaries/distributions': 'beneficiary_distributions',
+    '/api/cash-funds': 'cash_funds',
+    '/api/settings': 'settings',
+    '/api/users': 'users',
+}
+
+LOGGED_VIEWS = {}
+
+@app.after_request
+def log_api_activity(response):
+    try:
+        if not request.path.startswith('/api/'):
+            return response
+        if request.path in ('/api/logs', '/api/backup/info', '/api/data', '/api/notifications',
+                           '/api/dashboard-stats', '/api/map/data', '/api/disaster-statistics'):
+            return response
+        if request.method == 'GET' and request.path.startswith('/api/backup'):
+            return response
+        if response.status_code >= 400:
+            return response
+
+        action_map = {
+            'POST': 'create', 'PUT': 'update', 'DELETE': 'delete',
+        }
+        action = action_map.get(request.method)
+
+        if request.method == 'GET':
+            action = VIEW_ENDPOINTS.get(request.path.rstrip('/'))
+            if not action:
+                return response
+            uid = current_user.id if current_user.is_authenticated else 0
+            now = time.time()
+            last = LOGGED_VIEWS.get((uid, action), 0)
+            if now - last < 30:
+                return response
+            LOGGED_VIEWS[(uid, action)] = now
+            action = 'view'
+
+        resource_path = request.path.rstrip('/')
+        details = None
+        if request.method in ('POST', 'PUT') and request.is_json:
+            try:
+                body = request.get_json(silent=True) or {}
+                name = body.get('name') or body.get('incident_name') or body.get('username') or ''
+                if name:
+                    details = name[:200]
+            except Exception:
+                pass
+        log_activity(action, resource_path, details=details)
+    except Exception:
+        pass
+    return response
+
 # ============ AUTH ROUTES ============
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -1410,16 +1534,22 @@ def login():
                 {'last_login': datetime.now(timezone.utc), 'id': user.id}
             )
             db.session.commit()
+            log_activity('login', 'auth', details=f'User {username} logged in', ip=request.remote_addr)
             next_page = request.args.get('next')
             if next_page:
                 return redirect(next_page)
             return redirect(url_for('index'))
+        log_activity('login_failed', 'auth', details=f'Failed login attempt for {username}', ip=request.remote_addr)
         flash('Invalid username or password', 'danger')
         return render_template('login.html')
     return render_template('login.html')
 
 @app.route('/logout')
 def logout():
+    if current_user.is_authenticated:
+        log_activity('logout', 'auth', details=f'User {current_user.username} logged out', user=current_user, ip=request.remote_addr)
+    else:
+        log_activity('logout', 'auth', details='Session ended', ip=request.remote_addr)
     logout_user()
     return redirect(url_for('login'))
 
@@ -1433,6 +1563,11 @@ def index():
 @login_required
 def settings():
     return render_template('settings.html')
+
+@app.route('/logs')
+@login_required
+def logs_page():
+    return render_template('logs.html')
 
 @app.route('/warehouses')
 @login_required
@@ -1585,6 +1720,256 @@ def handle_setting(key):
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': friendly_message(e)}), 400
+
+# ============ ACTIVITY LOG API ============
+@app.route('/api/logs', methods=['GET'])
+@login_required
+def get_activity_logs():
+    try:
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 50, type=int)
+        per_page = min(per_page, 200)
+        action = request.args.get('action')
+        resource = request.args.get('resource')
+        username = request.args.get('username')
+        search = request.args.get('search')
+
+        query = ActivityLog.query.order_by(ActivityLog.created_at.desc())
+        if action:
+            query = query.filter(ActivityLog.action == action)
+        if resource:
+            query = query.filter(ActivityLog.resource.ilike(f'%{resource}%'))
+        if username:
+            query = query.filter(ActivityLog.username.ilike(f'%{username}%'))
+        if search:
+            q = f'%{search}%'
+            query = query.filter(db.or_(
+                ActivityLog.details.ilike(q),
+                ActivityLog.resource.ilike(q),
+                ActivityLog.username.ilike(q),
+                ActivityLog.action.ilike(q),
+            ))
+
+        total = query.count()
+        logs = query.offset((page - 1) * per_page).limit(per_page).all()
+
+        distinct_actions = [r[0] for r in db.session.query(ActivityLog.action).distinct().order_by(ActivityLog.action).all()]
+        distinct_usernames = [r[0] for r in db.session.query(ActivityLog.username).distinct().order_by(ActivityLog.username).all()]
+
+        return jsonify({
+            'success': True,
+            'logs': [l.to_dict() for l in logs],
+            'total': total,
+            'page': page,
+            'per_page': per_page,
+            'actions': distinct_actions,
+            'usernames': distinct_usernames,
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
+
+@app.route('/api/logs/clear', methods=['POST'])
+@permission_required('manage_users')
+def clear_old_logs():
+    try:
+        cutoff = datetime.now() - timedelta(days=30)
+        deleted = ActivityLog.query.filter(ActivityLog.created_at < cutoff).delete()
+        db.session.commit()
+        msg = f'Deleted {deleted} log entries older than 30 days' if deleted else 'No old logs to delete'
+        log_activity('clear_logs', 'logs', details=msg)
+        return jsonify({'success': True, 'message': msg})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
+
+# ============ WARD API ============
+@app.route('/api/wards', methods=['GET', 'POST'])
+@permission_required('edit')
+def handle_wards():
+    if request.method == 'GET':
+        try:
+            return jsonify({'success': True, 'wards': [w.to_dict() for w in get_ward_list()]})
+        except Exception as e:
+            return jsonify({'success': False, 'message': friendly_message(e)}), 500
+    try:
+        data = request.get_json()
+        name = (data.get('name') or '').strip()
+        if not name:
+            return jsonify({'success': False, 'message': 'Ward name is required'}), 400
+        max_order = db.session.query(db.func.max(Ward.sort_order)).scalar() or 0
+        ward = Ward(name=name, sort_order=max_order + 1)
+        db.session.add(ward)
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Ward added', 'data': ward.to_dict()}), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
+
+@app.route('/api/wards/<int:id>', methods=['PUT', 'DELETE'])
+@permission_required('edit')
+def manage_ward(id):
+    ward = Ward.query.get(id)
+    if not ward:
+        return jsonify({'success': False, 'message': 'Ward not found'}), 404
+    try:
+        if request.method == 'DELETE':
+            incident_count = Incident.query.filter_by(ward=id).count()
+            beneficiary_count = Beneficiary.query.filter_by(ward=id).count()
+            if incident_count > 0 or beneficiary_count > 0:
+                parts = []
+                if incident_count:
+                    parts.append(f'{incident_count} incident(s)')
+                if beneficiary_count:
+                    parts.append(f'{beneficiary_count} beneficiary(ies)')
+                return jsonify({'success': False, 'message': f'Cannot delete: Ward is referenced by {" and ".join(parts)}. Remove or reassign them first.'}), 400
+            db.session.delete(ward)
+            db.session.commit()
+            return jsonify({'success': True, 'message': 'Ward deleted'})
+        data = request.get_json()
+        if 'name' in data:
+            name = (data.get('name') or '').strip()
+            if not name:
+                return jsonify({'success': False, 'message': 'Ward name cannot be empty'}), 400
+            ward.name = name
+        if 'sort_order' in data:
+            new_order = int(data['sort_order'])
+            other = Ward.query.filter_by(sort_order=new_order).first()
+            if other and other.id != ward.id:
+                other.sort_order, ward.sort_order = ward.sort_order, other.sort_order
+                db.session.add(other)
+            else:
+                ward.sort_order = new_order
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Ward updated', 'data': ward.to_dict()})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
+
+# ============ BACKUP / RESTORE ============
+import sqlite3 as sqlite3_module
+
+BACKUP_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'backups')
+os.makedirs(BACKUP_DIR, exist_ok=True)
+
+def _dump_sqlite_to_sql(db_path, output_path):
+    conn = sqlite3_module.connect(db_path)
+    with open(output_path, 'w', encoding='utf-8') as f:
+        for line in conn.iterdump():
+            f.write(line + '\n')
+    conn.close()
+
+def _execute_sql_script(db_path, sql_path):
+    conn = sqlite3_module.connect(db_path)
+    cur = conn.cursor()
+    with open(sql_path, 'r', encoding='utf-8') as f:
+        sql = f.read()
+    cur.executescript(sql)
+    conn.commit()
+    conn.close()
+
+@app.route('/api/backup', methods=['GET'])
+@permission_required('manage_users')
+def create_backup():
+    try:
+        ts = datetime.now().strftime('%Y%m%d_%H%M%S')
+        backup_name = f'leoc_backup_{ts}.sql'
+        backup_path = os.path.join(BACKUP_DIR, backup_name)
+        _dump_sqlite_to_sql(db_path, backup_path)
+        return send_file(backup_path, as_attachment=True, download_name=backup_name,
+                         mimetype='application/sql')
+    except Exception as e:
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
+
+@app.route('/api/backup/info', methods=['GET'])
+@permission_required('manage_users')
+def get_backup_info():
+    try:
+        size = os.path.getsize(db_path)
+        ts = os.path.getmtime(db_path)
+        return jsonify({
+            'success': True,
+            'db_path': db_path,
+            'size': size,
+            'size_str': f'{size / 1024:.1f} KB' if size < 1024 * 1024 else f'{size / (1024 * 1024):.1f} MB',
+            'modified': datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
+
+@app.route('/api/restore', methods=['POST'])
+@permission_required('manage_users')
+def restore_backup():
+    try:
+        if 'file' not in request.files:
+            return jsonify({'success': False, 'message': 'No file provided'}), 400
+        f = request.files['file']
+        if f.filename == '':
+            return jsonify({'success': False, 'message': 'No file selected'}), 400
+        if not f.filename.endswith('.sql'):
+            return jsonify({'success': False, 'message': 'Please upload a .sql backup file'}), 400
+
+        upload_path = os.path.join(BACKUP_DIR, 'restore_upload_temp.sql')
+        f.save(upload_path)
+
+        try:
+            conn = sqlite3_module.connect(':memory:')
+            with open(upload_path, 'r', encoding='utf-8') as sf:
+                conn.executescript(sf.read())
+            conn.close()
+        except Exception:
+            os.remove(upload_path)
+            return jsonify({'success': False, 'message': 'Invalid or corrupted SQL backup file'}), 400
+
+        ts = datetime.now().strftime('%Y%m%d_%H%M%S')
+        pre_restore_backup = os.path.join(BACKUP_DIR, f'pre_restore_{ts}.sql')
+        _dump_sqlite_to_sql(db_path, pre_restore_backup)
+
+        db.session.close_all()
+        db.engine.dispose()
+
+        os.remove(db_path)
+        _execute_sql_script(db_path, upload_path)
+        os.remove(upload_path)
+
+        from sqlalchemy import create_engine
+        temp_engine = create_engine(f'sqlite:///{db_path}')
+        temp_engine.dispose()
+
+        return jsonify({
+            'success': True,
+            'message': 'Database restored successfully. Page will reload.',
+            'pre_restore_backup': os.path.basename(pre_restore_backup)
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
+
+@app.route('/api/reset-db', methods=['POST'])
+@permission_required('manage_users')
+def reset_database():
+    try:
+        ts = datetime.now().strftime('%Y%m%d_%H%M%S')
+        pre_reset_backup = os.path.join(BACKUP_DIR, f'pre_reset_{ts}.sql')
+        _dump_sqlite_to_sql(db_path, pre_reset_backup)
+
+        db.session.close_all()
+        db.engine.dispose()
+
+        from init_db import drop_all_tables, create_tables, seed_all_data
+        drop_all_tables()
+        create_tables()
+        seed_all_data()
+
+        from sqlalchemy import create_engine
+        temp_engine = create_engine(f'sqlite:///{db_path}')
+        temp_engine.dispose()
+
+        return jsonify({
+            'success': True,
+            'message': 'Database reset complete. All data cleared and defaults re-seeded. Page will reload.',
+            'pre_reset_backup': os.path.basename(pre_reset_backup)
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 # ============ WAREHOUSE API ============
 @app.route('/api/warehouses', methods=['GET', 'POST'])
@@ -2462,7 +2847,7 @@ def handle_incidents():
             return jsonify({'success': False, 'message': 'Incident name and type are required'}), 400
         ward = parse_int_field(data, 'ward', minimum=1, default=None)
         if ward is not None and not is_valid_ward(ward):
-            return jsonify({'success': False, 'message': f'Ward must be between 1 and {len(get_ward_list())}'}), 400
+            return jsonify({'success': False, 'message': 'Invalid ward selected'}), 400
         fiscal_year = data.get('fiscal_year') or AppSettings.get_setting('active_fiscal_year', '2081/82')
         incident = Incident(
             incident_name=incident_name, incident_type=incident_type,
@@ -2506,7 +2891,7 @@ def manage_incident(id):
         if 'ward' in data:
             ward = parse_int_field(data, 'ward', minimum=1, default=None)
             if ward is not None and not is_valid_ward(ward):
-                return jsonify({'success': False, 'message': f'Ward must be between 1 and {len(get_ward_list())}'}), 400
+                return jsonify({'success': False, 'message': 'Invalid ward selected'}), 400
             incident.ward = ward
         for field in ['status', 'description', 'fiscal_year']:
             if field in data:
@@ -2521,6 +2906,67 @@ def manage_incident(id):
         return jsonify({'success': False, 'message': friendly_message(e)}), 400
     except Exception as e:
         db.session.rollback()
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
+
+@app.route('/api/incidents/<int:id>/history', methods=['GET'])
+@permission_required('edit')
+def incident_history(id):
+    try:
+        incident = db_get(Incident, id)
+        if not incident:
+            return jsonify({'success': False, 'message': 'Incident not found'}), 404
+        timeline = []
+        for rr in ReliefRequest.query.filter_by(incident_id=id).order_by(ReliefRequest.created_at.desc()).all():
+            d = rr.to_dict()
+            d['_type'] = 'relief_request'
+            d['_label'] = d['request_number']
+            d['_date'] = d['request_date']
+            timeline.append(d)
+        for dsp in Dispatch.query.filter_by(incident_id=id).order_by(Dispatch.created_at.desc()).all():
+            d = dsp.to_dict()
+            d['_type'] = 'dispatch'
+            d['_label'] = d['dispatch_number']
+            d['_date'] = d['date']
+            timeline.append(d)
+        for dist in Distribution.query.filter_by(incident_id=id).order_by(Distribution.created_at.desc()).all():
+            d = dist.to_dict()
+            d['_type'] = 'distribution'
+            d['_label'] = d['distribution_no']
+            d['_date'] = d['distribution_date']
+            timeline.append(d)
+        for cr in CashRequest.query.filter_by(incident_id=id).order_by(CashRequest.created_at.desc()).all():
+            d = cr.to_dict()
+            d['_type'] = 'cash_request'
+            d['_label'] = d['request_number']
+            d['_date'] = d['request_date']
+            timeline.append(d)
+        for cd in CashDistribution.query.filter_by(incident_id=id).order_by(CashDistribution.created_at.desc()).all():
+            d = cd.to_dict()
+            d['_type'] = 'cash_distribution'
+            d['_label'] = d['distribution_no']
+            d['_date'] = d['distribution_date']
+            timeline.append(d)
+        for asm in DisasterAssessment.query.filter_by(incident_id=id).order_by(DisasterAssessment.created_at.desc()).all():
+            d = asm.to_dict()
+            d['_type'] = 'assessment'
+            d['_label'] = f"Assessment #{d['id']}"
+            d['_date'] = d['disaster_date_bs']
+            timeline.append(d)
+        timeline.sort(key=lambda x: x.get('_date') or '', reverse=True)
+        return jsonify({
+            'success': True,
+            'incident': incident.to_dict(),
+            'timeline': timeline,
+            'counts': {
+                'relief_requests': sum(1 for t in timeline if t['_type'] == 'relief_request'),
+                'dispatches': sum(1 for t in timeline if t['_type'] == 'dispatch'),
+                'distributions': sum(1 for t in timeline if t['_type'] == 'distribution'),
+                'cash_requests': sum(1 for t in timeline if t['_type'] == 'cash_request'),
+                'cash_distributions': sum(1 for t in timeline if t['_type'] == 'cash_distribution'),
+                'assessments': sum(1 for t in timeline if t['_type'] == 'assessment'),
+            }
+        })
+    except Exception as e:
         return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 # ============ RELIEF REQUEST API ============
@@ -2601,6 +3047,8 @@ def manage_relief_request(id):
             db.session.delete(req)
             db.session.commit()
             return jsonify({'success': True, 'message': 'Relief request deleted'})
+        if req.status == 'Completed':
+            return jsonify({'success': False, 'message': 'Cannot edit a completed relief request'}), 400
         data = request.get_json()
         if 'incident_id' in data:
             incident = db_get(Incident, data.get('incident_id'))
@@ -2744,6 +3192,8 @@ def handle_dispatch(id):
         return jsonify({'success': False, 'message': 'Dispatch not found'}), 404
     if request.method == 'GET':
         return jsonify({'success': True, 'dispatch': dispatch.to_dict()})
+    if Distribution.query.filter_by(dispatch_id=dispatch.id).first():
+        return jsonify({'success': False, 'message': 'Cannot edit a dispatch that has been distributed'}), 400
     try:
         data = request.get_json()
         if not isinstance(data, dict):
@@ -3523,7 +3973,7 @@ def handle_beneficiaries():
             return jsonify({'success': False, 'message': 'Beneficiary name is required'}), 400
         ward = parse_int_field(data, 'ward', minimum=1, default=None)
         if ward is not None and not is_valid_ward(ward):
-            return jsonify({'success': False, 'message': f'Ward must be between 1 and {len(get_ward_list())}'}), 400
+            return jsonify({'success': False, 'message': 'Invalid ward selected'}), 400
         family_members = parse_int_field(data, 'family_members', minimum=0, default=1)
         family_members_json = data.get('family_members_json')
         if family_members_json is not None and not isinstance(family_members_json, str):
@@ -3582,7 +4032,7 @@ def manage_beneficiary(id):
         if 'ward' in data:
             ward = parse_int_field(data, 'ward', minimum=1, default=None)
             if ward is not None and not is_valid_ward(ward):
-                return jsonify({'success': False, 'message': f'Ward must be between 1 and {len(get_ward_list())}'}), 400
+                return jsonify({'success': False, 'message': 'Invalid ward selected'}), 400
             data['ward'] = ward
         if 'family_members' in data:
             data['family_members'] = parse_int_field(data, 'family_members', minimum=0, default=1)
@@ -3684,11 +4134,13 @@ def get_beneficiary_distributions():
         data = []
         for db_ben in results:
             ben_reg = db_get(Beneficiary, db_ben.beneficiary_id) if db_ben.beneficiary_id else None
+            w = db_ben.distribution.incident.ward if db_ben.distribution and db_ben.distribution.incident else (ben_reg.ward if ben_reg else None)
             data.append({
                 'id': db_ben.id,
                 'beneficiary_id': db_ben.beneficiary_id,
                 'family_name': db_ben.family_name,
-                'ward': db_ben.distribution.incident.ward if db_ben.distribution and db_ben.distribution.incident else (ben_reg.ward if ben_reg else None),
+                'ward': w,
+                'ward_name': ward_name_filter(w),
                 'phone': ben_reg.phone if ben_reg else None,
                 'items_received': f"{db_ben.item} x {db_ben.quantity}" if db_ben.item else '-',
                 'date': ad_to_bs_date(db_ben.distribution.distribution_date) if db_ben.distribution else None,
@@ -3722,11 +4174,13 @@ def get_beneficiary_distributions():
         cash_results = cash_query.limit(500).all()
         for cb in cash_results:
             ben_reg = db_get(Beneficiary, cb.beneficiary_id) if cb.beneficiary_id else None
+            w = cb.distribution.incident.ward if cb.distribution and cb.distribution.incident else (ben_reg.ward if ben_reg else None)
             data.append({
                 'id': cb.id,
                 'beneficiary_id': cb.beneficiary_id,
                 'family_name': cb.name,
-                'ward': cb.distribution.incident.ward if cb.distribution and cb.distribution.incident else (ben_reg.ward if ben_reg else None),
+                'ward': w,
+                'ward_name': ward_name_filter(w),
                 'phone': ben_reg.phone if ben_reg else None,
                 'items_received': '-',
                 'date': ad_to_bs_date(cb.distribution.distribution_date) if cb.distribution else None,
@@ -3862,9 +4316,9 @@ def generate_daily_report():
 
         ward_stats = {}
         for w in get_ward_list():
-            w_incidents = [i for i in incidents if i.ward == w]
-            w_assess = [a for a in assessments if a.incident and a.incident.ward == w]
-            ward_stats[str(w)] = {
+            w_incidents = [i for i in incidents if i.ward == w.id]
+            w_assess = [a for a in assessments if a.incident and a.incident.ward == w.id]
+            ward_stats[str(w.id)] = {
                 'incidents': len(w_incidents),
                 'deaths': sum(a.deaths for a in w_assess),
                 'missing': sum(a.missing_persons for a in w_assess),
@@ -3932,9 +4386,9 @@ def generate_disaster_pdf(assessments, incidents, total, ward_stats, type_stats,
 
     header_data = [['वडा', 'घटना', 'मृतक', 'बेपत्ता', 'घाइते', 'घर नष्ट', 'अ.क्षति']]
     for w in get_ward_list():
-        ws = ward_stats.get(str(w), {})
+        ws = ward_stats.get(str(w.id), {})
         header_data.append([
-            str(w), str(ws.get('incidents', 0)), str(ws.get('deaths', 0)),
+            w.name, str(ws.get('incidents', 0)), str(ws.get('deaths', 0)),
             str(ws.get('missing', 0)), str(ws.get('injured', 0)),
             str(ws.get('house_destroyed', 0)), str(ws.get('estimated_loss', 0))
         ])
@@ -4021,9 +4475,9 @@ def daily_report_preview():
 
     ward_stats = {}
     for w in get_ward_list():
-        w_incidents = [i for i in incidents if i.ward == w]
-        w_assess = [a for a in assessments if a.incident and a.incident.ward == w]
-        ward_stats[str(w)] = {
+        w_incidents = [i for i in incidents if i.ward == w.id]
+        w_assess = [a for a in assessments if a.incident and a.incident.ward == w.id]
+        ward_stats[str(w.id)] = {
             'incidents': len(w_incidents), 'deaths': sum(a.deaths for a in w_assess),
             'missing': sum(a.missing_persons for a in w_assess), 'injured': sum(a.injured for a in w_assess),
             'house_destroyed': sum(a.house_destroyed for a in w_assess),
@@ -4523,6 +4977,7 @@ def get_map_data():
                     incident_markers.append({
                         'id': inc.id, 'name': inc.incident_name,
                         'type': inc.incident_type, 'ward': inc.ward,
+                        'ward_name': ward_name_filter(inc.ward),
                         'lat': lat, 'lng': lng, 'status': inc.status,
                         'severity': inc.severity
                     })
@@ -4784,7 +5239,7 @@ def get_form_data():
             'active_fiscal_year': AppSettings.get_setting('active_fiscal_year', '2081/82'),
             'disaster_types': AppSettings.get_setting('disaster_types', ['Flood', 'Earthquake', 'Landslide', 'Fire', 'Storm', 'Epidemic', 'Other']),
             'ssf_types': AppSettings.get_setting('ssf_types', ['OAS (बर्षा पेन्सन)', 'विधवा (Widow)', 'अपाङ्गता (Disabled)', 'कोही नभएको (Endangered)', 'बाल भत्ता (Child Grant)', 'अन्य (Other)']),
-            'wards': get_ward_list(),
+            'wards': [w.to_dict() for w in get_ward_list()],
             'cash_funds': [f.to_dict() for f in CashFund.query.all()],
             'cash_requests': [r.to_dict() for r in CashRequest.query.all()],
             'beneficiaries': [b.to_dict() for b in Beneficiary.query.all()],

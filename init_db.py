@@ -320,7 +320,7 @@ def seed_default_settings():
         'currency': 'NPR',
         'language': 'ne',
         'default_warehouse': '',
-        'number_of_wards': 9,
+
     }
     
     seeded = 0
@@ -332,6 +332,21 @@ def seed_default_settings():
         print(f"[OK] Seeded {seeded} default settings")
     else:
         print("[SKIP] Settings already exist")
+
+def seed_wards():
+    try:
+        from app import Ward
+        if Ward.query.first():
+            print("[SKIP] Wards already seeded")
+            return
+        default_wards = [f"Ward {i}" for i in range(1, 10)]
+        for i, name in enumerate(default_wards, 1):
+            db.session.add(Ward(name=name, sort_order=i))
+        db.session.commit()
+        print(f"[OK] Seeded {len(default_wards)} wards")
+    except Exception as e:
+        db.session.rollback()
+        print(f"[ERROR] Failed to seed wards: {e}")
 
 def run_migrations():
     """Add missing columns to existing tables for backward compatibility."""
@@ -447,6 +462,7 @@ def seed_all_data():
         seed_item_categories()
         seed_non_distributable_items()
         seed_default_settings()
+        seed_wards()
 
 def drop_all_tables():
     """Drop all tables (DANGER: destroys data)."""

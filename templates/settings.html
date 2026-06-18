@@ -104,9 +104,39 @@
         <div class="card mb-3">
             <div class="card-header"><span><i class="bi bi-map me-2"></i>Wards</span></div>
             <div class="card-body">
-                <label class="form-label">Number of Wards</label>
-                <input type="number" class="form-control" id="number_of_wards" data-key="number_of_wards" min="1" max="99">
-                <small class="text-muted">System will auto-generate ward options (1 to N) across all forms.</small>
+                <label class="form-label">Ward List</label>
+                <div id="wards_list" class="mb-2"></div>
+                <div class="input-group">
+                    <input type="text" class="form-control" id="new_ward_name" placeholder="e.g. Ward 1 or Ward Name">
+                    <button class="btn btn-outline-primary" onclick="addWard()"><i class="bi bi-plus-lg"></i></button>
+                </div>
+                <small class="text-muted">Customize ward names shown in all dropdowns across the system.</small>
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-header"><span><i class="bi bi-database me-2"></i>Backup & Restore</span></div>
+            <div class="card-body">
+                <div id="dbInfo" class="small text-muted mb-2"></div>
+                <div class="d-grid gap-2">
+                    <a href="/api/backup" class="btn btn-outline-primary btn-sm"><i class="bi bi-download me-1"></i>Download Backup</a>
+                    <hr class="my-1">
+                    <label class="form-label small mb-1">Restore from SQL Backup</label>
+                    <div class="input-group">
+                        <input type="file" class="form-control form-control-sm" id="restoreFile" accept=".sql">
+                        <button class="btn btn-outline-warning btn-sm" onclick="restoreBackup()"><i class="bi bi-upload me-1"></i>Restore</button>
+                    </div>
+                    <small class="text-muted">Upload a .sql backup file. Current data will be replaced.</small>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-3 border-danger">
+            <div class="card-header text-danger"><span><i class="bi bi-exclamation-triangle-fill me-2"></i>Danger Zone</span></div>
+            <div class="card-body">
+                <label class="form-label small">Reset Database</label>
+                <p class="small text-muted">Deletes all data and re-seeds defaults (admin user, wards, settings).</p>
+                <button class="btn btn-outline-danger btn-sm w-100" onclick="resetDatabase()"><i class="bi bi-arrow-counterclockwise me-1"></i>Reset & Re-seed</button>
             </div>
         </div>
     </div>
@@ -217,6 +247,87 @@ document.getElementById('settingsForm').addEventListener('submit', async functio
     if (success) showToast('success', 'Settings saved successfully');
 });
 
+async function loadWards() {
+    try {
+        const resp = await fetch('/api/wards');
+        const d = await resp.json();
+        if (!d.success) return;
+        const container = document.getElementById('wards_list');
+        container.innerHTML = d.wards.map((w, i) =>
+            `<div class="d-flex justify-content-between align-items-center mb-1 p-1 border rounded">
+                <div class="d-flex align-items-center gap-2 flex-grow-1">
+                    <span class="text-muted small">${w.sort_order}.</span>
+                    <input type="text" class="form-control form-control-sm ward-name-input" value="${w.name}" data-id="${w.id}" style="max-width:250px">
+                </div>
+                <div class="d-flex gap-1">
+                    <button class="btn btn-sm btn-outline-secondary" onclick="moveWard(${w.id}, -1)" ${i === 0 ? 'disabled' : ''}><i class="bi bi-chevron-up"></i></button>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="moveWard(${w.id}, 1)" ${i === d.wards.length - 1 ? 'disabled' : ''}><i class="bi bi-chevron-down"></i></button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="deleteWard(${w.id}, '${w.name}')"><i class="bi bi-x"></i></button>
+                </div>
+            </div>`
+        ).join('');
+        document.querySelectorAll('.ward-name-input').forEach(inp => {
+            inp.addEventListener('change', async function() {
+                const id = this.dataset.id;
+                const name = this.value.trim();
+                if (!name) return;
+                await fetch(`/api/wards/${id}`, {
+                    method: 'PUT',
+                    headers: {'Content-Type':'application/json','X-CSRFToken':document.querySelector('meta[name="csrf-token"]').getAttribute('content')},
+                    body: JSON.stringify({name})
+                });
+                showToast('success', 'Ward renamed');
+            });
+        });
+    } catch(e) { console.error('Failed to load wards:', e); }
+}
+
+async function addWard() {
+    const input = document.getElementById('new_ward_name');
+    const name = input.value.trim();
+    if (!name) return;
+    const resp = await fetch('/api/wards', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json','X-CSRFToken':document.querySelector('meta[name="csrf-token"]').getAttribute('content')},
+        body: JSON.stringify({name})
+    });
+    const d = await resp.json();
+    if (!d.success) { showToast('danger', d.message); return; }
+    input.value = '';
+    await loadWards();
+    showToast('success', 'Ward added');
+}
+
+async function deleteWard(id, name) {
+    if (!confirm(`Delete "${name}"? This cannot be undone if no records reference it.`)) return;
+    const resp = await fetch(`/api/wards/${id}`, {
+        method: 'DELETE',
+        headers: {'X-CSRFToken':document.querySelector('meta[name="csrf-token"]').getAttribute('content')}
+    });
+    const d = await resp.json();
+    if (!d.success) { showToast('danger', d.message); return; }
+    await loadWards();
+    showToast('success', 'Ward deleted');
+}
+
+async function moveWard(id, direction) {
+    const items = document.querySelectorAll('#wards_list .ward-name-input');
+    let currentIdx = -1;
+    items.forEach((inp, i) => { if (parseInt(inp.dataset.id) === id) currentIdx = i; });
+    if (currentIdx < 0) return;
+    const targetIdx = currentIdx + direction;
+    if (targetIdx < 0 || targetIdx >= items.length) return;
+    const targetId = parseInt(items[targetIdx].dataset.id);
+    const resp = await fetch(`/api/wards/${id}`, {
+        method: 'PUT',
+        headers: {'Content-Type':'application/json','X-CSRFToken':document.querySelector('meta[name="csrf-token"]').getAttribute('content')},
+        body: JSON.stringify({sort_order: targetIdx + 1})
+    });
+    const d = await resp.json();
+    if (!d.success) { showToast('danger', d.message); return; }
+    await loadWards();
+}
+
 document.getElementById('logo').addEventListener('change', function(e) {
     const file = e.target.files[0];
     if (file) {
@@ -228,6 +339,67 @@ document.getElementById('logo').addEventListener('change', function(e) {
     }
 });
 
-document.addEventListener('DOMContentLoaded', loadSettings);
+async function loadDbInfo() {
+    try {
+        const resp = await fetch('/api/backup/info');
+        const d = await resp.json();
+        if (d.success) {
+            document.getElementById('dbInfo').textContent = `DB: ${d.size_str}, last modified: ${d.modified}`;
+        }
+    } catch(e) {}
+}
+
+async function resetDatabase() {
+    if (!confirm('This will DELETE ALL DATA and re-seed defaults. A backup will be created automatically.')) return;
+    if (!confirm('ARE YOU SURE? All incidents, beneficiaries, distributions, receipts, and other records will be permanently deleted.')) return;
+    if (!confirm('Final confirmation: This cannot be undone. Proceed?')) return;
+    try {
+        const resp = await fetch('/api/reset-db', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json','X-CSRFToken':document.querySelector('meta[name="csrf-token"]').getAttribute('content')},
+            body: '{}'
+        });
+        const d = await resp.json();
+        if (d.success) {
+            showToast('success', d.message);
+            setTimeout(() => location.reload(), 2000);
+        } else {
+            showToast('danger', d.message);
+        }
+    } catch(e) {
+        showToast('danger', 'Reset failed: ' + e.message);
+    }
+}
+
+async function restoreBackup() {
+    const input = document.getElementById('restoreFile');
+    if (!input.files.length) { showToast('warning', 'Please select a backup file'); return; }
+    if (!confirm('Restore will REPLACE all current data with the backup. This cannot be undone. Continue?')) return;
+    if (!confirm('Are you absolutely sure? A pre-restore backup will be created automatically.')) return;
+    const formData = new FormData();
+    formData.append('file', input.files[0]);
+    try {
+        const resp = await fetch('/api/restore', {
+            method: 'POST',
+            headers: {'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')},
+            body: formData
+        });
+        const d = await resp.json();
+        if (d.success) {
+            showToast('success', d.message);
+            loadDbInfo();
+        } else {
+            showToast('danger', d.message);
+        }
+    } catch(e) {
+        showToast('danger', 'Restore failed: ' + e.message);
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadSettings();
+    loadWards();
+    loadDbInfo();
+});
 </script>
 {% endblock %}

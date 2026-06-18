@@ -14,7 +14,19 @@ os.environ['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{_db_path}'
 import app as app_module
 
 
+def _seed_test_wards():
+    from app import Ward, db
+    if Ward.query.first() is None:
+        for i in range(1, 10):
+            db.session.add(Ward(name=f'Ward {i}', sort_order=i))
+        db.session.commit()
+
 class SmokeTestCase(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        with app_module.app.app_context():
+            _seed_test_wards()
+
     @classmethod
     def tearDownClass(cls):
         with app_module.app.app_context():
@@ -174,7 +186,7 @@ class SmokeTestCase(unittest.TestCase):
             },
         )
         self.assertEqual(bad_incident.status_code, 400)
-        self.assertIn('Ward must be between 1 and 9', bad_incident.get_json()['message'])
+        self.assertIn('Invalid ward selected', bad_incident.get_json()['message'])
 
         bad_item = client.post(
             '/api/items',

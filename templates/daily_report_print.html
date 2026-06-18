@@ -44,9 +44,9 @@
         <thead class="table-dark"><tr><th>वडा</th><th>घटना</th><th>मृतक</th><th>बेपत्ता</th><th>घाइते</th><th>घर नष्ट</th><th>अ.क्षति</th></tr></thead>
         <tbody>
             {% for w in ward_list %}
-            {% set ws = ward_stats.get(w|string, {}) %}
+            {% set ws = ward_stats.get(w.id|string, {}) %}
             <tr>
-                <td>{{ w }}</td><td>{{ ws.get('incidents', 0) }}</td><td>{{ ws.get('deaths', 0) }}</td>
+                <td>{{ w.name }}</td><td>{{ ws.get('incidents', 0) }}</td><td>{{ ws.get('deaths', 0) }}</td>
                 <td>{{ ws.get('missing', 0) }}</td><td>{{ ws.get('injured', 0) }}</td>
                 <td>{{ ws.get('house_destroyed', 0) }}</td><td>{{ ws.get('estimated_loss', 0) }}</td>
             </tr>

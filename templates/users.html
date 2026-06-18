@@ -89,6 +89,50 @@
     </div>
 </div>
 
+<!-- Roles & Permissions Table -->
+<div class="card mt-4">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-shield-check me-2"></i>Roles & Permissions</h5>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-bordered mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Role</th>
+                        <th class="text-center" title="View all data">View</th>
+                        <th class="text-center" title="Create & edit records">Create/Edit</th>
+                        <th class="text-center" title="Delete records">Delete</th>
+                        <th class="text-center" title="Manage user accounts">Manage Users</th>
+                        <th class="text-center" title="System settings & backup">System Settings</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% set roles = [
+                        ('admin', 'Administrator', ['view', 'create', 'delete', 'users', 'system']),
+                        ('warehouse_manager', 'Warehouse Manager', ['view', 'create', 'delete']),
+                        ('data_entry', 'Data Entry', ['view', 'create']),
+                        ('editor', 'Editor', ['view', 'create']),
+                        ('operator', 'Operator', ['view', 'create', 'delete']),
+                        ('finance', 'Finance', ['view', 'create']),
+                        ('viewer', 'Viewer', ['view']),
+                    ] %}
+                    {% for key, label, perms in roles %}
+                    <tr>
+                        <td><span class="badge {{ {'admin':'bg-danger','warehouse_manager':'bg-primary','data_entry':'bg-info text-dark','editor':'bg-success','operator':'bg-warning text-dark','finance':'bg-purple','viewer':'bg-secondary'}[key] }}">{{ label }}</span></td>
+                        <td class="text-center">{% if 'view' in perms %}<i class="bi bi-check-lg text-success fs-5"></i>{% else %}<i class="bi bi-x-lg text-danger fs-5"></i>{% endif %}</td>
+                        <td class="text-center">{% if 'create' in perms %}<i class="bi bi-check-lg text-success fs-5"></i>{% else %}<i class="bi bi-x-lg text-danger fs-5"></i>{% endif %}</td>
+                        <td class="text-center">{% if 'delete' in perms %}<i class="bi bi-check-lg text-success fs-5"></i>{% else %}<i class="bi bi-x-lg text-danger fs-5"></i>{% endif %}</td>
+                        <td class="text-center">{% if 'users' in perms %}<i class="bi bi-check-lg text-success fs-5"></i>{% else %}<i class="bi bi-x-lg text-danger fs-5"></i>{% endif %}</td>
+                        <td class="text-center">{% if 'system' in perms %}<i class="bi bi-check-lg text-success fs-5"></i>{% else %}<i class="bi bi-x-lg text-danger fs-5"></i>{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
 <!-- Delete Confirmation Modal -->
 <div class="modal fade" id="deleteModal" tabindex="-1">
     <div class="modal-dialog modal-sm modal-dialog-centered">

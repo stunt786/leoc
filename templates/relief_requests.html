@@ -241,7 +241,7 @@ function renderReqBenPicker(list) {
         <td>${b.name}</td>
         <td>${b.father_name || '-'}</td>
         <td>${b.phone || '-'}</td>
-        <td>${b.ward || '-'}</td>
+        <td>${b.ward_name || b.ward || '-'}</td>
         <td><button class="btn btn-sm btn-outline-primary" onclick="selectRequesterFromPicker(${b.id})"><i class="bi bi-plus-lg"></i></button></td>
     </tr>`).join('');
 }
@@ -338,7 +338,9 @@ function renderRR(data) {
             <td>${hasCash ? `<small class="text-nowrap">${Number(r.distributed_cash_amount).toLocaleString()} / ${Number(r.requested_cash_amount).toLocaleString()}</small><div class="progress" style="height:4px"><div class="progress-bar bg-success" style="width:${pct}%"></div></div>` : '-'}</td>
             <td><span class="badge bg-${statusColors[r.status] || 'secondary'}">${r.status}</span></td>
             <td class="text-end" onclick="event.stopPropagation()">
-                <button class="btn btn-sm btn-outline-primary" onclick="editRR(${r.id})"><i class="bi bi-pencil"></i></button>
+                ${r.status === 'Completed'
+                    ? '<button class="btn btn-sm btn-outline-secondary" disabled title="Completed requests cannot be edited"><i class="bi bi-pencil"></i></button>'
+                    : '<button class="btn btn-sm btn-outline-primary" onclick="editRR(' + r.id + ')"><i class="bi bi-pencil"></i></button>'}
                 <button class="btn btn-sm btn-outline-secondary" onclick='window.open("/api/relief-requests/' + r.id + '/print","_blank")' title="Print"><i class="bi bi-printer"></i></button>
                 <button class="btn btn-sm btn-outline-danger" onclick="deleteRR(${r.id})"><i class="bi bi-trash"></i></button>
             </td>

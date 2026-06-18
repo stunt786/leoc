@@ -541,7 +541,7 @@ function renderBenPicker(list) {
         <td>${b.name}</td>
         <td>${b.father_name || '-'}</td>
         <td>${b.national_id || '-'}</td>
-        <td>${b.ward || '-'}</td>
+        <td>${b.ward_name || b.ward || '-'}</td>
         <td>${b.family_members || 1}</td>
         <td><button class="btn btn-sm btn-outline-primary" onclick="selectBeneficiaryFromPicker(${b.id})"><i class="bi bi-plus-lg"></i></button></td>
     </tr>`).join('');
@@ -804,7 +804,7 @@ async function viewDistribution(id) {
                                 <tr><td class="fw-medium">Father's Name:</td><td>${ben.father_name || '-'}</td></tr>
                                 <tr><td class="fw-medium">National ID:</td><td>${ben.national_id || '-'}</td></tr>
                                 <tr><td class="fw-medium">Phone:</td><td>${ben.phone || '-'}</td></tr>
-                                <tr><td class="fw-medium">Ward:</td><td>${ben.ward || '-'}</td></tr>
+                                <tr><td class="fw-medium">Ward:</td><td>${ben.ward_name || ben.ward || '-'}</td></tr>
                                 <tr><td class="fw-medium">Tole:</td><td>${ben.tole || '-'}</td></tr>
                                 <tr><td class="fw-medium">Current Shelter:</td><td>${ben.current_shelter_location || '-'}</td></tr>
                                 <tr><td class="fw-medium">Coordinates:</td><td>${ben.coordinates || '-'}</td></tr>
@@ -884,7 +884,7 @@ async function viewDistribution(id) {
                         <div class="col-md-3"><strong>Type:</strong> ${inc.incident_type || '-'}</div>
                         <div class="col-md-3"><strong>Date:</strong> ${inc.start_date || '-'}</div>
                         <div class="col-md-3"><strong>Fiscal Year:</strong> ${inc.fiscal_year || dist.fiscal_year || '-'}</div>
-                        <div class="col-md-3"><strong>Ward:</strong> ${inc.ward || '-'}</div>
+                        <div class="col-md-3"><strong>Ward:</strong> ${inc.ward_name || inc.ward || '-'}</div>
                         <div class="col-md-3"><strong>Tole:</strong> ${inc.tole || '-'}</div>
                         <div class="col-md-3"><strong>Latitude:</strong> ${inc.coordinates ? inc.coordinates.split(',')[0] || '-' : '-'}</div>
                         <div class="col-md-3"><strong>Longitude:</strong> ${inc.coordinates ? inc.coordinates.split(',')[1] || '-' : '-'}</div>
@@ -999,10 +999,6 @@ async function saveDistribution() {
 
     const dateVal = document.getElementById('dist_distribution_date').value;
     if (!dateVal) { showToast('danger', 'Please select a distribution date'); return; }
-    const selectedDate = new Date(dateVal + 'T00:00:00');
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    if (selectedDate > today) { showToast('danger', 'Distribution date cannot be in the future'); return; }
 
     let hasErrors = false;
     const beneficiaries = [];

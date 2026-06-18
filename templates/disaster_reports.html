@@ -124,7 +124,7 @@
                     <select class="form-select form-select-sm" id="statWard" onchange="loadStatistics()">
                         <option value="">All</option>
                         {% for w in ward_list %}
-                        <option value="{{ w }}">Ward {{ w }}</option>
+                        <option value="{{ w.id }}">{{ w.name }}</option>
                         {% endfor %}
                     </select>
                 </div>

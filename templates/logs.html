@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% block title %}Activity Logs - LEOC{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('index') }}"><i class="bi bi-house-fill"></i></a></li>
+<li class="breadcrumb-item active">Activity Logs</li>
+{% endblock %}
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <h4><i class="bi bi-clock-history me-2"></i>Activity Logs</h4>
+    <div class="d-flex gap-2 flex-wrap align-items-center">
+        <select class="form-select form-select-sm" id="filterAction" style="width:auto" onchange="loadLogs()">
+            <option value="">All Actions</option>
+        </select>
+        <select class="form-select form-select-sm" id="filterUser" style="width:auto" onchange="loadLogs()">
+            <option value="">All Users</option>
+        </select>
+        <input type="text" class="form-control form-control-sm" id="filterSearch" placeholder="Search..." style="width:200px" onkeyup="if(event.key==='Enter')loadLogs()">
+        <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('filterSearch').value='';loadLogs()"><i class="bi bi-x-lg"></i></button>
+        <button class="btn btn-sm btn-outline-danger" onclick="clearLogs()"><i class="bi bi-trash me-1"></i>Clear Older</button>
+    </div>
+</div>
+
+<div class="card mt-3">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0" id="logTable">
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>User</th>
+                        <th>Action</th>
+                        <th>Resource</th>
+                        <th>Details</th>
+                        <th>IP</th>
+                    </tr>
+                </thead>
+                <tbody id="logBody">
+                    <tr><td colspan="6" class="text-center text-muted py-4">Loading...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="d-flex justify-content-between align-items-center mt-2">
+    <small class="text-muted" id="logCount">0 entries</small>
+    <nav><ul class="pagination pagination-sm mb-0" id="logPagination"></ul></nav>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+let currentPage = 1;
+let totalPages = 1;
+
+async function loadLogs(page) {
+    if (page !== undefined) currentPage = page;
+    const params = new URLSearchParams();
+    params.set('page', currentPage);
+    params.set('per_page', 50);
+    const action = document.getElementById('filterAction').value;
+    if (action) params.set('action', action);
+    const user = document.getElementById('filterUser').value;
+    if (user) params.set('username', user);
+    const search = document.getElementById('filterSearch').value.trim();
+    if (search) params.set('search', search);
+    try {
+        const resp = await fetch(`/api/logs?${params}`);
+        const d = await resp.json();
+        if (!d.success) { document.getElementById('logBody').innerHTML = '<tr><td colspan="6" class="text-center text-danger">Failed to load logs</td></tr>'; return; }
+        const tbody = document.getElementById('logBody');
+        if (!d.logs.length) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">No logs found</td></tr>';
+        } else {
+            const actionColors = {create:'success', update:'primary', delete:'danger', login:'info', logout:'secondary', login_failed:'warning'};
+            tbody.innerHTML = d.logs.map(l => `<tr>
+                <td class="small text-nowrap">${l.created_at}</td>
+                <td class="small">${esc(l.username)}</td>
+                <td><span class="badge bg-${actionColors[l.action] || 'secondary'}">${esc(l.action)}</span></td>
+                <td class="small">${esc(l.resource || '')}</td>
+                <td class="small text-muted" style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(l.details || '')}</td>
+                <td class="small text-muted">${l.ip_address || ''}</td>
+            </tr>`).join('');
+        }
+        document.getElementById('logCount').textContent = `${d.total} entries`;
+        renderPagination(d.total, d.page, d.per_page);
+        populateFilters(d.actions, d.usernames);
+    } catch(e) {
+        document.getElementById('logBody').innerHTML = '<tr><td colspan="6" class="text-center text-danger">Error: ' + e.message + '</td></tr>';
+    }
+}
+
+function renderPagination(total, page, perPage) {
+    totalPages = Math.ceil(total / perPage) || 1;
+    const ul = document.getElementById('logPagination');
+    if (totalPages <= 1) { ul.innerHTML = ''; return; }
+    let html = '';
+    if (page > 1) html += `<li class="page-item"><a class="page-link" href="#" onclick="loadLogs(${page-1})">&laquo;</a></li>`;
+    const start = Math.max(1, page - 2);
+    const end = Math.min(totalPages, page + 2);
+    for (let i = start; i <= end; i++) {
+        html += `<li class="page-item ${i === page ? 'active' : ''}"><a class="page-link" href="#" onclick="loadLogs(${i})">${i}</a></li>`;
+    }
+    if (page < totalPages) html += `<li class="page-item"><a class="page-link" href="#" onclick="loadLogs(${page+1})">&raquo;</a></li>`;
+    ul.innerHTML = html;
+}
+
+let cachedActions = [], cachedUsers = [];
+
+function populateFilters(actions, users) {
+    const aSel = document.getElementById('filterAction');
+    const currentAction = aSel.value;
+    if (JSON.stringify(actions) !== JSON.stringify(cachedActions)) {
+        cachedActions = actions;
+        aSel.innerHTML = '<option value="">All Actions</option>' + actions.map(a => `<option value="${a}" ${a === currentAction ? 'selected' : ''}>${a}</option>`).join('');
+    }
+    const uSel = document.getElementById('filterUser');
+    const currentUser = uSel.value;
+    if (JSON.stringify(users) !== JSON.stringify(cachedUsers)) {
+        cachedUsers = users;
+        uSel.innerHTML = '<option value="">All Users</option>' + users.map(u => `<option value="${u}" ${u === currentUser ? 'selected' : ''}>${u}</option>`).join('');
+    }
+}
+
+function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+async function clearLogs() {
+    if (!confirm('Delete ALL activity logs older than 30 days? This cannot be undone.')) return;
+    try {
+        const resp = await fetch('/api/logs/clear', {method:'POST',
+            headers:{'Content-Type':'application/json','X-CSRFToken':document.querySelector('meta[name="csrf-token"]').getAttribute('content')}
+        });
+        const d = await resp.json();
+        if (d.success) { showToast('success', d.message); loadLogs(1); }
+        else showToast('danger', d.message);
+    } catch(e) { showToast('danger', 'Error: ' + e.message); }
+}
+
+document.addEventListener('DOMContentLoaded', () => loadLogs(1));
+</script>
+{% endblock %}

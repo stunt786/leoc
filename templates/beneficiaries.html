@@ -86,7 +86,7 @@
                                             <select class="form-select" name="ward" id="benWardSelect">
                                                 <option value="">-- Select --</option>
                                                 {% for w in ward_list %}
-                                                <option value="{{ w }}">Ward {{ w }}</option>
+                                                <option value="{{ w.id }}">{{ w.name }}</option>
                                                 {% endfor %}
                                             </select>
                                         </div>
@@ -382,8 +382,8 @@ async function loadBeneficiaries() {
             <td><strong>${b.name}</strong></td>
             <td>${b.national_id || '-'}</td>
             <td>${b.phone || '-'}</td>
-            <td>${b.address || ''}${b.ward ? ', Ward '+b.ward : ''}</td>
-            <td>${b.ward || '-'}</td>
+            <td>${b.address || ''}${b.ward ? ', '+b.ward_name : ''}</td>
+            <td>${b.ward_name || b.ward || '-'}</td>
             <td>${b.family_members || 0}</td>
             <td>
                 <button class="btn btn-sm btn-outline-info" onclick="showHistory(${b.id})" title="Assistance History"><i class="bi bi-clock-history"></i></button>
@@ -402,7 +402,7 @@ async function loadData() {
         const d = await r.json();
         if (!d.success) { showToast('danger', d.message); return; }
         const wards = d.wards || [];
-        document.getElementById('benWard').innerHTML = '<option value="">All Wards</option>' + wards.map(w => `<option value="${w}">Ward ${w}</option>`).join('');
+        document.getElementById('benWard').innerHTML = '<option value="">All Wards</option>' + wards.map(w => `<option value="${w.id}">${w.name}</option>`).join('');
         const ssfSelect = document.getElementById('benSsfType');
         if (d.ssf_types && Array.isArray(d.ssf_types)) {
             ssfSelect.innerHTML = '<option value="">-- Select --</option>' + d.ssf_types.map(t => `<option value="${t}">${t}</option>`).join('');

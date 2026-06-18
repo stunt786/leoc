@@ -102,7 +102,7 @@ async function loadFilters() {
 
         const wSel = document.getElementById('filterWard');
         const wards = d.wards || [];
-        wSel.innerHTML = '<option value="">All</option>' + wards.map(w => `<option value="${w}">Ward ${w}</option>`).join('');
+        wSel.innerHTML = '<option value="">All</option>' + wards.map(w => `<option value="${w.id}">${w.name}</option>`).join('');
     } catch(e) {
         showToast('danger', 'Error loading filters: ' + e.message);
     }
@@ -139,7 +139,7 @@ async function loadData() {
             return `<tr>
                 <td>${i+1}</td>
                 <td><strong>${row.family_name}</strong></td>
-                <td>${row.ward ? 'Ward ' + row.ward : '-'}</td>
+                <td>${row.ward_name || row.ward || '-'}</td>
                 <td>${row.phone || '-'}</td>
                 <td>${row.items_received}</td>
                 <td>${row.cash ? Number(row.cash).toLocaleString() : '-'}</td>

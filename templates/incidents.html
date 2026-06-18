@@ -90,21 +90,17 @@
                                     <select class="form-select" id="inc_ward" onchange="autoGenerateName()">
                                         <option value="">Select Ward</option>
                                         {% for w in ward_list %}
-                                        <option value="{{ w }}">Ward {{ w }}</option>
+                                        <option value="{{ w.id }}">{{ w.name }}</option>
                                         {% endfor %}
                                     </select>
                                 </div>
                                 <div class="col-md-3">
-                                    <label class="form-label">Date (BS)</label>
-                                    <input type="text" class="form-control" id="inc_disaster_date_bs" placeholder="YYYY-MM-DD">
+                                    <label class="form-label">Date (BS) *</label>
+                                    <input type="text" class="form-control nepali-date" placeholder="YYYY-MM-DD" id="inc_disaster_date_bs" onchange="autoGenerateName()" required>
                                 </div>
                                 <div class="col-md-3">
                                     <label class="form-label">Time</label>
                                     <input type="time" class="form-control" id="inc_incident_time">
-                                </div>
-                                <div class="col-md-3">
-                                    <label class="form-label">Start Date (BS)</label>
-                                    <input type="text" class="form-control nepali-date" placeholder="YYYY-MM-DD" id="inc_start_date" onchange="autoGenerateName()">
                                 </div>
                                 <div class="col-md-3">
                                     <label class="form-label">Status</label>
@@ -115,7 +111,7 @@
                                 </div>
                                 <div class="col-md-3">
                                     <label class="form-label">Fiscal Year</label>
-                                    <select class="form-select" id="inc_fiscal_year"></select>
+                                    <input type="text" class="form-control" id="inc_fiscal_year" readonly>
                                 </div>
                                 <div class="col-md-4">
                                     <label class="form-label">Coordinates</label>
@@ -315,6 +311,23 @@
         </div>
     </div>
 </div>
+<!-- History Modal -->
+<div class="modal fade" id="historyModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-clock-history me-2"></i>Incident History</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="historyBody">
+                <div class="text-center py-5"><div class="spinner-border text-primary"></div></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
@@ -336,17 +349,11 @@ async function loadIncidentTypes() {
         incidentTypes.map(t => `<option value="${t}">${t}</option>`).join('');
 
     try {
-        const r2 = await fetch('/api/settings/fiscal_years');
-        const d2 = await r2.json();
-        const years = Array.isArray(d2.value) ? d2.value : [];
-        const r3 = await fetch('/api/settings/active_fiscal_year');
-        const d3 = await r3.json();
-        const active = d3.value || (years.length ? years[years.length-1] : '2081/82');
-        const fySel = document.getElementById('inc_fiscal_year');
-        fySel.innerHTML = years.map(y => `<option value="${y}" ${y === active ? 'selected' : ''}>${y}</option>`).join('');
+        const r = await fetch('/api/settings/active_fiscal_year');
+        const d = await r.json();
+        document.getElementById('inc_fiscal_year').value = d.value || '2081/82';
     } catch(e) {
-        const fySel = document.getElementById('inc_fiscal_year');
-        fySel.innerHTML = '<option value="2081/82">2081/82</option>';
+        document.getElementById('inc_fiscal_year').value = '2081/82';
     }
 }
 
@@ -358,7 +365,7 @@ function getTypeOptions(selected) {
 function autoGenerateName() {
     const type = document.getElementById('inc_incident_type').value;
     const ward = document.getElementById('inc_ward').value;
-    const date = document.getElementById('inc_start_date').value;
+    const date = document.getElementById('inc_disaster_date_bs').value;
     const nameField = document.getElementById('inc_incident_name');
     if (type && ward && date && !nameField.dataset.userEdited) {
         nameField.value = `${type} - Ward ${ward} - ${date}`;
@@ -394,12 +401,13 @@ function renderIncidents(data) {
             <td>${i.id}</td>
             <td><strong>${i.incident_name}</strong></td>
             <td><span class="badge bg-info">${i.incident_type}</span></td>
-            <td>${i.ward ? 'Ward ' + i.ward : '-'}</td>
+            <td>${i.ward_name || i.ward || '-'}</td>
             <td>${i.start_date || '-'}</td>
             <td><span class="badge bg-${statusColor}">${i.status}</span></td>
             <td class="text-end">
-                <button class="btn btn-sm btn-outline-primary" onclick="editIncident(${i.id})"><i class="bi bi-pencil"></i></button>
-                <button class="btn btn-sm btn-outline-danger" onclick="deleteIncident(${i.id})"><i class="bi bi-trash"></i></button>
+                <button class="btn btn-sm btn-outline-info" onclick="showIncidentHistory(${i.id})" title="History"><i class="bi bi-clock-history"></i></button>
+                <button class="btn btn-sm btn-outline-primary" onclick="editIncident(${i.id})" title="Edit"><i class="bi bi-pencil"></i></button>
+                <button class="btn btn-sm btn-outline-danger" onclick="deleteIncident(${i.id})" title="Delete"><i class="bi bi-trash"></i></button>
             </td>
         </tr>`;
     }).join('');
@@ -417,7 +425,7 @@ function filterIncidents() {
 document.getElementById('statusFilter').addEventListener('change', loadIncidents);
 
 const FIELD_MAP = [
-    'incident_name', 'incident_type', 'ward', 'fiscal_year', 'start_date', 'status', 'description',
+    'incident_name', 'incident_type', 'ward', 'fiscal_year', 'status', 'description',
     'disaster_date_bs', 'incident_time', 'coordinates', 'tole', 'severity',
     'affected_people', 'injured', 'deaths', 'missing_persons', 'affected_people_male',
     'affected_people_female', 'affected_households', 'house_damaged', 'house_destroyed',
@@ -510,6 +518,94 @@ async function deleteIncident(id) {
     const d = await r.json();
     if (d.success) { showToast('success', 'Incident deleted'); loadIncidents(); }
     else showToast('danger', d.message);
+}
+
+function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+async function showIncidentHistory(id) {
+    const modal = new bootstrap.Modal(document.getElementById('historyModal'));
+    document.getElementById('historyBody').innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary"></div></div>';
+    modal.show();
+    try {
+        const r = await fetch(`/api/incidents/${id}/history`);
+        const d = await r.json();
+        if (!d.success) { document.getElementById('historyBody').innerHTML = `<div class="alert alert-danger m-3">${d.message}</div>`; return; }
+        const inc = d.incident;
+        const counts = d.counts;
+        const timeline = d.timeline;
+        let html = `<div class="card mb-3 border-primary">
+            <div class="card-header bg-primary text-white py-2">
+                <h6 class="mb-0"><i class="bi bi-info-circle me-1"></i> ${esc(inc.incident_name)}</h6>
+            </div>
+            <div class="card-body py-2">
+                <div class="row small">
+                    <div class="col-md-2"><strong>Type:</strong> ${esc(inc.incident_type)}</div>
+                    <div class="col-md-2"><strong>Ward:</strong> ${inc.ward_name || inc.ward || '-'}</div>
+                    <div class="col-md-2"><strong>Date:</strong> ${inc.disaster_date_bs || '-'}</div>
+                    <div class="col-md-2"><strong>Fiscal Year:</strong> ${inc.fiscal_year || '-'}</div>
+                    <div class="col-md-2"><strong>Severity:</strong> <span class="badge ${inc.severity === 'critical' ? 'bg-danger' : inc.severity === 'high' ? 'bg-warning text-dark' : 'bg-info'}">${esc(inc.severity)}</span></div>
+                    <div class="col-md-2"><strong>Status:</strong> <span class="badge bg-${inc.status === 'Active' ? 'success' : 'secondary'}">${esc(inc.status)}</span></div>
+                </div>
+            </div>
+        </div>`;
+        html += `<div class="row g-2 mb-3">
+            <div class="col"><div class="card text-center py-2 border-info"><div class="h5 mb-0 text-info">${counts.relief_requests}</div><small>Relief Requests</small></div></div>
+            <div class="col"><div class="card text-center py-2 border-primary"><div class="h5 mb-0 text-primary">${counts.dispatches}</div><small>Dispatches</small></div></div>
+            <div class="col"><div class="card text-center py-2 border-success"><div class="h5 mb-0 text-success">${counts.distributions}</div><small>Distributions</small></div></div>
+            <div class="col"><div class="card text-center py-2 border-warning"><div class="h5 mb-0 text-warning">${counts.cash_requests}</div><small>Cash Requests</small></div></div>
+            <div class="col"><div class="card text-center py-2 border-danger"><div class="h5 mb-0 text-danger">${counts.cash_distributions}</div><small>Cash Distributions</small></div></div>
+            <div class="col"><div class="card text-center py-2 border-secondary"><div class="h5 mb-0 text-secondary">${counts.assessments}</div><small>Assessments</small></div></div>
+        </div>`;
+        if (!timeline.length) {
+            html += '<div class="text-center text-muted py-4">No related records found for this incident.</div>';
+        } else {
+            const typeMeta = {
+                relief_request:   {icon:'bi-file-earmark-text', color:'info', label:'Relief Request'},
+                dispatch:         {icon:'bi-truck', color:'primary', label:'Dispatch'},
+                distribution:     {icon:'bi-box-seam', color:'success', label:'Distribution'},
+                cash_request:     {icon:'bi-cash-stack', color:'warning', label:'Cash Request'},
+                cash_distribution:{icon:'bi-wallet2', color:'danger', label:'Cash Distribution'},
+                assessment:       {icon:'bi-clipboard-data', color:'secondary', label:'Assessment'},
+            };
+            html += '<div class="list-group">';
+            timeline.forEach(item => {
+                const meta = typeMeta[item._type] || {icon:'bi-circle', color:'secondary', label:item._type};
+                html += `<a href="#" class="list-group-item list-group-item-action py-2" onclick="event.preventDefault()">
+                    <div class="d-flex w-100 justify-content-between align-items-center">
+                        <div>
+                            <span class="badge bg-${meta.color} me-2"><i class="${meta.icon} me-1"></i>${meta.label}</span>
+                            <strong>${esc(item._label)}</strong>`;
+                if (item._type === 'relief_request') {
+                    html += ` <small class="text-muted">${esc(item.organization || '')} - ${esc(item.requester_name || '')}</small>`;
+                    if (item.requested_cash_amount > 0) html += ` <span class="badge bg-light text-dark">Rs. ${item.requested_cash_amount}</span>`;
+                    html += ` <span class="badge bg-${item.status === 'Completed' ? 'success' : item.status === 'Partial' ? 'warning text-dark' : 'secondary'}">${esc(item.status)}</span>`;
+                } else if (item._type === 'dispatch') {
+                    html += ` <small class="text-muted">→ ${esc(item.destination || '')}</small>`;
+                    if (item.items) html += ` <span class="badge bg-light text-dark">${item.items.length} item(s)</span>`;
+                } else if (item._type === 'distribution') {
+                    html += ` <small class="text-muted">${esc(item.location || '')}</small>`;
+                    html += ` <span class="badge bg-${item.status === 'Completed' ? 'success' : 'secondary'}">${esc(item.status)}</span>`;
+                } else if (item._type === 'cash_request') {
+                    html += ` <small class="text-muted">${esc(item.requesting_office || '')} - ${esc(item.requester_name || '')}</small>`;
+                    html += ` <span class="badge bg-light text-dark">Rs. ${item.requested_amount}</span>`;
+                    html += ` <span class="badge bg-${item.status === 'Approved' ? 'success' : item.status === 'Pending' ? 'warning text-dark' : 'secondary'}">${esc(item.status)}</span>`;
+                } else if (item._type === 'cash_distribution') {
+                    html += ` <small class="text-muted">${esc(item.fund_name || '')}</small>`;
+                    html += ` <span class="badge bg-light text-dark">Rs. ${item.total_amount}</span>`;
+                } else if (item._type === 'assessment') {
+                    html += ` <small class="text-muted">${item.deaths || 0} deaths · ${item.affected_people || 0} affected</small>`;
+                }
+                html += `</div>
+                        <small class="text-muted text-nowrap ms-2">${item._date || ''}</small>
+                    </div>
+                </a>`;
+            });
+            html += '</div>';
+        }
+        document.getElementById('historyBody').innerHTML = html;
+    } catch(e) {
+        document.getElementById('historyBody').innerHTML = `<div class="alert alert-danger m-3">Error: ${e.message}</div>`;
+    }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
