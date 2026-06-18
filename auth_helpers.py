@@ -29,7 +29,9 @@ class User(UserMixin):
             return None
         if isinstance(val, str):
             return val
-        return val.strftime('%Y-%m-%d %H:%M')
+        from app import ad_to_bs_date
+        bs = ad_to_bs_date(val)
+        return f"{bs} {val.strftime('%H:%M')}"
 
     def to_dict(self):
         return {

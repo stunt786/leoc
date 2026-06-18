@@ -1,4 +1,4 @@
-python3<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ne">
 <head>
     <meta charset="UTF-8">
@@ -73,7 +73,7 @@ python3<!DOCTYPE html>
     {% endif %}
 
     <div class="footer">
-        <p>Report generated on {{ generated_at.strftime('%Y-%m-%d %H:%M') if generated_at else '' }} | LEOC - थलारा गाउँपालिका</p>
+        <p>Report generated on {{ generated_at|nepali_date if generated_at else '' }} | LEOC - थलारा गाउँपालिका</p>
     </div>
 </body>
 </html>

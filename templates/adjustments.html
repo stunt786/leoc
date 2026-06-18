@@ -28,7 +28,7 @@
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Date</label>
-                            <input type="date" class="form-control" id="adjDate">
+                            <input type="text" class="form-control nepali-date" placeholder="YYYY-MM-DD" id="adjDate">
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Warehouse <span class="text-danger">*</span></label>
@@ -118,8 +118,7 @@
 const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 
 function setDefaultDate() {
-    const today = new Date().toISOString().split('T')[0];
-    document.getElementById('adjDate').value = today;
+    document.getElementById('adjDate').value = today_bs;
 }
 
 function generateAdjNo() {

@@ -145,7 +145,7 @@ def is_valid_nepali_date(date_string):
         return False
     if day < 1 or day > 32:
         return False
-    if (year >= 2025 and year <= 2090) or (year >= 1968 and year <= 2033):
+    if year in BS_YEAR_START:
         return True
     return False
 
@@ -202,72 +202,138 @@ def friendly_message(e):
     return str(e)
 
 # ============ BS DATE CONVERSION HELPERS ============
+# Extensive BS year start date lookup (BS year -> (AD year, AD month, AD day))
+BS_YEAR_START = {
+    2000: (1943, 4, 14), 2001: (1944, 4, 13), 2002: (1945, 4, 14),
+    2003: (1946, 4, 14), 2004: (1947, 4, 14), 2005: (1948, 4, 13),
+    2006: (1949, 4, 14), 2007: (1950, 4, 14), 2008: (1951, 4, 14),
+    2009: (1952, 4, 13), 2010: (1953, 4, 14), 2011: (1954, 4, 14),
+    2012: (1955, 4, 14), 2013: (1956, 4, 13), 2014: (1957, 4, 14),
+    2015: (1958, 4, 14), 2016: (1959, 4, 14), 2017: (1960, 4, 13),
+    2018: (1961, 4, 14), 2019: (1962, 4, 14), 2020: (1963, 4, 14),
+    2021: (1964, 4, 13), 2022: (1965, 4, 14), 2023: (1966, 4, 14),
+    2024: (1967, 4, 14), 2025: (1968, 4, 13), 2026: (1969, 4, 14),
+    2027: (1970, 4, 14), 2028: (1971, 4, 14), 2029: (1972, 4, 13),
+    2030: (1973, 4, 14), 2031: (1974, 4, 14), 2032: (1975, 4, 14),
+    2033: (1976, 4, 13), 2034: (1977, 4, 14), 2035: (1978, 4, 14),
+    2036: (1979, 4, 14), 2037: (1980, 4, 13), 2038: (1981, 4, 14),
+    2039: (1982, 4, 14), 2040: (1983, 4, 14), 2041: (1984, 4, 13),
+    2042: (1985, 4, 14), 2043: (1986, 4, 14), 2044: (1987, 4, 14),
+    2045: (1988, 4, 13), 2046: (1989, 4, 14), 2047: (1990, 4, 14),
+    2048: (1991, 4, 14), 2049: (1992, 4, 13), 2050: (1993, 4, 14),
+    2051: (1994, 4, 14), 2052: (1995, 4, 14), 2053: (1996, 4, 13),
+    2054: (1997, 4, 14), 2055: (1998, 4, 14), 2056: (1999, 4, 14),
+    2057: (2000, 4, 13), 2058: (2001, 4, 14), 2059: (2002, 4, 14),
+    2060: (2003, 4, 14), 2061: (2004, 4, 13), 2062: (2005, 4, 14),
+    2063: (2006, 4, 14), 2064: (2007, 4, 14), 2065: (2008, 4, 13),
+    2066: (2009, 4, 14), 2067: (2010, 4, 14), 2068: (2011, 4, 14),
+    2069: (2012, 4, 13), 2070: (2013, 4, 14), 2071: (2014, 4, 14),
+    2072: (2015, 4, 14), 2073: (2016, 4, 13), 2074: (2017, 4, 14),
+    2075: (2018, 4, 14), 2076: (2019, 4, 14), 2077: (2020, 4, 13),
+    2078: (2021, 4, 14), 2079: (2022, 4, 14), 2080: (2023, 4, 14),
+    2081: (2024, 4, 13), 2082: (2025, 4, 14), 2083: (2026, 4, 14),
+    2084: (2027, 4, 14), 2085: (2028, 4, 13), 2086: (2029, 4, 14),
+    2087: (2030, 4, 14), 2088: (2031, 4, 14), 2089: (2032, 4, 13),
+    2090: (2033, 4, 14), 2091: (2034, 4, 14), 2092: (2035, 4, 14),
+    2093: (2036, 4, 13), 2094: (2037, 4, 14), 2095: (2038, 4, 14),
+    2096: (2039, 4, 14), 2097: (2040, 4, 13), 2098: (2041, 4, 14),
+    2099: (2042, 4, 14), 2100: (2043, 4, 14),
+}
+
+BS_MONTHS_DAYS = {1: 31, 2: 31, 3: 31, 4: 32, 5: 31, 6: 31, 7: 30, 8: 30, 9: 29, 10: 29, 11: 30, 12: 30}
+
+BS_MONTH_NAMES = {
+    1: 'बैशाख', 2: 'जेठ', 3: 'असार', 4: 'साउन', 5: 'भदौ', 6: 'असोज',
+    7: 'कात्तिक', 8: 'मंसिर', 9: 'पुस', 10: 'माघ', 11: 'फागुन', 12: 'चैत',
+}
+
 def ad_to_bs(ad_year, ad_month, ad_day):
-    bs_year_start = {
-        2072: (2015, 4, 14), 2073: (2016, 4, 13), 2074: (2017, 4, 14),
-        2075: (2018, 4, 14), 2076: (2019, 4, 14), 2077: (2020, 4, 13),
-        2078: (2021, 4, 14), 2079: (2022, 4, 14), 2080: (2023, 4, 14),
-        2081: (2024, 4, 13), 2082: (2025, 4, 14), 2083: (2026, 4, 14),
-        2084: (2027, 4, 14), 2085: (2028, 4, 13), 2086: (2029, 4, 14),
-        2087: (2030, 4, 14), 2088: (2031, 4, 14), 2089: (2032, 4, 13),
-        2090: (2033, 4, 14),
-    }
-    bs_months_days = {1: 31, 2: 31, 3: 31, 4: 32, 5: 31, 6: 31, 7: 30, 8: 30, 9: 29, 10: 29, 11: 30, 12: 30}
-    ad_date = datetime(ad_year, ad_month, ad_day)
-    bs_year = None
-    for year in sorted(bs_year_start.keys()):
-        start = datetime(*bs_year_start[year])
-        if ad_date >= start:
-            bs_year = year
-        else:
-            break
-    if bs_year is None:
-        bs_year = 2082
-    bs_start = datetime(*bs_year_start[bs_year])
-    days_diff = (ad_date - bs_start).days
-    bs_month = 1
-    bs_day = 1
-    remaining_days = days_diff
-    for month in range(1, 13):
-        days_in_month = bs_months_days.get(month, 30)
-        if remaining_days < days_in_month:
-            bs_month = month
-            bs_day = remaining_days + 1
-            break
-        remaining_days -= days_in_month
-    else:
-        bs_year += 1
+    try:
+        ad_date = datetime(ad_year, ad_month, ad_day)
+        bs_year = None
+        for year in sorted(BS_YEAR_START.keys()):
+            start = datetime(*BS_YEAR_START[year])
+            if ad_date >= start:
+                bs_year = year
+            else:
+                break
+        if bs_year is None:
+            bs_year = 2082
+        bs_start = datetime(*BS_YEAR_START[bs_year])
+        days_diff = (ad_date - bs_start).days
         bs_month = 1
-        bs_day = remaining_days + 1
-    return f"{bs_year}-{bs_month:02d}-{bs_day:02d}"
+        bs_day = 1
+        remaining_days = days_diff
+        for month in range(1, 13):
+            days_in_month = BS_MONTHS_DAYS.get(month, 30)
+            if remaining_days < days_in_month:
+                bs_month = month
+                bs_day = remaining_days + 1
+                break
+            remaining_days -= days_in_month
+        else:
+            bs_year += 1
+            bs_month = 1
+            bs_day = remaining_days + 1
+        return f"{bs_year}-{bs_month:02d}-{bs_day:02d}"
+    except Exception:
+        return f"{2082}-01-01"
 
 def bs_to_ad(bs_date_str):
-    bs_year_start = {
-        2072: (2015, 4, 14), 2073: (2016, 4, 13), 2074: (2017, 4, 14),
-        2075: (2018, 4, 14), 2076: (2019, 4, 14), 2077: (2020, 4, 13),
-        2078: (2021, 4, 14), 2079: (2022, 4, 14), 2080: (2023, 4, 14),
-        2081: (2024, 4, 13), 2082: (2025, 4, 14), 2083: (2026, 4, 14),
-        2084: (2027, 4, 14), 2085: (2028, 4, 13), 2086: (2029, 4, 14),
-        2087: (2030, 4, 14), 2088: (2031, 4, 14), 2089: (2032, 4, 13),
-        2090: (2033, 4, 14),
-    }
-    bs_months_days = {1: 31, 2: 31, 3: 31, 4: 32, 5: 31, 6: 31, 7: 30, 8: 30, 9: 29, 10: 29, 11: 30, 12: 30}
     try:
+        if not bs_date_str or not isinstance(bs_date_str, str):
+            return None
         parts = bs_date_str.split('-')
+        if len(parts) != 3:
+            return None
         bs_year = int(parts[0])
         bs_month = int(parts[1])
         bs_day = int(parts[2])
-        if bs_year not in bs_year_start:
-            return datetime.now().strftime('%Y-%m-%d')
-        ad_date = datetime(*bs_year_start[bs_year])
+        if bs_year not in BS_YEAR_START:
+            return None
+        ad_date = datetime(*BS_YEAR_START[bs_year])
         days_to_add = 0
         for m in range(1, bs_month):
-            days_to_add += bs_months_days.get(m, 30)
+            days_to_add += BS_MONTHS_DAYS.get(m, 30)
         days_to_add += (bs_day - 1)
         ad_date = ad_date + timedelta(days=days_to_add)
         return ad_date.strftime('%Y-%m-%d')
     except Exception:
-        return datetime.now().strftime('%Y-%m-%d')
+        return None
+
+def today_bs():
+    now = datetime.now()
+    return ad_to_bs(now.year, now.month, now.day)
+
+def ad_to_bs_date(ad_date):
+    if ad_date is None:
+        return None
+    if isinstance(ad_date, str):
+        return ad_date
+    return ad_to_bs(ad_date.year, ad_date.month, ad_date.day)
+
+def parse_bs_date_field(data, field_name, default=None):
+    value = data.get(field_name, default)
+    if value in (None, ''):
+        return default
+    if not is_valid_nepali_date(str(value)):
+        raise ValueError(f"{field_name} must be a valid BS date in YYYY-MM-DD format")
+    ad_str = bs_to_ad(str(value))
+    if ad_str is None:
+        raise ValueError(f"{field_name} BS date conversion failed")
+    return datetime.strptime(ad_str, '%Y-%m-%d').date()
+
+def bs_date_str(bs_str_or_ad_date):
+    if bs_str_or_ad_date is None:
+        return None
+    if isinstance(bs_str_or_ad_date, str):
+        if is_valid_nepali_date(bs_str_or_ad_date):
+            return bs_str_or_ad_date
+        ad = datetime.strptime(bs_str_or_ad_date, '%Y-%m-%d').date()
+        return ad_to_bs(ad.year, ad.month, ad.day)
+    if isinstance(bs_str_or_ad_date, (datetime, date)):
+        return ad_to_bs(bs_str_or_ad_date.year, bs_str_or_ad_date.month, bs_str_or_ad_date.day)
+    return str(bs_str_or_ad_date)
 
 # ============ SETTINGS MODEL (Module 1) ============
 class AppSettings(db.Model):
@@ -304,7 +370,7 @@ class AppSettings(db.Model):
         return {
             'id': self.id, 'setting_key': self.setting_key,
             'setting_value': parsed,
-            'updated_at': self.updated_at.strftime('%Y-%m-%d')
+            'updated_at': ad_to_bs_date(self.updated_at)
         }
 
 # ============ WAREHOUSE MODEL (Module 3) ============
@@ -325,7 +391,7 @@ class Warehouse(db.Model):
             'id': self.id, 'name': self.name, 'code': self.code,
             'address': self.address, 'contact_person': self.contact_person,
             'phone': self.phone, 'capacity': self.capacity, 'remarks': self.remarks,
-            'created_at': self.created_at.strftime('%Y-%m-%d')
+            'created_at': ad_to_bs_date(self.created_at)
         }
 
 # ============ SUPPLIER/VENDOR MODEL ============
@@ -347,7 +413,7 @@ class Supplier(db.Model):
             'id': self.id, 'name': self.name, 'contact_person': self.contact_person,
             'phone': self.phone, 'email': self.email, 'address': self.address,
             'supplier_type': self.supplier_type, 'status': self.status,
-            'remarks': self.remarks, 'created_at': self.created_at.strftime('%Y-%m-%d')
+            'remarks': self.remarks, 'created_at': ad_to_bs_date(self.created_at)
         }
 
 # ============ WAREHOUSE ZONE/LOCATION MODEL ============
@@ -458,7 +524,7 @@ class StockReceipt(db.Model):
     def to_dict(self):
         return {
             'id': self.id, 'receipt_no': self.receipt_no,
-            'date': self.date.strftime('%Y-%m-%d') if self.date else None,
+            'date': ad_to_bs_date(self.date),
             'warehouse_id': self.warehouse_id, 'warehouse_name': self.warehouse.name if self.warehouse else None,
             'supplier_id': self.supplier_id,
             'supplier_name': self.supplier.name if self.supplier else None,
@@ -466,7 +532,7 @@ class StockReceipt(db.Model):
             'source_contact': self.source_contact, 'phone': self.phone,
             'email': self.email, 'address': self.address,
             'ref_number': self.ref_number, 'invoice_no': self.invoice_no,
-            'invoice_date': self.invoice_date.strftime('%Y-%m-%d') if self.invoice_date else None,
+            'invoice_date': ad_to_bs_date(self.invoice_date),
             'delivery_note': self.delivery_note, 'vehicle_no': self.vehicle_no,
             'verified_by': self.verified_by,
             'remarks': self.remarks, 'items': [i.to_dict() for i in self.items],
@@ -493,8 +559,8 @@ class StockReceiptItem(db.Model):
             'item_name': self.item.name if self.item else None,
             'quantity': self.quantity, 'unit': self.unit or (self.item.unit if self.item else None),
             'batch_no': self.batch_no, 'serial_no': self.serial_no,
-            'mfg_date': self.mfg_date.strftime('%Y-%m-%d') if self.mfg_date else None,
-            'expiry_date': self.expiry_date.strftime('%Y-%m-%d') if self.expiry_date else None,
+            'mfg_date': ad_to_bs_date(self.mfg_date),
+            'expiry_date': ad_to_bs_date(self.expiry_date),
             'unit_cost': self.unit_cost, 'total_cost': self.total_cost,
         }
 
@@ -511,7 +577,7 @@ class StockReceiptAttachment(db.Model):
         return {
             'id': self.id, 'filename': self.filename,
             'original_name': self.original_name, 'file_type': self.file_type,
-            'file_size': self.file_size, 'uploaded_at': self.uploaded_at.strftime('%Y-%m-%d') if self.uploaded_at else None
+            'file_size': self.file_size,             'uploaded_at': ad_to_bs_date(self.uploaded_at)
         }
 
 # ============ MANUAL ADJUSTMENT MODEL (Module 8) ============
@@ -535,7 +601,7 @@ class ManualAdjustment(db.Model):
     def to_dict(self):
         return {
             'id': self.id, 'adjustment_no': self.adjustment_no,
-            'date': self.date.strftime('%Y-%m-%d') if self.date else None,
+            'date': ad_to_bs_date(self.date),
             'warehouse_id': self.warehouse_id, 'warehouse_name': self.warehouse.name if self.warehouse else None,
             'item_id': self.item_id, 'item_name': self.item.name if self.item else None,
             'adjustment_type': self.adjustment_type, 'reason': self.reason,
@@ -651,7 +717,7 @@ class Incident(db.Model):
             'id': self.id, 'incident_name': self.incident_name,
             'incident_type': self.incident_type,
             'ward': self.ward,
-            'start_date': self.start_date.strftime('%Y-%m-%d') if self.start_date else None,
+            'start_date': ad_to_bs_date(self.start_date),
             'status': self.status, 'fiscal_year': self.fiscal_year,
             'description': self.description,
             'disaster_date_bs': self.disaster_date_bs,
@@ -709,7 +775,7 @@ class ReliefRequest(db.Model):
     def to_dict(self):
         return {
             'id': self.id, 'request_number': self.request_number,
-            'request_date': self.request_date.strftime('%Y-%m-%d') if self.request_date else None,
+            'request_date': ad_to_bs_date(self.request_date),
             'incident_id': self.incident_id,
             'incident_name': self.incident.incident_name if self.incident else None,
             'organization': self.organization, 'requester_name': self.requester_name,
@@ -762,7 +828,7 @@ class Dispatch(db.Model):
     def to_dict(self):
         return {
             'id': self.id, 'dispatch_number': self.dispatch_number,
-            'date': self.date.strftime('%Y-%m-%d') if self.date else None,
+            'date': ad_to_bs_date(self.date),
             'warehouse_id': self.warehouse_id, 'warehouse_name': self.warehouse.name if self.warehouse else None,
             'incident_id': self.incident_id, 'incident_name': self.incident.incident_name if self.incident else None,
             'relief_request_id': self.relief_request_id,
@@ -796,7 +862,7 @@ class DispatchItem(db.Model):
             'available_qty': inv.quantity if inv else 0,
             'unit': self.unit or (self.item.unit if self.item else None),
             'batch_no': self.batch_no,
-            'expiry_date': self.expiry_date.strftime('%Y-%m-%d') if self.expiry_date else None,
+            'expiry_date': ad_to_bs_date(self.expiry_date),
         }
 
 # ============ DISASTER ASSESSMENT MODEL ============
@@ -863,7 +929,7 @@ class DisasterAssessment(db.Model):
             'other_livestock_lost': self.other_livestock_lost,
             'other_livestock_injured': self.other_livestock_injured,
             'remarks': self.remarks,
-            'created_at': self.created_at.strftime('%Y-%m-%d') if self.created_at else None
+            'created_at': ad_to_bs_date(self.created_at)
         }
 
 class DailyReportLog(db.Model):
@@ -920,7 +986,7 @@ class Distribution(db.Model):
             'latitude': self.latitude,
             'longitude': self.longitude,
             'fiscal_year': self.fiscal_year,
-            'distribution_date': self.distribution_date.strftime('%Y-%m-%d') if self.distribution_date else None,
+            'distribution_date': ad_to_bs_date(self.distribution_date),
             'officer': self.officer, 'status': self.status, 'remarks': self.remarks,
             'beneficiaries': [b.to_dict() for b in self.beneficiaries],
             'cash_distribution': cash_info,
@@ -1045,7 +1111,7 @@ class StockTransfer(db.Model):
             'from_warehouse_name': self.from_warehouse.name if self.from_warehouse else None,
             'to_warehouse_id': self.to_warehouse_id,
             'to_warehouse_name': self.to_warehouse.name if self.to_warehouse else None,
-            'transfer_date': self.transfer_date.strftime('%Y-%m-%d') if self.transfer_date else None,
+            'transfer_date': ad_to_bs_date(self.transfer_date),
             'reason': self.reason, 'remarks': self.remarks,
             'approved_by': self.approved_by, 'status': self.status,
             'items': [i.to_dict() for i in self.items]
@@ -1090,7 +1156,7 @@ class CashFund(db.Model):
             'fiscal_year': self.fiscal_year, 'funding_source': self.funding_source,
             'allocated_amount': self.allocated_amount, 'current_balance': self.current_balance,
             'description': self.description, 'status': self.status,
-            'created_at': self.created_at.strftime('%Y-%m-%d') if self.created_at else None
+            'created_at': ad_to_bs_date(self.created_at)
         }
 
 # ============ CASH RECEIPT MODEL ============
@@ -1113,13 +1179,13 @@ class CashReceipt(db.Model):
     def to_dict(self):
         return {
             'id': self.id, 'receipt_no': self.receipt_no,
-            'receipt_date': self.receipt_date.strftime('%Y-%m-%d') if self.receipt_date else None,
+            'receipt_date': ad_to_bs_date(self.receipt_date),
             'fund_id': self.fund_id, 'fund_name': self.fund.name if self.fund else None,
             'funding_source': self.funding_source, 'reference_number': self.reference_number,
             'voucher_number': self.voucher_number, 'bank_transaction_no': self.bank_transaction_no,
             'amount_received': self.amount_received, 'received_by': self.received_by,
             'remarks': self.remarks, 'document_file': self.document_file,
-            'created_at': self.created_at.strftime('%Y-%m-%d') if self.created_at else None
+            'created_at': ad_to_bs_date(self.created_at)
         }
 
 # ============ CASH REQUEST MODEL ============
@@ -1144,7 +1210,7 @@ class CashRequest(db.Model):
     def to_dict(self):
         return {
             'id': self.id, 'request_number': self.request_number,
-            'request_date': self.request_date.strftime('%Y-%m-%d') if self.request_date else None,
+            'request_date': ad_to_bs_date(self.request_date),
             'incident_id': self.incident_id,
             'incident_name': self.incident.incident_name if self.incident else None,
             'requesting_office': self.requesting_office, 'requester_name': self.requester_name,
@@ -1177,7 +1243,7 @@ class CashDistribution(db.Model):
     def to_dict(self):
         return {
             'id': self.id, 'distribution_no': self.distribution_no,
-            'distribution_date': self.distribution_date.strftime('%Y-%m-%d') if self.distribution_date else None,
+            'distribution_date': ad_to_bs_date(self.distribution_date),
             'fund_id': self.fund_id, 'fund_name': self.fund.name if self.fund else None,
             'incident_id': self.incident_id,
             'incident_name': self.incident.incident_name if self.incident else None,
@@ -1274,7 +1340,10 @@ def is_valid_ward(ward):
 # ============ CONTEXT PROCESSORS ============
 @app.context_processor
 def inject_now():
-    return {'now': datetime.now}
+    return {
+        'now': datetime.now,
+        'today_bs': today_bs(),
+    }
 
 @app.context_processor
 def inject_role():
@@ -1297,6 +1366,32 @@ def to_nepali_num(value):
         '5': '५', '6': '६', '7': '७', '8': '८', '9': '९'
     }
     return ''.join(english_to_nepali.get(c, c) for c in str_val)
+
+@app.template_filter('nepali_date')
+def nepali_date_filter(value):
+    if value is None:
+        return ''
+    if isinstance(value, str):
+        if is_valid_nepali_date(value):
+            return value
+        try:
+            d = datetime.strptime(value, '%Y-%m-%d').date()
+            return ad_to_bs(d.year, d.month, d.day)
+        except (ValueError, TypeError):
+            return value
+    if isinstance(value, (datetime, date)):
+        return ad_to_bs(value.year, value.month, value.day)
+    return str(value)
+
+@app.template_filter('nepali_month_name')
+def nepali_month_name_filter(bs_date_str):
+    if not bs_date_str or not isinstance(bs_date_str, str):
+        return ''
+    try:
+        month = int(bs_date_str.split('-')[1])
+        return BS_MONTH_NAMES.get(month, '')
+    except (IndexError, ValueError):
+        return ''
 
 # ============ AUTH ROUTES ============
 @app.route('/login', methods=['GET', 'POST'])
@@ -1869,7 +1964,7 @@ def handle_stock_transfers():
         transfer = StockTransfer(
             transfer_no=data.get('transfer_no') or generate_transfer_no(),
             from_warehouse_id=from_wh, to_warehouse_id=to_wh,
-            transfer_date=parse_date_field({'transfer_date': data.get('transfer_date')}, 'transfer_date', default=date.today()),
+            transfer_date=parse_bs_date_field(data, 'transfer_date', default=date.today()),
             reason=data.get('reason'), remarks=data.get('remarks'),
             approved_by=data.get('approved_by'), status=data.get('status', 'Completed'),
             created_by=current_user.id
@@ -1948,9 +2043,13 @@ def handle_stock_receipts():
             if source_type:
                 query = query.filter(StockReceipt.source_type == source_type)
             if date_from:
-                query = query.filter(StockReceipt.date >= parse_date_field({'date_from': date_from}, 'date_from'))
+                ad_from = bs_to_ad(date_from)
+                if ad_from:
+                    query = query.filter(StockReceipt.date >= datetime.strptime(ad_from, '%Y-%m-%d').date())
             if date_to:
-                query = query.filter(StockReceipt.date <= parse_date_field({'date_to': date_to}, 'date_to'))
+                ad_to = bs_to_ad(date_to)
+                if ad_to:
+                    query = query.filter(StockReceipt.date <= datetime.strptime(ad_to, '%Y-%m-%d').date())
             if search:
                 q = f'%{search}%'
                 query = query.filter(db.or_(
@@ -1976,7 +2075,7 @@ def handle_stock_receipts():
             return jsonify({'success': False, 'message': 'At least one item is required'}), 400
         invoice_date = None
         if data.get('invoice_date'):
-            invoice_date = parse_date_field({'invoice_date': data['invoice_date']}, 'invoice_date')
+            invoice_date = parse_bs_date_field(data, 'invoice_date')
         supplier_id = data.get('supplier_id')
         if supplier_id is not None:
             supplier_id = int(supplier_id)
@@ -2001,7 +2100,7 @@ def handle_stock_receipts():
                 address = supplier.address
         receipt = StockReceipt(
             receipt_no=data.get('receipt_no') or generate_receipt_no(),
-            date=parse_date_field({'date': data.get('date')}, 'date', default=date.today()),
+            date=parse_bs_date_field(data, 'date', default=date.today()),
             warehouse_id=data['warehouse_id'], supplier_id=supplier_id,
             source_type=data['source_type'],
             source_name=source_name,
@@ -2023,9 +2122,9 @@ def handle_stock_receipts():
             mfg = None
             exp = None
             if item_data.get('mfg_date'):
-                mfg = parse_date_field({'mfg_date': item_data['mfg_date']}, 'mfg_date')
+                mfg = parse_bs_date_field(item_data, 'mfg_date')
             if item_data.get('expiry_date'):
-                exp = parse_date_field({'expiry_date': item_data['expiry_date']}, 'expiry_date')
+                exp = parse_bs_date_field(item_data, 'expiry_date')
             qty = parse_int_field(item_data, 'quantity', minimum=1)
             unit_cost = parse_float_field(item_data, 'unit_cost', minimum=0, default=0)
             if mfg and exp and exp < mfg:
@@ -2074,7 +2173,7 @@ def update_stock_receipt(id):
             update_inventory(ri.item_id, receipt.warehouse_id, -ri.quantity)
             db.session.delete(ri)
 
-        receipt.date = parse_date_field({'date': data.get('date')}, 'date', default=receipt.date)
+        receipt.date = parse_bs_date_field(data, 'date', default=receipt.date)
         if 'supplier_id' in data:
             sid = data.get('supplier_id', type=int)
             if sid:
@@ -2098,7 +2197,7 @@ def update_stock_receipt(id):
         receipt.ref_number = data.get('ref_number', receipt.ref_number)
         receipt.invoice_no = data.get('invoice_no', receipt.invoice_no)
         if data.get('invoice_date'):
-            receipt.invoice_date = parse_date_field({'invoice_date': data['invoice_date']}, 'invoice_date')
+            receipt.invoice_date = parse_bs_date_field(data, 'invoice_date')
         else:
             receipt.invoice_date = None
         receipt.delivery_note = data.get('delivery_note', receipt.delivery_note)
@@ -2117,9 +2216,9 @@ def update_stock_receipt(id):
             mfg = None
             exp = None
             if item_data.get('mfg_date'):
-                mfg = parse_date_field({'mfg_date': item_data['mfg_date']}, 'mfg_date')
+                mfg = parse_bs_date_field(item_data, 'mfg_date')
             if item_data.get('expiry_date'):
-                exp = parse_date_field({'expiry_date': item_data['expiry_date']}, 'expiry_date')
+                exp = parse_bs_date_field(item_data, 'expiry_date')
             qty = parse_int_field(item_data, 'quantity', minimum=1)
             unit_cost = parse_float_field(item_data, 'unit_cost', minimum=0, default=0)
             if mfg and exp and exp < mfg:
@@ -2235,7 +2334,7 @@ def get_inventory_summary():
                 if key not in expired_inv_set:
                     expired_inv_set.add(key)
                     expiring_count += 1
-                    expiring_items.append({'item': item_name, 'batch': batch_no or '', 'expiry': expiry_date.strftime('%Y-%m-%d'), 'status': 'expired'})
+                    expiring_items.append({'item': item_name, 'batch': batch_no or '', 'expiry': ad_to_bs_date(expiry_date) or '', 'status': 'expired'})
             elif (expiry_date - today).days <= 30:
                 key = (item_id, wh_id)
                 if key not in expiring_30_set:
@@ -2302,7 +2401,7 @@ def handle_adjustments():
         current_qty = inv.available_quantity if inv else 0
         adjustment = ManualAdjustment(
             adjustment_no=data.get('adjustment_no') or generate_adjustment_no(),
-            date=parse_date_field({'date': data.get('date')}, 'date', default=date.today()),
+            date=parse_bs_date_field(data, 'date', default=date.today()),
             warehouse_id=warehouse_id, item_id=item.id,
             adjustment_type=adj_type, reason=data.get('reason'),
             current_quantity=current_qty, adjusted_quantity=adj_qty,
@@ -2368,7 +2467,7 @@ def handle_incidents():
         incident = Incident(
             incident_name=incident_name, incident_type=incident_type,
             ward=ward, fiscal_year=fiscal_year,
-            start_date=parse_date_field(data, 'start_date', default=date.today()),
+            start_date=parse_bs_date_field(data, 'start_date', default=date.today()),
             status=data.get('status', 'Active'), description=data.get('description')
         )
         _apply_incident_fields(incident, data)
@@ -2413,7 +2512,7 @@ def manage_incident(id):
             if field in data:
                 setattr(incident, field, data[field])
         if data.get('start_date'):
-            incident.start_date = parse_date_field(data, 'start_date', default=incident.start_date)
+            incident.start_date = parse_bs_date_field(data, 'start_date', default=incident.start_date)
         _apply_incident_fields(incident, data)
         db.session.commit()
         return jsonify({'success': True, 'message': 'Incident updated', 'data': incident.to_dict()})
@@ -2457,7 +2556,7 @@ def handle_relief_requests():
             return jsonify({'success': False, 'message': 'At least one item or cash amount is required'}), 400
         req = ReliefRequest(
             request_number=data.get('request_number') or generate_request_no(),
-            request_date=parse_date_field({'request_date': data.get('request_date')}, 'request_date', default=date.today()),
+            request_date=parse_bs_date_field(data, 'request_date', default=date.today()),
             incident_id=incident.id, organization=data.get('organization'),
             requester_name=data.get('requester_name'), phone=data.get('phone'),
             priority=data.get('priority', 'Medium'),
@@ -2514,7 +2613,7 @@ def manage_relief_request(id):
         if 'requested_cash_amount' in data:
             req.requested_cash_amount = parse_float_field(data, 'requested_cash_amount', minimum=0, default=0)
         if data.get('request_date'):
-            req.request_date = parse_date_field(data, 'request_date', default=req.request_date)
+            req.request_date = parse_bs_date_field(data, 'request_date', default=req.request_date)
         if data.get('items') is not None:
             ReliefRequestItem.query.filter_by(request_id=req.id).delete()
             if not data['items'] and (req.requested_cash_amount or 0) <= 0:
@@ -2571,7 +2670,7 @@ def handle_dispatches():
             return jsonify({'success': False, 'message': 'Warehouse not found'}), 404
         if not incident:
             return jsonify({'success': False, 'message': 'Incident not found'}), 404
-        dispatch_date = parse_date_field({'date': data.get('date')}, 'date', default=date.today())
+        dispatch_date = parse_bs_date_field(data, 'date', default=date.today())
         if dispatch_date > date.today():
             return jsonify({'success': False, 'message': 'Dispatch date cannot be in the future'}), 400
         phone = data.get('phone', '')
@@ -2609,7 +2708,7 @@ def handle_dispatches():
             batch = item_data.get('batch_no') or ''
             expiry = None
             if item_data.get('expiry_date'):
-                expiry = parse_date_field({'expiry_date': item_data['expiry_date']}, 'expiry_date')
+                expiry = parse_bs_date_field(item_data, 'expiry_date')
             di = DispatchItem(dispatch_id=dispatch.id, item_id=item_id, quantity=qty,
                               unit=item_data.get('unit'), batch_no=batch, expiry_date=expiry)
             db.session.add(di)
@@ -2657,7 +2756,7 @@ def handle_dispatch(id):
             return jsonify({'success': False, 'message': 'Warehouse not found'}), 404
         if not incident:
             return jsonify({'success': False, 'message': 'Incident not found'}), 404
-        dispatch_date = parse_date_field({'date': data.get('date')}, 'date', default=date.today())
+        dispatch_date = parse_bs_date_field(data, 'date', default=date.today())
         if dispatch_date > date.today():
             return jsonify({'success': False, 'message': 'Dispatch date cannot be in the future'}), 400
         phone = data.get('phone', '')
@@ -2702,7 +2801,7 @@ def handle_dispatch(id):
             batch = item_data.get('batch_no') or ''
             expiry = None
             if item_data.get('expiry_date'):
-                expiry = parse_date_field({'expiry_date': item_data['expiry_date']}, 'expiry_date')
+                expiry = parse_bs_date_field(item_data, 'expiry_date')
             di = DispatchItem(dispatch_id=dispatch.id, item_id=item_id, quantity=qty,
                               unit=item_data.get('unit'), batch_no=batch, expiry_date=expiry)
             db.session.add(di)
@@ -2780,7 +2879,7 @@ def handle_distributions():
         beneficiaries_payload = data.get('beneficiaries', [])
         if not beneficiaries_payload:
             return jsonify({'success': False, 'message': 'At least one beneficiary is required'}), 400
-        dist_date = parse_date_field({'distribution_date': data.get('distribution_date')}, 'distribution_date', default=date.today())
+        dist_date = parse_bs_date_field(data, 'distribution_date', default=date.today())
         if dist_date > date.today():
             return jsonify({'success': False, 'message': 'Distribution date cannot be in the future'}), 400
         # Validate total distributed qty per item does not exceed dispatched qty
@@ -3138,7 +3237,7 @@ def handle_cash_receipts():
             return jsonify({'success': False, 'message': 'Fund and amount are required'}), 400
         receipt = CashReceipt(
             receipt_no=data.get('receipt_no') or generate_cash_receipt_no(),
-            receipt_date=parse_date_field({'receipt_date': data.get('receipt_date')}, 'receipt_date', default=date.today()),
+            receipt_date=parse_bs_date_field(data, 'receipt_date', default=date.today()),
             fund_id=fund.id, funding_source=data.get('funding_source'),
             reference_number=data.get('reference_number'), voucher_number=data.get('voucher_number'),
             bank_transaction_no=data.get('bank_transaction_no'),
@@ -3201,7 +3300,7 @@ def handle_cash_requests():
             return jsonify({'success': False, 'message': 'Incident and amount are required'}), 400
         req = CashRequest(
             request_number=data.get('request_number') or generate_cash_request_no(),
-            request_date=parse_date_field({'request_date': data.get('request_date')}, 'request_date', default=date.today()),
+            request_date=parse_bs_date_field(data, 'request_date', default=date.today()),
             incident_id=incident.id, requesting_office=data.get('requesting_office'),
             requester_name=data.get('requester_name'), phone=data.get('phone'),
             priority=data.get('priority', 'Medium'),
@@ -3246,7 +3345,7 @@ def manage_cash_request(id):
         if 'requested_amount' in data:
             req.requested_amount = parse_float_field(data, 'requested_amount', minimum=0.01, default=req.requested_amount)
         if data.get('request_date'):
-            req.request_date = parse_date_field(data, 'request_date', default=req.request_date)
+            req.request_date = parse_bs_date_field(data, 'request_date', default=req.request_date)
         db.session.commit()
         return jsonify({'success': True, 'message': 'Cash request updated', 'data': req.to_dict()})
     except ValueError as e:
@@ -3324,7 +3423,7 @@ def handle_cash_distributions():
         fiscal_year = AppSettings.get_setting('active_fiscal_year', '2081/82')
         dist = CashDistribution(
             distribution_no=data.get('distribution_no') or generate_cash_distribution_no(),
-            distribution_date=parse_date_field({'distribution_date': data.get('distribution_date')}, 'distribution_date', default=date.today()),
+            distribution_date=parse_bs_date_field(data, 'distribution_date', default=date.today()),
             fund_id=fund.id, incident_id=incident.id,
             cash_request_id=data.get('cash_request_id'),
             relief_request_id=data.get('relief_request_id'),
@@ -3528,14 +3627,14 @@ def get_beneficiary_history(id):
         events = []
         for m in material_dists:
             events.append({
-                'date': m.distribution.distribution_date.strftime('%Y-%m-%d') if m.distribution and m.distribution.distribution_date else '',
+                'date': ad_to_bs_date(m.distribution.distribution_date) or '',
                 'type': 'Material', 'ref': m.distribution.distribution_no if m.distribution else '',
                 'detail': f"{m.item}: {m.quantity} (Members: {m.members})",
                 'amount': None
             })
         for c in cash_dist_items:
             events.append({
-                'date': c.distribution.distribution_date.strftime('%Y-%m-%d') if c.distribution and c.distribution.distribution_date else '',
+                'date': ad_to_bs_date(c.distribution.distribution_date) or '',
                 'type': 'Cash', 'ref': c.distribution.distribution_no if c.distribution else '',
                 'detail': f"Amount: {c.amount}",
                 'amount': c.amount
@@ -3592,7 +3691,7 @@ def get_beneficiary_distributions():
                 'ward': db_ben.distribution.incident.ward if db_ben.distribution and db_ben.distribution.incident else (ben_reg.ward if ben_reg else None),
                 'phone': ben_reg.phone if ben_reg else None,
                 'items_received': f"{db_ben.item} x {db_ben.quantity}" if db_ben.item else '-',
-                'date': db_ben.distribution.distribution_date.strftime('%Y-%m-%d') if db_ben.distribution and db_ben.distribution.distribution_date else None,
+                'date': ad_to_bs_date(db_ben.distribution.distribution_date) if db_ben.distribution else None,
                 'cash': None,
                 'status': db_ben.status,
                 'distribution_no': db_ben.distribution.distribution_no if db_ben.distribution else None,
@@ -3630,7 +3729,7 @@ def get_beneficiary_distributions():
                 'ward': cb.distribution.incident.ward if cb.distribution and cb.distribution.incident else (ben_reg.ward if ben_reg else None),
                 'phone': ben_reg.phone if ben_reg else None,
                 'items_received': '-',
-                'date': cb.distribution.distribution_date.strftime('%Y-%m-%d') if cb.distribution and cb.distribution.distribution_date else None,
+                'date': ad_to_bs_date(cb.distribution.distribution_date) if cb.distribution else None,
                 'cash': cb.amount,
                 'status': 'Received',
                 'distribution_no': cb.distribution.distribution_no if cb.distribution else None,
@@ -3874,7 +3973,7 @@ def generate_disaster_pdf(assessments, incidents, total, ward_stats, type_stats,
         elements.append(tbl2)
 
     elements.append(Spacer(1, 10))
-    elements.append(Paragraph(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}", small))
+    elements.append(Paragraph(f"Generated: {today_bs()} {datetime.now().strftime('%H:%M')}", small))
     doc.build(elements)
     buffer.seek(0)
     return buffer
@@ -4079,7 +4178,7 @@ def get_item_history(id):
         events = []
         for r in receipts:
             events.append({
-                'date': r.receipt.date.strftime('%Y-%m-%d') if r.receipt and r.receipt.date else '',
+                'date': ad_to_bs_date(r.receipt.date) or '',
                 'type': 'Receipt', 'ref': r.receipt.receipt_no if r.receipt else '',
                 'detail': f"Qty: {r.quantity} {r.unit or ''} Batch: {r.batch_no or '-'}",
                 'qty_change': f"+{r.quantity}",
@@ -4091,7 +4190,7 @@ def get_item_history(id):
         for a in adjustments:
             sign = '+' if a.adjustment_type in ('Increase', 'Correction_Increase') else '-'
             events.append({
-                'date': a.date.strftime('%Y-%m-%d') if a.date else '',
+                'date': ad_to_bs_date(a.date) or '',
                 'type': 'Adjustment', 'ref': a.adjustment_no,
                 'detail': f"{a.adjustment_type}" + (f": {a.reason}" if a.reason else ''),
                 'qty_change': f"{sign}{a.adjusted_quantity}",
@@ -4102,7 +4201,7 @@ def get_item_history(id):
             })
         for d in dispatches:
             events.append({
-                'date': d.dispatch.date.strftime('%Y-%m-%d') if d.dispatch and d.dispatch.date else '',
+                'date': ad_to_bs_date(d.dispatch.date) or '',
                 'type': 'Dispatch', 'ref': d.dispatch.dispatch_number if d.dispatch else '',
                 'detail': f"Qty: {d.quantity} {d.unit or ''}" + (f" → {d.dispatch.destination}" if d.dispatch and d.dispatch.destination else ''),
                 'qty_change': f"-{d.quantity}",
@@ -4113,7 +4212,7 @@ def get_item_history(id):
             })
         for ti in transfers_out:
             events.append({
-                'date': ti.transfer.transfer_date.strftime('%Y-%m-%d') if ti.transfer and ti.transfer.transfer_date else '',
+                'date': ad_to_bs_date(ti.transfer.transfer_date) or '',
                 'type': 'Transfer Out', 'ref': ti.transfer.transfer_no if ti.transfer else '',
                 'detail': f"Qty: {ti.quantity} {ti.unit or ''} → {ti.transfer.to_warehouse.name if ti.transfer and ti.transfer.to_warehouse else 'N/A'}",
                 'qty_change': f"-{ti.quantity}",
@@ -4124,7 +4223,7 @@ def get_item_history(id):
             })
         for ti in transfers_in:
             events.append({
-                'date': ti.transfer.transfer_date.strftime('%Y-%m-%d') if ti.transfer and ti.transfer.transfer_date else '',
+                'date': ad_to_bs_date(ti.transfer.transfer_date) or '',
                 'type': 'Transfer In', 'ref': ti.transfer.transfer_no if ti.transfer else '',
                 'detail': f"Qty: {ti.quantity} {ti.unit or ''} ← {ti.transfer.from_warehouse.name if ti.transfer and ti.transfer.from_warehouse else 'N/A'}",
                 'qty_change': f"+{ti.quantity}",
@@ -4154,7 +4253,7 @@ def get_item_history(id):
                     total_distributed_qty += dbene.quantity
                     location_info = dist.location or ''
                     events.append({
-                        'date': dist.distribution_date.strftime('%Y-%m-%d') if dist.distribution_date else '',
+                        'date': ad_to_bs_date(dist.distribution_date) or '',
                         'type': 'Distribution',
                         'ref': dist.distribution_no or '',
                         'detail': f"{dbene.quantity} × {dbene.item}" + (f" at {location_info}" if location_info else ''),
@@ -4441,7 +4540,7 @@ def get_map_data():
                 'id': dist.id, 'distribution_no': dist.distribution_no,
                 'location': dist.location,
                 'lat': dist.latitude, 'lng': dist.longitude,
-                'date': dist.distribution_date.strftime('%Y-%m-%d') if dist.distribution_date else None,
+                'date': ad_to_bs_date(dist.distribution_date) or None,
                 'incident_name': dist.incident.incident_name if dist.incident else None
             })
 
@@ -4763,7 +4862,7 @@ def make_pdf_report(title, headers, rows, col_widths):
     ]))
     elements.append(tbl)
     elements.append(Spacer(1, 6))
-    elements.append(Paragraph(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}", normal))
+    elements.append(Paragraph(f"Generated: {today_bs()} {datetime.now().strftime('%H:%M')}", normal))
 
     report_footer = AppSettings.get_setting('report_footer', '')
     if report_footer:
@@ -4789,7 +4888,7 @@ def report_dispatch():
         q = q.filter(Dispatch.warehouse_id == warehouse_id)
     dispatches = q.all()
     headers = ['#', 'Dispatch No', 'Date', 'Warehouse', 'Incident', 'Destination', 'Receiver']
-    rows = [[i+1, d.dispatch_number, d.date.strftime('%Y-%m-%d') if d.date else '',
+    rows = [[i+1, d.dispatch_number, ad_to_bs_date(d.date) or '',
              d.warehouse.name if d.warehouse else '', d.incident.incident_name if d.incident else '',
              d.destination or '', d.receiver or ''] for i, d in enumerate(dispatches)]
     pdf = make_pdf_report('Dispatch Report', headers, rows, [10*mm, 30*mm, 25*mm, 25*mm, 35*mm, 30*mm, 25*mm])
@@ -4804,7 +4903,7 @@ def report_distribution():
         q = q.filter(Distribution.incident_id == incident_id)
     dists = q.all()
     headers = ['#', 'Dist No', 'Date', 'Location', 'Incident', 'Officer', 'Beneficiaries']
-    rows = [[i+1, d.distribution_no, d.distribution_date.strftime('%Y-%m-%d') if d.distribution_date else '',
+    rows = [[i+1, d.distribution_no, ad_to_bs_date(d.distribution_date) or '',
              d.location or '', d.incident.incident_name if d.incident else '',
              d.officer or '', len(d.beneficiaries)] for i, d in enumerate(dists)]
     pdf = make_pdf_report('Distribution Report', headers, rows, [10*mm, 30*mm, 25*mm, 30*mm, 35*mm, 25*mm, 20*mm])
@@ -4820,7 +4919,7 @@ def report_incidents():
     incidents = q.all()
     headers = ['#', 'Name', 'Type', 'Ward', 'Date', 'Status']
     rows = [[i+1, inc.incident_name, inc.incident_type, inc.ward or '',
-             inc.start_date.strftime('%Y-%m-%d') if inc.start_date else '', inc.status] for i, inc in enumerate(incidents)]
+             ad_to_bs_date(inc.start_date) or '', inc.status] for i, inc in enumerate(incidents)]
     pdf = make_pdf_report('Incident Report', headers, rows, [10*mm, 35*mm, 25*mm, 12*mm, 25*mm, 20*mm])
     return make_response(pdf.getvalue(), 200, {'Content-Type': 'application/pdf', 'Content-Disposition': 'attachment; filename=incidents_report.pdf'})
 
@@ -4836,7 +4935,7 @@ def report_requests():
         q = q.filter(ReliefRequest.incident_id == incident_id)
     reqs = q.all()
     headers = ['#', 'Req No', 'Date', 'Incident', 'Organization', 'Priority', 'Status']
-    rows = [[i+1, r.request_number, r.request_date.strftime('%Y-%m-%d') if r.request_date else '',
+    rows = [[i+1, r.request_number, ad_to_bs_date(r.request_date) or '',
              r.incident.incident_name if r.incident else '', r.organization or '', r.priority, r.status] for i, r in enumerate(reqs)]
     pdf = make_pdf_report('Relief Request Report', headers, rows, [10*mm, 30*mm, 25*mm, 35*mm, 30*mm, 15*mm, 20*mm])
     return make_response(pdf.getvalue(), 200, {'Content-Type': 'application/pdf', 'Content-Disposition': 'attachment; filename=requests_report.pdf'})
@@ -4847,7 +4946,7 @@ def report_adjustments():
     q = ManualAdjustment.query.order_by(ManualAdjustment.date.desc())
     adjustments = q.all()
     headers = ['#', 'Adj No', 'Date', 'Warehouse', 'Item', 'Type', 'Qty', 'Reason']
-    rows = [[i+1, a.adjustment_no, a.date.strftime('%Y-%m-%d') if a.date else '',
+    rows = [[i+1, a.adjustment_no, ad_to_bs_date(a.date) or '',
              a.warehouse.name if a.warehouse else '', a.item.name if a.item else '',
              a.adjustment_type, a.adjusted_quantity, a.reason or ''] for i, a in enumerate(adjustments)]
     pdf = make_pdf_report('Adjustment Report', headers, rows, [10*mm, 25*mm, 25*mm, 25*mm, 30*mm, 20*mm, 15*mm, 25*mm])
@@ -4938,9 +5037,13 @@ def reports_data_json(report_type):
 
         def apply_date_filter(q, date_col):
             if date_from:
-                q = q.filter(date_col >= datetime.strptime(date_from, '%Y-%m-%d').date())
+                ad_from = bs_to_ad(date_from)
+                if ad_from:
+                    q = q.filter(date_col >= datetime.strptime(ad_from, '%Y-%m-%d').date())
             if date_to:
-                q = q.filter(date_col <= datetime.strptime(date_to, '%Y-%m-%d').date())
+                ad_to = bs_to_ad(date_to)
+                if ad_to:
+                    q = q.filter(date_col <= datetime.strptime(ad_to, '%Y-%m-%d').date())
             return q
 
         if report_type == 'inventory':
@@ -4958,7 +5061,7 @@ def reports_data_json(report_type):
             if warehouse_id: q = q.filter(Dispatch.warehouse_id == warehouse_id)
             q = apply_date_filter(q, Dispatch.date)
             headers = ['Dispatch No', 'Date', 'Warehouse', 'Incident', 'Destination', 'Receiver']
-            rows = [[d.dispatch_number, d.date.strftime('%Y-%m-%d') if d.date else '',
+            rows = [[d.dispatch_number, ad_to_bs_date(d.date) or '',
                      d.warehouse.name if d.warehouse else '', d.incident.incident_name if d.incident else '',
                      d.destination or '', d.receiver or ''] for d in q.all()]
         elif report_type == 'distribution':
@@ -4967,7 +5070,7 @@ def reports_data_json(report_type):
             if incident_id: q = q.filter(Distribution.incident_id == incident_id)
             q = apply_date_filter(q, Distribution.distribution_date)
             headers = ['Dist No', 'Date', 'Location', 'Incident', 'Officer', 'Beneficiaries']
-            rows = [[d.distribution_no, d.distribution_date.strftime('%Y-%m-%d') if d.distribution_date else '',
+            rows = [[d.distribution_no, ad_to_bs_date(d.distribution_date) or '',
                      d.location or '', d.incident.incident_name if d.incident else '',
                      d.officer or '', len(d.beneficiaries)] for d in q.all()]
         elif report_type == 'incidents':
@@ -4977,7 +5080,7 @@ def reports_data_json(report_type):
             q = apply_date_filter(q, Incident.start_date)
             headers = ['Name', 'Type', 'Ward', 'Date', 'Status']
             rows = [[inc.incident_name, inc.incident_type, inc.ward or '',
-                     inc.start_date.strftime('%Y-%m-%d') if inc.start_date else '', inc.status] for inc in q.all()]
+                     ad_to_bs_date(inc.start_date) or '', inc.status] for inc in q.all()]
         elif report_type == 'requests':
             status = request.args.get('status')
             incident_id = request.args.get('incident_id', type=int)
@@ -4986,14 +5089,14 @@ def reports_data_json(report_type):
             if incident_id: q = q.filter(ReliefRequest.incident_id == incident_id)
             q = apply_date_filter(q, ReliefRequest.request_date)
             headers = ['Req No', 'Date', 'Incident', 'Organization', 'Priority', 'Status']
-            rows = [[r.request_number, r.request_date.strftime('%Y-%m-%d') if r.request_date else '',
+            rows = [[r.request_number, ad_to_bs_date(r.request_date) or '',
                      r.incident.incident_name if r.incident else '', r.organization or '',
                      r.priority, r.status] for r in q.all()]
         elif report_type == 'adjustments':
             q = ManualAdjustment.query.order_by(ManualAdjustment.date.desc())
             q = apply_date_filter(q, ManualAdjustment.date)
             headers = ['Adj No', 'Date', 'Warehouse', 'Item', 'Type', 'Qty', 'Reason']
-            rows = [[a.adjustment_no, a.date.strftime('%Y-%m-%d') if a.date else '',
+            rows = [[a.adjustment_no, ad_to_bs_date(a.date) or '',
                      a.warehouse.name if a.warehouse else '', a.item.name if a.item else '',
                      a.adjustment_type, a.adjusted_quantity, a.reason or ''] for a in q.all()]
         elif report_type == 'low-stock':
@@ -5053,7 +5156,7 @@ def reports_data_json(report_type):
             q = CashReceipt.query.order_by(CashReceipt.receipt_date.desc())
             q = apply_date_filter(q, CashReceipt.receipt_date)
             headers = ['Receipt No', 'Date', 'Fund', 'Source', 'Amount', 'Received By']
-            rows = [[cr.receipt_no, cr.receipt_date.strftime('%Y-%m-%d') if cr.receipt_date else '',
+            rows = [[cr.receipt_no, ad_to_bs_date(cr.receipt_date) or '',
                      cr.fund.name if cr.fund else '', cr.funding_source or '',
                      cr.amount_received, cr.received_by or ''] for cr in q.all()]
         elif report_type == 'cash-requests':
@@ -5064,7 +5167,7 @@ def reports_data_json(report_type):
             if incident_id: q = q.filter(CashRequest.incident_id == incident_id)
             q = apply_date_filter(q, CashRequest.request_date)
             headers = ['Req No', 'Date', 'Incident', 'Amount', 'Priority', 'Status']
-            rows = [[cr.request_number, cr.request_date.strftime('%Y-%m-%d') if cr.request_date else '',
+            rows = [[cr.request_number, ad_to_bs_date(cr.request_date) or '',
                      cr.incident.incident_name if cr.incident else '', cr.requested_amount,
                      cr.priority, cr.status] for cr in q.all()]
         elif report_type == 'cash-distributions':
@@ -5075,7 +5178,7 @@ def reports_data_json(report_type):
             if fund_id: q = q.filter(CashDistribution.fund_id == fund_id)
             q = apply_date_filter(q, CashDistribution.distribution_date)
             headers = ['Dist No', 'Date', 'Fund', 'Incident', 'Type', 'Amount']
-            rows = [[d.distribution_no, d.distribution_date.strftime('%Y-%m-%d') if d.distribution_date else '',
+            rows = [[d.distribution_no, ad_to_bs_date(d.distribution_date) or '',
                      d.fund.name if d.fund else '', d.incident.incident_name if d.incident else '',
                      d.distribution_type, d.total_amount] for d in q.all()]
         elif report_type == 'cash-by-incident':
@@ -5138,7 +5241,7 @@ def report_cash_balance():
 def report_cash_receipts_pdf():
     r = CashReceipt.query.order_by(CashReceipt.receipt_date.desc()).all()
     headers = ['#', 'Receipt No', 'Date', 'Fund', 'Source', 'Amount', 'Received By']
-    rows = [[i+1, cr.receipt_no, cr.receipt_date.strftime('%Y-%m-%d') if cr.receipt_date else '',
+    rows = [[i+1, cr.receipt_no, ad_to_bs_date(cr.receipt_date) or '',
              cr.fund.name if cr.fund else '', cr.funding_source or '', cr.amount_received, cr.received_by or ''] for i, cr in enumerate(r)]
     pdf = make_pdf_report('Cash Receipt Report', headers, rows, [10*mm, 30*mm, 25*mm, 30*mm, 25*mm, 25*mm, 25*mm])
     return make_response(pdf.getvalue(), 200, {'Content-Type': 'application/pdf', 'Content-Disposition': 'attachment; filename=cash_receipts_report.pdf'})
@@ -5153,7 +5256,7 @@ def report_cash_requests_pdf():
     if incident_id: q = q.filter(CashRequest.incident_id == incident_id)
     r = q.all()
     headers = ['#', 'Req No', 'Date', 'Incident', 'Amount', 'Priority', 'Status']
-    rows = [[i+1, cr.request_number, cr.request_date.strftime('%Y-%m-%d') if cr.request_date else '',
+    rows = [[i+1, cr.request_number, ad_to_bs_date(cr.request_date) or '',
              cr.incident.incident_name if cr.incident else '', cr.requested_amount, cr.priority, cr.status] for i, cr in enumerate(r)]
     pdf = make_pdf_report('Cash Request Report', headers, rows, [10*mm, 30*mm, 25*mm, 35*mm, 25*mm, 15*mm, 20*mm])
     return make_response(pdf.getvalue(), 200, {'Content-Type': 'application/pdf', 'Content-Disposition': 'attachment; filename=cash_requests_report.pdf'})
@@ -5168,7 +5271,7 @@ def report_cash_distributions_pdf():
     if fund_id: q = q.filter(CashDistribution.fund_id == fund_id)
     dists = q.all()
     headers = ['#', 'Dist No', 'Date', 'Fund', 'Incident', 'Type', 'Amount']
-    rows = [[i+1, d.distribution_no, d.distribution_date.strftime('%Y-%m-%d') if d.distribution_date else '',
+    rows = [[i+1, d.distribution_no, ad_to_bs_date(d.distribution_date) or '',
              d.fund.name if d.fund else '', d.incident.incident_name if d.incident else '',
              d.distribution_type, d.total_amount] for i, d in enumerate(dists)]
     pdf = make_pdf_report('Cash Distribution Report', headers, rows, [10*mm, 30*mm, 25*mm, 30*mm, 35*mm, 20*mm, 20*mm])
@@ -5323,7 +5426,7 @@ def print_bin_card():
 
     events = []
     for r in receipts:
-        events.append({'date': r.receipt.date.strftime('%Y-%m-%d') if r.receipt.date else '',
+        events.append({'date': ad_to_bs_date(r.receipt.date) or '',
                        'type': 'Receipt', 'ref': r.receipt.receipt_no,
                        'party': r.receipt.source_name or '',
                        'in': r.quantity, 'out': 0,
@@ -5331,33 +5434,33 @@ def print_bin_card():
                        'sort_key': (r.receipt.date or date.min, r.receipt.id)})
     for a in adjustments:
         if a.adjustment_type in ('Increase', 'Correction_Increase'):
-            events.append({'date': a.date.strftime('%Y-%m-%d') if a.date else '',
+            events.append({'date': ad_to_bs_date(a.date) or '',
                            'type': 'Adjustment (+%s)' % a.reason if a.reason else 'Adjustment (+)',
                            'ref': a.adjustment_no, 'party': '',
                            'in': a.adjusted_quantity, 'out': 0, 'batch': '',
                            'remarks': a.reason or '', 'sort_key': (a.date or date.min, a.id)})
         else:
-            events.append({'date': a.date.strftime('%Y-%m-%d') if a.date else '',
+            events.append({'date': ad_to_bs_date(a.date) or '',
                            'type': 'Adjustment (-%s)' % a.reason if a.reason else 'Adjustment (-)',
                            'ref': a.adjustment_no, 'party': '',
                            'in': 0, 'out': a.adjusted_quantity, 'batch': '',
                            'remarks': a.reason or '', 'sort_key': (a.date or date.min, a.id)})
     for d in dispatches:
-        events.append({'date': d.dispatch.date.strftime('%Y-%m-%d') if d.dispatch.date else '',
+        events.append({'date': ad_to_bs_date(d.dispatch.date) or '',
                        'type': 'Dispatch', 'ref': d.dispatch.dispatch_number,
                        'party': d.dispatch.destination or d.dispatch.receiver or '',
                        'in': 0, 'out': d.quantity,
                        'batch': d.batch_no or '', 'remarks': '',
                        'sort_key': (d.dispatch.date or date.min, d.dispatch.id)})
     for t in transfers_out:
-        events.append({'date': t.transfer.transfer_date.strftime('%Y-%m-%d') if t.transfer.transfer_date else '',
+        events.append({'date': ad_to_bs_date(t.transfer.transfer_date) or '',
                        'type': 'Transfer Out', 'ref': t.transfer.transfer_no,
                        'party': t.transfer.to_warehouse.name if t.transfer.to_warehouse else '',
                        'in': 0, 'out': t.quantity,
                        'batch': t.batch_no or '', 'remarks': t.transfer.reason or '',
                        'sort_key': (t.transfer.transfer_date or date.min, t.transfer.id)})
     for t in transfers_in:
-        events.append({'date': t.transfer.transfer_date.strftime('%Y-%m-%d') if t.transfer.transfer_date else '',
+        events.append({'date': ad_to_bs_date(t.transfer.transfer_date) or '',
                        'type': 'Transfer In', 'ref': t.transfer.transfer_no,
                        'party': t.transfer.from_warehouse.name if t.transfer.from_warehouse else '',
                        'in': t.quantity, 'out': 0,
@@ -5383,7 +5486,7 @@ def print_bin_card():
     return render_template('print_bin_card.html', item=item, warehouse=warehouse, inv=inv,
                            events=events, office=office, address=address,
                            current_balance=inv.quantity if inv else 0,
-                           generated_at=now_val.strftime('%Y-%m-%d %H:%M'))
+                            generated_at=f"{today_bs()} {now_val.strftime('%H:%M')}")
 
 @app.route('/api/inventory/stock-book', methods=['GET'])
 @login_required
@@ -5397,11 +5500,14 @@ def print_stock_book():
 
     from_date = None
     to_date = None
-    try:
-        from_date = datetime.strptime(from_date_str, '%Y-%m-%d').date() if from_date_str else None
-        to_date = datetime.strptime(to_date_str, '%Y-%m-%d').date() if to_date_str else None
-    except (ValueError, TypeError):
-        pass
+    if from_date_str:
+        ad_from = bs_to_ad(from_date_str)
+        if ad_from:
+            from_date = datetime.strptime(ad_from, '%Y-%m-%d').date()
+    if to_date_str:
+        ad_to = bs_to_ad(to_date_str)
+        if ad_to:
+            to_date = datetime.strptime(ad_to, '%Y-%m-%d').date()
 
     all_inv = Inventory.query.filter_by(warehouse_id=warehouse_id).all()
     rows = []
@@ -5554,7 +5660,7 @@ def print_stock_book():
                            from_date=from_date_str or '', to_date=to_date_str or '',
                            grand_opening=grand_opening, grand_received=grand_received,
                            grand_dispatched=grand_dispatched, grand_balance=grand_balance,
-                           fiscal_year=fiscal_year, generated_at=now_val.strftime('%Y-%m-%d %H:%M'))
+                            fiscal_year=fiscal_year, generated_at=f"{today_bs()} {now_val.strftime('%H:%M')}")
 
 # ============ DATABASE INITIALIZATION ============
 def init_db():

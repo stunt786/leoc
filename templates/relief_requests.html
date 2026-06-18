@@ -72,7 +72,7 @@
                         </div>
                         <div class="col-md-4">
                             <label class="form-label">Request Date</label>
-                            <input type="date" class="form-control" id="rr_request_date">
+                            <input type="text" class="form-control nepali-date" placeholder="YYYY-MM-DD" id="rr_request_date">
                         </div>
                         <div class="col-md-4">
                             <label class="form-label">Incident *</label>
@@ -387,7 +387,7 @@ function resetRRForm() {
     document.getElementById('rr_id').value = '';
     document.getElementById('rrForm').reset();
     document.getElementById('rr_request_number').value = 'REQ-' + String(Date.now()).slice(-4);
-    document.getElementById('rr_request_date').value = new Date().toISOString().split('T')[0];
+    document.getElementById('rr_request_date').value = today_bs;
     document.getElementById('rr_status').value = 'Pending';
     document.getElementById('rr_cash_distributed').value = '0';
     document.getElementById('rr_cash_remaining').value = '0';

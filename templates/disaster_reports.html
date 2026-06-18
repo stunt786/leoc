@@ -352,11 +352,12 @@ function renderWardChart(byWard) {
     });
 }
 
+
 function showPrintPreview() {
     const fy = document.getElementById('statFiscalYear').value;
     const params = new URLSearchParams();
     if (fy) params.set('fiscal_year', fy);
-    const url = `/daily-report-preview?bs_date=${new Date().toISOString().slice(0,10)}`;
+    const url = `/daily-report-preview?bs_date=${today_bs}`;
     window.open(url, '_blank');
 }
 
@@ -364,7 +365,7 @@ function downloadDailyReport() {
     const params = new URLSearchParams();
     const fy = document.getElementById('statFiscalYear').value;
     if (fy) params.set('fiscal_year', fy);
-    window.open(`/api/generate-daily-report?bs_date=${new Date().toISOString().slice(0,10)}`, '_blank');
+    window.open(`/api/generate-daily-report?bs_date=${today_bs}`, '_blank');
 }
 
 document.addEventListener('DOMContentLoaded', loadFormData);

@@ -33,7 +33,7 @@
         <div class="col-6">
             <table class="table table-sm table-borderless">
                 <tr><td class="field-label">Request Number:</td><td>{{ req.request_number }}</td></tr>
-                <tr><td class="field-label">Date:</td><td>{{ req.request_date.strftime('%Y-%m-%d') if req.request_date else '' }}</td></tr>
+                <tr><td class="field-label">Date:</td><td>{{ req.request_date|nepali_date if req.request_date else '' }}</td></tr>
                 <tr><td class="field-label">Incident:</td><td>{{ req.incident.incident_name if req.incident else '' }}</td></tr>
                 <tr><td class="field-label">Organization:</td><td>{{ req.organization or '' }}</td></tr>
             </table>
@@ -91,7 +91,7 @@
     {% endif %}
 
     <div class="footer">
-        <p>Generated on {{ req.created_at.strftime('%Y-%m-%d %H:%M') if req.created_at else '' }} | {{ office or 'थलारा गाउँपालिका' }} - LEOC</p>
+        <p>Generated on {{ req.created_at|nepali_date if req.created_at else '' }} | {{ office or 'थलारा गाउँपालिका' }} - LEOC</p>
     </div>
 </body>
 </html>

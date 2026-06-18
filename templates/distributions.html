@@ -45,7 +45,7 @@
                 </div>
                 <div class="col-md-3">
                     <label class="form-label">Distribution Date</label>
-                    <input type="date" class="form-control" id="dist_distribution_date">
+                    <input type="text" class="form-control nepali-date" placeholder="YYYY-MM-DD" id="dist_distribution_date">
                 </div>
                 <div class="col-md-3">
                     <label class="form-label">Officer</label>
@@ -225,7 +225,7 @@ async function loadFormData() {
                 return `<option value="${dp.id}">${dp.dispatch_number} - ${dp.incident_name || ''} (${dp.date || ''})</option>`;
             }).join('');
 
-        document.getElementById('dist_distribution_date').value = new Date().toISOString().split('T')[0];
+        document.getElementById('dist_distribution_date').value = today_bs;
         document.getElementById('dist_distribution_no').value = 'DIST-' + String(Date.now()).slice(-4);
 
         // Cache relief request cash data
@@ -985,7 +985,7 @@ function resetDistributionForm() {
     document.getElementById('dist_id').value = '';
     document.getElementById('distributionForm').reset();
     document.getElementById('dist_distribution_no').value = 'DIST-' + String(Date.now()).slice(-4);
-    document.getElementById('dist_distribution_date').value = new Date().toISOString().split('T')[0];
+    document.getElementById('dist_distribution_date').value = today_bs;
     document.getElementById('dist_incident').value = '';
     document.getElementById('beneficiaryBody').innerHTML = '<tr><td colspan="9" class="text-center text-muted py-3">Add beneficiaries to this distribution</td></tr>';
     document.getElementById('dispatchItemsSummaryBody').innerHTML = '<tr><td colspan="4" class="text-center text-muted py-2">Select a dispatch to view items</td></tr>';

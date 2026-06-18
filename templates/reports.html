@@ -38,11 +38,11 @@
         <div class="row g-2 align-items-end" id="filterRow">
             <div class="col-auto">
                 <label class="form-label small">Date From</label>
-                <input type="date" class="form-control form-control-sm" id="dateFrom" onchange="loadReportData()">
+                <input type="text" class="form-control form-control-sm nepali-date" placeholder="YYYY-MM-DD" id="dateFrom" onchange="loadReportData()">
             </div>
             <div class="col-auto">
                 <label class="form-label small">Date To</label>
-                <input type="date" class="form-control form-control-sm" id="dateTo" onchange="loadReportData()">
+                <input type="text" class="form-control form-control-sm nepali-date" placeholder="YYYY-MM-DD" id="dateTo" onchange="loadReportData()">
             </div>
             <div class="col-auto filter-optional" data-types="inventory,dispatch,stock-receipts,adjustments,low-stock">
                 <label class="form-label small">Warehouse</label>

@@ -42,7 +42,7 @@
         </tr>
         <tr>
             <td class="field-label">Dispatch No:</td><td>{{ dist.dispatch.dispatch_number if dist.dispatch else '' }}</td>
-            <td class="field-label">Date:</td><td>{{ dist.distribution_date.strftime('%Y-%m-%d') if dist.distribution_date else '' }}</td>
+            <td class="field-label">Date:</td><td>{{ dist.distribution_date|nepali_date if dist.distribution_date else '' }}</td>
         </tr>
         <tr>
             <td class="field-label">Location:</td><td>{{ dist.location or '' }}</td>
@@ -67,7 +67,7 @@
             <td class="field-label" style="width:18%">Type:</td><td style="width:32%">{{ inc.incident_type if inc else '' }}</td>
         </tr>
         <tr>
-            <td class="field-label">Date:</td><td>{{ inc.start_date.strftime('%Y-%m-%d') if inc and inc.start_date else '' }}</td>
+            <td class="field-label">Date:</td><td>{{ inc.start_date|nepali_date if inc and inc.start_date else '' }}</td>
             <td class="field-label">Fiscal Year:</td><td>{{ inc.fiscal_year if inc else dist.fiscal_year or '' }}</td>
         </tr>
         <tr>
@@ -195,7 +195,7 @@
     {% endif %}
 
     <div class="footer">
-        <p>Generated on {{ dist.created_at.strftime('%Y-%m-%d %H:%M') if dist.created_at else '' }} | {{ office or 'थलारा गाउँपालिका' }} - LEOC</p>
+        <p>Generated on {{ dist.created_at|nepali_date if dist.created_at else '' }} | {{ office or 'थलारा गाउँपालिका' }} - LEOC</p>
     </div>
 </body>
 </html>

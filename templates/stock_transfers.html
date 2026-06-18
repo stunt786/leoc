@@ -26,7 +26,7 @@
                 </div>
                 <div class="col-md-3">
                     <label class="form-label">Transfer Date *</label>
-                    <input type="date" class="form-control" id="transfer_date" required>
+                    <input type="text" class="form-control nepali-date" placeholder="YYYY-MM-DD" id="transfer_date" required>
                 </div>
                 <div class="col-md-3">
                     <label class="form-label">From Warehouse *</label>
@@ -162,7 +162,7 @@ async function loadFormData() {
 function resetForm() {
     document.getElementById('transferForm').reset();
     document.getElementById('transfer_no').value = 'TRF-' + String(Date.now()).slice(-6);
-    document.getElementById('transfer_date').value = new Date().toISOString().split('T')[0];
+    document.getElementById('transfer_date').value = today_bs;
     document.getElementById('itemsBody').innerHTML = '';
 }
 

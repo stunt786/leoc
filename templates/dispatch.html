@@ -27,7 +27,7 @@
                 </div>
                 <div class="col-md-3">
                     <label class="form-label">Date</label>
-                    <input type="date" class="form-control" id="dp_date">
+                    <input type="text" class="form-control nepali-date" placeholder="YYYY-MM-DD" id="dp_date">
                 </div>
                 <div class="col-md-3">
                     <label class="form-label">Warehouse *</label>
@@ -156,7 +156,7 @@ async function loadFormData() {
         const distItems = (d.items || []).filter(i => i.is_distributable !== false);
         window.distributableItemIds = new Set(distItems.map(i => i.id));
 
-        document.getElementById('dp_date').value = new Date().toISOString().split('T')[0];
+        document.getElementById('dp_date').value = today_bs;
         document.getElementById('dp_dispatch_number').value = 'DSP-' + String(Date.now()).slice(-4);
     } catch(e) {
         showToast('danger', 'Error loading form data: ' + e.message);
@@ -209,7 +209,7 @@ async function addItemRow(item, availQty) {
         <td><input type="number" class="form-control form-control-sm dp-dispatch-qty" value="0" min="0" max="${availQty}" oninput="validateQty(this)"></td>
         <td><input type="text" class="form-control form-control-sm dp-unit" value="${item.unit || 'pcs'}" readonly></td>
         <td><input type="text" class="form-control form-control-sm dp-batch-no" placeholder="Auto-fill"></td>
-        <td><input type="date" class="form-control form-control-sm dp-expiry-date"></td>`;
+        <td><input type="text" class="form-control form-control-sm dp-expiry-date nepali-date" placeholder="YYYY-MM-DD"></td>`;
     tbody.appendChild(tr);
 
     try {
@@ -423,7 +423,7 @@ async function editDispatch(id) {
                     <td><input type="number" class="form-control form-control-sm dp-dispatch-qty" value="${item.quantity}" min="0" max="${avail}" oninput="validateQty(this)"></td>
                     <td><input type="text" class="form-control form-control-sm dp-unit" value="${item.unit || 'pcs'}" readonly></td>
                     <td><input type="text" class="form-control form-control-sm dp-batch-no" value="${item.batch_no || ''}"></td>
-                    <td><input type="date" class="form-control form-control-sm dp-expiry-date" value="${item.expiry_date || ''}"></td>`;
+                    <td><input type="text" class="form-control form-control-sm dp-expiry-date nepali-date" placeholder="YYYY-MM-DD" value="${item.expiry_date || ''}"></td>`;
                 tbody.appendChild(tr);
             }
             if (!editHasItems) {
@@ -445,7 +445,7 @@ function resetDispatchForm() {
     document.getElementById('dp_id').value = '';
     document.getElementById('dispatchForm').reset();
     document.getElementById('dp_dispatch_number').value = 'DSP-' + String(Date.now()).slice(-4);
-    document.getElementById('dp_date').value = new Date().toISOString().split('T')[0];
+    document.getElementById('dp_date').value = today_bs;
     document.getElementById('dispatchItemsBody').innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">Select a relief request to load items</td></tr>';
     const header = document.querySelector('.card-header span');
     if (header) header.innerHTML = '<i class="bi bi-plus-circle me-2 text-primary"></i>Create Dispatch Order';

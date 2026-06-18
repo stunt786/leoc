@@ -31,7 +31,7 @@
             <form id="crForm">
                 <div class="modal-body">
                     <div class="row g-2">
-                        <div class="col-md-6 mb-3"><label class="form-label">Receipt Date</label><input type="date" class="form-control" name="receipt_date" id="crDate" value="{{ now().strftime('%Y-%m-%d') }}"></div>
+                        <div class="col-md-6 mb-3"><label class="form-label">Receipt Date</label><input type="text" class="form-control nepali-date" placeholder="YYYY-MM-DD" name="receipt_date" id="crDate" value="{{ today_bs }}"></div>
                         <div class="col-md-6 mb-3"><label class="form-label">Fund <span class="text-danger">*</span></label><select class="form-select" name="fund_id" id="crFund" required></select></div>
                     </div>
                     <div class="mb-3"><label class="form-label">Funding Source</label><select class="form-select" name="funding_source" id="crSource"></select></div>

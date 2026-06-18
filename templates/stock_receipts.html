@@ -27,7 +27,7 @@
                 </div>
                 <div class="col-md-3">
                     <label class="form-label">Date *</label>
-                    <input type="date" class="form-control" id="receipt_date" required>
+                    <input type="text" class="form-control nepali-date" placeholder="YYYY-MM-DD" id="receipt_date" required>
                 </div>
                 <div class="col-md-3">
                     <label class="form-label">Warehouse *</label>
@@ -96,7 +96,7 @@
                         </div>
                         <div class="col-md-3">
                             <label class="form-label">Invoice Date</label>
-                            <input type="date" class="form-control" id="receipt_invoice_date">
+                            <input type="text" class="form-control nepali-date" placeholder="YYYY-MM-DD" id="receipt_invoice_date">
                         </div>
                         <div class="col-md-3">
                             <label class="form-label">Delivery Note</label>
@@ -274,7 +274,7 @@ function resetReceiptForm() {
     document.getElementById('receipt_id').value = '';
     document.getElementById('receiptForm').reset();
     document.getElementById('receipt_no').value = 'RCPT-' + String(Date.now()).slice(-6);
-    document.getElementById('receipt_date').value = new Date().toISOString().split('T')[0];
+    document.getElementById('receipt_date').value = today_bs;
     document.getElementById('itemsBody').innerHTML = '';
     document.getElementById('saveReceiptBtn').innerHTML = '<i class="bi bi-check-lg me-1"></i>Save Receipt';
 }
@@ -332,8 +332,8 @@ function addItemRow(itemId = '', unit = '', qty = '', batchNo = '', serialNo = '
         <td><input type="number" class="form-control form-control-sm receipt-qty" value="${qty}" min="1" step="1" oninput="calcRowTotal(this.closest('tr'))"></td>
         <td><input type="text" class="form-control form-control-sm receipt-batch-no" value="${batchNo}" placeholder="Batch"></td>
         <td><input type="text" class="form-control form-control-sm receipt-serial-no" value="${serialNo}" placeholder="Serial"></td>
-        <td><input type="date" class="form-control form-control-sm receipt-mfg-date" value="${mfgDate}"></td>
-        <td><input type="date" class="form-control form-control-sm receipt-expiry-date" value="${expiryDate}"></td>
+        <td><input type="text" class="form-control form-control-sm receipt-mfg-date nepali-date" placeholder="YYYY-MM-DD" value="${mfgDate}"></td>
+        <td><input type="text" class="form-control form-control-sm receipt-expiry-date nepali-date" placeholder="YYYY-MM-DD" value="${expiryDate}"></td>
         <td><input type="number" class="form-control form-control-sm receipt-unit-cost" value="${unitCost}" min="0" step="0.01" oninput="calcRowTotal(this.closest('tr'))"></td>
         <td><input type="text" class="form-control form-control-sm receipt-total-cost" value="" readonly></td>
         <td><button class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove()"><i class="bi bi-x"></i></button></td>

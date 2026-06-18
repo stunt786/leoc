@@ -33,7 +33,7 @@
         <div class="col-6">
             <table class="table table-sm table-borderless">
                 <tr><td class="field-label">Dispatch Number:</td><td>{{ dispatch.dispatch_number }}</td></tr>
-                <tr><td class="field-label">Date:</td><td>{{ dispatch.date.strftime('%Y-%m-%d') if dispatch.date else '' }}</td></tr>
+                <tr><td class="field-label">Date:</td><td>{{ dispatch.date|nepali_date if dispatch.date else '' }}</td></tr>
                 <tr><td class="field-label">Warehouse:</td><td>{{ dispatch.warehouse.name }}</td></tr>
                 <tr><td class="field-label">Incident:</td><td>{{ dispatch.incident.incident_name if dispatch.incident else '' }}</td></tr>
             </table>
@@ -67,7 +67,7 @@
                 <td>{{ item.unit or item.item.unit }}</td>
                 <td>{{ item.quantity }}</td>
                 <td>{{ item.batch_no or '' }}</td>
-                <td>{{ item.expiry_date.strftime('%Y-%m-%d') if item.expiry_date else '' }}</td>
+                <td>{{ item.expiry_date|nepali_date if item.expiry_date else '' }}</td>
             </tr>
             {% endfor %}
         </tbody>
@@ -80,7 +80,7 @@
     {% endif %}
 
     <div class="footer">
-        <p>Generated on {{ dispatch.created_at.strftime('%Y-%m-%d %H:%M') if dispatch.created_at else '' }} | {{ office or 'थलारा गाउँपालिका' }} - LEOC</p>
+        <p>Generated on {{ dispatch.created_at|nepali_date if dispatch.created_at else '' }} | {{ office or 'थलारा गाउँपालिका' }} - LEOC</p>
     </div>
 </body>
 </html>

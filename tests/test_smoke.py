@@ -83,7 +83,7 @@ class SmokeTestCase(unittest.TestCase):
             'incident_name': name or f'Incident-{uuid.uuid4().hex[:8]}',
             'incident_type': incident_type,
             'ward': ward,
-            'start_date': '2026-06-10',
+            'start_date': '2082-01-01',
             'status': 'Active',
             'description': 'Smoke test incident',
         }
@@ -129,15 +129,15 @@ class SmokeTestCase(unittest.TestCase):
             'warehouse_id': warehouse['id'],
             'source_type': 'Donation',
             'source_name': 'Smoke Test Donor',
-            'date': '2026-06-10',
+            'date': '2082-03-01',
             'items': [
                 {
                     'item_id': item['id'],
                     'quantity': 7,
                     'unit': 'Piece',
                     'unit_cost': 12.5,
-                    'mfg_date': '2026-01-01',
-                    'expiry_date': '2027-01-01',
+                    'mfg_date': '2081-09-01',
+                    'expiry_date': '2083-09-01',
                 }
             ],
         }
@@ -203,7 +203,7 @@ class SmokeTestCase(unittest.TestCase):
             '/api/cash-receipts',
             json={
                 'fund_id': fund['id'],
-                'receipt_date': '2026-06-10',
+                'receipt_date': '2082-03-01',
             },
         )
         self.assertEqual(bad_cash_receipt.status_code, 400)
@@ -222,15 +222,15 @@ class SmokeTestCase(unittest.TestCase):
                 'warehouse_id': warehouse['id'],
                 'source_type': 'Donation',
                 'source_name': 'Smoke Test Donor',
-                'date': '2026-06-10',
+                'date': '2082-03-01',
                 'items': [
                     {
                         'item_id': item['id'],
                         'quantity': 10,
                         'unit': 'Piece',
                         'unit_cost': 12.5,
-                        'mfg_date': '2026-01-01',
-                        'expiry_date': '2027-01-01',
+                        'mfg_date': '2081-09-01',
+                        'expiry_date': '2083-09-01',
                     }
                 ],
             },
@@ -247,14 +247,14 @@ class SmokeTestCase(unittest.TestCase):
                 'destination': 'Smoke Test Destination',
                 'receiver': 'Smoke Receiver',
                 'phone': '9800000000',
-                'date': '2026-06-10',
+                'date': '2082-03-02',
                 'items': [
                     {
                         'item_id': item['id'],
                         'quantity': 4,
                         'unit': 'Piece',
                         'batch_no': 'BATCH-001',
-                        'expiry_date': '2027-01-01',
+                        'expiry_date': '2083-09-01',
                     }
                 ],
             },
@@ -267,7 +267,7 @@ class SmokeTestCase(unittest.TestCase):
             json={
                 'dispatch_id': dispatch['id'],
                 'location': 'Ward 1',
-                'distribution_date': '2026-06-10',
+                'distribution_date': '2082-03-03',
                 'officer': 'Smoke Officer',
                 'remarks': 'Smoke distribution',
                 'beneficiaries': [
@@ -316,7 +316,7 @@ class SmokeTestCase(unittest.TestCase):
                 'requested_amount': 300,
                 'purpose': 'Smoke cash support',
                 'remarks': 'Smoke cash request',
-                'request_date': '2026-06-10',
+                'request_date': '2082-03-01',
             },
         )
         self.assertEqual(cash_request_response.status_code, 201, cash_request_response.get_json())
@@ -329,7 +329,7 @@ class SmokeTestCase(unittest.TestCase):
                 'incident_id': incident['id'],
                 'cash_request_id': cash_request['id'],
                 'distribution_type': 'Individual',
-                'distribution_date': '2026-06-10',
+                'distribution_date': '2082-03-03',
                 'officer': 'Smoke Officer',
                 'remarks': 'Smoke cash distribution',
                 'beneficiaries': [
