@@ -1,79 +1,772 @@
 <!DOCTYPE html>
 <html lang="ne">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Daily Report - LEOC</title>
+    <title>दैनिक विपद् बुलेटीन - {{ start_bs }}{% if start_bs != end_bs %} देखि {{ end_bs }}{% endif %}</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <style>
-        body { font-family: 'Noto Sans Devanagari', 'Inter', sans-serif; padding: 20px; font-size: 12px; }
-        @media print { body { padding: 0; } .no-print { display: none !important; } }
-        .header { text-align: center; margin-bottom: 20px; }
-        .header h3 { margin-bottom: 2px; }
-        .header h5 { color: #2c5282; }
-        .stat-card { text-align: center; padding: 8px; border: 1px solid #dee2e6; border-radius: 4px; }
-        table { font-size: 11px; }
-        .footer { text-align: center; margin-top: 20px; font-size: 10px; color: #666; }
+        @page {
+            size: A4;
+            margin: 5mm;
+        }
+
+        @media print {
+            body {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+
+            .no-print {
+                display: none !important;
+            }
+
+            .container {
+                width: 100%;
+                max-width: none;
+                padding: 0;
+            }
+
+            .report-content {
+                page-break-inside: avoid;
+            }
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-size: 9pt;
+            line-height: 1.3;
+            color: #333;
+            background: white;
+        }
+
+        .report-header {
+            position: relative;
+            text-align: center;
+            border-bottom: 2px double #1a472a;
+            padding-bottom: 5px;
+            margin-bottom: 10px;
+            min-height: 80px;
+        }
+
+        .report-header img {
+            position: absolute;
+            left: 5px;
+            top: 0;
+            height: 70px;
+            width: auto;
+        }
+
+        .report-header h1 {
+            color: #d32f2f;
+            font-size: 18pt;
+            font-weight: bold;
+            margin: 0;
+            line-height: 1.1;
+        }
+
+        .report-header h2 {
+            color: #1a472a;
+            font-size: 12pt;
+            margin: 2px 0;
+            font-weight: bold;
+        }
+
+        .report-header h3 {
+            color: #1a472a;
+            font-size: 11pt;
+            margin: 1px 0;
+            font-weight: 500;
+        }
+
+        .report-header h4 {
+            color: #2c5282;
+            font-size: 10pt;
+            margin: 2px 0;
+            font-weight: bold;
+        }
+
+        .report-header h5 {
+            color: #2c5282;
+            font-size: 12pt;
+            margin-top: 5px;
+            text-decoration: underline;
+            font-weight: bold;
+        }
+
+        .report-meta {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            padding: 5px 10px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            font-size: 9pt;
+        }
+
+        .section-title {
+            background-color: #2c5282;
+            color: white;
+            padding: 4px 8px;
+            font-weight: bold;
+            font-size: 10pt;
+            margin-bottom: 5px;
+            border-radius: 3px;
+        }
+
+        .section-title.brown {
+            background-color: #744210;
+        }
+
+        .section-title.gray {
+            background-color: #4a5568;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 8pt;
+            margin-bottom: 10px;
+        }
+
+        .data-table th {
+            background-color: #2c5282;
+            color: white;
+            padding: 4px 3px;
+            text-align: center;
+            font-weight: bold;
+            border: 1px solid #1a365d;
+            font-size: 8pt;
+        }
+
+        .data-table th.brown {
+            background-color: #744210;
+            border-color: #553c0d;
+        }
+
+        .data-table td {
+            padding: 3px 3px;
+            text-align: center;
+            border: 1px solid #cbd5e0;
+            vertical-align: middle;
+            font-size: 8pt;
+        }
+
+        .data-table tr:nth-child(even) {
+            background-color: #f7fafc;
+        }
+
+        .data-table tr.total-row {
+            background-color: #e2e8f0;
+            font-weight: bold;
+        }
+
+        .infrastructure-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .infrastructure-item {
+            display: flex;
+            align-items: center;
+            padding: 5px;
+            background-color: #f7fafc;
+            border-radius: 4px;
+            border-left: 3px solid #2c5282;
+            font-size: 8pt;
+        }
+
+        .infrastructure-item i {
+            margin-right: 10px;
+            font-size: 14pt;
+        }
+
+        .infrastructure-item .label {
+            font-weight: bold;
+            margin-right: 10px;
+        }
+
+        .status-normal {
+            color: #28a745;
+        }
+
+        .status-disrupted {
+            color: #dc3545;
+        }
+
+        .advisory-item {
+            padding: 5px;
+            margin-bottom: 3px;
+            border-left: 3px solid #ffc107;
+            background-color: #fffaf0;
+            font-size: 8pt;
+        }
+
+        .advisory-item.critical {
+            border-left-color: #dc3545;
+            background-color: #fff5f5;
+        }
+
+        .advisory-item.high {
+            border-left-color: #fd7e14;
+            background-color: #fff7ed;
+        }
+
+        .report-footer {
+            margin-top: 10px;
+            padding-top: 5px;
+            border-top: 1px solid #cbd5e0;
+            text-align: center;
+            font-size: 8pt;
+            color: #666;
+            font-style: italic;
+        }
+
+        .sit-rep-box {
+            position: absolute;
+            top: 0;
+            right: 0;
+            border: 1px solid #2c5282;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            color: #2c5282;
+            background: rgba(255, 255, 255, 0.9);
+            font-size: 8pt;
+        }
+
+        .stats-cards {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 4px;
+            margin-bottom: 15px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #4338ca 0%, #6d28d9 100%);
+            color: white;
+            padding: 10px 5px;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            min-height: 85px;
+            position: relative;
+        }
+
+        .stat-card.danger {
+            background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
+        }
+
+        .stat-card.warning {
+            background: linear-gradient(135deg, #d97706 0%, #92400e 100%);
+            color: white;
+        }
+
+        .stat-card.success {
+            background: linear-gradient(135deg, #059669 0%, #065f46 100%);
+        }
+
+        .stat-card.info {
+            background: linear-gradient(135deg, #0284c7 0%, #075985 100%);
+        }
+
+        .stat-card.dark {
+            background: linear-gradient(135deg, #475569 0%, #1e293b 100%);
+        }
+
+        .stat-card i {
+            position: absolute;
+            top: 7px;
+            left: 7px;
+            font-size: 13pt;
+            opacity: 0.7;
+        }
+
+        .stat-info {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            text-align: center;
+            padding-top: 5px;
+        }
+
+        .stat-card .number {
+            font-size: 18pt;
+            font-weight: 800;
+            line-height: 1.1;
+        }
+
+        .stat-card .label {
+            font-size: 10.5pt;
+            font-weight: 700;
+            line-height: 1.3;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            width: 100%;
+            opacity: 0.95;
+            margin-top: 2px;
+        }
+
+        .print-actions {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn-print {
+            background-color: #2c5282;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 11pt;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn-print:hover {
+            background-color: #1a365d;
+        }
+
+        .btn-pdf {
+            background-color: #dc3545;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 11pt;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            text-decoration: none;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn-pdf:hover {
+            background-color: #c82333;
+            color: white;
+        }
+
+        .date-selector {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 1000;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            width: 200px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .date-selector .form-control {
+            margin-bottom: 10px;
+        }
+
+        .date-selector .btn-filter {
+            width: 100%;
+            background-color: #2c5282;
+            color: white;
+            border: none;
+            padding: 8px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+
+        .date-selector .btn-filter:hover {
+            background-color: #1a365d;
+        }
+
+        .event-log-item {
+            padding: 8px;
+            border-bottom: 1px solid #e2e8f0;
+            font-size: 9pt;
+        }
+
+        .event-log-item:last-child {
+            border-bottom: none;
+        }
+
+        .badge-status {
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 8pt;
+        }
+
+        .badge-active {
+            background-color: #17a2b8;
+            color: white;
+        }
+
+        .badge-completed {
+            background-color: #28a745;
+            color: white;
+        }
+
+        .badge-pending {
+            background-color: #ffc107;
+            color: #333;
+        }
+
+        .notice-box {
+            border: 1px solid #2c5282;
+            border-radius: 4px;
+            padding: 8px;
+            margin-bottom: 10px;
+            background-color: #f0f4ff;
+        }
+        .notice-box .notice-title {
+            font-weight: bold;
+            font-size: 10pt;
+            color: #1a365d;
+        }
+        .notice-box .notice-priority {
+            float: right;
+        }
     </style>
 </head>
+
 <body>
-    <div class="no-print mb-3">
-        <button class="btn btn-primary btn-sm" onclick="window.print()"><i class="bi bi-printer"></i> Print</button>
-        <a href="/api/generate-daily-report?bs_date={{ start_bs }}" class="btn btn-success btn-sm">Download PDF</a>
+    <!-- Print Actions -->
+    <div class="print-actions no-print">
+        <button class="btn-print" onclick="window.print()">
+            <i class="bi bi-printer"></i> प्रतिवेदन प्रिन्ट गर्नुहोस्
+        </button>
+        <a href="/api/generate-daily-report?from_bs_date={{ start_bs }}&to_bs_date={{ end_bs }}" class="btn-pdf">
+            <i class="bi bi-file-earmark-pdf"></i> PDF मा सुरक्षित गर्नुहोस्
+        </a>
     </div>
 
-    <div class="header">
-        <h3>{{ office_name or 'थलारा गाउँपालिका' }}</h3>
-        <h5>स्थानीय आपतकालीन कार्य केन्द्र (LEOC)</h5>
-        <h4>दैनिक घटना प्रतिवेदन</h4>
-        {% if sit_rep_no %}<p><strong>Sit Rep No: {{ sit_rep_no }}</strong></p>{% endif %}
-        <p><strong>मिति:</strong> {{ start_bs }}{% if start_bs != end_bs %} देखि {{ end_bs }}{% endif %}</p>
+    <!-- Date Selector -->
+    <div class="date-selector no-print">
+        <label class="form-label mb-1"><strong>मिति फिल्टर (BS):</strong></label>
+        <div class="mb-2">
+            <small class="text-muted d-block mb-1">देखि:</small>
+            <input type="text" id="fromDateBS" class="form-control form-control-sm" value="{{ start_bs }}"
+                placeholder="YYYY-MM-DD">
+        </div>
+        <div class="mb-3">
+            <small class="text-muted d-block mb-1">सम्म:</small>
+            <input type="text" id="toDateBS" class="form-control form-control-sm" value="{{ end_bs }}"
+                placeholder="YYYY-MM-DD">
+        </div>
+        <button class="btn-filter" onclick="applyFilter()">
+            <i class="bi bi-filter"></i> फिल्टर लागू गर्नुहोस्
+        </button>
+        <small class="text-muted d-block mt-2" style="font-size: 8pt;">Format: YYYY-MM-DD</small>
     </div>
 
-    <div class="row g-2 mb-3">
-        <div class="col-4"><div class="stat-card"><small class="text-muted">जम्मा घटना</small><br><strong>{{ total.incidents }}</strong></div></div>
-        <div class="col-4"><div class="stat-card"><small class="text-muted">मृतक</small><br><strong class="text-danger">{{ total.deaths }}</strong></div></div>
-        <div class="col-4"><div class="stat-card"><small class="text-muted">बेपत्ता</small><br><strong class="text-warning">{{ total.missing }}</strong></div></div>
-        <div class="col-4"><div class="stat-card"><small class="text-muted">घाइते</small><br><strong class="text-info">{{ total.injured }}</strong></div></div>
-        <div class="col-4"><div class="stat-card"><small class="text-muted">प्रभावित परिवार</small><br><strong>{{ total.affected_households }}</strong></div></div>
-        <div class="col-4"><div class="stat-card"><small class="text-muted">अनुमानित क्षति</small><br><strong>{{ "%.2f"|format(total.estimated_loss) }}</strong></div></div>
+    <div class="container mt-5">
+        <!-- Report Header -->
+        <div class="report-header">
+            {% if sit_rep_no is not none %}
+            <div class="sit-rep-box">
+                Sit Rep No: {{ sit_rep_no }}
+            </div>
+            {% endif %}
+            <img src="{{ url_for('static', filename='Emblem_of_Nepal.png') }}" alt="Logo">
+            <h1>{{ office_name or 'थलारा गाउँपालिका' }}</h1>
+            <h2>गाउँकार्यपालिकाको कार्यालय</h2>
+            <h3>खोली, बझाङ</h3>
+            <h4>स्थानीय आपतकालिन कार्य संचालन केन्द्र (LEOC)</h4>
+            <h5>दैनिक विपद् बुलेटीन</h5>
+        </div>
+
+        <!-- Report Meta -->
+        <div class="report-meta">
+            <div>
+                <strong>मिति (BS):</strong> {{ start_bs }}{% if start_bs != end_bs %} देखि {{ end_bs }}{% endif %}
+            </div>
+            <div>
+                <strong>आजको मौसम:</strong>
+                {% if weather_status %}
+                {{ weather_status }}
+                {% else %}
+                खुलेको छैन
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Public Notice -->
+        {% if notice_title %}
+        <div class="notice-box">
+            <div class="notice-priority">
+                <span class="badge {% if notice_priority == 'critical' %}bg-danger{% elif notice_priority == 'high' %}bg-warning text-dark{% elif notice_priority == 'medium' %}bg-info{% else %}bg-secondary{% endif %}">
+                    {{ notice_priority|upper }}
+                </span>
+            </div>
+            <div class="notice-title">{{ notice_title }}</div>
+            {% if notice_description %}
+            <div style="font-size: 8pt; margin-top: 4px;">{{ notice_description }}</div>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <!-- Summary Statistics -->
+        <div class="stats-cards">
+            <!-- Total Incidents -->
+            <div class="stat-card">
+                <i class="bi bi-exclamation-triangle"></i>
+                <div class="stat-info">
+                    <span class="number">{{ total.incidents }}</span>
+                    <span class="label">जम्मा घटनाहरू</span>
+                </div>
+            </div>
+
+            <!-- Deaths -->
+            <div class="stat-card danger">
+                <i class="bi bi-person-x-fill"></i>
+                <div class="stat-info">
+                    <span class="number">{{ total.deaths }}</span>
+                    <span class="label">मृतक संख्या</span>
+                </div>
+            </div>
+
+            <!-- Missing -->
+            <div class="stat-card warning">
+                <i class="bi bi-person-dash-fill"></i>
+                <div class="stat-info">
+                    <span class="number">{{ total.missing }}</span>
+                    <span class="label">बेपत्ता</span>
+                </div>
+            </div>
+
+            <!-- Injured -->
+            <div class="stat-card info">
+                <i class="bi bi-bandaid-fill"></i>
+                <div class="stat-info">
+                    <span class="number">{{ total.injured }}</span>
+                    <span class="label">घाइते</span>
+                </div>
+            </div>
+
+            <!-- Estimated Loss -->
+            <div class="stat-card dark">
+                <i class="bi bi-cash-stack"></i>
+                <div class="stat-info">
+                    <span class="number">{{ "%.0f"|format(total.estimated_loss) if total.estimated_loss else '०' }}</span>
+                    <span class="label">अनुमानित क्षति रु</span>
+                </div>
+            </div>
+
+            <!-- Reporting Status Card -->
+            {% if incident_reporting_status %}
+            <div class="stat-card {% if incident_reporting_status in ['Critical','Severe'] %}danger{% elif incident_reporting_status == 'Moderate' %}warning{% else %}success{% endif %}">
+                <i class="bi bi-shield-check"></i>
+                <div class="stat-info">
+                    <span class="number" style="font-size:14pt">{{ incident_reporting_status }}</span>
+                    <span class="label">रिपोर्टिङ स्थिति</span>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Incident Overview by Ward -->
+        <div class="report-content">
+            <div class="section-title">
+                <i class="bi bi-table"></i> वडा अनुसार घटना विबरण
+            </div>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>वडा</th>
+                        <th>जम्मा<br>घटना</th>
+                        <th>मृत्यु</th>
+                        <th>बेपत्ता</th>
+                        <th>घाइते</th>
+                        <th>अनुमानित<br>क्षति</th>
+                        <th>सडक</th>
+                        <th>विद्युत</th>
+                        <th>संचार</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for ward in ward_list %}
+                    {% set ws = ward_stats.get(ward.id|string, {}) %}
+                    <tr>
+                        <td><strong>{{ ward.name }}</strong></td>
+                        <td>{{ ws.get('incidents', 0) }}</td>
+                        <td>{{ ws.get('deaths', 0) }}</td>
+                        <td>{{ ws.get('missing', 0) }}</td>
+                        <td>{{ ws.get('injured', 0) }}</td>
+                        <td>{{ "%.0f"|format(ws.get('estimated_loss', 0)) }}</td>
+                        <td>
+                            {% if ws.get('road_blocked') %}
+                            <span class="badge bg-danger"><i class="bi bi-signpost-split-fill"></i></span>
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if ws.get('electricity_blocked') %}
+                            <span class="badge bg-danger"><i class="bi bi-lightning-charge-fill"></i></span>
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if ws.get('communication_blocked') %}
+                            <span class="badge bg-danger"><i class="bi bi-wifi"></i></span>
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    <tr class="total-row">
+                        <td>जम्मा</td>
+                        <td>{{ total.incidents }}</td>
+                        <td>{{ total.deaths }}</td>
+                        <td>{{ total.missing }}</td>
+                        <td>{{ total.injured }}</td>
+                        <td>{{ "%.0f"|format(total.estimated_loss) if total.estimated_loss else '०' }}</td>
+                        <td>-</td>
+                        <td>-</td>
+                        <td>-</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Disaster Type Summary -->
+        {% if disaster_type_stats %}
+        <div class="report-content">
+            <div class="section-title brown">
+                <i class="bi bi-graph-up"></i> विपद् प्रकार अनुसार विवरण
+            </div>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th class="brown">विपद्</th>
+                        <th class="brown">जम्मा</th>
+                        <th class="brown">मृत्यु</th>
+                        <th class="brown">बेपत्ता</th>
+                        <th class="brown">घाइते</th>
+                        <th class="brown">प्रभावित<br>परिवार</th>
+                        <th class="brown">घर<br>पूर्ण.क्षति</th>
+                        <th class="brown">घर<br>आं.क्षति</th>
+                        <th class="brown">अ.क्षति</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for dtype, stats in disaster_type_stats.items() %}
+                    <tr>
+                        <td><strong>{{ dtype }}</strong></td>
+                        <td>{{ stats.get('count', 0) }}</td>
+                        <td>{{ stats.get('deaths', 0) }}</td>
+                        <td>{{ stats.get('missing', 0) }}</td>
+                        <td>{{ stats.get('injured', 0) }}</td>
+                        <td>{{ stats.get('affected_households', 0) }}</td>
+                        <td>{{ stats.get('house_destroyed', 0) }}</td>
+                        <td>{{ stats.get('house_damaged', 0) }}</td>
+                        <td>{{ "%.0f"|format(stats.get('estimated_loss', 0)) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+
+        <!-- Infrastructure Status -->
+        <div class="report-content">
+            <div class="section-title gray">
+                <i class="bi bi-hdd-network"></i> पूर्वाधारको स्थिति
+            </div>
+            <div class="infrastructure-grid">
+                <div class="infrastructure-item">
+                    <i class="bi bi-lightning-charge-fill status-normal"></i>
+                    <span class="label">विद्युत:</span>
+                    <span class="status-normal">सामान्य</span>
+                </div>
+                <div class="infrastructure-item">
+                    <i class="bi bi-signpost-split-fill status-normal"></i>
+                    <span class="label">सडक:</span>
+                    <span class="status-normal">सामान्य</span>
+                </div>
+                <div class="infrastructure-item">
+                    <i class="bi bi-wifi status-normal"></i>
+                    <span class="label">संचार:</span>
+                    <span class="status-normal">सामान्य</span>
+                </div>
+                <div class="infrastructure-item">
+                    <i class="bi bi-droplet-fill status-normal"></i>
+                    <span class="label">खानेपानी:</span>
+                    <span class="status-normal">सामान्य</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Situation Report Summary -->
+        <div class="report-content" style="margin-bottom: 5px;">
+            <div class="section-title" style="background-color: #38a169;">
+                <i class="bi bi-clipboard-data"></i> स्थितिको सारांश
+            </div>
+            <div style="padding: 10px; background-color: #f0fff4; border-radius: 4px; font-size: 9pt;">
+                <p><strong>वर्तमान अवस्था:</strong> {{ situation_summary or 'खुलेको छैन' }}</p>
+                {% if resources_deployed %}
+                <p><strong>परिचालित स्रोतहरू:</strong> {{ resources_deployed }}</p>
+                {% endif %}
+                {% if next_update %}
+                <p><strong>अर्को अपडेट:</strong> {{ next_update }}</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Report Footer -->
+        <div class="report-footer">
+            <p>प्रतिवेदन तयार गरिएको मिति: {{ generated_at.strftime('%Y-%m-%d %H:%M') if generated_at is not string else generated_at }} | LEOC थलारा गाउँपालिका</p>
+            <p style="font-size: 8pt; margin-top: 5px;">
+                यो स्थानीय आपतकालीन कार्य केन्द्रको आधिकारिक कागजात हो।
+                आपतकालीन अवस्थाका लागि LEOC सञ्चालन कक्षमा सम्पर्क गर्नुहोस्।
+            </p>
+        </div>
     </div>
 
-    <h6>वडा अनुसार घटना विवरण</h6>
-    <table class="table table-bordered table-sm">
-        <thead class="table-dark"><tr><th>वडा</th><th>घटना</th><th>मृतक</th><th>बेपत्ता</th><th>घाइते</th><th>घर नष्ट</th><th>अ.क्षति</th></tr></thead>
-        <tbody>
-            {% for w in ward_list %}
-            {% set ws = ward_stats.get(w.id|string, {}) %}
-            <tr>
-                <td>{{ w.name }}</td><td>{{ ws.get('incidents', 0) }}</td><td>{{ ws.get('deaths', 0) }}</td>
-                <td>{{ ws.get('missing', 0) }}</td><td>{{ ws.get('injured', 0) }}</td>
-                <td>{{ ws.get('house_destroyed', 0) }}</td><td>{{ ws.get('estimated_loss', 0) }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-        <tfoot class="table-secondary">
-            <tr><th>जम्मा</th><th>{{ total.incidents }}</th><th>{{ total.deaths }}</th>
-            <th>{{ total.missing }}</th><th>{{ total.injured }}</th>
-            <th>{{ total.house_destroyed }}</th><th>{{ total.estimated_loss }}</th></tr>
-        </tfoot>
-    </table>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function applyFilter() {
+            const fromDate = document.getElementById('fromDateBS').value;
+            const toDate = document.getElementById('toDateBS').value;
 
-    {% if disaster_type_stats %}
-    <h6>विपद् प्रकार अनुसार</h6>
-    <table class="table table-bordered table-sm">
-        <thead class="table-dark"><tr><th>प्रकार</th><th>जम्मा</th><th>मृतक</th><th>घाइते</th><th>परिवार</th><th>घर नष्ट</th><th>अ.क्षति</th></tr></thead>
-        <tbody>
-            {% for t, s in disaster_type_stats.items() %}
-            <tr><td>{{ t }}</td><td>{{ s.count }}</td><td>{{ s.deaths }}</td><td>{{ s.injured }}</td>
-                <td>{{ s.affected_households }}</td><td>{{ s.house_destroyed }}</td><td>{{ s.estimated_loss }}</td></tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    {% endif %}
+            if (fromDate && toDate) {
+                if (fromDate === toDate) {
+                    window.location.href = '/daily-report-preview?bs_date=' + fromDate;
+                } else {
+                    window.location.href = '/daily-report-preview?from_bs_date=' + fromDate + '&to_bs_date=' + toDate;
+                }
+            } else {
+                alert('Please enter both From and To dates');
+            }
+        }
 
-    <div class="footer">
-        <p>Report generated on {{ generated_at|nepali_date if generated_at else '' }} | LEOC - थलारा गाउँपालिका</p>
-    </div>
+        // Auto-print on load if requested
+        if (window.location.search.includes('autoprint=1')) {
+            window.onload = function () {
+                setTimeout(function () {
+                    window.print();
+                }, 500);
+            };
+        }
+    </script>
 </body>
+
 </html>

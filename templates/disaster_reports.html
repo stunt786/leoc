@@ -1,373 +1,419 @@
 {% extends "base.html" %}
-{% block title %}Disaster Reports - LEOC{% endblock %}
+{% block title %}Daily Bulletin - LEOC{% endblock %}
 {% block breadcrumb %}
 <li class="breadcrumb-item"><a href="{{ url_for('index') }}"><i class="bi bi-house-fill"></i></a></li>
-<li class="breadcrumb-item active">Disaster Reports</li>
+<li class="breadcrumb-item active">Daily Bulletin</li>
 {% endblock %}
 {% block content %}
+<style>
+  .bulletin-form .card-header { font-weight: 600; }
+  .bulletin-form .form-label { font-weight: 500; font-size: 0.85rem; }
+  .priority-badge { width: fit-content; }
+  .incident-checkbox:checked + label { background-color: #e8f4fd; }
+  .selected-count { font-size: 0.85rem; }
+  .stat-mini { text-align: center; padding: 8px; border-radius: 6px; background: #f8f9fa; }
+  .stat-mini .number { font-size: 1.25rem; font-weight: 700; }
+  .stat-mini .label { font-size: 0.7rem; color: #6c757d; text-transform: uppercase; letter-spacing: 0.5px; }
+</style>
+
 <div class="page-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-    <h4><i class="bi bi-exclamation-triangle-fill me-2"></i>Disaster Reports</h4>
-    <div class="d-flex gap-2">
-        <button class="btn btn-outline-primary btn-sm" onclick="showPrintPreview()"><i class="bi bi-eye me-1"></i>Print Preview</button>
-        <button class="btn btn-primary btn-sm" onclick="downloadDailyReport()"><i class="bi bi-download me-1"></i>Download Daily Report</button>
-    </div>
+  <div>
+    <h4 class="mb-0"><i class="bi bi-megaphone-fill me-2"></i>Daily Bulletin</h4>
+    <p class="text-muted mb-0 small">Create and manage daily disaster bulletins</p>
+  </div>
+  <div class="d-flex gap-2">
+    <button class="btn btn-outline-primary btn-sm" onclick="showPrintPreview()" title="Print Preview">
+      <i class="bi bi-eye me-1"></i>Print Preview
+    </button>
+    <button class="btn btn-outline-success btn-sm" onclick="downloadPDF()" title="Download PDF">
+      <i class="bi bi-file-earmark-pdf me-1"></i>PDF
+    </button>
+    <button class="btn btn-primary btn-sm" onclick="saveBulletin()" id="btnSave">
+      <i class="bi bi-save me-1"></i>Save Bulletin
+    </button>
+  </div>
 </div>
 
-<div class="row g-3 mt-1">
-    <div class="col-md-8">
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <span><i class="bi bi-plus-circle me-2"></i>New Disaster Assessment</span>
+<form id="bulletinForm" class="bulletin-form">
+  <div class="row g-3 mt-1">
+    <!-- Main Form -->
+    <div class="col-lg-8">
+      <!-- Bulletin Details -->
+      <div class="card mb-3">
+        <div class="card-header py-2">
+          <i class="bi bi-info-circle me-1 text-primary"></i> Bulletin Details
+        </div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">Public Notice Title <span class="text-danger">*</span></label>
+              <input type="text" class="form-control" id="notice_title" placeholder="e.g. आगलागी सम्बन्धी सूचना" required>
             </div>
-            <div class="card-body">
-                <form id="assessmentForm">
-                    <div class="row g-2 mb-2">
-                        <div class="col-md-4">
-                            <label class="form-label small">Incident</label>
-                            <select class="form-select form-select-sm" id="incident_id" required></select>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label small">Disaster Type</label>
-                            <select class="form-select form-select-sm" id="disaster_type" required></select>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label small">Fiscal Year</label>
-                            <select class="form-select form-select-sm" id="fiscal_year"></select>
-                        </div>
-                    </div>
-                    <div class="row g-2 mb-2">
-                        <div class="col-md-4">
-                            <label class="form-label small">Date (BS)</label>
-                            <input type="text" class="form-control form-control-sm" id="disaster_date_bs" placeholder="2081-12-25">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label small">Location/Tole</label>
-                            <input type="text" class="form-control form-control-sm" id="tole">
-                        </div>
-                    </div>
-
-                    <h6 class="mt-3 mb-2"><i class="bi bi-people-fill me-1"></i>Human Impact</h6>
-                    <div class="row g-2 mb-2">
-                        <div class="col-3"><label class="form-label small">Deaths</label><input type="number" class="form-control form-control-sm" id="deaths" min="0" value="0"></div>
-                        <div class="col-3"><label class="form-label small">Missing</label><input type="number" class="form-control form-control-sm" id="missing_persons" min="0" value="0"></div>
-                        <div class="col-3"><label class="form-label small">Injured</label><input type="number" class="form-control form-control-sm" id="injured" min="0" value="0"></div>
-                        <div class="col-3"><label class="form-label small">Affected Households</label><input type="number" class="form-control form-control-sm" id="affected_households" min="0" value="0"></div>
-                    </div>
-                    <div class="row g-2 mb-2">
-                        <div class="col-4"><label class="form-label small">Affected People (Male)</label><input type="number" class="form-control form-control-sm" id="affected_people_male" min="0" value="0"></div>
-                        <div class="col-4"><label class="form-label small">Affected People (Female)</label><input type="number" class="form-control form-control-sm" id="affected_people_female" min="0" value="0"></div>
-                        <div class="col-4"><label class="form-label small">Affected People (Total)</label><input type="number" class="form-control form-control-sm" id="affected_people" min="0" value="0"></div>
-                    </div>
-
-                    <h6 class="mt-3 mb-2"><i class="bi bi-building me-1"></i>Property Damage</h6>
-                    <div class="row g-2 mb-2">
-                        <div class="col-3"><label class="form-label small">House Destroyed</label><input type="number" class="form-control form-control-sm" id="house_destroyed" min="0" value="0"></div>
-                        <div class="col-3"><label class="form-label small">House Damaged</label><input type="number" class="form-control form-control-sm" id="house_damaged" min="0" value="0"></div>
-                        <div class="col-3"><label class="form-label small">Public Bldg Destroyed</label><input type="number" class="form-control form-control-sm" id="public_building_destroyed" min="0" value="0"></div>
-                        <div class="col-3"><label class="form-label small">Public Bldg Damaged</label><input type="number" class="form-control form-control-sm" id="public_building_damaged" min="0" value="0"></div>
-                    </div>
-                    <div class="row g-2 mb-2">
-                        <div class="col-4"><label class="form-label small">Est. Loss (NPR)</label><input type="number" class="form-control form-control-sm" id="estimated_loss" min="0" value="0" step="0.01"></div>
-                        <div class="col-8"><label class="form-label small">Crop Damage</label><input type="text" class="form-control form-control-sm" id="agriculture_crop_damage" placeholder="e.g. 5 ha paddy destroyed"></div>
-                    </div>
-
-                    <h6 class="mt-3 mb-2"><i class="bi bi-paw me-1"></i>Livestock Impact</h6>
-                    <div class="row g-2 mb-2">
-                        <div class="col-3"><label class="form-label small">Cattle Lost</label><input type="number" class="form-control form-control-sm" id="cattle_lost" min="0" value="0"></div>
-                        <div class="col-3"><label class="form-label small">Cattle Injured</label><input type="number" class="form-control form-control-sm" id="cattle_injured" min="0" value="0"></div>
-                        <div class="col-3"><label class="form-label small">Poultry Lost</label><input type="number" class="form-control form-control-sm" id="poultry_lost" min="0" value="0"></div>
-                        <div class="col-3"><label class="form-label small">Poultry Injured</label><input type="number" class="form-control form-control-sm" id="poultry_injured" min="0" value="0"></div>
-                    </div>
-                    <div class="row g-2 mb-2">
-                        <div class="col-3"><label class="form-label small">Goats/Sheep Lost</label><input type="number" class="form-control form-control-sm" id="goats_sheep_lost" min="0" value="0"></div>
-                        <div class="col-3"><label class="form-label small">Goats/Sheep Injured</label><input type="number" class="form-control form-control-sm" id="goats_sheep_injured" min="0" value="0"></div>
-                        <div class="col-3"><label class="form-label small">Other Livestock Lost</label><input type="number" class="form-control form-control-sm" id="other_livestock_lost" min="0" value="0"></div>
-                        <div class="col-3"><label class="form-label small">Other Livestock Injured</label><input type="number" class="form-control form-control-sm" id="other_livestock_injured" min="0" value="0"></div>
-                    </div>
-
-                    <h6 class="mt-3 mb-2"><i class="bi bi-infinity me-1"></i>Infrastructure</h6>
-                    <div class="row g-2 mb-2">
-                        <div class="col-3"><div class="form-check"><input class="form-check-input" type="checkbox" id="road_blocked"><label class="form-check-label small">Road Blocked</label></div></div>
-                        <div class="col-3"><div class="form-check"><input class="form-check-input" type="checkbox" id="electricity_blocked"><label class="form-check-label small">Electricity Disrupted</label></div></div>
-                        <div class="col-3"><div class="form-check"><input class="form-check-input" type="checkbox" id="communication_blocked"><label class="form-check-label small">Communication Down</label></div></div>
-                        <div class="col-3"><div class="form-check"><input class="form-check-input" type="checkbox" id="drinking_water_disrupted"><label class="form-check-label small">Water Disrupted</label></div></div>
-                    </div>
-
-                    <div class="mb-2">
-                        <label class="form-label small">Remarks</label>
-                        <textarea class="form-control form-control-sm" id="remarks" rows="2"></textarea>
-                    </div>
-                    <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-check-lg me-1"></i>Save Assessment</button>
-                </form>
+            <div class="col-md-3">
+              <label class="form-label">Priority</label>
+              <select class="form-select" id="priority">
+                <option value="low">Low</option>
+                <option value="medium" selected>Medium</option>
+                <option value="high">High</option>
+                <option value="critical">Critical</option>
+              </select>
             </div>
-        </div>
-    </div>
-
-    <div class="col-md-4">
-        <div class="card mb-3">
-            <div class="card-header"><span><i class="bi bi-funnel me-2"></i>Filter</span></div>
-            <div class="card-body">
-                <div class="mb-2">
-                    <label class="form-label small">Fiscal Year</label>
-                    <select class="form-select form-select-sm" id="statFiscalYear" onchange="loadStatistics()">
-                        <option value="">All</option>
-                    </select>
-                </div>
-                <div class="mb-2">
-                    <label class="form-label small">Disaster Type</label>
-                    <select class="form-select form-select-sm" id="statDisasterType" onchange="loadStatistics()">
-                        <option value="">All</option>
-                    </select>
-                </div>
-                <div class="mb-2">
-                    <label class="form-label small">Ward</label>
-                    <select class="form-select form-select-sm" id="statWard" onchange="loadStatistics()">
-                        <option value="">All</option>
-                        {% for w in ward_list %}
-                        <option value="{{ w.id }}">{{ w.name }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
+            <div class="col-md-3">
+              <label class="form-label">Status</label>
+              <select class="form-select" id="report_status">
+                <option value="draft">Draft</option>
+                <option value="published" selected>Published</option>
+              </select>
             </div>
-        </div>
-
-        <div class="card mb-3">
-            <div class="card-header"><span><i class="bi bi-bar-chart me-2"></i>Summary</span></div>
-            <div class="card-body">
-                <div class="row g-1 text-center" id="statCards">
-                    <div class="col-6 mb-1"><div class="p-2 bg-light rounded"><small class="text-muted d-block">Total Assessments</small><strong id="statCount">0</strong></div></div>
-                    <div class="col-6 mb-1"><div class="p-2 bg-danger bg-opacity-10 rounded"><small class="text-muted d-block">Deaths</small><strong id="statDeaths" class="text-danger">0</strong></div></div>
-                    <div class="col-6 mb-1"><div class="p-2 bg-warning bg-opacity-10 rounded"><small class="text-muted d-block">Missing</small><strong id="statMissing" class="text-warning">0</strong></div></div>
-                    <div class="col-6 mb-1"><div class="p-2 bg-info bg-opacity-10 rounded"><small class="text-muted d-block">Injured</small><strong id="statInjured" class="text-info">0</strong></div></div>
-                    <div class="col-6 mb-1"><div class="p-2 bg-success bg-opacity-10 rounded"><small class="text-muted d-block">Affected HH</small><strong id="statAffectedHH" class="text-success">0</strong></div></div>
-                    <div class="col-6 mb-1"><div class="p-2 bg-secondary bg-opacity-10 rounded"><small class="text-muted d-block">House Destroyed</small><strong id="statHouseDestroyed">0</strong></div></div>
-                    <div class="col-12 mt-2"><div class="p-2 bg-primary bg-opacity-10 rounded"><small class="text-muted d-block">Est. Loss (NPR)</small><strong id="statLoss" class="text-primary">0</strong></div></div>
-                </div>
+            <div class="col-md-6">
+              <label class="form-label">Public Notice Description</label>
+              <textarea class="form-control" id="notice_description" rows="2" placeholder="Brief description of the public notice"></textarea>
             </div>
+            <div class="col-md-3">
+              <label class="form-label">Valid Date From (BS) <span class="text-danger">*</span></label>
+              <input type="text" class="form-control nepali-date" id="valid_from" placeholder="2081-12-25" required>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Valid Date To (BS)</label>
+              <input type="text" class="form-control nepali-date" id="valid_to" placeholder="2081-12-30">
+            </div>
+          </div>
         </div>
+      </div>
 
-        <div class="card mb-3">
-            <div class="card-header"><span><i class="bi bi-pie-chart me-2"></i>By Disaster Type</span></div>
-            <div class="card-body"><canvas id="typeChart" height="150"></canvas></div>
+      <!-- Weather & Status -->
+      <div class="card mb-3">
+        <div class="card-header py-2">
+          <i class="bi bi-cloud-sun me-1 text-warning"></i> Weather & Reporting Status
         </div>
-
-        <div class="card">
-            <div class="card-header"><span><i class="bi bi-pie-chart me-2"></i>By Ward</span></div>
-            <div class="card-body"><canvas id="wardChart" height="150"></canvas></div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label">Today's Weather Status</label>
+              <select class="form-select" id="weather_status">
+                <option value="">Select weather</option>
+                <option value="Sunny">Sunny / घाम लागेको</option>
+                <option value="Cloudy">Cloudy / बादल लागेको</option>
+                <option value="Rainy">Rainy / वर्षा</option>
+                <option value="Heavy Rain">Heavy Rain / भारी वर्षा</option>
+                <option value="Storm">Storm / आँधी</option>
+                <option value="Foggy">Foggy / कुहिरो</option>
+                <option value="Cold Wave">Cold Wave / शीतलहर</option>
+                <option value="Heat Wave">Heat Wave / गर्मी लहर</option>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Incidents Reporting Status</label>
+              <select class="form-select" id="incident_reporting_status">
+                <option value="All Normal">All Normal / सबै सामान्य</option>
+                <option value="Minor Incidents">Minor Incidents / सानातिना घटना</option>
+                <option value="Moderate">Moderate / मध्यम</option>
+                <option value="Severe">Severe / गम्भीर</option>
+                <option value="Critical">Critical / अत्यन्त गम्भीर</option>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Next Update</label>
+              <div class="input-group">
+                <input type="text" class="form-control" id="next_update_date" placeholder="2081-12-26">
+                <input type="time" class="form-control" id="next_update_time" placeholder="15:00" style="max-width:100px">
+              </div>
+              <small class="text-muted">Date (BS) and time for next bulletin</small>
+            </div>
+          </div>
         </div>
-    </div>
-</div>
+      </div>
 
-<div class="card mt-3">
-    <div class="card-header d-flex justify-content-between align-items-center">
-        <span><i class="bi bi-list me-2"></i>Assessment Records</span>
-    </div>
-    <div class="card-body p-0">
-        <div class="table-responsive">
-            <table class="table table-hover mb-0" id="assessmentTable">
-                <thead><tr>
-                    <th>Incident</th><th>Type</th><th>Fiscal Year</th><th>BS Date</th><th>Deaths</th><th>Missing</th><th>Injured</th><th>Actions</th>
-                </tr></thead>
-                <tbody id="assessmentBody"></tbody>
+      <!-- Incident Selection -->
+      <div class="card mb-3">
+        <div class="card-header py-2 d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-list-check me-1 text-success"></i> Select Incidents</span>
+          <span class="selected-count"><span id="selectedIncidentCount">0</span> selected</span>
+        </div>
+        <div class="card-body p-0">
+          <div class="p-2 border-bottom d-flex gap-2">
+            <select class="form-select form-select-sm" style="width:auto;min-width:140px" id="incidentFilterWard" onchange="filterIncidentsForBulletin()">
+              <option value="">All Wards</option>
+              {% for w in ward_list %}
+              <option value="{{ w.id }}">{{ w.name }}</option>
+              {% endfor %}
+            </select>
+            <select class="form-select form-select-sm" style="width:auto;min-width:140px" id="incidentFilterType" onchange="filterIncidentsForBulletin()">
+              <option value="">All Types</option>
+            </select>
+            <input type="text" class="form-control form-control-sm" style="width:200px" id="incidentFilterSearch" placeholder="Search incidents..." oninput="filterIncidentsForBulletin()">
+            <div class="ms-auto">
+              <button type="button" class="btn btn-sm btn-outline-primary" onclick="selectAllIncidents(true)">Select All</button>
+              <button type="button" class="btn btn-sm btn-outline-secondary" onclick="selectAllIncidents(false)">Clear</button>
+            </div>
+          </div>
+          <div class="table-responsive" style="max-height:350px;overflow-y:auto">
+            <table class="table table-hover mb-0 table-sm" id="incidentSelectTable">
+              <thead class="table-light">
+                <tr>
+                  <th style="width:40px">
+                    <input type="checkbox" class="form-check-input" id="selectAllIncidents" onchange="toggleAllIncidents(this)">
+                  </th>
+                  <th>Name</th>
+                  <th>Type</th>
+                  <th>Ward</th>
+                  <th>Date (BS)</th>
+                  <th>Severity</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="incidentSelectBody">
+                <tr><td colspan="7" class="text-center py-3"><div class="spinner-border spinner-border-sm text-primary"></div> Loading...</td></tr>
+              </tbody>
             </table>
+          </div>
         </div>
+      </div>
+
+      <!-- Situation Report -->
+      <div class="card mb-3">
+        <div class="card-header py-2">
+          <i class="bi bi-clipboard-data me-1 text-info"></i> Situation Report
+        </div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">Current Situation Summary</label>
+              <textarea class="form-control" id="situation_summary" rows="2" placeholder="Brief summary of current situation"></textarea>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Resources Deployed</label>
+              <textarea class="form-control" id="resources_deployed" rows="2" placeholder="Details of resources deployed"></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
-</div>
+
+    <!-- Sidebar -->
+    <div class="col-lg-4">
+      <!-- Quick Stats -->
+      <div class="card mb-3">
+        <div class="card-header py-2">
+          <i class="bi bi-bar-chart me-1 text-primary"></i> Selected Stats
+        </div>
+        <div class="card-body">
+          <div class="row g-2" id="selectedStats">
+            <div class="col-6"><div class="stat-mini"><div class="number" id="selCount">0</div><div class="label">Incidents</div></div></div>
+            <div class="col-6"><div class="stat-mini"><div class="number text-danger" id="selDeaths">0</div><div class="label">Deaths</div></div></div>
+            <div class="col-6"><div class="stat-mini"><div class="number text-warning" id="selMissing">0</div><div class="label">Missing</div></div></div>
+            <div class="col-6"><div class="stat-mini"><div class="number text-info" id="selInjured">0</div><div class="label">Injured</div></div></div>
+            <div class="col-6"><div class="stat-mini"><div class="number text-success" id="selAffected">0</div><div class="label">Affected HH</div></div></div>
+            <div class="col-6"><div class="stat-mini"><div class="number text-secondary" id="selLoss">0</div><div class="label">Est. Loss</div></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Priority Guide -->
+      <div class="card mb-3">
+        <div class="card-header py-2">
+          <i class="bi bi-flag me-1 text-warning"></i> Priority Guide
+        </div>
+        <div class="card-body py-2 small">
+          <div class="d-flex align-items-center mb-1"><span class="badge bg-secondary me-2">Low</span> Routine information</div>
+          <div class="d-flex align-items-center mb-1"><span class="badge bg-info me-2">Medium</span> General alert</div>
+          <div class="d-flex align-items-center mb-1"><span class="badge bg-warning text-dark me-2">High</span> Urgent attention</div>
+          <div class="d-flex align-items-center"><span class="badge bg-danger me-2">Critical</span> Immediate action</div>
+        </div>
+      </div>
+
+      <!-- Recent Bulletins -->
+      <div class="card mb-3">
+        <div class="card-header py-2">
+          <i class="bi bi-clock-history me-1 text-secondary"></i> Recent Bulletins
+        </div>
+        <div class="card-body p-0">
+          <div id="recentBulletinsList">
+            <div class="text-center text-muted py-3 small">No bulletins saved yet</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</form>
 {% endblock %}
+
 {% block extra_js %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-let formData = {};
-let typeChart = null, wardChart = null;
+const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+let allIncidents = [];
+let incidentTypes = [];
 
-async function loadFormData() {
-    try {
-        const resp = await fetch('/api/data');
-        formData = await resp.json();
-        populateSelect('incident_id', formData.incidents, 'id', 'incident_name');
-        populateSelect('disaster_type', formData.disaster_types, null, null);
-        populateSelect('fiscal_year', formData.fiscal_years, null, null);
-        populateSelect('statFiscalYear', formData.fiscal_years, null, null);
-        populateSelect('statDisasterType', formData.disaster_types, null, null);
-        if (formData.active_fiscal_year) document.getElementById('fiscal_year').value = formData.active_fiscal_year;
-    } catch(e) { console.error(e); }
-    loadAssessments();
-    loadStatistics();
+// --- Load incident types for filter ---
+async function loadIncidentTypes() {
+  try {
+    const r = await fetch('/api/settings/disaster_types');
+    const d = await r.json();
+    incidentTypes = Array.isArray(d.value) ? d.value : [];
+  } catch(e) {
+    incidentTypes = ['Flood', 'Earthquake', 'Landslide', 'Fire', 'Storm', 'Other'];
+  }
+  const sel = document.getElementById('incidentFilterType');
+  sel.innerHTML = '<option value="">All Types</option>' +
+    incidentTypes.map(t => `<option value="${t}">${t}</option>`).join('');
 }
 
-function populateSelect(id, items, valKey, labelKey) {
-    const sel = document.getElementById(id);
-    if (!sel) return;
-    items.forEach(item => {
-        const opt = document.createElement('option');
-        if (valKey === null) { opt.value = item; opt.textContent = item; }
-        else { opt.value = item[valKey]; opt.textContent = item[labelKey]; }
-        sel.appendChild(opt);
+// --- Load incidents ---
+async function loadIncidents() {
+  try {
+    const r = await fetch('/api/incidents');
+    const d = await r.json();
+    if (!d.success) { showToast('danger', d.message); return; }
+    allIncidents = d.incidents || [];
+    renderIncidentTable(allIncidents);
+  } catch(e) {
+    document.getElementById('incidentSelectBody').innerHTML =
+      '<tr><td colspan="7" class="text-center py-3 text-danger">Failed to load incidents</td></tr>';
+  }
+}
+
+function renderIncidentTable(incidents) {
+  const tbody = document.getElementById('incidentSelectBody');
+  if (!incidents.length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="text-center py-3 text-muted">No incidents found</td></tr>';
+    updateStats();
+    return;
+  }
+  tbody.innerHTML = incidents.map(i => {
+    const severityColor = i.severity === 'critical' ? 'danger' : i.severity === 'high' ? 'warning text-dark' : 'info';
+    const statusColor = i.status === 'Active' ? 'success' : 'secondary';
+    return `<tr>
+      <td><input type="checkbox" class="form-check-input incident-checkbox" value="${i.id}" data-incident='${esc(JSON.stringify(i))}' onchange="onIncidentSelect()"></td>
+      <td><strong>${esc(i.incident_name || '')}</strong></td>
+      <td><span class="badge bg-info">${esc(i.incident_type || '')}</span></td>
+      <td>${esc(i.ward_name || i.ward || '-')}</td>
+      <td>${i.start_date_bs || i.disaster_date_bs || '-'}</td>
+      <td><span class="badge bg-${severityColor}">${esc(i.severity || 'medium')}</span></td>
+      <td><span class="badge bg-${statusColor}">${esc(i.status || '')}</span></td>
+    </tr>`;
+  }).join('');
+  updateStats();
+}
+
+function filterIncidentsForBulletin() {
+  const ward = document.getElementById('incidentFilterWard').value;
+  const type = document.getElementById('incidentFilterType').value;
+  const q = document.getElementById('incidentFilterSearch').value.toLowerCase();
+  let filtered = allIncidents;
+  if (ward) filtered = filtered.filter(i => i.ward == ward);
+  if (type) filtered = filtered.filter(i => i.incident_type === type);
+  if (q) filtered = filtered.filter(i =>
+    (i.incident_name && i.incident_name.toLowerCase().includes(q)) ||
+    (i.incident_type && i.incident_type.toLowerCase().includes(q))
+  );
+  renderIncidentTable(filtered);
+}
+
+function toggleAllIncidents(master) {
+  document.querySelectorAll('.incident-checkbox').forEach(cb => cb.checked = master.checked);
+  onIncidentSelect();
+}
+
+function selectAllIncidents(select) {
+  document.querySelectorAll('.incident-checkbox').forEach(cb => cb.checked = select);
+  document.getElementById('selectAllIncidents').checked = select;
+  onIncidentSelect();
+}
+
+function onIncidentSelect() {
+  const checked = document.querySelectorAll('.incident-checkbox:checked');
+  document.getElementById('selectedIncidentCount').textContent = checked.length;
+  updateStats(Array.from(checked).map(cb => JSON.parse(cb.dataset.incident)));
+}
+
+function updateStats(selected = []) {
+  document.getElementById('selCount').textContent = selected.length;
+  document.getElementById('selDeaths').textContent = selected.reduce((s, i) => s + (parseInt(i.deaths) || 0), 0);
+  document.getElementById('selMissing').textContent = selected.reduce((s, i) => s + (parseInt(i.missing_persons) || 0), 0);
+  document.getElementById('selInjured').textContent = selected.reduce((s, i) => s + (parseInt(i.injured) || 0), 0);
+  document.getElementById('selAffected').textContent = selected.reduce((s, i) => s + (parseInt(i.affected_households) || 0), 0);
+  const loss = selected.reduce((s, i) => s + (parseFloat(i.estimated_loss) || 0), 0);
+  document.getElementById('selLoss').textContent = loss.toLocaleString();
+}
+
+function esc(s) {
+  if (!s) return '';
+  if (typeof s !== 'string') s = String(s);
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+// --- Save Bulletin ---
+async function saveBulletin() {
+  const title = document.getElementById('notice_title').value.trim();
+  if (!title) { showToast('danger', 'Public Notice Title is required'); return; }
+  const validFrom = document.getElementById('valid_from').value.trim();
+  if (!validFrom) { showToast('danger', 'Valid Date From is required'); return; }
+
+  const selectedIncidents = Array.from(document.querySelectorAll('.incident-checkbox:checked'))
+    .map(cb => parseInt(cb.value));
+
+  const payload = {
+    notice_title: title,
+    notice_description: document.getElementById('notice_description').value.trim(),
+    priority: document.getElementById('priority').value,
+    report_status: document.getElementById('report_status').value,
+    valid_from: validFrom,
+    valid_to: document.getElementById('valid_to').value.trim(),
+    weather_status: document.getElementById('weather_status').value,
+    incident_reporting_status: document.getElementById('incident_reporting_status').value,
+    next_update_date: document.getElementById('next_update_date').value.trim(),
+    next_update_time: document.getElementById('next_update_time').value,
+    situation_summary: document.getElementById('situation_summary').value.trim(),
+    resources_deployed: document.getElementById('resources_deployed').value.trim(),
+    incident_ids: selectedIncidents,
+  };
+
+  try {
+    const r = await fetch('/api/daily-bulletins', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
+      body: JSON.stringify(payload),
     });
+    const d = await r.json();
+    if (d.success) {
+      showToast('success', 'Bulletin saved successfully');
+    } else {
+      showToast('danger', d.message || 'Failed to save bulletin');
+    }
+  } catch(e) {
+    showToast('danger', 'Error: ' + e.message);
+  }
 }
 
-document.getElementById('assessmentForm').addEventListener('submit', async function(e) {
-    e.preventDefault();
-    const data = {
-        incident_id: parseInt(document.getElementById('incident_id').value),
-        disaster_type: document.getElementById('disaster_type').value,
-        fiscal_year: document.getElementById('fiscal_year').value,
-        disaster_date_bs: document.getElementById('disaster_date_bs').value,
-        tole: document.getElementById('tole').value,
-        deaths: parseInt(document.getElementById('deaths').value) || 0,
-        missing_persons: parseInt(document.getElementById('missing_persons').value) || 0,
-        injured: parseInt(document.getElementById('injured').value) || 0,
-        affected_households: parseInt(document.getElementById('affected_households').value) || 0,
-        affected_people: parseInt(document.getElementById('affected_people').value) || 0,
-        affected_people_male: parseInt(document.getElementById('affected_people_male').value) || 0,
-        affected_people_female: parseInt(document.getElementById('affected_people_female').value) || 0,
-        house_destroyed: parseInt(document.getElementById('house_destroyed').value) || 0,
-        house_damaged: parseInt(document.getElementById('house_damaged').value) || 0,
-        public_building_destroyed: parseInt(document.getElementById('public_building_destroyed').value) || 0,
-        public_building_damaged: parseInt(document.getElementById('public_building_damaged').value) || 0,
-        estimated_loss: parseFloat(document.getElementById('estimated_loss').value) || 0.0,
-        agriculture_crop_damage: document.getElementById('agriculture_crop_damage').value,
-        cattle_lost: parseInt(document.getElementById('cattle_lost').value) || 0,
-        cattle_injured: parseInt(document.getElementById('cattle_injured').value) || 0,
-        poultry_lost: parseInt(document.getElementById('poultry_lost').value) || 0,
-        poultry_injured: parseInt(document.getElementById('poultry_injured').value) || 0,
-        goats_sheep_lost: parseInt(document.getElementById('goats_sheep_lost').value) || 0,
-        goats_sheep_injured: parseInt(document.getElementById('goats_sheep_injured').value) || 0,
-        other_livestock_lost: parseInt(document.getElementById('other_livestock_lost').value) || 0,
-        other_livestock_injured: parseInt(document.getElementById('other_livestock_injured').value) || 0,
-        road_blocked: document.getElementById('road_blocked').checked,
-        electricity_blocked: document.getElementById('electricity_blocked').checked,
-        communication_blocked: document.getElementById('communication_blocked').checked,
-        drinking_water_disrupted: document.getElementById('drinking_water_disrupted').checked,
-        remarks: document.getElementById('remarks').value,
-    };
-    try {
-        const resp = await fetch('/api/disaster-assessments', {
-            method: 'POST',
-            headers: {'Content-Type':'application/json','X-CSRFToken':document.querySelector('meta[name="csrf-token"]').getAttribute('content')},
-            body: JSON.stringify(data)
-        });
-        const result = await resp.json();
-        if (result.success) {
-            showToast('success', 'Assessment saved');
-            document.getElementById('assessmentForm').reset();
-            loadAssessments();
-            loadStatistics();
-        } else {
-            showToast('danger', result.message);
-        }
-    } catch(e) { showToast('danger', e.message); }
-});
-
-async function loadAssessments() {
-    try {
-        const resp = await fetch('/api/disaster-assessments');
-        const data = await resp.json();
-        const tbody = document.getElementById('assessmentBody');
-        if (!data.success || !data.assessments.length) {
-            tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">No assessments yet</td></tr>';
-            return;
-        }
-        tbody.innerHTML = data.assessments.map(a => `
-            <tr>
-                <td>${a.incident_name || ''}</td>
-                <td>${a.disaster_type}</td>
-                <td>${a.fiscal_year || ''}</td>
-                <td>${a.disaster_date_bs || ''}</td>
-                <td>${a.deaths}</td>
-                <td>${a.missing_persons}</td>
-                <td>${a.injured}</td>
-                <td><button class="btn btn-sm btn-outline-danger" onclick="deleteAssessment(${a.id})"><i class="bi bi-trash"></i></button></td>
-            </tr>
-        `).join('');
-    } catch(e) { console.error(e); }
-}
-
-async function deleteAssessment(id) {
-    if (!confirm('Delete this assessment?')) return;
-    try {
-        await fetch(`/api/disaster-assessments/${id}`, {
-            method: 'DELETE',
-            headers: {'X-CSRFToken':document.querySelector('meta[name="csrf-token"]').getAttribute('content')}
-        });
-        loadAssessments();
-        loadStatistics();
-        showToast('success', 'Deleted');
-    } catch(e) { showToast('danger', e.message); }
-}
-
-async function loadStatistics() {
-    const params = new URLSearchParams();
-    const fy = document.getElementById('statFiscalYear').value;
-    const dt = document.getElementById('statDisasterType').value;
-    const wd = document.getElementById('statWard').value;
-    if (fy) params.set('fiscal_year', fy);
-    if (dt) params.set('disaster_type', dt);
-    if (wd) params.set('ward', wd);
-    try {
-        const resp = await fetch(`/api/disaster-statistics?${params.toString()}`);
-        const data = await resp.json();
-        if (!data.success) return;
-        document.getElementById('statCount').textContent = data.total.count || 0;
-        document.getElementById('statDeaths').textContent = data.total.deaths || 0;
-        document.getElementById('statMissing').textContent = data.total.missing || 0;
-        document.getElementById('statInjured').textContent = data.total.injured || 0;
-        document.getElementById('statAffectedHH').textContent = data.total.affected_households || 0;
-        document.getElementById('statHouseDestroyed').textContent = data.total.house_destroyed || 0;
-        document.getElementById('statLoss').textContent = (data.total.estimated_loss || 0).toLocaleString();
-        renderTypeChart(data.by_type);
-        renderWardChart(data.by_ward);
-    } catch(e) { console.error(e); }
-}
-
-function renderTypeChart(byType) {
-    const labels = Object.keys(byType);
-    const values = labels.map(k => byType[k].count || 0);
-    const colors = ['#ef4444','#f97316','#eab308','#22c55e','#3b82f6','#8b5cf6','#ec4899'];
-    if (typeChart) typeChart.destroy();
-    const ctx = document.getElementById('typeChart').getContext('2d');
-    typeChart = new Chart(ctx, {
-        type: 'doughnut',
-        data: { labels, datasets: [{ data: values, backgroundColor: colors.slice(0, labels.length) }] },
-        options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12 } } } }
-    });
-}
-
-function renderWardChart(byWard) {
-    const labels = Object.keys(byWard).sort((a,b) => parseInt(a) - parseInt(b));
-    const deaths = labels.map(k => byWard[k].deaths || 0);
-    const injured = labels.map(k => byWard[k].injured || 0);
-    if (wardChart) wardChart.destroy();
-    const ctx = document.getElementById('wardChart').getContext('2d');
-    wardChart = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: labels.map(w => `W${w}`),
-            datasets: [
-                { label: 'Deaths', data: deaths, backgroundColor: '#ef4444' },
-                { label: 'Injured', data: injured, backgroundColor: '#f97316' },
-            ]
-        },
-        options: { responsive: true, scales: { y: { beginAtZero: true } }, plugins: { legend: { position: 'bottom' } } }
-    });
-}
-
-
+// --- Print Preview / PDF ---
 function showPrintPreview() {
-    const fy = document.getElementById('statFiscalYear').value;
-    const params = new URLSearchParams();
-    if (fy) params.set('fiscal_year', fy);
-    const url = `/daily-report-preview?bs_date=${today_bs}`;
-    window.open(url, '_blank');
+  const validFrom = document.getElementById('valid_from').value.trim();
+  const validTo = document.getElementById('valid_to').value.trim();
+  let url = '/daily-report-preview?';
+  if (validFrom && validTo) url += 'from_bs_date=' + validFrom + '&to_bs_date=' + validTo;
+  else if (validFrom) url += 'bs_date=' + validFrom;
+  else url += 'bs_date=' + today_bs;
+  window.open(url, '_blank');
 }
 
-function downloadDailyReport() {
-    const params = new URLSearchParams();
-    const fy = document.getElementById('statFiscalYear').value;
-    if (fy) params.set('fiscal_year', fy);
-    window.open(`/api/generate-daily-report?bs_date=${today_bs}`, '_blank');
+function downloadPDF() {
+  const validFrom = document.getElementById('valid_from').value.trim();
+  const validTo = document.getElementById('valid_to').value.trim();
+  let url = '/api/generate-daily-report?';
+  if (validFrom && validTo) url += 'from_bs_date=' + validFrom + '&to_bs_date=' + validTo;
+  else if (validFrom) url += 'bs_date=' + validFrom;
+  else url += 'bs_date=' + today_bs;
+  window.open(url, '_blank');
 }
 
-document.addEventListener('DOMContentLoaded', loadFormData);
+// --- Init ---
+document.addEventListener('DOMContentLoaded', () => {
+  loadIncidentTypes();
+  loadIncidents();
+  document.getElementById('valid_from').value = today_bs;
+  document.getElementById('next_update_date').value = today_bs;
+});
 </script>
 {% endblock %}

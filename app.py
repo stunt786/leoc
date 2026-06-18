@@ -4510,7 +4510,27 @@ def daily_report_preview():
     return render_template('daily_report_print.html', total=total, ward_stats=ward_stats,
                            disaster_type_stats=disaster_type_stats, assessments=assessments,
                            incidents=incidents, start_bs=start_bs, end_bs=end_bs,
-                           office_name=office_name, sit_rep_no=sit_rep_no, generated_at=datetime.now())
+                           office_name=office_name, sit_rep_no=sit_rep_no, generated_at=datetime.now(),
+                           weather_status=request.args.get('weather', ''),
+                           notice_title=request.args.get('notice_title', ''),
+                           notice_description=request.args.get('notice_description', ''),
+                           notice_priority=request.args.get('notice_priority', 'medium'),
+                           incident_reporting_status=request.args.get('reporting_status', ''),
+                           situation_summary=request.args.get('situation_summary', ''),
+                           resources_deployed=request.args.get('resources_deployed', ''),
+                           next_update=request.args.get('next_update', ''))
+
+# --- Daily Bulletin API (stub - DB integration in next step) ---
+@app.route('/api/daily-bulletins', methods=['POST'])
+@login_required
+def save_daily_bulletin():
+    try:
+        data = request.get_json()
+        if not data or not data.get('notice_title'):
+            return jsonify({'success': False, 'message': 'Notice title is required'}), 400
+        return jsonify({'success': True, 'message': 'Bulletin saved successfully', 'id': None})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 # ============ FILE UPLOAD ============
 @app.route('/api/upload', methods=['POST'])
