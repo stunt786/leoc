@@ -8,6 +8,7 @@ import json
 import io
 import logging
 import sqlite3
+from sqlalchemy.exc import IntegrityError
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash
 from werkzeug.exceptions import NotFound
@@ -194,6 +195,11 @@ def parse_date_field(data, field_name, default=None):
         return datetime.strptime(value, '%Y-%m-%d').date()
     except (TypeError, ValueError):
         raise ValueError(f"{field_name} must be in YYYY-MM-DD format")
+
+def friendly_message(e):
+    if isinstance(e, IntegrityError):
+        return "This operation failed because the record is linked to other records. Please remove all related records and try again."
+    return str(e)
 
 # ============ BS DATE CONVERSION HELPERS ============
 def ad_to_bs(ad_year, ad_month, ad_day):
@@ -1446,7 +1452,7 @@ def get_settings():
         settings = AppSettings.query.all()
         return jsonify({'success': True, 'data': [s.to_dict() for s in settings]})
     except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 400
+        return jsonify({'success': False, 'message': friendly_message(e)}), 400
 
 @app.route('/api/settings/<key>', methods=['GET', 'POST'])
 @permission_required('edit')
@@ -1463,7 +1469,7 @@ def handle_setting(key):
                     value = setting.setting_value
             return jsonify({'success': True, 'key': key, 'value': value})
         except Exception as e:
-            return jsonify({'success': False, 'message': str(e)}), 400
+            return jsonify({'success': False, 'message': friendly_message(e)}), 400
     try:
         data = request.get_json()
         if not isinstance(data, dict):
@@ -1480,10 +1486,10 @@ def handle_setting(key):
         return jsonify({'success': True, 'message': f'Setting {key} updated'})
     except ValueError as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 400
+        return jsonify({'success': False, 'message': friendly_message(e)}), 400
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 400
+        return jsonify({'success': False, 'message': friendly_message(e)}), 400
 
 # ============ WAREHOUSE API ============
 @app.route('/api/warehouses', methods=['GET', 'POST'])
@@ -1509,10 +1515,10 @@ def handle_warehouses():
         return jsonify({'success': True, 'message': 'Warehouse created', 'data': wh.to_dict()}), 201
     except ValueError as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 400
+        return jsonify({'success': False, 'message': friendly_message(e)}), 400
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 @app.route('/api/warehouses/<int:id>', methods=['GET', 'PUT', 'DELETE'])
 @permission_required('edit')
@@ -1556,10 +1562,10 @@ def manage_warehouse(id):
         return jsonify({'success': True, 'message': 'Warehouse updated', 'data': wh.to_dict()})
     except ValueError as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 400
+        return jsonify({'success': False, 'message': friendly_message(e)}), 400
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 # ============ CATEGORY API ============
 @app.route('/api/categories', methods=['GET', 'POST'])
@@ -1581,10 +1587,10 @@ def handle_categories():
         return jsonify({'success': True, 'message': 'Category created', 'data': cat.to_dict()}), 201
     except ValueError as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 400
+        return jsonify({'success': False, 'message': friendly_message(e)}), 400
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 @app.route('/api/categories/<int:id>', methods=['PUT', 'DELETE'])
 @permission_required('edit')
@@ -1609,10 +1615,10 @@ def manage_category(id):
         return jsonify({'success': True, 'message': 'Category updated', 'data': cat.to_dict()})
     except ValueError as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 400
+        return jsonify({'success': False, 'message': friendly_message(e)}), 400
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 # ============ ITEM API ============
 import uuid as uuid_lib
@@ -1644,7 +1650,7 @@ def handle_items():
             items = query.order_by(Item.name).all()
             return jsonify({'success': True, 'items': [i.to_dict() for i in items]})
         except Exception as e:
-            return jsonify({'success': False, 'message': str(e)}), 500
+            return jsonify({'success': False, 'message': friendly_message(e)}), 500
     try:
         data = request.get_json()
         if not data.get('name') or not data.get('unit') or not data.get('category_id'):
@@ -1681,10 +1687,10 @@ def handle_items():
         return jsonify({'success': True, 'message': 'Item created', 'data': item.to_dict()}), 201
     except ValueError as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 400
+        return jsonify({'success': False, 'message': friendly_message(e)}), 400
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 @app.route('/api/items/<int:id>', methods=['PUT', 'DELETE'])
 @permission_required('edit')
@@ -1740,10 +1746,10 @@ def manage_item(id):
         return jsonify({'success': True, 'message': 'Item updated', 'data': item.to_dict()})
     except ValueError as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 400
+        return jsonify({'success': False, 'message': friendly_message(e)}), 400
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 # ============ SUPPLIER API ============
 @app.route('/api/suppliers', methods=['GET', 'POST'])
@@ -1765,7 +1771,7 @@ def handle_suppliers():
         return jsonify({'success': True, 'message': 'Supplier created', 'data': sup.to_dict()}), 201
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 @app.route('/api/suppliers/<int:id>', methods=['PUT', 'DELETE'])
 @permission_required('edit')
@@ -1786,7 +1792,7 @@ def manage_supplier(id):
         return jsonify({'success': True, 'message': 'Supplier updated', 'data': sup.to_dict()})
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 # ============ WAREHOUSE ZONE API ============
 @app.route('/api/warehouse-zones', methods=['GET', 'POST'])
@@ -1811,7 +1817,7 @@ def handle_warehouse_zones():
         return jsonify({'success': True, 'message': 'Zone created', 'data': zone.to_dict()}), 201
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 @app.route('/api/warehouse-zones/<int:id>', methods=['PUT', 'DELETE'])
 @permission_required('edit')
@@ -1832,7 +1838,7 @@ def manage_warehouse_zone(id):
         return jsonify({'success': True, 'message': 'Zone updated', 'data': zone.to_dict()})
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 # ============ STOCK TRANSFER API ============
 def generate_transfer_no():
@@ -1848,7 +1854,7 @@ def handle_stock_transfers():
             transfers = StockTransfer.query.order_by(StockTransfer.transfer_date.desc()).all()
             return jsonify({'success': True, 'transfers': [t.to_dict() for t in transfers]})
         except Exception as e:
-            return jsonify({'success': False, 'message': str(e)}), 500
+            return jsonify({'success': False, 'message': friendly_message(e)}), 500
     try:
         data = request.get_json()
         from_wh = data.get('from_warehouse_id')
@@ -1894,7 +1900,7 @@ def handle_stock_transfers():
         return jsonify({'success': True, 'message': 'Stock transfer completed', 'data': transfer.to_dict()}), 201
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 @app.route('/api/stock-transfers/<int:id>', methods=['GET'])
 @login_required
@@ -1905,7 +1911,7 @@ def get_stock_transfer(id):
             return jsonify({'success': False, 'message': 'Transfer not found'}), 404
         return jsonify({'success': True, 'transfer': transfer.to_dict()})
     except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 # ============ STOCK RECEIPT API ============
 def generate_receipt_no():
@@ -1955,7 +1961,7 @@ def handle_stock_receipts():
             receipts = query.order_by(StockReceipt.date.desc()).all()
             return jsonify({'success': True, 'receipts': [r.to_dict() for r in receipts]})
         except Exception as e:
-            return jsonify({'success': False, 'message': str(e)}), 500
+            return jsonify({'success': False, 'message': friendly_message(e)}), 500
     try:
         data = request.get_json()
         if not data.get('warehouse_id'):
@@ -2040,10 +2046,10 @@ def handle_stock_receipts():
         return jsonify({'success': True, 'message': 'Stock receipt recorded', 'data': receipt.to_dict()}), 201
     except ValueError as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 400
+        return jsonify({'success': False, 'message': friendly_message(e)}), 400
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 @app.route('/api/stock-receipts/<int:id>', methods=['GET'])
 @login_required
@@ -2134,10 +2140,10 @@ def update_stock_receipt(id):
         return jsonify({'success': True, 'message': 'Stock receipt updated', 'data': receipt.to_dict()})
     except ValueError as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 400
+        return jsonify({'success': False, 'message': friendly_message(e)}), 400
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 # ============ INVENTORY API ============
 @app.route('/api/inventory', methods=['GET'])
@@ -2187,7 +2193,7 @@ def get_inventory():
             results = [r for r in results if r['status'] == 'available']
         return jsonify({'success': True, 'inventory': results})
     except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 @app.route('/api/inventory/summary', methods=['GET'])
 @login_required
@@ -2257,7 +2263,7 @@ def get_inventory_summary():
             'stock_by_category': [{'category': c[0], 'total': c[1]} for c in categories]
         })
     except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 # ============ MANUAL ADJUSTMENT API ============
 def generate_adjustment_no():
@@ -2312,10 +2318,10 @@ def handle_adjustments():
         return jsonify({'success': True, 'message': 'Adjustment recorded', 'data': adjustment.to_dict()}), 201
     except ValueError as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 400
+        return jsonify({'success': False, 'message': friendly_message(e)}), 400
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 # ============ INCIDENT API ============
 INCIDENT_FIELDS = [
@@ -2346,7 +2352,7 @@ def handle_incidents():
             incidents = query.all()
             return jsonify({'success': True, 'incidents': [i.to_dict() for i in incidents]})
         except Exception as e:
-            return jsonify({'success': False, 'message': str(e)}), 500
+            return jsonify({'success': False, 'message': friendly_message(e)}), 500
     try:
         data = request.get_json()
         if not isinstance(data, dict):
@@ -2371,10 +2377,10 @@ def handle_incidents():
         return jsonify({'success': True, 'message': 'Incident created', 'data': incident.to_dict()}), 201
     except ValueError as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 400
+        return jsonify({'success': False, 'message': friendly_message(e)}), 400
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 @app.route('/api/incidents/<int:id>', methods=['PUT', 'DELETE'])
 @permission_required('edit')
@@ -2413,10 +2419,10 @@ def manage_incident(id):
         return jsonify({'success': True, 'message': 'Incident updated', 'data': incident.to_dict()})
     except ValueError as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 400
+        return jsonify({'success': False, 'message': friendly_message(e)}), 400
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 # ============ RELIEF REQUEST API ============
 def generate_request_no():
@@ -2478,10 +2484,10 @@ def handle_relief_requests():
         return jsonify({'success': True, 'message': 'Relief request created', 'data': req.to_dict()}), 201
     except ValueError as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 400
+        return jsonify({'success': False, 'message': friendly_message(e)}), 400
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 @app.route('/api/relief-requests/<int:id>', methods=['GET', 'PUT', 'DELETE'])
 @permission_required('edit')
@@ -2526,10 +2532,10 @@ def manage_relief_request(id):
         return jsonify({'success': True, 'message': 'Relief request updated', 'data': req.to_dict()})
     except ValueError as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 400
+        return jsonify({'success': False, 'message': friendly_message(e)}), 400
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 # ============ DISPATCH API ============
 def generate_dispatch_no():
@@ -2552,7 +2558,7 @@ def handle_dispatches():
             dispatches = query.all()
             return jsonify({'success': True, 'dispatches': [d.to_dict() for d in dispatches]})
         except Exception as e:
-            return jsonify({'success': False, 'message': str(e)}), 500
+            return jsonify({'success': False, 'message': friendly_message(e)}), 500
     try:
         data = request.get_json()
         if not isinstance(data, dict):
@@ -2629,7 +2635,7 @@ def handle_dispatches():
         return jsonify({'success': True, 'message': 'Dispatch created', 'data': dispatch.to_dict()}), 201
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 @app.route('/api/dispatch/<int:id>', methods=['GET', 'PUT'])
 @permission_required('edit')
@@ -2729,7 +2735,7 @@ def handle_dispatch(id):
         return jsonify({'success': True, 'message': 'Dispatch updated', 'data': dispatch.to_dict()}), 200
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 # ============ DISTRIBUTION API ============
 def generate_distribution_no():
@@ -2755,7 +2761,7 @@ def handle_distributions():
             distributions = query.all()
             return jsonify({'success': True, 'distributions': [d.to_dict() for d in distributions]})
         except Exception as e:
-            return jsonify({'success': False, 'message': str(e)}), 500
+            return jsonify({'success': False, 'message': friendly_message(e)}), 500
     try:
         data = request.get_json()
         if not isinstance(data, dict):
@@ -2828,7 +2834,7 @@ def handle_distributions():
         return jsonify({'success': True, 'message': 'Distribution recorded', 'data': dist.to_dict()}), 201
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 @app.route('/api/distributions/<int:id>', methods=['GET'])
 @login_required
@@ -2870,7 +2876,7 @@ def upload_dist_beneficiary_photo(id):
         }), 201
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 @app.route('/api/distributions/beneficiary/<int:id>/upload-document', methods=['POST'])
 @login_required
@@ -2904,7 +2910,7 @@ def upload_dist_beneficiary_document(id):
         }), 201
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 # ============ DISASTER ASSESSMENT API ============
 @app.route('/api/disaster-assessments', methods=['GET', 'POST'])
@@ -2977,10 +2983,10 @@ def handle_disaster_assessments():
         return jsonify({'success': True, 'message': 'Disaster assessment recorded', 'data': assessment.to_dict()}), 201
     except ValueError as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 400
+        return jsonify({'success': False, 'message': friendly_message(e)}), 400
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 @app.route('/api/disaster-assessments/<int:id>', methods=['GET', 'PUT', 'DELETE'])
 @permission_required('edit')
@@ -3018,10 +3024,10 @@ def manage_disaster_assessment(id):
         return jsonify({'success': True, 'message': 'Assessment updated', 'data': assessment.to_dict()})
     except ValueError as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 400
+        return jsonify({'success': False, 'message': friendly_message(e)}), 400
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 # ============ CASH FUND API ============
 def generate_fund_no():
@@ -3054,10 +3060,10 @@ def handle_cash_funds():
         return jsonify({'success': True, 'message': 'Fund created', 'data': fund.to_dict()}), 201
     except ValueError as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 400
+        return jsonify({'success': False, 'message': friendly_message(e)}), 400
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 @app.route('/api/cash-funds/<int:id>', methods=['GET', 'PUT', 'DELETE'])
 @permission_required('edit')
@@ -3069,6 +3075,15 @@ def manage_cash_fund(id):
         if request.method == 'GET':
             return jsonify({'success': True, 'fund': fund.to_dict()})
         if request.method == 'DELETE':
+            related_receipts = CashReceipt.query.filter_by(fund_id=fund.id).count()
+            related_distributions = CashDistribution.query.filter_by(fund_id=fund.id).count()
+            if related_receipts or related_distributions:
+                parts = []
+                if related_receipts:
+                    parts.append(f'{related_receipts} receipt(s)')
+                if related_distributions:
+                    parts.append(f'{related_distributions} distribution(s)')
+                return jsonify({'success': False, 'message': f'Cannot delete: Fund has {" and ".join(parts)}. Remove all related records first.'}), 400
             db.session.delete(fund)
             db.session.commit()
             return jsonify({'success': True, 'message': 'Fund deleted'})
@@ -3090,10 +3105,10 @@ def manage_cash_fund(id):
         return jsonify({'success': True, 'message': 'Fund updated', 'data': fund.to_dict()})
     except ValueError as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 400
+        return jsonify({'success': False, 'message': friendly_message(e)}), 400
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 # ============ CASH RECEIPT API ============
 def generate_cash_receipt_no():
@@ -3137,10 +3152,10 @@ def handle_cash_receipts():
         return jsonify({'success': True, 'message': 'Cash receipt recorded', 'data': receipt.to_dict()}), 201
     except ValueError as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 400
+        return jsonify({'success': False, 'message': friendly_message(e)}), 400
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 @app.route('/api/cash-receipts/<int:id>', methods=['GET'])
 @login_required
@@ -3198,10 +3213,10 @@ def handle_cash_requests():
         return jsonify({'success': True, 'message': 'Cash request created', 'data': req.to_dict()}), 201
     except ValueError as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 400
+        return jsonify({'success': False, 'message': friendly_message(e)}), 400
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 @app.route('/api/cash-requests/<int:id>', methods=['GET', 'PUT', 'DELETE'])
 @permission_required('edit')
@@ -3213,6 +3228,9 @@ def manage_cash_request(id):
         if request.method == 'GET':
             return jsonify({'success': True, 'cash_request': req.to_dict()})
         if request.method == 'DELETE':
+            related_dists = CashDistribution.query.filter_by(cash_request_id=req.id).count()
+            if related_dists:
+                return jsonify({'success': False, 'message': f'Cannot delete: Cash request has {related_dists} distribution(s). Remove all related records first.'}), 400
             db.session.delete(req)
             db.session.commit()
             return jsonify({'success': True, 'message': 'Cash request deleted'})
@@ -3233,10 +3251,10 @@ def manage_cash_request(id):
         return jsonify({'success': True, 'message': 'Cash request updated', 'data': req.to_dict()})
     except ValueError as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 400
+        return jsonify({'success': False, 'message': friendly_message(e)}), 400
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 # ============ CASH DISTRIBUTION API ============
 def generate_cash_distribution_no():
@@ -3265,7 +3283,7 @@ def handle_cash_distributions():
             dists = query.all()
             return jsonify({'success': True, 'distributions': [d.to_dict() for d in dists]})
         except Exception as e:
-            return jsonify({'success': False, 'message': str(e)}), 500
+            return jsonify({'success': False, 'message': friendly_message(e)}), 500
     try:
         data = request.get_json()
         if not isinstance(data, dict):
@@ -3369,10 +3387,10 @@ def handle_cash_distributions():
         return jsonify({'success': True, 'message': 'Cash distribution recorded', 'data': dist.to_dict()}), 201
     except ValueError as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 400
+        return jsonify({'success': False, 'message': friendly_message(e)}), 400
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 @app.route('/api/cash-distributions/<int:id>', methods=['GET'])
 @login_required
@@ -3399,7 +3417,7 @@ def handle_beneficiaries():
             beneficiaries = query.all()
             return jsonify({'success': True, 'beneficiaries': [b.to_dict() for b in beneficiaries]})
         except Exception as e:
-            return jsonify({'success': False, 'message': str(e)}), 500
+            return jsonify({'success': False, 'message': friendly_message(e)}), 500
     try:
         data = request.get_json()
         if not data.get('name'):
@@ -3434,10 +3452,10 @@ def handle_beneficiaries():
         return jsonify({'success': True, 'message': 'Beneficiary created', 'data': ben.to_dict()}), 201
     except ValueError as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 400
+        return jsonify({'success': False, 'message': friendly_message(e)}), 400
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 @app.route('/api/beneficiaries/<int:id>', methods=['GET', 'PUT', 'DELETE'])
 @permission_required('edit')
@@ -3449,6 +3467,15 @@ def manage_beneficiary(id):
         if request.method == 'GET':
             return jsonify({'success': True, 'beneficiary': ben.to_dict()})
         if request.method == 'DELETE':
+            related_dists = DistributionBeneficiary.query.filter_by(beneficiary_id=ben.id).count()
+            related_cash_dists = CashDistributionBeneficiary.query.filter_by(beneficiary_id=ben.id).count()
+            if related_dists or related_cash_dists:
+                parts = []
+                if related_dists:
+                    parts.append(f'{related_dists} distribution link(s)')
+                if related_cash_dists:
+                    parts.append(f'{related_cash_dists} cash distribution link(s)')
+                return jsonify({'success': False, 'message': f'Cannot delete: Beneficiary has {" and ".join(parts)}. Remove all related records first.'}), 400
             db.session.delete(ben)
             db.session.commit()
             return jsonify({'success': True, 'message': 'Beneficiary deleted'})
@@ -3478,10 +3505,10 @@ def manage_beneficiary(id):
         return jsonify({'success': True, 'message': 'Beneficiary updated', 'data': ben.to_dict()})
     except ValueError as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 400
+        return jsonify({'success': False, 'message': friendly_message(e)}), 400
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 @app.route('/api/beneficiaries/<int:id>/history', methods=['GET'])
 def get_beneficiary_history(id):
@@ -3521,7 +3548,7 @@ def get_beneficiary_history(id):
             'total_material_distributions': sum(1 for e in events if e['type'] == 'Material')
         })
     except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 @app.route('/api/beneficiaries/distributions', methods=['GET'])
 @login_required
@@ -3619,7 +3646,7 @@ def get_beneficiary_distributions():
             'total': len(data)
         })
     except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 @app.route('/api/disaster-statistics', methods=['GET'])
 @login_required
@@ -3684,7 +3711,7 @@ def get_disaster_statistics():
             'by_ward': by_ward
         })
     except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 @app.route('/api/generate-daily-report', methods=['GET'])
 @login_required
@@ -3779,7 +3806,7 @@ def generate_daily_report():
         response.headers['Content-Disposition'] = f'attachment; filename={fname}.pdf'
         return response
     except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 def generate_disaster_pdf(assessments, incidents, total, ward_stats, type_stats, start_bs, end_bs, office_name, sit_rep_no):
     buffer = BytesIO()
@@ -3960,7 +3987,7 @@ def upload_file():
         db.session.commit()
         return jsonify({'success': True, 'message': 'File uploaded', 'data': attachment.to_dict()}), 201
     except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 @app.route('/api/upload/item-photo', methods=['POST'])
 @login_required
@@ -3989,7 +4016,7 @@ def upload_item_photo():
             }
         }), 201
     except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 @app.route('/uploads/<filename>')
 def uploaded_file(filename):
@@ -4165,7 +4192,7 @@ def get_item_history(id):
             'events': events
         })
     except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 # ============ DASHBOARD API ============
 @app.route('/api/dashboard', methods=['GET'])
@@ -4252,7 +4279,7 @@ def get_dashboard():
                 db.extract('month', CashDistribution.distribution_date) == today.month).scalar(),
         })
     except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 # ============ RELIEF DASHBOARD API ============
 @app.route('/api/dashboard/relief', methods=['GET'])
@@ -4367,7 +4394,7 @@ def get_relief_dashboard():
             'total_cash_receipts': total_cash_receipts
         })
     except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 # ============ GIS MAP API ============
 MAP_BOUNDARY_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'thalara_boundary.json')
@@ -4426,7 +4453,7 @@ def get_map_data():
             'relief_markers': relief_markers
         })
     except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 # ============ USER MANAGEMENT API ============
 @app.route('/api/users', methods=['GET'])
@@ -4440,7 +4467,7 @@ def api_get_users():
         users = [User(r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7]).to_dict() for r in rows]
         return jsonify({'success': True, 'users': users})
     except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 @app.route('/api/users', methods=['POST'])
 @csrf.exempt
@@ -4472,7 +4499,7 @@ def api_create_user():
         return jsonify({'success': True, 'message': 'User created successfully'}), 201
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 @app.route('/api/users/<int:user_id>', methods=['PUT'])
 @csrf.exempt
@@ -4510,7 +4537,7 @@ def api_update_user(user_id):
         return jsonify({'success': True, 'message': 'User updated successfully'})
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 @app.route('/api/users/<int:user_id>', methods=['DELETE'])
 @csrf.exempt
@@ -4527,7 +4554,7 @@ def api_delete_user(user_id):
         return jsonify({'success': True, 'message': 'User deleted'})
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 @app.route('/api/auth/change-password', methods=['POST'])
 @csrf.exempt
@@ -4553,7 +4580,7 @@ def api_change_password():
         return jsonify({'success': True, 'message': 'Password changed successfully'})
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 # ============ GLOBAL SEARCH ============
 @app.route('/api/search', methods=['GET'])
@@ -4592,7 +4619,7 @@ def global_search():
             results.append({'title': f"Dispatch: {d.dispatch_number}", 'subtitle': f"To: {d.destination or ''}", 'url': url_for('dispatch_page'), 'icon': 'bi bi-truck text-warning'})
         return jsonify({'success': True, 'results': results})
     except Exception as e:
-        return jsonify({'success': False, 'message': str(e), 'results': []}), 500
+        return jsonify({'success': False, 'message': friendly_message(e), 'results': []}), 500
 
 # ============ NOTIFICATIONS ============
 @app.route('/api/notifications', methods=['GET'])
@@ -4619,7 +4646,7 @@ def get_notifications():
             notifications.append({'type': 'incident', 'title': 'Active Incidents', 'message': f'{active} active incident(s)', 'url': url_for('incidents_page'), 'created_at': datetime.now(timezone.utc).isoformat()})
         return jsonify({'success': True, 'notifications': notifications})
     except Exception as e:
-        return jsonify({'success': False, 'message': str(e), 'notifications': []}), 500
+        return jsonify({'success': False, 'message': friendly_message(e), 'notifications': []}), 500
 
 # ============ DATA FOR DROPDOWNS ============
 @app.route('/api/data', methods=['GET'])
@@ -4673,12 +4700,12 @@ def get_form_data():
             'distribution_statuses': ['Received', 'Pending'],
         })
     except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 @app.errorhandler(500)
 def handle_500(e):
     if request.path.startswith('/api/'):
-        return jsonify({'success': False, 'message': 'Internal server error: ' + str(e)}), 500
+        return jsonify({'success': False, 'message': 'Internal server error: ' + friendly_message(e)}), 500
     return e
 
 @app.errorhandler(404)
@@ -5089,7 +5116,7 @@ def reports_data_json(report_type):
 
         return jsonify({'success': True, 'headers': headers, 'rows': rows})
     except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 400
+        return jsonify({'success': False, 'message': friendly_message(e)}), 400
 
 # ============ CASH REPORT ENDPOINTS ============
 @app.route('/api/reports/cash-balance', methods=['GET'])
