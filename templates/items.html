@@ -376,37 +376,45 @@ let items = [];
 let categories = [];
 
 async function loadData() {
-    const r = await fetch('/api/data');
-    const d = await r.json();
-    if (!d.success) { showToast('danger', d.message); return; }
-    categories = d.categories || [];
-    const catFilter = document.getElementById('categoryFilter');
-    const catSelect = document.getElementById('item_category_id');
-    const opts = categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
-    catFilter.innerHTML = '<option value="">All Categories</option>' + opts;
-    catSelect.innerHTML = '<option value="">Select Category</option>' + opts;
-    document.getElementById('totalCategories').textContent = categories.length;
+    try {
+        const r = await fetch('/api/data');
+        const d = await r.json();
+        if (!d.success) { showToast('danger', d.message); return; }
+        categories = d.categories || [];
+        const catFilter = document.getElementById('categoryFilter');
+        const catSelect = document.getElementById('item_category_id');
+        const opts = categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+        catFilter.innerHTML = '<option value="">All Categories</option>' + opts;
+        catSelect.innerHTML = '<option value="">Select Category</option>' + opts;
+        document.getElementById('totalCategories').textContent = categories.length;
 
-    const units = d.units || [];
-    const unitSel = document.getElementById('item_unit');
-    unitSel.innerHTML = '<option value="">Select Unit</option>' +
-        units.map(u => `<option value="${u}">${u}</option>`).join('');
+        const units = d.units || [];
+        const unitSel = document.getElementById('item_unit');
+        unitSel.innerHTML = '<option value="">Select Unit</option>' +
+            units.map(u => `<option value="${u}">${u}</option>`).join('');
 
-    const storageReqs = d.storage_requirements || [];
-    const storageSel = document.getElementById('item_storage_requirement');
-    storageSel.innerHTML = '<option value="">Select Storage</option>' +
-        storageReqs.map(s => `<option value="${s}">${s}</option>`).join('');
+        const storageReqs = d.storage_requirements || [];
+        const storageSel = document.getElementById('item_storage_requirement');
+        storageSel.innerHTML = '<option value="">Select Storage</option>' +
+            storageReqs.map(s => `<option value="${s}">${s}</option>`).join('');
 
-    loadItems();
+        loadItems();
+    } catch(e) {
+        showToast('danger', 'Error loading form data: ' + e.message);
+    }
 }
 
 async function loadItems() {
-    const r = await fetch('/api/items');
-    const d = await r.json();
-    if (!d.success) { showToast('danger', d.message); return; }
-    items = d.items;
-    filterItems();
-    updateStats();
+    try {
+        const r = await fetch('/api/items');
+        const d = await r.json();
+        if (!d.success) { showToast('danger', d.message); return; }
+        items = d.items;
+        filterItems();
+        updateStats();
+    } catch(e) {
+        showToast('danger', 'Error loading items: ' + e.message);
+    }
 }
 
 function updateStats() {

@@ -224,7 +224,7 @@ async function loadFormData() {
             itemSel.innerHTML += `<option value="${i.id}">${label}</option>`;
             printItemSel.innerHTML += `<option value="${i.id}">${label}</option>`;
         });
-    } catch (e) { console.error('Error loading form data:', e); }
+    } catch (e) { showToast('danger', 'Error loading form data: ' + e.message); }
 }
 
 async function loadInventory() {
@@ -280,7 +280,7 @@ async function loadSummary() {
         document.getElementById('lowStockCount').textContent = d.low_stock;
         document.getElementById('outOfStockCount').textContent = d.out_of_stock;
         document.getElementById('expiringCount').textContent = d.expiring_count;
-    } catch (e) { console.error('Error loading summary:', e); }
+    } catch (e) { showToast('danger', 'Error loading summary: ' + e.message); }
 }
 
 let searchTimeout;

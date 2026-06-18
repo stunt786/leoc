@@ -103,7 +103,9 @@ async function loadFilters() {
         const wSel = document.getElementById('filterWard');
         const wards = d.wards || [];
         wSel.innerHTML = '<option value="">All</option>' + wards.map(w => `<option value="${w}">Ward ${w}</option>`).join('');
-    } catch(e) { console.error(e); }
+    } catch(e) {
+        showToast('danger', 'Error loading filters: ' + e.message);
+    }
 }
 
 async function loadData() {
@@ -148,7 +150,7 @@ async function loadData() {
         }).join('');
         footer.textContent = `${d.total} record(s)`;
     } catch(e) {
-        console.error(e);
+        showToast('danger', 'Error loading data: ' + e.message);
         document.getElementById('distTableBody').innerHTML = '<tr><td colspan="9" class="text-center py-4 text-danger">Error loading data</td></tr>';
     }
 }

@@ -79,11 +79,13 @@
                             <th>Items</th>
                             <th style="width:90px">Receive Cash?</th>
                             <th style="width:110px">Cash Amount</th>
+                            <th style="width:100px">Photo</th>
+                            <th style="width:100px">Document</th>
                             <th style="width:40px"></th>
                         </tr>
                     </thead>
                     <tbody id="beneficiaryBody">
-<tr><td colspan="7" class="text-center text-muted py-3">Add beneficiaries to this distribution</td></tr>
+<tr><td colspan="9" class="text-center text-muted py-3">Add beneficiaries to this distribution</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -178,7 +180,7 @@
                 <div class="table-responsive" style="max-height:350px">
                     <table class="table table-sm table-hover mb-0">
                         <thead class="table-light sticky-top">
-                            <tr><th>Name</th><th>National ID</th><th>Ward</th><th>Members</th><th></th></tr>
+                            <tr><th>Name</th><th>Father's Name</th><th>National ID</th><th>Ward</th><th>Members</th><th></th></tr>
                         </thead>
                         <tbody id="benPickerBody"></tbody>
                     </table>
@@ -237,17 +239,20 @@ async function loadFormData() {
 async function loadBeneficiaries() {
     try {
         const r = await fetch('/api/beneficiaries');
-        if (!r.ok) return;
+        if (!r.ok) { showToast('danger', 'Failed to load beneficiaries'); return; }
         const d = await r.json();
         if (d.success) beneficiaries = d.beneficiaries || [];
-    } catch(e) { /* silently fail */ }
+        else showToast('danger', d.message);
+    } catch(e) {
+        showToast('danger', 'Error loading beneficiaries: ' + e.message);
+    }
 }
 
 document.getElementById('dist_dispatch_id').addEventListener('change', function() {
     const dispatchId = parseInt(this.value);
     if (!dispatchId) {
         document.getElementById('dist_incident').value = '';
-        document.getElementById('beneficiaryBody').innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">Add beneficiaries to this distribution</td></tr>';
+    document.getElementById('beneficiaryBody').innerHTML = '<tr><td colspan="9" class="text-center text-muted py-3">Add beneficiaries to this distribution</td></tr>';
         document.getElementById('dispatchItemsSummaryBody').innerHTML = '<tr><td colspan="4" class="text-center text-muted py-2">Select a dispatch to view items</td></tr>';
         document.getElementById('cashFundSection').style.display = 'none';
         return;
@@ -384,6 +389,24 @@ function addBeneficiaryRow(data) {
         <td>
             <input type="number" step="0.01" class="form-control form-control-sm ben-cash-amount" placeholder="Amount" disabled oninput="updateCashTotal()">
         </td>
+        <td class="text-center">
+            <div class="ben-photo-upload">
+                <input type="file" class="form-control form-control-sm ben-photo-input" accept="image/jpeg,image/png,image/gif" style="font-size:0.75rem" onchange="previewBenFile(this, 'photo')">
+                <div class="ben-photo-preview mt-1" style="max-width:60px;max-height:60px;display:none">
+                    <img src="" class="img-thumbnail" style="max-width:60px;max-height:60px;object-fit:cover">
+                    <button type="button" class="btn btn-sm btn-outline-danger p-0 mt-1" style="font-size:0.65rem;line-height:1" onclick="removeBenFile(this, 'photo')"><i class="bi bi-x"></i></button>
+                </div>
+            </div>
+        </td>
+        <td class="text-center">
+            <div class="ben-doc-upload">
+                <input type="file" class="form-control form-control-sm ben-doc-input" accept="application/pdf" style="font-size:0.75rem" onchange="previewBenFile(this, 'document')">
+                <div class="ben-doc-preview mt-1" style="display:none">
+                    <span class="badge bg-secondary"><i class="bi bi-file-pdf"></i> PDF</span>
+                    <button type="button" class="btn btn-sm btn-outline-danger p-0 ms-1" style="font-size:0.65rem;line-height:1" onclick="removeBenFile(this, 'document')"><i class="bi bi-x"></i></button>
+                </div>
+            </div>
+        </td>
         <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove(); updateDistributedQtySummary(); updateCashTotal()"><i class="bi bi-trash"></i></button></td>
     `;
     // Populate item dropdown from cache
@@ -480,6 +503,7 @@ function filterBenPicker() {
     const q = document.getElementById('benPickerSearch').value.toLowerCase();
     const filtered = beneficiaries.filter(b =>
         (b.name && b.name.toLowerCase().includes(q)) ||
+        (b.father_name && b.father_name.toLowerCase().includes(q)) ||
         (b.national_id && b.national_id.toLowerCase().includes(q)) ||
         (b.phone && b.phone.toLowerCase().includes(q))
     );
@@ -489,11 +513,12 @@ function filterBenPicker() {
 function renderBenPicker(list) {
     const tbody = document.getElementById('benPickerBody');
     if (list.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">No beneficiaries found</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">No beneficiaries found</td></tr>';
         return;
     }
     tbody.innerHTML = list.map(b => `<tr>
         <td>${b.name}</td>
+        <td>${b.father_name || '-'}</td>
         <td>${b.national_id || '-'}</td>
         <td>${b.ward || '-'}</td>
         <td>${b.family_members || 1}</td>
@@ -566,11 +591,21 @@ async function viewDistribution(id) {
     if (!d.success) { showToast('danger', d.message); return; }
     const dist = d.distribution;
 
-    let benHtml = '<table class="table table-sm mb-0"><thead><tr><th>Family Name</th><th>ID Number</th><th>Members</th><th>Item</th><th>Qty</th></tr></thead><tbody>';
+    let benHtml = '<table class="table table-sm mb-0" id="viewBenTable"><thead><tr><th>Family Name</th><th>ID Number</th><th>Members</th><th>Item</th><th>Qty</th><th>Photo</th><th>Document</th></tr></thead><tbody>';
     if (dist.beneficiaries && dist.beneficiaries.length > 0) {
         dist.beneficiaries.forEach(b => {
             const name = b.beneficiary_name || b.family_name;
-            benHtml += `<tr><td>${name}</td><td>${b.id_number || '-'}</td><td>${b.members}</td><td>${b.item || '-'}</td><td>${b.quantity}</td></tr>`;
+            const photoHtml = b.photo_url
+                ? `<div><a href="${b.photo_url}" target="_blank"><img src="${b.photo_url}" class="img-thumbnail" style="max-width:60px;max-height:60px;object-fit:cover" title="View photo"></a>
+                    <button type="button" class="btn btn-sm btn-outline-primary d-block mx-auto mt-1" style="font-size:0.65rem;line-height:1.2;padding:2px 4px" onclick="uploadViewBenFile(${b.id},'photo',this)"><i class="bi bi-camera"></i></button></div>`
+                : `<button type="button" class="btn btn-sm btn-outline-primary" style="font-size:0.75rem" onclick="uploadViewBenFile(${b.id},'photo',this)"><i class="bi bi-camera"></i><br><small>Upload</small></button>`;
+            const docHtml = b.document_url
+                ? `<div><a href="${b.document_url}" target="_blank" class="btn btn-sm btn-outline-secondary"><i class="bi bi-file-pdf"></i> PDF</a>
+                    <button type="button" class="btn btn-sm btn-outline-primary d-block mx-auto mt-1" style="font-size:0.65rem;line-height:1.2;padding:2px 4px" onclick="uploadViewBenFile(${b.id},'document',this)"><i class="bi bi-upload"></i></button></div>`
+                : `<button type="button" class="btn btn-sm btn-outline-primary" style="font-size:0.75rem" onclick="uploadViewBenFile(${b.id},'document',this)"><i class="bi bi-file-earmark-pdf"></i><br><small>Upload</small></button>`;
+            benHtml += `<tr><td>${name}</td><td>${b.id_number || '-'}</td><td>${b.members}</td><td>${b.item || '-'}</td><td>${b.quantity}</td>
+                <td class="text-center align-middle">${photoHtml}</td>
+                <td class="text-center align-middle">${docHtml}</td></tr>`;
         });
     }
     benHtml += '</tbody></table>';
@@ -626,13 +661,44 @@ async function viewDistribution(id) {
     }
 }
 
+function previewBenFile(input, type) {
+    const tr = input.closest('tr');
+    const previewDiv = tr.querySelector(`.ben-${type}-preview`);
+    const file = input.files[0];
+    if (!file) { previewDiv.style.display = 'none'; return; }
+    if (type === 'photo') {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const img = previewDiv.querySelector('img');
+            if (img) { img.src = e.target.result; previewDiv.style.display = 'block'; }
+        };
+        reader.readAsDataURL(file);
+    } else {
+        previewDiv.style.display = 'block';
+    }
+}
+
+function removeBenFile(btn, type) {
+    const tr = btn.closest('tr');
+    const input = tr.querySelector(`.ben-${type}-input`);
+    const previewDiv = tr.querySelector(`.ben-${type}-preview`);
+    if (input) input.value = '';
+    if (previewDiv) previewDiv.style.display = 'none';
+}
+
+function getBenFileData(tr, type) {
+    const input = tr.querySelector(`.ben-${type}-input`);
+    if (input && input.files && input.files[0]) return input.files[0];
+    return null;
+}
+
 function resetDistributionForm() {
     document.getElementById('dist_id').value = '';
     document.getElementById('distributionForm').reset();
     document.getElementById('dist_distribution_no').value = 'DIST-' + String(Date.now()).slice(-4);
     document.getElementById('dist_distribution_date').value = new Date().toISOString().split('T')[0];
     document.getElementById('dist_incident').value = '';
-    document.getElementById('beneficiaryBody').innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">Add beneficiaries to this distribution</td></tr>';
+    document.getElementById('beneficiaryBody').innerHTML = '<tr><td colspan="9" class="text-center text-muted py-3">Add beneficiaries to this distribution</td></tr>';
     document.getElementById('dispatchItemsSummaryBody').innerHTML = '<tr><td colspan="4" class="text-center text-muted py-2">Select a dispatch to view items</td></tr>';
     document.getElementById('cashFundSection').style.display = 'none';
     document.getElementById('cdTotal').value = '0';
@@ -768,7 +834,40 @@ async function saveDistribution() {
             });
             const d = await r.json();
             itemsSaved = d.success;
-            if (d.success && d.data) savedDistNo = d.data.distribution_no;
+            if (d.success && d.data) {
+                savedDistNo = d.data.distribution_no;
+                // Upload photo/document files for each beneficiary
+                const savedBens = d.data.beneficiaries || [];
+                const rows = Array.from(document.querySelectorAll('#beneficiaryBody tr'));
+                for (let i = 0; i < rows.length && i < savedBens.length; i++) {
+                    const tr = rows[i];
+                    const benId = savedBens[i].id;
+                    const photoFile = getBenFileData(tr, 'photo');
+                    const docFile = getBenFileData(tr, 'document');
+                    if (photoFile) {
+                        const fd = new FormData();
+                        fd.append('file', photoFile);
+                        try {
+                            await fetch(`/api/distributions/beneficiary/${benId}/upload-photo`, {
+                                method: 'POST',
+                                headers: {'X-CSRFToken': csrf},
+                                body: fd
+                            });
+                        } catch(e) { console.error('Photo upload failed:', e); }
+                    }
+                    if (docFile) {
+                        const fd = new FormData();
+                        fd.append('file', docFile);
+                        try {
+                            await fetch(`/api/distributions/beneficiary/${benId}/upload-document`, {
+                                method: 'POST',
+                                headers: {'X-CSRFToken': csrf},
+                                body: fd
+                            });
+                        } catch(e) { console.error('Document upload failed:', e); }
+                    }
+                }
+            }
             if (!d.success) showToast('danger', d.message);
         }
 
@@ -820,6 +919,43 @@ async function saveDistribution() {
         isSaving = false;
         if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-check-lg me-1"></i>Save Distribution'; }
     }
+}
+
+function uploadViewBenFile(benId, type, btn) {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = type === 'photo' ? 'image/jpeg,image/png,image/gif' : 'application/pdf';
+    input.onchange = async function() {
+        const file = input.files[0];
+        if (!file) return;
+        const fd = new FormData();
+        fd.append('file', file);
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+        try {
+            const r = await fetch(`/api/distributions/beneficiary/${benId}/upload-${type}`, {
+                method: 'POST',
+                headers: {'X-CSRFToken': csrf},
+                body: fd
+            });
+            const d = await r.json();
+            if (d.success) {
+                showToast('success', `${type === 'photo' ? 'Photo' : 'Document'} uploaded`);
+                const modal = bootstrap.Modal.getInstance(btn.closest('.modal'));
+                if (modal) modal.hide();
+                loadDistributions();
+            } else {
+                showToast('danger', d.message || 'Upload failed');
+                btn.disabled = false;
+                btn.innerHTML = type === 'photo' ? '<i class="bi bi-camera"></i><br><small>Upload</small>' : '<i class="bi bi-file-earmark-pdf"></i><br><small>Upload</small>';
+            }
+        } catch(e) {
+            showToast('danger', 'Upload error: ' + e.message);
+            btn.disabled = false;
+            btn.innerHTML = type === 'photo' ? '<i class="bi bi-camera"></i><br><small>Upload</small>' : '<i class="bi bi-file-earmark-pdf"></i><br><small>Upload</small>';
+        }
+    };
+    input.click();
 }
 
 document.addEventListener('DOMContentLoaded', function() {

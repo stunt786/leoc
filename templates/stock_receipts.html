@@ -237,7 +237,8 @@ function loadReceipts() {
             if (!d.success) { showToast('danger', d.message); return; }
             receipts = d.receipts;
             renderReceipts(receipts);
-        });
+        })
+        .catch(e => showToast('danger', 'Error loading receipts: ' + e.message));
 }
 
 function renderReceipts(data) {

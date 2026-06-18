@@ -43,7 +43,7 @@ python3<!DOCTYPE html>
     <table class="table table-bordered table-sm">
         <thead class="table-dark"><tr><th>वडा</th><th>घटना</th><th>मृतक</th><th>बेपत्ता</th><th>घाइते</th><th>घर नष्ट</th><th>अ.क्षति</th></tr></thead>
         <tbody>
-            {% for w in range(1, 10) %}
+            {% for w in ward_list %}
             {% set ws = ward_stats.get(w|string, {}) %}
             <tr>
                 <td>{{ w }}</td><td>{{ ws.get('incidents', 0) }}</td><td>{{ ws.get('deaths', 0) }}</td>

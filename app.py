@@ -919,17 +919,25 @@ class DistributionBeneficiary(db.Model):
     item = db.Column(db.String(200))
     quantity = db.Column(db.Integer, nullable=False)
     status = db.Column(db.String(20), default='Received')
+    photo = db.Column(db.String(255))
+    document = db.Column(db.String(255))
 
     beneficiary = db.relationship('Beneficiary', backref=db.backref('distribution_links', lazy=True))
 
     def to_dict(self):
+        photo_url = f'/uploads/{self.photo}' if self.photo else None
+        document_url = f'/uploads/{self.document}' if self.document else None
         return {
             'id': self.id, 'family_name': self.family_name,
             'id_number': self.id_number, 'members': self.members,
             'item': self.item, 'quantity': self.quantity,
             'beneficiary_id': self.beneficiary_id,
             'beneficiary_name': self.beneficiary.name if self.beneficiary else None,
-            'status': self.status
+            'status': self.status,
+            'photo': self.photo,
+            'photo_url': photo_url,
+            'document': self.document,
+            'document_url': document_url
         }
 
 # ============ STOCK TRANSFER MODEL ============
@@ -1124,12 +1132,21 @@ class Beneficiary(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(200), nullable=False, index=True)
     national_id = db.Column(db.String(100))
+    father_name = db.Column(db.String(200))
     phone = db.Column(db.String(50))
     address = db.Column(db.String(300))
-    municipality = db.Column(db.String(200))
     ward = db.Column(db.Integer)
+    tole = db.Column(db.String(200))
+    current_shelter_location = db.Column(db.String(300))
+    coordinates = db.Column(db.String(100))
     family_members = db.Column(db.Integer, default=1)
+    family_members_json = db.Column(db.Text, default='[]')
+    in_social_security_fund = db.Column(db.Boolean, default=False)
+    ssf_type = db.Column(db.String(100))
+    poverty_card_holder = db.Column(db.Boolean, default=False)
+    bank_account_holder_name = db.Column(db.String(200))
     bank_account = db.Column(db.String(100))
+    bank_name = db.Column(db.String(200))
     mobile_wallet = db.Column(db.String(100))
     remarks = db.Column(db.Text)
     created_by = db.Column(db.Integer)
@@ -1137,13 +1154,41 @@ class Beneficiary(db.Model):
     updated_at = db.Column(db.DateTime, default=utc_now, onupdate=utc_now)
 
     def to_dict(self):
+        fm_json = []
+        if self.family_members_json:
+            try:
+                fm_json = json.loads(self.family_members_json) if isinstance(self.family_members_json, str) else self.family_members_json
+            except (json.JSONDecodeError, TypeError):
+                fm_json = []
         return {
             'id': self.id, 'name': self.name, 'national_id': self.national_id,
-            'phone': self.phone, 'address': self.address, 'municipality': self.municipality,
-            'ward': self.ward, 'family_members': self.family_members,
-            'bank_account': self.bank_account, 'mobile_wallet': self.mobile_wallet,
+            'father_name': self.father_name,
+            'phone': self.phone, 'address': self.address,
+            'ward': self.ward, 'tole': self.tole,
+            'current_shelter_location': self.current_shelter_location,
+            'coordinates': self.coordinates,
+            'family_members': self.family_members,
+            'family_members_json': fm_json,
+            'in_social_security_fund': self.in_social_security_fund,
+            'ssf_type': self.ssf_type,
+            'poverty_card_holder': self.poverty_card_holder,
+            'bank_account_holder_name': self.bank_account_holder_name,
+            'bank_account': self.bank_account, 'bank_name': self.bank_name,
+            'mobile_wallet': self.mobile_wallet,
             'remarks': self.remarks
         }
+
+# ============ WARD HELPERS ============
+def get_ward_list():
+    n = AppSettings.get_setting('number_of_wards', 9)
+    try:
+        n = int(n)
+    except (ValueError, TypeError):
+        n = 9
+    return list(range(1, n + 1))
+
+def is_valid_ward(ward):
+    return ward in get_ward_list()
 
 # ============ CONTEXT PROCESSORS ============
 @app.context_processor
@@ -1153,6 +1198,10 @@ def inject_now():
 @app.context_processor
 def inject_role():
     return {'current_user': current_user}
+
+@app.context_processor
+def inject_wards():
+    return {'ward_list': get_ward_list()}
 
 # ============ TEMPLATE FILTERS ============
 @app.template_filter('to_nepali_num')
@@ -1502,22 +1551,25 @@ def generate_item_code():
 @permission_required('edit')
 def handle_items():
     if request.method == 'GET':
-        query = Item.query
-        category_id = request.args.get('category_id', type=int)
-        search = request.args.get('search')
-        status = request.args.get('status')
-        if category_id:
-            query = query.filter(Item.category_id == category_id)
-        if status:
-            query = query.filter(Item.status == status)
-        if search:
-            q = f'%{search}%'
-            query = query.filter(db.or_(
-                Item.name.ilike(q), Item.item_code.ilike(q),
-                Item.barcode.ilike(q), Item.local_name.ilike(q)
-            ))
-        items = query.order_by(Item.name).all()
-        return jsonify({'success': True, 'items': [i.to_dict() for i in items]})
+        try:
+            query = Item.query
+            category_id = request.args.get('category_id', type=int)
+            search = request.args.get('search')
+            status = request.args.get('status')
+            if category_id:
+                query = query.filter(Item.category_id == category_id)
+            if status:
+                query = query.filter(Item.status == status)
+            if search:
+                q = f'%{search}%'
+                query = query.filter(db.or_(
+                    Item.name.ilike(q), Item.item_code.ilike(q),
+                    Item.barcode.ilike(q), Item.local_name.ilike(q)
+                ))
+            items = query.order_by(Item.name).all()
+            return jsonify({'success': True, 'items': [i.to_dict() for i in items]})
+        except Exception as e:
+            return jsonify({'success': False, 'message': str(e)}), 500
     try:
         data = request.get_json()
         if not data.get('name') or not data.get('unit') or not data.get('category_id'):
@@ -1717,8 +1769,11 @@ def generate_transfer_no():
 @permission_required('edit')
 def handle_stock_transfers():
     if request.method == 'GET':
-        transfers = StockTransfer.query.order_by(StockTransfer.transfer_date.desc()).all()
-        return jsonify({'success': True, 'transfers': [t.to_dict() for t in transfers]})
+        try:
+            transfers = StockTransfer.query.order_by(StockTransfer.transfer_date.desc()).all()
+            return jsonify({'success': True, 'transfers': [t.to_dict() for t in transfers]})
+        except Exception as e:
+            return jsonify({'success': False, 'message': str(e)}), 500
     try:
         data = request.get_json()
         from_wh = data.get('from_warehouse_id')
@@ -1769,10 +1824,13 @@ def handle_stock_transfers():
 @app.route('/api/stock-transfers/<int:id>', methods=['GET'])
 @login_required
 def get_stock_transfer(id):
-    transfer = db_get(StockTransfer, id)
-    if not transfer:
-        return jsonify({'success': False, 'message': 'Transfer not found'}), 404
-    return jsonify({'success': True, 'transfer': transfer.to_dict()})
+    try:
+        transfer = db_get(StockTransfer, id)
+        if not transfer:
+            return jsonify({'success': False, 'message': 'Transfer not found'}), 404
+        return jsonify({'success': True, 'transfer': transfer.to_dict()})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 # ============ STOCK RECEIPT API ============
 def generate_receipt_no():
@@ -1797,29 +1855,32 @@ def update_inventory(item_id, warehouse_id, quantity_change):
 @permission_required('edit')
 def handle_stock_receipts():
     if request.method == 'GET':
-        query = StockReceipt.query
-        warehouse_id = request.args.get('warehouse_id', type=int)
-        source_type = request.args.get('source_type')
-        date_from = request.args.get('date_from')
-        date_to = request.args.get('date_to')
-        search = request.args.get('search')
-        if warehouse_id:
-            query = query.filter(StockReceipt.warehouse_id == warehouse_id)
-        if source_type:
-            query = query.filter(StockReceipt.source_type == source_type)
-        if date_from:
-            query = query.filter(StockReceipt.date >= parse_date_field({'date_from': date_from}, 'date_from'))
-        if date_to:
-            query = query.filter(StockReceipt.date <= parse_date_field({'date_to': date_to}, 'date_to'))
-        if search:
-            q = f'%{search}%'
-            query = query.filter(db.or_(
-                StockReceipt.receipt_no.ilike(q),
-                StockReceipt.source_name.ilike(q),
-                StockReceipt.invoice_no.ilike(q)
-            ))
-        receipts = query.order_by(StockReceipt.date.desc()).all()
-        return jsonify({'success': True, 'receipts': [r.to_dict() for r in receipts]})
+        try:
+            query = StockReceipt.query
+            warehouse_id = request.args.get('warehouse_id', type=int)
+            source_type = request.args.get('source_type')
+            date_from = request.args.get('date_from')
+            date_to = request.args.get('date_to')
+            search = request.args.get('search')
+            if warehouse_id:
+                query = query.filter(StockReceipt.warehouse_id == warehouse_id)
+            if source_type:
+                query = query.filter(StockReceipt.source_type == source_type)
+            if date_from:
+                query = query.filter(StockReceipt.date >= parse_date_field({'date_from': date_from}, 'date_from'))
+            if date_to:
+                query = query.filter(StockReceipt.date <= parse_date_field({'date_to': date_to}, 'date_to'))
+            if search:
+                q = f'%{search}%'
+                query = query.filter(db.or_(
+                    StockReceipt.receipt_no.ilike(q),
+                    StockReceipt.source_name.ilike(q),
+                    StockReceipt.invoice_no.ilike(q)
+                ))
+            receipts = query.order_by(StockReceipt.date.desc()).all()
+            return jsonify({'success': True, 'receipts': [r.to_dict() for r in receipts]})
+        except Exception as e:
+            return jsonify({'success': False, 'message': str(e)}), 500
     try:
         data = request.get_json()
         if not data.get('warehouse_id'):
@@ -2202,12 +2263,15 @@ def _apply_incident_fields(incident, data):
 @permission_required('edit')
 def handle_incidents():
     if request.method == 'GET':
-        query = Incident.query.order_by(Incident.start_date.desc())
-        status = request.args.get('status')
-        if status:
-            query = query.filter(Incident.status == status)
-        incidents = query.all()
-        return jsonify({'success': True, 'incidents': [i.to_dict() for i in incidents]})
+        try:
+            query = Incident.query.order_by(Incident.start_date.desc())
+            status = request.args.get('status')
+            if status:
+                query = query.filter(Incident.status == status)
+            incidents = query.all()
+            return jsonify({'success': True, 'incidents': [i.to_dict() for i in incidents]})
+        except Exception as e:
+            return jsonify({'success': False, 'message': str(e)}), 500
     try:
         data = request.get_json()
         if not isinstance(data, dict):
@@ -2217,8 +2281,8 @@ def handle_incidents():
         if not incident_name or not incident_type:
             return jsonify({'success': False, 'message': 'Incident name and type are required'}), 400
         ward = parse_int_field(data, 'ward', minimum=1, default=None)
-        if ward is not None and ward not in range(1, 10):
-            return jsonify({'success': False, 'message': 'Ward must be between 1 and 9'}), 400
+        if ward is not None and not is_valid_ward(ward):
+            return jsonify({'success': False, 'message': f'Ward must be between 1 and {len(get_ward_list())}'}), 400
         fiscal_year = data.get('fiscal_year') or AppSettings.get_setting('active_fiscal_year', '2081/82')
         incident = Incident(
             incident_name=incident_name, incident_type=incident_type,
@@ -2261,8 +2325,8 @@ def manage_incident(id):
             incident.incident_type = incident_type
         if 'ward' in data:
             ward = parse_int_field(data, 'ward', minimum=1, default=None)
-            if ward is not None and ward not in range(1, 10):
-                return jsonify({'success': False, 'message': 'Ward must be between 1 and 9'}), 400
+            if ward is not None and not is_valid_ward(ward):
+                return jsonify({'success': False, 'message': f'Ward must be between 1 and {len(get_ward_list())}'}), 400
             incident.ward = ward
         for field in ['status', 'description', 'fiscal_year']:
             if field in data:
@@ -2402,15 +2466,18 @@ def generate_dispatch_no():
 @permission_required('edit')
 def handle_dispatches():
     if request.method == 'GET':
-        query = Dispatch.query.order_by(Dispatch.date.desc())
-        incident_id = request.args.get('incident_id', type=int)
-        warehouse_id = request.args.get('warehouse_id', type=int)
-        if incident_id:
-            query = query.filter(Dispatch.incident_id == incident_id)
-        if warehouse_id:
-            query = query.filter(Dispatch.warehouse_id == warehouse_id)
-        dispatches = query.all()
-        return jsonify({'success': True, 'dispatches': [d.to_dict() for d in dispatches]})
+        try:
+            query = Dispatch.query.order_by(Dispatch.date.desc())
+            incident_id = request.args.get('incident_id', type=int)
+            status = request.args.get('status')
+            if incident_id:
+                query = query.filter(Dispatch.incident_id == incident_id)
+            if status:
+                query = query.filter(Dispatch.status == status)
+            dispatches = query.all()
+            return jsonify({'success': True, 'dispatches': [d.to_dict() for d in dispatches]})
+        except Exception as e:
+            return jsonify({'success': False, 'message': str(e)}), 500
     try:
         data = request.get_json()
         if not isinstance(data, dict):
@@ -2599,18 +2666,21 @@ def generate_distribution_no():
 @permission_required('edit')
 def handle_distributions():
     if request.method == 'GET':
-        incident_id = request.args.get('incident_id', type=int)
-        fiscal_year = request.args.get('fiscal_year')
-        ward = request.args.get('ward', type=int)
-        query = Distribution.query.order_by(Distribution.distribution_date.desc())
-        if incident_id:
-            query = query.filter(Distribution.incident_id == incident_id)
-        if fiscal_year:
-            query = query.filter(Distribution.fiscal_year == fiscal_year)
-        if ward:
-            query = query.join(Incident).filter(Incident.ward == ward)
-        distributions = query.all()
-        return jsonify({'success': True, 'distributions': [d.to_dict() for d in distributions]})
+        try:
+            incident_id = request.args.get('incident_id', type=int)
+            fiscal_year = request.args.get('fiscal_year')
+            ward = request.args.get('ward', type=int)
+            query = Distribution.query.order_by(Distribution.distribution_date.desc())
+            if incident_id:
+                query = query.filter(Distribution.incident_id == incident_id)
+            if fiscal_year:
+                query = query.filter(Distribution.fiscal_year == fiscal_year)
+            if ward:
+                query = query.join(Incident).filter(Incident.ward == ward)
+            distributions = query.all()
+            return jsonify({'success': True, 'distributions': [d.to_dict() for d in distributions]})
+        except Exception as e:
+            return jsonify({'success': False, 'message': str(e)}), 500
     try:
         data = request.get_json()
         if not isinstance(data, dict):
@@ -2692,6 +2762,74 @@ def get_distribution(id):
     if not dist:
         return jsonify({'success': False, 'message': 'Distribution not found'}), 404
     return jsonify({'success': True, 'distribution': dist.to_dict()})
+
+@app.route('/api/distributions/beneficiary/<int:id>/upload-photo', methods=['POST'])
+@login_required
+def upload_dist_beneficiary_photo(id):
+    try:
+        ben = db_get(DistributionBeneficiary, id)
+        if not ben:
+            return jsonify({'success': False, 'message': 'Beneficiary record not found'}), 404
+        if 'file' not in request.files:
+            return jsonify({'success': False, 'message': 'No file provided'}), 400
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'success': False, 'message': 'No file selected'}), 400
+        ALLOWED_EXTENSIONS = {'jpg', 'jpeg', 'png', 'gif'}
+        ext = file.filename.rsplit('.', 1)[-1].lower() if '.' in file.filename else ''
+        if ext not in ALLOWED_EXTENSIONS:
+            return jsonify({'success': False, 'message': 'Allowed: JPG, JPEG, PNG, GIF'}), 400
+        import uuid as uuid_lib
+        safe_name = f"dist_ben_photo_{uuid_lib.uuid4().hex}.{ext}"
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], safe_name)
+        file.save(filepath)
+        if ben.photo:
+            old_path = os.path.join(app.config['UPLOAD_FOLDER'], ben.photo)
+            if os.path.exists(old_path):
+                os.remove(old_path)
+        ben.photo = safe_name
+        db.session.commit()
+        return jsonify({
+            'success': True, 'message': 'Photo uploaded',
+            'data': {'filename': safe_name, 'url': f'/uploads/{safe_name}'}
+        }), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/distributions/beneficiary/<int:id>/upload-document', methods=['POST'])
+@login_required
+def upload_dist_beneficiary_document(id):
+    try:
+        ben = db_get(DistributionBeneficiary, id)
+        if not ben:
+            return jsonify({'success': False, 'message': 'Beneficiary record not found'}), 404
+        if 'file' not in request.files:
+            return jsonify({'success': False, 'message': 'No file provided'}), 400
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'success': False, 'message': 'No file selected'}), 400
+        ALLOWED_EXTENSIONS = {'pdf'}
+        ext = file.filename.rsplit('.', 1)[-1].lower() if '.' in file.filename else ''
+        if ext not in ALLOWED_EXTENSIONS:
+            return jsonify({'success': False, 'message': 'Only PDF files are allowed'}), 400
+        import uuid as uuid_lib
+        safe_name = f"dist_ben_doc_{uuid_lib.uuid4().hex}.{ext}"
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], safe_name)
+        file.save(filepath)
+        if ben.document:
+            old_path = os.path.join(app.config['UPLOAD_FOLDER'], ben.document)
+            if os.path.exists(old_path):
+                os.remove(old_path)
+        ben.document = safe_name
+        db.session.commit()
+        return jsonify({
+            'success': True, 'message': 'Document uploaded',
+            'data': {'filename': safe_name, 'url': f'/uploads/{safe_name}'}
+        }), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 # ============ DISASTER ASSESSMENT API ============
 @app.route('/api/disaster-assessments', methods=['GET', 'POST'])
@@ -3035,21 +3173,24 @@ def generate_cash_distribution_no():
 @permission_required('edit')
 def handle_cash_distributions():
     if request.method == 'GET':
-        query = CashDistribution.query.order_by(CashDistribution.distribution_date.desc())
-        incident_id = request.args.get('incident_id', type=int)
-        fund_id = request.args.get('fund_id', type=int)
-        relief_request_id = request.args.get('relief_request_id', type=int)
-        fiscal_year = request.args.get('fiscal_year')
-        if incident_id:
-            query = query.filter(CashDistribution.incident_id == incident_id)
-        if fund_id:
-            query = query.filter(CashDistribution.fund_id == fund_id)
-        if relief_request_id:
-            query = query.filter(CashDistribution.relief_request_id == relief_request_id)
-        if fiscal_year:
-            query = query.filter(CashDistribution.fiscal_year == fiscal_year)
-        dists = query.all()
-        return jsonify({'success': True, 'distributions': [d.to_dict() for d in dists]})
+        try:
+            query = CashDistribution.query.order_by(CashDistribution.distribution_date.desc())
+            incident_id = request.args.get('incident_id', type=int)
+            fund_id = request.args.get('fund_id', type=int)
+            relief_request_id = request.args.get('relief_request_id', type=int)
+            fiscal_year = request.args.get('fiscal_year')
+            if incident_id:
+                query = query.filter(CashDistribution.incident_id == incident_id)
+            if fund_id:
+                query = query.filter(CashDistribution.fund_id == fund_id)
+            if relief_request_id:
+                query = query.filter(CashDistribution.relief_request_id == relief_request_id)
+            if fiscal_year:
+                query = query.filter(CashDistribution.fiscal_year == fiscal_year)
+            dists = query.all()
+            return jsonify({'success': True, 'distributions': [d.to_dict() for d in dists]})
+        except Exception as e:
+            return jsonify({'success': False, 'message': str(e)}), 500
     try:
         data = request.get_json()
         if not isinstance(data, dict):
@@ -3171,30 +3312,46 @@ def get_cash_distribution(id):
 @permission_required('edit')
 def handle_beneficiaries():
     if request.method == 'GET':
-        query = Beneficiary.query.order_by(Beneficiary.name)
-        search = request.args.get('search')
-        ward = request.args.get('ward', type=int)
-        if search:
-            q = f'%{search}%'
-            query = query.filter(db.or_(Beneficiary.name.ilike(q), Beneficiary.national_id.ilike(q), Beneficiary.phone.ilike(q)))
-        if ward:
-            query = query.filter(Beneficiary.ward == ward)
-        beneficiaries = query.all()
-        return jsonify({'success': True, 'beneficiaries': [b.to_dict() for b in beneficiaries]})
+        try:
+            query = Beneficiary.query.order_by(Beneficiary.name)
+            search = request.args.get('search')
+            ward = request.args.get('ward', type=int)
+            if search:
+                q = f'%{search}%'
+                query = query.filter(db.or_(Beneficiary.name.ilike(q), Beneficiary.national_id.ilike(q), Beneficiary.phone.ilike(q)))
+            if ward:
+                query = query.filter(Beneficiary.ward == ward)
+            beneficiaries = query.all()
+            return jsonify({'success': True, 'beneficiaries': [b.to_dict() for b in beneficiaries]})
+        except Exception as e:
+            return jsonify({'success': False, 'message': str(e)}), 500
     try:
         data = request.get_json()
         if not data.get('name'):
             return jsonify({'success': False, 'message': 'Beneficiary name is required'}), 400
         ward = parse_int_field(data, 'ward', minimum=1, default=None)
-        if ward is not None and ward not in range(1, 10):
-            return jsonify({'success': False, 'message': 'Ward must be between 1 and 9'}), 400
+        if ward is not None and not is_valid_ward(ward):
+            return jsonify({'success': False, 'message': f'Ward must be between 1 and {len(get_ward_list())}'}), 400
         family_members = parse_int_field(data, 'family_members', minimum=1, default=1)
+        family_members_json = data.get('family_members_json')
+        if family_members_json is not None and not isinstance(family_members_json, str):
+            family_members_json = json.dumps(family_members_json, ensure_ascii=False)
         ben = Beneficiary(
-            name=data['name'], national_id=data.get('national_id'), phone=data.get('phone'),
-            address=data.get('address'), municipality=data.get('municipality'),
-            ward=ward,
+            name=data['name'], national_id=data.get('national_id'),
+            father_name=data.get('father_name'),
+            phone=data.get('phone'),
+            address=data.get('address'),
+            ward=ward, tole=data.get('tole'),
+            current_shelter_location=data.get('current_shelter_location'),
+            coordinates=data.get('coordinates'),
             family_members=family_members,
-            bank_account=data.get('bank_account'), mobile_wallet=data.get('mobile_wallet'),
+            family_members_json=family_members_json or '[]',
+            in_social_security_fund=data.get('in_social_security_fund', False),
+            ssf_type=data.get('ssf_type'),
+            poverty_card_holder=data.get('poverty_card_holder', False),
+            bank_account_holder_name=data.get('bank_account_holder_name'),
+            bank_account=data.get('bank_account'), bank_name=data.get('bank_name'),
+            mobile_wallet=data.get('mobile_wallet'),
             remarks=data.get('remarks'), created_by=current_user.id
         )
         db.session.add(ben)
@@ -3223,12 +3380,23 @@ def manage_beneficiary(id):
         data = request.get_json()
         if 'ward' in data:
             ward = parse_int_field(data, 'ward', minimum=1, default=None)
-            if ward is not None and ward not in range(1, 10):
-                return jsonify({'success': False, 'message': 'Ward must be between 1 and 9'}), 400
+            if ward is not None and not is_valid_ward(ward):
+                return jsonify({'success': False, 'message': f'Ward must be between 1 and {len(get_ward_list())}'}), 400
             data['ward'] = ward
         if 'family_members' in data:
             data['family_members'] = parse_int_field(data, 'family_members', minimum=1, default=1)
-        for field in ['name', 'national_id', 'phone', 'address', 'municipality', 'ward', 'family_members', 'bank_account', 'mobile_wallet', 'remarks']:
+        for bool_field in ['in_social_security_fund', 'poverty_card_holder']:
+            if bool_field in data:
+                data[bool_field] = bool(data[bool_field])
+        if 'family_members_json' in data and data['family_members_json'] is not None:
+            fmj = data['family_members_json']
+            data['family_members_json'] = json.dumps(fmj, ensure_ascii=False) if not isinstance(fmj, str) else fmj
+        for field in ['name', 'national_id', 'father_name', 'phone', 'address', 'ward', 'tole',
+                      'current_shelter_location', 'coordinates',
+                      'family_members', 'family_members_json',
+                      'in_social_security_fund', 'ssf_type', 'poverty_card_holder',
+                      'bank_account_holder_name', 'bank_account', 'bank_name',
+                      'mobile_wallet', 'remarks']:
             if field in data:
                 setattr(ben, field, data[field])
         db.session.commit()
@@ -3492,7 +3660,7 @@ def generate_daily_report():
         }
 
         ward_stats = {}
-        for w in range(1, 10):
+        for w in get_ward_list():
             w_incidents = [i for i in incidents if i.ward == w]
             w_assess = [a for a in assessments if a.incident and a.incident.ward == w]
             ward_stats[str(w)] = {
@@ -3562,7 +3730,7 @@ def generate_disaster_pdf(assessments, incidents, total, ward_stats, type_stats,
     elements.append(Spacer(1, 6))
 
     header_data = [['वडा', 'घटना', 'मृतक', 'बेपत्ता', 'घाइते', 'घर नष्ट', 'अ.क्षति']]
-    for w in range(1, 10):
+    for w in get_ward_list():
         ws = ward_stats.get(str(w), {})
         header_data.append([
             str(w), str(ws.get('incidents', 0)), str(ws.get('deaths', 0)),
@@ -3651,7 +3819,7 @@ def daily_report_preview():
     }
 
     ward_stats = {}
-    for w in range(1, 10):
+    for w in get_ward_list():
         w_incidents = [i for i in incidents if i.ward == w]
         w_assess = [a for a in assessments if a.incident and a.incident.ward == w]
         ward_stats[str(w)] = {
@@ -4382,52 +4550,79 @@ def get_notifications():
 @app.route('/api/data', methods=['GET'])
 @login_required
 def get_form_data():
-    inv_avail_rows = db.session.query(
-        Inventory.item_id,
-        db.func.sum(Inventory.quantity - Inventory.reserved_quantity)
-    ).group_by(Inventory.item_id).all()
-    inventory_available = {row[0]: row[1] or 0 for row in inv_avail_rows}
-    total_fund_balance = db.session.query(
-        db.func.coalesce(db.func.sum(CashFund.current_balance), 0)
-    ).scalar()
+    try:
+        inv_avail_rows = db.session.query(
+            Inventory.item_id,
+            db.func.sum(Inventory.quantity - Inventory.reserved_quantity)
+        ).group_by(Inventory.item_id).all()
+        inventory_available = {row[0]: row[1] or 0 for row in inv_avail_rows}
+        total_fund_balance = db.session.query(
+            db.func.coalesce(db.func.sum(CashFund.current_balance), 0)
+        ).scalar()
 
-    return jsonify({
-        'success': True,
-        'warehouses': [w.to_dict() for w in Warehouse.query.all()],
-        'categories': [c.to_dict() for c in Category.query.all()],
-        'items': [i.to_dict() for i in Item.query.all()],
-        'inventory_available': inventory_available,
-        'total_fund_balance': total_fund_balance,
-        'incidents': [i.to_dict() for i in Incident.query.all()],
-        'requests': [r.to_dict() for r in ReliefRequest.query.all()],
-        'dispatches': [d.to_dict() for d in Dispatch.query.all()],
-        'assessments': [a.to_dict() for a in DisasterAssessment.query.all()],
-        'source_types': ['Government Supply', 'Donation', 'NGO', 'Local Government', 'Purchase', 'Supplier', 'Transfer', 'Other'],
-        'priorities': ['Low', 'Medium', 'High', 'Urgent'],
-        'adjustment_types': ['Increase', 'Decrease', 'Damage', 'Expired', 'Lost', 'Correction', 'Correction_Increase'],
-        'adjustment_reasons': ['Damage', 'Loss', 'Physical Count', 'Correction', 'Expired', 'Miscount'],
-        'units': ['Kg', 'Gram', 'Packet', 'Piece', 'Box', 'Bottle', 'Roll', 'Set', 'Carton', 'Bundle', 'Litre', 'Meter', 'Sack'],
-        'user_roles': ['admin', 'warehouse_manager', 'data_entry', 'viewer', 'editor', 'operator', 'finance'],
-        'storage_requirements': ['Normal', 'Dry Storage', 'Cold Storage', 'Refrigerated', 'Hazardous'],
-        'incident_types': AppSettings.get_setting('disaster_types', ['Flood', 'Earthquake', 'Landslide', 'Fire', 'Storm', 'Epidemic', 'Other']),
-        'fiscal_years': AppSettings.get_setting('fiscal_years', ['2080/81', '2081/82', '2082/83', '2083/84', '2084/85']),
-        'active_fiscal_year': AppSettings.get_setting('active_fiscal_year', '2081/82'),
-        'disaster_types': AppSettings.get_setting('disaster_types', ['Flood', 'Earthquake', 'Landslide', 'Fire', 'Storm', 'Epidemic', 'Other']),
-        'ssf_types': AppSettings.get_setting('ssf_types', ['OAS (बर्षा पेन्सन)', 'विधवा (Widow)', 'अपाङ्गता (Disabled)', 'कोही नभएको (Endangered)', 'बाल भत्ता (Child Grant)', 'अन्य (Other)']),
-        'wards': list(range(1, 10)),
-        'cash_funds': [f.to_dict() for f in CashFund.query.all()],
-        'cash_requests': [r.to_dict() for r in CashRequest.query.all()],
-        'beneficiaries': [b.to_dict() for b in Beneficiary.query.all()],
-        'suppliers': [s.to_dict() for s in Supplier.query.all()],
-        'supplier_types': ['Government', 'NGO', 'Private', 'Individual', 'Other'],
-        'warehouse_zones': [z.to_dict() for z in WarehouseZone.query.all()],
-        'funding_sources': ['Federal Government', 'Provincial Government', 'Municipality', 'Disaster Relief Fund', 'Donor Agency', 'NGO', 'Other'],
-        'cash_purposes': ['Medical Support', 'Immediate Relief', 'Temporary Shelter', 'Funeral Support', 'Food Assistance', 'Livelihood Support', 'Other'],
-        'cash_request_statuses': ['Pending', 'Approved', 'Rejected', 'Partial', 'Completed'],
-        'distribution_types': ['Individual', 'Family', 'Community', 'Local Government', 'Organization'],
-        'cash_priorities': ['Low', 'Medium', 'High', 'Urgent'],
-        'distribution_statuses': ['Received', 'Pending'],
-    })
+        return jsonify({
+            'success': True,
+            'warehouses': [w.to_dict() for w in Warehouse.query.all()],
+            'categories': [c.to_dict() for c in Category.query.all()],
+            'items': [i.to_dict() for i in Item.query.all()],
+            'inventory_available': inventory_available,
+            'total_fund_balance': total_fund_balance,
+            'incidents': [i.to_dict() for i in Incident.query.all()],
+            'requests': [r.to_dict() for r in ReliefRequest.query.all()],
+            'dispatches': [d.to_dict() for d in Dispatch.query.all()],
+            'assessments': [a.to_dict() for a in DisasterAssessment.query.all()],
+            'source_types': ['Government Supply', 'Donation', 'NGO', 'Local Government', 'Purchase', 'Supplier', 'Transfer', 'Other'],
+            'priorities': ['Low', 'Medium', 'High', 'Urgent'],
+            'adjustment_types': ['Increase', 'Decrease', 'Damage', 'Expired', 'Lost', 'Correction', 'Correction_Increase'],
+            'adjustment_reasons': ['Damage', 'Loss', 'Physical Count', 'Correction', 'Expired', 'Miscount'],
+            'units': ['Kg', 'Gram', 'Packet', 'Piece', 'Box', 'Bottle', 'Roll', 'Set', 'Carton', 'Bundle', 'Litre', 'Meter', 'Sack'],
+            'user_roles': ['admin', 'warehouse_manager', 'data_entry', 'viewer', 'editor', 'operator', 'finance'],
+            'storage_requirements': ['Normal', 'Dry Storage', 'Cold Storage', 'Refrigerated', 'Hazardous'],
+            'incident_types': AppSettings.get_setting('disaster_types', ['Flood', 'Earthquake', 'Landslide', 'Fire', 'Storm', 'Epidemic', 'Other']),
+            'fiscal_years': AppSettings.get_setting('fiscal_years', ['2080/81', '2081/82', '2082/83', '2083/84', '2084/85']),
+            'active_fiscal_year': AppSettings.get_setting('active_fiscal_year', '2081/82'),
+            'disaster_types': AppSettings.get_setting('disaster_types', ['Flood', 'Earthquake', 'Landslide', 'Fire', 'Storm', 'Epidemic', 'Other']),
+            'ssf_types': AppSettings.get_setting('ssf_types', ['OAS (बर्षा पेन्सन)', 'विधवा (Widow)', 'अपाङ्गता (Disabled)', 'कोही नभएको (Endangered)', 'बाल भत्ता (Child Grant)', 'अन्य (Other)']),
+            'wards': get_ward_list(),
+            'cash_funds': [f.to_dict() for f in CashFund.query.all()],
+            'cash_requests': [r.to_dict() for r in CashRequest.query.all()],
+            'beneficiaries': [b.to_dict() for b in Beneficiary.query.all()],
+            'suppliers': [s.to_dict() for s in Supplier.query.all()],
+            'supplier_types': ['Government', 'NGO', 'Private', 'Individual', 'Other'],
+            'warehouse_zones': [z.to_dict() for z in WarehouseZone.query.all()],
+            'funding_sources': ['Federal Government', 'Provincial Government', 'Municipality', 'Disaster Relief Fund', 'Donor Agency', 'NGO', 'Other'],
+            'cash_purposes': ['Medical Support', 'Immediate Relief', 'Temporary Shelter', 'Funeral Support', 'Food Assistance', 'Livelihood Support', 'Other'],
+            'cash_request_statuses': ['Pending', 'Approved', 'Rejected', 'Partial', 'Completed'],
+            'distribution_types': ['Individual', 'Family', 'Community', 'Local Government', 'Organization'],
+            'cash_priorities': ['Low', 'Medium', 'High', 'Urgent'],
+            'distribution_statuses': ['Received', 'Pending'],
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.errorhandler(500)
+def handle_500(e):
+    if request.path.startswith('/api/'):
+        return jsonify({'success': False, 'message': 'Internal server error: ' + str(e)}), 500
+    return e
+
+@app.errorhandler(404)
+def handle_404(e):
+    if request.path.startswith('/api/'):
+        return jsonify({'success': False, 'message': 'Endpoint not found'}), 404
+    return e
+
+@app.errorhandler(401)
+def handle_401(e):
+    if request.path.startswith('/api/'):
+        return jsonify({'success': False, 'message': 'Authentication required'}), 401
+    return e
+
+@app.errorhandler(403)
+def handle_403(e):
+    if request.path.startswith('/api/'):
+        return jsonify({'success': False, 'message': 'Forbidden'}), 403
+    return e
 
 # ============ REPORTS (PDF) ============
 def make_pdf_report(title, headers, rows, col_widths):
@@ -5299,6 +5494,18 @@ def init_db():
                 if 'status' not in dbencols:
                     try:
                         db.session.execute(db.text("ALTER TABLE distribution_beneficiary ADD COLUMN status VARCHAR(20) DEFAULT 'Received'"))
+                        db.session.commit()
+                    except Exception:
+                        pass
+                if 'photo' not in dbencols:
+                    try:
+                        db.session.execute(db.text("ALTER TABLE distribution_beneficiary ADD COLUMN photo VARCHAR(255)"))
+                        db.session.commit()
+                    except Exception:
+                        pass
+                if 'document' not in dbencols:
+                    try:
+                        db.session.execute(db.text("ALTER TABLE distribution_beneficiary ADD COLUMN document VARCHAR(255)"))
                         db.session.commit()
                     except Exception:
                         pass

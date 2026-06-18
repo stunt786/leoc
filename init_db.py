@@ -320,6 +320,7 @@ def seed_default_settings():
         'currency': 'NPR',
         'language': 'ne',
         'default_warehouse': '',
+        'number_of_wards': 9,
     }
     
     seeded = 0
@@ -384,6 +385,22 @@ def run_migrations():
         ],
         'inventory_item': [
             ('uuid', 'VARCHAR(36)'),
+        ],
+        'beneficiary': [
+            ('father_name', 'VARCHAR(200)'),
+            ('tole', 'VARCHAR(200)'),
+            ('current_shelter_location', 'VARCHAR(300)'),
+            ('coordinates', 'VARCHAR(100)'),
+            ('family_members_json', 'TEXT DEFAULT \'[]\''),
+            ('in_social_security_fund', 'BOOLEAN DEFAULT 0'),
+            ('ssf_type', 'VARCHAR(100)'),
+            ('poverty_card_holder', 'BOOLEAN DEFAULT 0'),
+            ('bank_account_holder_name', 'VARCHAR(200)'),
+            ('bank_name', 'VARCHAR(200)'),
+        ],
+        'distribution_beneficiary': [
+            ('photo', 'VARCHAR(255)'),
+            ('document', 'VARCHAR(255)'),
         ],
         'event_log': [('is_locked', 'BOOLEAN DEFAULT 0')],
         'situation_report': [('is_locked', 'BOOLEAN DEFAULT 0')],
