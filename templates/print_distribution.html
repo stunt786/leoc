@@ -7,14 +7,18 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
     <style>
-        body { font-family: 'Noto Sans Devanagari', 'Inter', sans-serif; padding: 20px; font-size: 12px; }
+        body { font-family: 'Noto Sans Devanagari', 'Inter', sans-serif; padding: 20px; font-size: 11px; }
         @media print { body { padding: 0; } .no-print { display: none !important; } }
-        .header { text-align: center; margin-bottom: 20px; }
+        .header { text-align: center; margin-bottom: 16px; }
         .header h3 { margin-bottom: 2px; }
         .header h5 { color: #2c5282; }
-        table { font-size: 11px; }
-        .footer { text-align: center; margin-top: 20px; font-size: 10px; color: #666; }
+        table { font-size: 10px; }
+        .footer { text-align: center; margin-top: 20px; font-size: 9px; color: #666; }
         .field-label { font-weight: 600; color: #495057; }
+        .section-title { background: #2c5282; color: #fff; padding: 4px 8px; font-size: 11px; margin: 12px 0 6px 0; }
+        .ben-card { border: 1px solid #dee2e6; padding: 8px; margin-bottom: 8px; border-radius: 4px; }
+        .ben-header { background: #28a745; color: #fff; padding: 4px 8px; margin: -8px -8px 6px -8px; font-weight: 600; font-size: 11px; }
+        .page-break { page-break-after: always; }
     </style>
 </head>
 <body>
@@ -25,56 +29,169 @@
     <div class="header">
         <h3>{{ office or 'थलारा गाउँपालिका' }}</h3>
         <h5>स्थानीय आपतकालीन कार्य केन्द्र (LEOC)</h5>
-        <h4>वितरण (Distribution)</h4>
+        <h4>वितरण विवरण (Distribution Details)</h4>
         <p class="text-muted">{{ address }}</p>
     </div>
 
-    <div class="row mb-3">
-        <div class="col-6">
-            <table class="table table-sm table-borderless">
-                <tr><td class="field-label">Distribution Number:</td><td>{{ dist.distribution_no }}</td></tr>
-                <tr><td class="field-label">Dispatch Number:</td><td>{{ dist.dispatch.dispatch_number if dist.dispatch else '' }}</td></tr>
-                <tr><td class="field-label">Incident:</td><td>{{ dist.incident.incident_name if dist.incident else '' }}</td></tr>
-            </table>
-        </div>
-        <div class="col-6">
-            <table class="table table-sm table-borderless">
-                <tr><td class="field-label">Location:</td><td>{{ dist.location or '' }}</td></tr>
-                <tr><td class="field-label">Date:</td><td>{{ dist.distribution_date.strftime('%Y-%m-%d') if dist.distribution_date else '' }}</td></tr>
-                <tr><td class="field-label">Officer:</td><td>{{ dist.officer or '' }}</td></tr>
-            </table>
-        </div>
-    </div>
+    <!-- Distribution Info -->
+    <div class="section-title">वितरण जानकारी (Distribution Information)</div>
+    <table class="table table-sm table-bordered mb-2">
+        <tr>
+            <td class="field-label" style="width:18%">Distribution No:</td><td style="width:32%">{{ dist.distribution_no }}</td>
+            <td class="field-label" style="width:18%">Status:</td><td style="width:32%">{{ dist.status }}</td>
+        </tr>
+        <tr>
+            <td class="field-label">Dispatch No:</td><td>{{ dist.dispatch.dispatch_number if dist.dispatch else '' }}</td>
+            <td class="field-label">Date:</td><td>{{ dist.distribution_date.strftime('%Y-%m-%d') if dist.distribution_date else '' }}</td>
+        </tr>
+        <tr>
+            <td class="field-label">Location:</td><td>{{ dist.location or '' }}</td>
+            <td class="field-label">Officer:</td><td>{{ dist.officer or '' }}</td>
+        </tr>
+        <tr>
+            <td class="field-label">Coordinates:</td><td colspan="3">{{ (dist.latitude ~ ', ' ~ dist.longitude) if dist.latitude is not none and dist.longitude is not none else '-' }}</td>
+        </tr>
+        {% if dist.remarks %}
+        <tr>
+            <td class="field-label">Remarks:</td><td colspan="3">{{ dist.remarks }}</td>
+        </tr>
+        {% endif %}
+    </table>
 
-    <table class="table table-bordered table-sm">
-        <thead class="table-dark">
-            <tr>
-                <th>#</th>
-                <th>Family Name</th>
-                <th>ID Number</th>
-                <th>Members</th>
-                <th>Item</th>
-                <th>Quantity</th>
-            </tr>
+    <!-- Disaster/Incident Info -->
+    {% set inc = dist.incident %}
+    <div class="section-title">प्रकोप / घटना जानकारी (Disaster / Incident Information)</div>
+    <table class="table table-sm table-bordered mb-2">
+        <tr>
+            <td class="field-label" style="width:18%">Incident:</td><td style="width:32%">{{ inc.incident_name if inc else '' }}</td>
+            <td class="field-label" style="width:18%">Type:</td><td style="width:32%">{{ inc.incident_type if inc else '' }}</td>
+        </tr>
+        <tr>
+            <td class="field-label">Date:</td><td>{{ inc.start_date.strftime('%Y-%m-%d') if inc and inc.start_date else '' }}</td>
+            <td class="field-label">Fiscal Year:</td><td>{{ inc.fiscal_year if inc else dist.fiscal_year or '' }}</td>
+        </tr>
+        <tr>
+            <td class="field-label">Ward:</td><td>{{ inc.ward if inc else '' }}</td>
+            <td class="field-label">Tole:</td><td>{{ inc.tole if inc else '' }}</td>
+        </tr>
+        <tr>
+            <td class="field-label">Severity:</td><td>{{ inc.severity if inc else '' }}</td>
+            <td class="field-label">Coordinates:</td><td>{{ inc.coordinates if inc else '' }}</td>
+        </tr>
+    </table>
+
+    <!-- Relief Items -->
+    <div class="section-title">राहत सामग्री वितरण (Relief Items Distribution)</div>
+    <table class="table table-sm table-bordered mb-2">
+        <thead class="table-secondary">
+            <tr><th>#</th><th>Item Name</th><th>Quantity</th><th>Unit</th></tr>
         </thead>
         <tbody>
-            {% for b in dist.beneficiaries %}
-            <tr>
-                <td>{{ loop.index }}</td>
-                <td>{{ b.family_name }}</td>
-                <td>{{ b.id_number or '' }}</td>
-                <td>{{ b.members }}</td>
-                <td>{{ b.item }}</td>
-                <td>{{ b.quantity }}</td>
-            </tr>
-            {% endfor %}
+            {% if dist.dispatch and dist.dispatch.items %}
+                {% for di in dist.dispatch.items %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td>{{ di.item.name if di.item else '' }}</td>
+                    <td>{{ di.quantity }}</td>
+                    <td>{{ di.unit or (di.item.unit if di.item else '') }}</td>
+                </tr>
+                {% endfor %}
+            {% else %}
+                <tr><td colspan="4" class="text-center text-muted">No items</td></tr>
+            {% endif %}
         </tbody>
     </table>
 
-    {% if dist.remarks %}
-    <div class="mb-3">
-        <strong>Remarks:</strong> {{ dist.remarks }}
+    <!-- Beneficiaries -->
+    <div class="section-title">लाभग्राही विवरण (Beneficiary Details)</div>
+    {% for b in dist.beneficiaries %}
+    {% set bd = ben_data[loop.index0] if ben_data and loop.index0 < ben_data|length else None %}
+    {% set ben_dict = bd.beneficiary if bd else None %}
+    {% set fm_list = bd.family_members if bd else [] %}
+    {% set fs = bd.family_stats if bd else {} %}
+    <div class="ben-card">
+        <div class="ben-header">{{ loop.index }}. {{ b.family_name }} ({{ b.id_number or 'No ID' }}) — Status: {{ b.status }}</div>
+
+        <table class="table table-sm table-borderless mb-1" style="font-size:10px">
+            <tr>
+                <td class="field-label" style="width:15%">Name:</td><td style="width:35%">{{ ben_dict.name if ben_dict else b.family_name }}</td>
+                <td class="field-label" style="width:15%">Father's Name:</td><td style="width:35%">{{ ben_dict.father_name if ben_dict else '-' }}</td>
+            </tr>
+            <tr>
+                <td class="field-label">National ID:</td><td>{{ ben_dict.national_id if ben_dict else '-' }}</td>
+                <td class="field-label">Phone:</td><td>{{ ben_dict.phone if ben_dict else '-' }}</td>
+            </tr>
+            <tr>
+                <td class="field-label">Ward:</td><td>{{ ben_dict.ward if ben_dict else '-' }}</td>
+                <td class="field-label">Tole:</td><td>{{ ben_dict.tole if ben_dict else '-' }}</td>
+            </tr>
+            <tr>
+                <td class="field-label">Current Shelter:</td><td>{{ ben_dict.current_shelter_location if ben_dict else '-' }}</td>
+                <td class="field-label">Coordinates:</td><td>{{ ben_dict.coordinates if ben_dict else '-' }}</td>
+            </tr>
+        </table>
+
+        <!-- Social Security -->
+        <table class="table table-sm table-borderless mb-1" style="font-size:10px">
+            <tr>
+                <td class="field-label" style="width:15%">Social Security:</td><td style="width:35%">{{ 'Yes' if ben_dict and ben_dict.in_social_security_fund else 'No' }}</td>
+                <td class="field-label" style="width:15%">SSF Type:</td><td style="width:35%">{{ ben_dict.ssf_type if ben_dict else '-' }}</td>
+            </tr>
+            <tr>
+                <td class="field-label">Poverty Card:</td><td>{{ 'Yes' if ben_dict and ben_dict.poverty_card_holder else 'No' }}</td>
+                <td class="field-label">Relief Items:</td><td>{{ b.item or '-' }} × {{ b.quantity or 0 }}</td>
+            </tr>
+        </table>
+
+        <!-- Family Members -->
+        <table class="table table-sm table-bordered mb-1" style="font-size:9px">
+            <thead class="table-light">
+                <tr><th>Name</th><th>Relation</th><th>Age</th><th>Gender</th><th>Disabled</th><th>Pregnant</th><th>SSF(60+)</th></tr>
+            </thead>
+            <tbody>
+                {% if fm_list %}
+                {% for m in fm_list %}
+                <tr>
+                    <td>{{ m.name or '' }}</td>
+                    <td>{{ m.relation or '' }}</td>
+                    <td>{{ m.age or '' }}</td>
+                    <td>{{ m.gender or '' }}</td>
+                    <td>{{ 'Yes' if m.get('is_disabled') else 'No' }}</td>
+                    <td>{{ 'Yes' if m.get('is_pregnant') else 'No' }}</td>
+                    <td>{{ 'Yes' if m.get('is_old_ssf') else 'No' }}</td>
+                </tr>
+                {% endfor %}
+                {% else %}
+                <tr><td colspan="7" class="text-center text-muted">No family members listed</td></tr>
+                {% endif %}
+            </tbody>
+        </table>
+        <!-- Family Summary -->
+        <div style="font-size:9px;margin-bottom:4px">
+            <strong>Family Summary:</strong>
+            Male: {{ fs.male_count or 0 }} | Female: {{ fs.female_count or 0 }} | Children (<13): {{ fs.child_count or 0 }} |
+            Pregnant: {{ fs.pregnant_count or 0 }} | SSF Age (60+): {{ fs.old_ssf_count or 0 }} | Total: {{ fs.total_members or 0 }}
+        </div>
+
+        <!-- Photo & Document -->
+        <div style="font-size:9px;margin-top:4px">
+            <strong>Photo:</strong> {% if b.photo %}<a href="/uploads/{{ b.photo }}" target="_blank">👁️</a>{% else %}—{% endif %}
+            &nbsp;|&nbsp;
+            <strong>Document:</strong> {% if b.document %}<a href="/uploads/{{ b.document }}" target="_blank">👁️</a>{% else %}—{% endif %}
+        </div>
     </div>
+    {% endfor %}
+
+    <!-- Cash Distribution -->
+    {% set cash_dist = dist.dispatch.relief_request.cash_distributions_ref[0] if dist.dispatch and dist.dispatch.relief_request and dist.dispatch.relief_request.cash_distributions_ref else None %}
+    {% if cash_dist %}
+    <div class="section-title">नगद वितरण (Cash Distribution)</div>
+    <table class="table table-sm table-bordered mb-2">
+        <tr>
+            <td class="field-label">Distribution No:</td><td>{{ cash_dist.distribution_no }}</td>
+            <td class="field-label">Total Cash:</td><td><strong>{{ cash_dist.total_amount }}</strong></td>
+        </tr>
+    </table>
     {% endif %}
 
     <div class="footer">

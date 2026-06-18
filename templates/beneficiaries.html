@@ -286,15 +286,6 @@
 <script>
 const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 
-function updateFamilyCount() {
-    const rows = document.querySelectorAll('#familyMembersContainer .family-member-row');
-    const count = rows.length;
-    document.getElementById('familyCountBadge').textContent = count + ' member' + (count !== 1 ? 's' : '');
-    document.getElementById('noFamilyMsg').style.display = count > 0 ? 'none' : '';
-    document.getElementById('benFamily').value = count || 0;
-    updateFamilyMembersJson();
-}
-
 function updateFamilyMembersJson() {
     const members = [];
     document.querySelectorAll('#familyMembersContainer .family-member-row').forEach(row => {
@@ -311,6 +302,17 @@ function updateFamilyMembersJson() {
         });
     });
     document.getElementById('benFamilyMembersJson').value = JSON.stringify(members);
+}
+
+function updateFamilyCount() {
+    // Count rows with a non-empty name
+    const names = document.querySelectorAll('#familyMembersContainer .family-member-row .fm-name');
+    let count = 0;
+    names.forEach(el => { if (el.value.trim()) count++; });
+    document.getElementById('familyCountBadge').textContent = count + ' member' + (count !== 1 ? 's' : '');
+    document.getElementById('noFamilyMsg').style.display = count > 0 ? 'none' : '';
+    document.getElementById('benFamily').value = count || 0;
+    updateFamilyMembersJson();
 }
 
 function addFamilyMember(data) {
@@ -414,8 +416,13 @@ document.getElementById('benForm').addEventListener('submit', async function(e) 
     e.preventDefault();
     updateFamilyMembersJson();
     const id = document.getElementById('benId').value;
+    const fmJson = JSON.parse(document.getElementById('benFamilyMembersJson').value || '[]');
+    let fmCount = fmJson.length;
+    const nameVal = document.getElementById('benName').value.trim();
+    // Default to 1 if a name is entered but no detailed family members added
+    if (fmCount === 0 && nameVal) fmCount = 1;
     const body = {
-        name: document.getElementById('benName').value,
+        name: nameVal,
         national_id: document.getElementById('benNid').value,
         father_name: document.getElementById('benFatherName').value,
         phone: document.getElementById('benPhone').value,
@@ -424,8 +431,8 @@ document.getElementById('benForm').addEventListener('submit', async function(e) 
         tole: document.getElementById('benTole').value,
         current_shelter_location: document.getElementById('benShelter').value,
         coordinates: document.getElementById('benCoordinates').value,
-        family_members: parseInt(document.getElementById('benFamily').value) || 0,
-        family_members_json: JSON.parse(document.getElementById('benFamilyMembersJson').value || '[]'),
+        family_members: fmCount,
+        family_members_json: fmJson,
         in_social_security_fund: document.getElementById('benSocialSecurity').checked,
         ssf_type: document.getElementById('benSsfType').value,
         poverty_card_holder: document.getElementById('benPovertyCard').checked,
@@ -486,6 +493,9 @@ async function editBen(id) {
     const fm = b.family_members_json || [];
     if (fm.length === 0) {
         document.getElementById('familyMembersContainer').innerHTML = '<p class="text-muted text-center py-3 mb-0" id="noFamilyMsg"><i class="bi bi-info-circle me-1"></i>No family members added. Click "Add Member" below.</p>';
+        document.getElementById('benFamilyMembersJson').value = '[]';
+        document.getElementById('benFamily').value = 0;
+        document.getElementById('familyCountBadge').textContent = '0 members';
     } else {
         fm.forEach(m => addFamilyMember(m));
     }

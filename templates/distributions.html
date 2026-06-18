@@ -39,13 +39,9 @@
                     <label class="form-label">Location</label>
                     <input type="text" class="form-control" id="dist_location">
                 </div>
-                <div class="col-md-2">
-                    <label class="form-label">Latitude</label>
-                    <input type="number" step="any" class="form-control" id="dist_latitude" placeholder="e.g. 29.4479">
-                </div>
-                <div class="col-md-2">
-                    <label class="form-label">Longitude</label>
-                    <input type="number" step="any" class="form-control" id="dist_longitude" placeholder="e.g. 80.9092">
+                <div class="col-md-3">
+                    <label class="form-label">Coordinates (Lat, Lng)</label>
+                    <input type="text" class="form-control" id="dist_coordinates" placeholder="e.g. 29.4479, 80.9092">
                 </div>
                 <div class="col-md-3">
                     <label class="form-label">Distribution Date</label>
@@ -54,6 +50,15 @@
                 <div class="col-md-3">
                     <label class="form-label">Officer</label>
                     <input type="text" class="form-control" id="dist_officer">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Import from Relief Request</label>
+                    <div class="input-group">
+                        <select class="form-select" id="dist_import_rr">
+                            <option value="">Select Request</option>
+                        </select>
+                        <button type="button" class="btn btn-outline-info" onclick="importFromReliefRequest()" title="Import"><i class="bi bi-download"></i></button>
+                    </div>
                 </div>
                 <div class="col-12">
                     <label class="form-label">Remarks</label>
@@ -196,6 +201,7 @@
 const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 let distributions = [];
 let dispatchItemsCache = {};
+let dispatchRRMap = {};
 let beneficiaries = [];
 let benPickerModal = null;
 let isSaving = false;
@@ -210,8 +216,12 @@ async function loadFormData() {
 
         const dispSel = document.getElementById('dist_dispatch_id');
         const dispatches = d.dispatches || [];
+        dispatchRRMap = {};
         dispSel.innerHTML = '<option value="">Select Dispatch</option>' +
-            dispatches.map(dp => `<option value="${dp.id}">${dp.dispatch_number} - ${dp.incident_name || ''} (${dp.date || ''})</option>`).join('');
+            dispatches.map(dp => {
+                dispatchRRMap[dp.id] = dp.relief_request_id;
+                return `<option value="${dp.id}">${dp.dispatch_number} - ${dp.incident_name || ''} (${dp.date || ''})</option>`;
+            }).join('');
 
         document.getElementById('dist_distribution_date').value = new Date().toISOString().split('T')[0];
         document.getElementById('dist_distribution_no').value = 'DIST-' + String(Date.now()).slice(-4);
@@ -220,6 +230,13 @@ async function loadFormData() {
         (d.requests || []).forEach(rr => {
             reliefRequestCashMap[rr.id] = rr;
         });
+
+        // Populate relief request import dropdown
+        const rrSel = document.getElementById('dist_import_rr');
+        rrSel.innerHTML = '<option value="">Select Request</option>' +
+            (d.requests || []).map(rr =>
+                `<option value="${rr.id}">${rr.request_number} - ${rr.requester_name || rr.organization || ''} (${rr.incident_name || ''})</option>`
+            ).join('');
 
         // Load cash distribution data
         const fundSel = document.getElementById('cdFund');
@@ -534,6 +551,54 @@ function selectBeneficiaryFromPicker(id) {
     }
 }
 
+function importFromReliefRequest() {
+    const rrId = parseInt(document.getElementById('dist_import_rr').value);
+    if (!rrId) { showToast('warning', 'Please select a relief request'); return; }
+    const rr = reliefRequestCashMap[rrId];
+    if (!rr) { showToast('danger', 'Relief request not found'); return; }
+
+    // Auto-fill basic info from relief request
+    if (rr.organization && !document.getElementById('dist_location').value) {
+        document.getElementById('dist_location').value = rr.organization;
+    }
+    if (rr.requester_name && !document.getElementById('dist_officer').value) {
+        document.getElementById('dist_officer').value = rr.requester_name;
+    }
+    if (rr.remarks) {
+        const existing = document.getElementById('dist_remarks').value;
+        if (!existing) document.getElementById('dist_remarks').value = rr.remarks;
+    }
+
+    // Find the related dispatch from cached map
+    const dispatchSel = document.getElementById('dist_dispatch_id');
+    let foundDpId = null;
+    for (const [dpId, dpRRId] of Object.entries(dispatchRRMap)) {
+        if (dpRRId === rrId) { foundDpId = parseInt(dpId); break; }
+    }
+
+    if (foundDpId) {
+        dispatchSel.value = foundDpId;
+        dispatchSel.dispatchEvent(new Event('change'));
+        // Fetch dispatch details and open beneficiary picker after items are cached
+        fetch('/api/dispatch/' + foundDpId)
+            .then(r => r.json())
+            .then(d => {
+                if (d.success && d.dispatch) {
+                    const dp = d.dispatch;
+                    dispatchItemsCache[foundDpId] = dp.items || [];
+                    if (dp.destination) document.getElementById('dist_location').value = dp.destination;
+                    if (dp.receiver) document.getElementById('dist_officer').value = dp.receiver;
+                }
+                openBeneficiaryPicker();
+            }).catch(() => {
+                openBeneficiaryPicker();
+            });
+    } else {
+        showToast('info', 'No dispatch found for this relief request. Auto-filling basic info.');
+        openBeneficiaryPicker();
+    }
+}
+
 async function loadDistributions() {
     try {
         const r = await fetch('/api/distributions');
@@ -590,43 +655,154 @@ async function viewDistribution(id) {
     const d = await r.json();
     if (!d.success) { showToast('danger', d.message); return; }
     const dist = d.distribution;
+    const inc = dist.incident || {};
 
-    let benHtml = '<table class="table table-sm mb-0" id="viewBenTable"><thead><tr><th>Family Name</th><th>ID Number</th><th>Members</th><th>Item</th><th>Qty</th><th>Photo</th><th>Document</th></tr></thead><tbody>';
+    let benCards = '';
     if (dist.beneficiaries && dist.beneficiaries.length > 0) {
-        dist.beneficiaries.forEach(b => {
-            const name = b.beneficiary_name || b.family_name;
+        dist.beneficiaries.forEach((b, idx) => {
+            const ben = b.beneficiary || {};
+            const fs = b.family_stats || {};
+            const ss = b.social_security || {};
+            const fm = b.family_members || [];
+
             const photoHtml = b.photo_url
-                ? `<div><a href="${b.photo_url}" target="_blank"><img src="${b.photo_url}" class="img-thumbnail" style="max-width:60px;max-height:60px;object-fit:cover" title="View photo"></a>
-                    <button type="button" class="btn btn-sm btn-outline-primary d-block mx-auto mt-1" style="font-size:0.65rem;line-height:1.2;padding:2px 4px" onclick="uploadViewBenFile(${b.id},'photo',this)"><i class="bi bi-camera"></i></button></div>`
-                : `<button type="button" class="btn btn-sm btn-outline-primary" style="font-size:0.75rem" onclick="uploadViewBenFile(${b.id},'photo',this)"><i class="bi bi-camera"></i><br><small>Upload</small></button>`;
+                ? `<a href="${b.photo_url}" target="_blank" class="btn btn-sm btn-outline-info" title="View Photo"><i class="bi bi-eye"></i></a>`
+                : `<span class="text-muted small">—</span>`;
             const docHtml = b.document_url
-                ? `<div><a href="${b.document_url}" target="_blank" class="btn btn-sm btn-outline-secondary"><i class="bi bi-file-pdf"></i> PDF</a>
-                    <button type="button" class="btn btn-sm btn-outline-primary d-block mx-auto mt-1" style="font-size:0.65rem;line-height:1.2;padding:2px 4px" onclick="uploadViewBenFile(${b.id},'document',this)"><i class="bi bi-upload"></i></button></div>`
-                : `<button type="button" class="btn btn-sm btn-outline-primary" style="font-size:0.75rem" onclick="uploadViewBenFile(${b.id},'document',this)"><i class="bi bi-file-earmark-pdf"></i><br><small>Upload</small></button>`;
-            benHtml += `<tr><td>${name}</td><td>${b.id_number || '-'}</td><td>${b.members}</td><td>${b.item || '-'}</td><td>${b.quantity}</td>
-                <td class="text-center align-middle">${photoHtml}</td>
-                <td class="text-center align-middle">${docHtml}</td></tr>`;
+                ? `<a href="${b.document_url}" target="_blank" class="btn btn-sm btn-outline-info" title="View Document"><i class="bi bi-eye"></i></a>`
+                : `<span class="text-muted small">—</span>`;
+
+            const fmRows = fm.map(m => `<tr>
+                <td>${m.name || ''}</td>
+                <td>${m.relation || ''}</td>
+                <td>${m.age || ''}</td>
+                <td>${m.gender || ''}</td>
+                <td>${m.is_disabled ? '<span class="badge bg-danger">Yes</span>' : 'No'}</td>
+                <td>${m.is_pregnant ? '<span class="badge bg-warning">Yes</span>' : 'No'}</td>
+                <td>${m.is_old_ssf ? '<span class="badge bg-info">Yes</span>' : 'No'}</td>
+            </tr>`).join('');
+
+            benCards += `<div class="card mb-3 border-success">
+                <div class="card-header bg-success text-white py-2 d-flex justify-content-between align-items-center">
+                    <span><strong>${idx + 1}. ${b.family_name}</strong> (${b.id_number || 'No ID'})</span>
+                    <span class="badge bg-light text-dark">Status: ${b.status}</span>
+                </div>
+                <div class="card-body py-2">
+                    <div class="row g-2">
+                        <div class="col-md-6">
+                            <table class="table table-sm table-borderless mb-0 small">
+                                <tr><td class="fw-medium" style="width:140px">Beneficiary Name:</td><td>${ben.name || b.family_name}</td></tr>
+                                <tr><td class="fw-medium">Father's Name:</td><td>${ben.father_name || '-'}</td></tr>
+                                <tr><td class="fw-medium">National ID:</td><td>${ben.national_id || '-'}</td></tr>
+                                <tr><td class="fw-medium">Phone:</td><td>${ben.phone || '-'}</td></tr>
+                                <tr><td class="fw-medium">Ward:</td><td>${ben.ward || '-'}</td></tr>
+                                <tr><td class="fw-medium">Tole:</td><td>${ben.tole || '-'}</td></tr>
+                                <tr><td class="fw-medium">Current Shelter:</td><td>${ben.current_shelter_location || '-'}</td></tr>
+                                <tr><td class="fw-medium">Coordinates:</td><td>${ben.coordinates || '-'}</td></tr>
+                            </table>
+                        </div>
+                        <div class="col-md-6">
+                            <table class="table table-sm table-borderless mb-0 small">
+                                <tr><td class="fw-medium" style="width:150px">Social Security:</td><td>${ss.in_social_security_fund ? '<span class="badge bg-success">Yes</span>' : 'No'}</td></tr>
+                                <tr><td class="fw-medium">SSF Type:</td><td>${ss.ssf_type || '-'}</td></tr>
+                                <tr><td class="fw-medium">Poverty Card:</td><td>${ss.poverty_card_holder ? '<span class="badge bg-success">Yes</span>' : 'No'}</td></tr>
+                            </table>
+                            <hr class="my-1">
+                            <table class="table table-sm table-borderless mb-0 small">
+                                <tr><td class="fw-medium" style="width:150px">👨 Male:</td><td>${fs.male_count || 0}</td>
+                                    <td class="fw-medium" style="width:150px">👩 Female:</td><td>${fs.female_count || 0}</td></tr>
+                                <tr><td class="fw-medium">🧒 Children (<13):</td><td>${fs.child_count || 0}</td>
+                                    <td class="fw-medium">🤰 Pregnant:</td><td>${fs.pregnant_count || 0}</td></tr>
+                                <tr><td class="fw-medium">👴 SSF Age (60+):</td><td>${fs.old_ssf_count || 0}</td>
+                                    <td class="fw-medium">Total Members:</td><td>${fs.total_members || 0}</td></tr>
+                            </table>
+                        </div>
+                    </div>
+                    <hr class="my-1">
+                    <strong class="small">Family Members:</strong>
+                    <div class="table-responsive mt-1">
+                        <table class="table table-sm table-bordered mb-0 small">
+                            <thead class="table-light"><tr><th>Name</th><th>Relation</th><th>Age</th><th>Gender</th><th>Disabled</th><th>Pregnant</th><th>SSF(60+)</th></tr></thead>
+                            <tbody>${fm.length > 0 ? fmRows : '<tr><td colspan="7" class="text-center text-muted">No family members listed</td></tr>'}</tbody>
+                        </table>
+                    </div>
+                    <hr class="my-1">
+                    <div class="d-flex gap-3 align-items-center">
+                        <div><strong class="small">Relief Items:</strong> ${b.item || '-'} × ${b.quantity || 0}</div>
+                        <div><strong class="small">Photo:</strong> ${photoHtml}</div>
+                        <div><strong class="small">Document:</strong> ${docHtml}</div>
+                    </div>
+                </div>
+            </div>`;
         });
     }
-    benHtml += '</tbody></table>';
 
+    const dispatchItemsHtml = (dist.dispatch_items || []).map(di =>
+        `<tr><td>${di.item_name}</td><td>${di.quantity}</td><td>${di.unit || '-'}</td></tr>`
+    ).join('');
+
+    // Build modal
     const modal = document.createElement('div');
     modal.className = 'modal fade';
-    modal.innerHTML = `<div class="modal-dialog modal-lg"><div class="modal-content">
-        <div class="modal-header"><h5 class="modal-title"><i class="bi bi-people me-2"></i>${dist.distribution_no}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    modal.innerHTML = `<div class="modal-dialog modal-xl"><div class="modal-content">
+        <div class="modal-header bg-primary text-white py-2">
+            <h5 class="modal-title"><i class="bi bi-people me-2"></i>${dist.distribution_no}</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
         <div class="modal-body">
-            <div class="row g-3 mb-3">
-                <div class="col-md-4"><strong>Dispatch:</strong> ${dist.dispatch_number || '-'}</div>
-                <div class="col-md-4"><strong>Incident:</strong> ${dist.incident_name || '-'}</div>
-                <div class="col-md-4"><strong>Location:</strong> ${dist.location || '-'}</div>
-                <div class="col-md-4"><strong>Date:</strong> ${dist.distribution_date || '-'}</div>
-                <div class="col-md-4"><strong>Officer:</strong> ${dist.officer || '-'}</div>
-                <div class="col-12"><strong>Remarks:</strong> ${dist.remarks || '-'}</div>
+            <!-- Distribution Info -->
+            <div class="card bg-light mb-3">
+                <div class="card-header py-1"><strong><i class="bi bi-info-circle me-1"></i>Distribution Information</strong></div>
+                <div class="card-body py-2">
+                    <div class="row g-1 small">
+                        <div class="col-md-3"><strong>Dispatch:</strong> ${dist.dispatch_number || '-'}</div>
+                        <div class="col-md-3"><strong>Date:</strong> ${dist.distribution_date || '-'}</div>
+                        <div class="col-md-3"><strong>Officer:</strong> ${dist.officer || '-'}</div>
+                        <div class="col-md-3"><strong>Status:</strong> <span class="badge bg-${dist.status === 'Completed' ? 'success' : 'warning'}">${dist.status}</span></div>
+                        <div class="col-md-3"><strong>Location:</strong> ${dist.location || '-'}</div>
+                        <div class="col-md-3"><strong>Coordinates:</strong> ${dist.latitude != null && dist.longitude != null ? dist.latitude + ', ' + dist.longitude : '-'}</div>
+                        <div class="col-12"><strong>Remarks:</strong> ${dist.remarks || '-'}</div>
+                    </div>
+                </div>
             </div>
-            <hr><h6>Beneficiaries</h6>${benHtml}
+
+            <!-- Incident / Disaster Info -->
+            <div class="card bg-light mb-3">
+                <div class="card-header py-1"><strong><i class="bi bi-tornado me-1"></i>Disaster / Incident Information</strong></div>
+                <div class="card-body py-2">
+                    <div class="row g-1 small">
+                        <div class="col-md-3"><strong>Incident:</strong> ${inc.incident_name || '-'}</div>
+                        <div class="col-md-3"><strong>Type:</strong> ${inc.incident_type || '-'}</div>
+                        <div class="col-md-3"><strong>Date:</strong> ${inc.start_date || '-'}</div>
+                        <div class="col-md-3"><strong>Fiscal Year:</strong> ${inc.fiscal_year || dist.fiscal_year || '-'}</div>
+                        <div class="col-md-3"><strong>Ward:</strong> ${inc.ward || '-'}</div>
+                        <div class="col-md-3"><strong>Tole:</strong> ${inc.tole || '-'}</div>
+                        <div class="col-md-3"><strong>Latitude:</strong> ${inc.coordinates ? inc.coordinates.split(',')[0] || '-' : '-'}</div>
+                        <div class="col-md-3"><strong>Longitude:</strong> ${inc.coordinates ? inc.coordinates.split(',')[1] || '-' : '-'}</div>
+                        <div class="col-md-3"><strong>Severity:</strong> ${inc.severity || '-'}</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dispatch Items Summary -->
+            <div class="card bg-light mb-3">
+                <div class="card-header py-1"><strong><i class="bi bi-box-seam me-1"></i>Relief Items Distribution</strong></div>
+                <div class="card-body py-2">
+                    <table class="table table-sm table-bordered mb-0 small">
+                        <thead class="table-light"><tr><th>Item Name</th><th>Quantity</th><th>Unit</th></tr></thead>
+                        <tbody>${dispatchItemsHtml || '<tr><td colspan="3" class="text-center text-muted">No items</td></tr>'}</tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Beneficiaries -->
+            <h6 class="fw-bold"><i class="bi bi-people me-1"></i>Beneficiaries (${dist.beneficiaries ? dist.beneficiaries.length : 0})</h6>
+            ${benCards || '<p class="text-muted">No beneficiaries</p>'}
             <div id="distViewCashInfo_${dist.id}"></div>
         </div>
-        <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        </div>
     </div></div>`;
     document.body.appendChild(modal);
     const bsModal = new bootstrap.Modal(modal);
@@ -648,11 +824,15 @@ async function viewDistribution(id) {
                             const div = document.getElementById('distViewCashInfo_' + dist.id);
                             if (div) {
                                 div.innerHTML = `<hr><h6><i class="bi bi-cash-stack me-1 text-success"></i>Cash Distribution</h6>
-                                    <div class="row g-2">
-                                        <div class="col-md-3"><small class="text-muted">Dist No</small><br><strong>${cd.distribution_no}</strong></div>
-                                        <div class="col-md-3"><small class="text-muted">Fund</small><br><strong>${cd.fund_name || '-'}</strong></div>
-                                        <div class="col-md-3"><small class="text-muted">Amount</small><br><strong class="text-danger">${Number(cd.total_amount).toLocaleString()}</strong></div>
-                                        <div class="col-md-3"><small class="text-muted">Beneficiaries</small><br><strong>${(cd.beneficiaries||[]).length}</strong></div>
+                                    <div class="card bg-light mb-0">
+                                        <div class="card-body py-2">
+                                            <div class="row g-1 small">
+                                                <div class="col-md-3"><strong>Dist No:</strong> ${cd.distribution_no}</div>
+                                                <div class="col-md-3"><strong>Fund:</strong> ${cd.fund_name || '-'}</div>
+                                                <div class="col-md-3"><strong>Total Cash:</strong> <strong class="text-danger">${Number(cd.total_amount).toLocaleString()}</strong></div>
+                                                <div class="col-md-3"><strong>Beneficiaries:</strong> ${(cd.beneficiaries||[]).length}</div>
+                                            </div>
+                                        </div>
                                     </div>`;
                             }
                         }
@@ -812,14 +992,21 @@ async function saveDistribution() {
         let savedDistNo = null;
         // Save items distribution if there are item beneficiaries
         if (beneficiaries.length > 0) {
-            const lat = document.getElementById('dist_latitude').value;
-            const lon = document.getElementById('dist_longitude').value;
+            const coords = document.getElementById('dist_coordinates').value.trim();
+            let lat = null, lon = null;
+            if (coords) {
+                const parts = coords.split(',').map(s => parseFloat(s.trim()));
+                if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+                    lat = parts[0];
+                    lon = parts[1];
+                }
+            }
             const body = {
                 distribution_no: document.getElementById('dist_distribution_no').value,
                 dispatch_id: dispatch_id,
                 location: document.getElementById('dist_location').value,
-                latitude: lat ? parseFloat(lat) : null,
-                longitude: lon ? parseFloat(lon) : null,
+                latitude: lat,
+                longitude: lon,
                 distribution_date: dateVal,
                 officer: document.getElementById('dist_officer').value,
                 status: document.getElementById('dist_status') ? document.getElementById('dist_status').value : 'Completed',

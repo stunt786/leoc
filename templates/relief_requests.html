@@ -56,7 +56,7 @@
 
 <!-- Relief Request Modal -->
 <div class="modal fade" id="reliefRequestModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
+    <div class="modal-dialog modal-xl">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="rrModalTitle"><i class="bi bi-send me-2"></i>New Relief Request</h5>
@@ -86,7 +86,10 @@
                         </div>
                         <div class="col-md-4">
                             <label class="form-label">Requester Name</label>
-                            <input type="text" class="form-control" id="rr_requester_name">
+                            <div class="input-group">
+                                <input type="text" class="form-control" id="rr_requester_name">
+                                <button type="button" class="btn btn-outline-info btn-sm" onclick="openRequesterPicker()" title="Select from Registry"><i class="bi bi-person-lines-fill"></i></button>
+                            </div>
                         </div>
                         <div class="col-md-4">
                             <label class="form-label">Phone</label>
@@ -113,43 +116,45 @@
                             <label class="form-label">Remarks</label>
                             <textarea class="form-control" id="rr_remarks" rows="2"></textarea>
                         </div>
-                        <div class="col-12"><hr><h6>Requested Items</h6></div>
-                        <div class="col-12"><hr><h6>Cash Assistance <small class="text-muted">(optional)</small></h6></div>
-                        <div class="col-md-4">
-                            <label class="form-label">Requested Cash Amount</label>
-                            <input type="number" step="0.01" class="form-control" id="rr_cash_amount" placeholder="0.00" oninput="toggleCashPurpose()">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label">Cash Purpose</label>
-                            <select class="form-select" id="rr_cash_purpose">
-                                <option value="">Select</option>
-                                <option value="Medical Support">Medical Support</option>
-                                <option value="Immediate Relief">Immediate Relief</option>
-                                <option value="Temporary Shelter">Temporary Shelter</option>
-                                <option value="Funeral Support">Funeral Support</option>
-                                <option value="Food Assistance">Food Assistance</option>
-                                <option value="Livelihood Support">Livelihood Support</option>
-                                <option value="Other">Other</option>
-                            </select>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label">Distributed Amount</label>
-                            <input type="text" class="form-control" id="rr_cash_distributed" readonly>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label">Available Fund Balance</label>
-                            <input type="text" class="form-control" id="rr_fund_balance" readonly>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label">Remaining Amount</label>
-                            <input type="text" class="form-control" id="rr_cash_remaining" readonly>
-                        </div>
-                        <div class="col-12">
+                        <div class="col-md-8">
+                            <h6 class="border-bottom pb-1"><i class="bi bi-box-seam me-1"></i>Requested Items</h6>
                             <table class="table table-sm" id="rrItemsTable">
-                                <thead><tr><th style="width:35%">Item</th><th style="width:10%">Unit</th><th style="width:15%">In Stock</th><th style="width:15%">Requested</th><th style="width:15%">Remaining</th><th style="width:10%"></th></tr></thead>
+                                <thead><tr><th style="width:30%">Item</th><th style="width:10%">Unit</th><th style="width:12%">In Stock</th><th style="width:14%">Requested</th><th style="width:12%">Remaining</th><th style="width:8%"></th></tr></thead>
                                 <tbody id="rrItemsBody"></tbody>
                             </table>
                             <button type="button" class="btn btn-sm btn-outline-primary" onclick="addRRItem()">+ Add Item</button>
+                        </div>
+                        <div class="col-md-4">
+                            <h6 class="border-bottom pb-1"><i class="bi bi-cash-stack me-1"></i>Cash Assistance <small class="text-muted">(optional)</small></h6>
+                            <div class="mb-2">
+                                <label class="form-label small">Requested Amount</label>
+                                <input type="number" step="0.01" class="form-control form-control-sm" id="rr_cash_amount" placeholder="0.00" oninput="toggleCashPurpose()">
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label small">Purpose</label>
+                                <select class="form-select form-select-sm" id="rr_cash_purpose">
+                                    <option value="">Select</option>
+                                    <option value="Medical Support">Medical Support</option>
+                                    <option value="Immediate Relief">Immediate Relief</option>
+                                    <option value="Temporary Shelter">Temporary Shelter</option>
+                                    <option value="Funeral Support">Funeral Support</option>
+                                    <option value="Food Assistance">Food Assistance</option>
+                                    <option value="Livelihood Support">Livelihood Support</option>
+                                    <option value="Other">Other</option>
+                                </select>
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label small">Distributed</label>
+                                <input type="text" class="form-control form-control-sm" id="rr_cash_distributed" readonly>
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label small">Fund Balance</label>
+                                <input type="text" class="form-control form-control-sm" id="rr_fund_balance" readonly>
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label small">Remaining</label>
+                                <input type="text" class="form-control form-control-sm" id="rr_cash_remaining" readonly>
+                            </div>
                         </div>
                     </div>
                 </form>
@@ -157,6 +162,30 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                 <button type="button" class="btn btn-primary" onclick="saveRR()"><i class="bi bi-check-lg"></i> Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- Beneficiary Picker Modal -->
+<div class="modal fade" id="reqBenPickerModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-person-lines-fill me-2"></i>Select Beneficiary as Requester</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <input type="text" class="form-control" id="reqBenPickerSearch" placeholder="Search by name, ID, phone..." oninput="filterReqBenPicker()">
+                </div>
+                <div class="table-responsive" style="max-height:350px">
+                    <table class="table table-sm table-hover mb-0">
+                        <thead class="table-light sticky-top">
+                            <tr><th>Name</th><th>Father's Name</th><th>Phone</th><th>Ward</th><th></th></tr>
+                        </thead>
+                        <tbody id="reqBenPickerBody"></tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
@@ -171,6 +200,61 @@ let itemsData = [];
 let incidentsData = [];
 let inventoryAvailable = {};
 let totalFundBalance = 0;
+let beneficiaries = [];
+let reqBenPickerModal = null;
+
+async function loadBeneficiaries() {
+    try {
+        const r = await fetch('/api/beneficiaries');
+        if (!r.ok) return;
+        const d = await r.json();
+        if (d.success) beneficiaries = d.beneficiaries || [];
+    } catch(e) {}
+}
+
+function openRequesterPicker() {
+    renderReqBenPicker(beneficiaries);
+    if (!reqBenPickerModal) {
+        reqBenPickerModal = new bootstrap.Modal(document.getElementById('reqBenPickerModal'));
+    }
+    reqBenPickerModal.show();
+}
+
+function filterReqBenPicker() {
+    const q = document.getElementById('reqBenPickerSearch').value.toLowerCase();
+    const filtered = beneficiaries.filter(b =>
+        (b.name && b.name.toLowerCase().includes(q)) ||
+        (b.father_name && b.father_name.toLowerCase().includes(q)) ||
+        (b.national_id && b.national_id.toLowerCase().includes(q)) ||
+        (b.phone && b.phone.toLowerCase().includes(q))
+    );
+    renderReqBenPicker(filtered);
+}
+
+function renderReqBenPicker(list) {
+    const tbody = document.getElementById('reqBenPickerBody');
+    if (list.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">No beneficiaries found</td></tr>';
+        return;
+    }
+    tbody.innerHTML = list.map(b => `<tr>
+        <td>${b.name}</td>
+        <td>${b.father_name || '-'}</td>
+        <td>${b.phone || '-'}</td>
+        <td>${b.ward || '-'}</td>
+        <td><button class="btn btn-sm btn-outline-primary" onclick="selectRequesterFromPicker(${b.id})"><i class="bi bi-plus-lg"></i></button></td>
+    </tr>`).join('');
+}
+
+function selectRequesterFromPicker(id) {
+    const ben = beneficiaries.find(b => b.id === id);
+    if (ben) {
+        document.getElementById('rr_requester_name').value = ben.name;
+        document.getElementById('rr_phone').value = ben.phone || '';
+        const modal = bootstrap.Modal.getInstance(document.getElementById('reqBenPickerModal'));
+        if (modal) modal.hide();
+    }
+}
 
 function getItemStock(itemId) {
     return inventoryAvailable[itemId] || 0;
@@ -405,6 +489,7 @@ async function deleteRR(id) {
 document.addEventListener('DOMContentLoaded', async () => {
     await loadFormData();
     loadRR();
+    loadBeneficiaries();
 });
 </script>
 {% endblock %}

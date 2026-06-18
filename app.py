@@ -893,12 +893,23 @@ class Distribution(db.Model):
             ).first()
             if cd:
                 cash_info = {'distribution_no': cd.distribution_no, 'total_amount': cd.total_amount}
+
+        incident_dict = self.incident.to_dict() if self.incident else None
+
+        dispatch_items = []
+        if self.dispatch:
+            dispatch_items = [{
+                'item_name': di.item.name if di.item else None,
+                'quantity': di.quantity,
+                'unit': di.unit or (di.item.unit if di.item else None)
+            } for di in self.dispatch.items]
+
         return {
             'id': self.id, 'distribution_no': self.distribution_no,
             'dispatch_id': self.dispatch_id,
             'dispatch_number': self.dispatch.dispatch_number if self.dispatch else None,
             'incident_id': self.incident_id,
-            'incident_name': self.incident.incident_name if self.incident else None,
+            'incident': incident_dict,
             'location': self.location,
             'latitude': self.latitude,
             'longitude': self.longitude,
@@ -906,7 +917,8 @@ class Distribution(db.Model):
             'distribution_date': self.distribution_date.strftime('%Y-%m-%d') if self.distribution_date else None,
             'officer': self.officer, 'status': self.status, 'remarks': self.remarks,
             'beneficiaries': [b.to_dict() for b in self.beneficiaries],
-            'cash_distribution': cash_info
+            'cash_distribution': cash_info,
+            'dispatch_items': dispatch_items
         }
 
 class DistributionBeneficiary(db.Model):
@@ -927,17 +939,80 @@ class DistributionBeneficiary(db.Model):
     def to_dict(self):
         photo_url = f'/uploads/{self.photo}' if self.photo else None
         document_url = f'/uploads/{self.document}' if self.document else None
+
+        ben = self.beneficiary
+        ben_dict = ben.to_dict() if ben else None
+        family_members_list = []
+        family_stats = {
+            'male_count': 0, 'female_count': 0, 'child_count': 0,
+            'pregnant_count': 0, 'old_ssf_count': 0, 'total_members': 0
+        }
+        social_security = {
+            'in_social_security_fund': False,
+            'ssf_type': None,
+            'poverty_card_holder': False
+        }
+
+        if ben:
+            fm_json = []
+            if ben.family_members_json:
+                try:
+                    fm_json = json.loads(ben.family_members_json) if isinstance(ben.family_members_json, str) else ben.family_members_json
+                except (json.JSONDecodeError, TypeError):
+                    fm_json = []
+
+            male_count = 0
+            female_count = 0
+            child_count = 0
+            pregnant_count = 0
+            old_ssf_count = 0
+
+            for fm in fm_json:
+                gender = (fm.get('gender') or '').lower()
+                age = int(fm.get('age') or 0)
+                if gender == 'male':
+                    male_count += 1
+                if gender == 'female':
+                    female_count += 1
+                if 0 < age < 13:
+                    child_count += 1
+                if fm.get('is_pregnant'):
+                    pregnant_count += 1
+                if age >= 60:
+                    old_ssf_count += 1
+                fm_copy = dict(fm)
+                fm_copy['is_old_ssf'] = age >= 60
+                family_members_list.append(fm_copy)
+
+            family_stats = {
+                'male_count': male_count,
+                'female_count': female_count,
+                'child_count': child_count,
+                'pregnant_count': pregnant_count,
+                'old_ssf_count': old_ssf_count,
+                'total_members': len(fm_json)
+            }
+
+            social_security = {
+                'in_social_security_fund': ben.in_social_security_fund,
+                'ssf_type': ben.ssf_type,
+                'poverty_card_holder': ben.poverty_card_holder
+            }
+
         return {
             'id': self.id, 'family_name': self.family_name,
             'id_number': self.id_number, 'members': self.members,
             'item': self.item, 'quantity': self.quantity,
             'beneficiary_id': self.beneficiary_id,
-            'beneficiary_name': self.beneficiary.name if self.beneficiary else None,
+            'beneficiary': ben_dict,
             'status': self.status,
             'photo': self.photo,
             'photo_url': photo_url,
             'document': self.document,
-            'document_url': document_url
+            'document_url': document_url,
+            'family_stats': family_stats,
+            'family_members': family_members_list,
+            'social_security': social_security
         }
 
 # ============ STOCK TRANSFER MODEL ============
@@ -3332,7 +3407,7 @@ def handle_beneficiaries():
         ward = parse_int_field(data, 'ward', minimum=1, default=None)
         if ward is not None and not is_valid_ward(ward):
             return jsonify({'success': False, 'message': f'Ward must be between 1 and {len(get_ward_list())}'}), 400
-        family_members = parse_int_field(data, 'family_members', minimum=1, default=1)
+        family_members = parse_int_field(data, 'family_members', minimum=0, default=1)
         family_members_json = data.get('family_members_json')
         if family_members_json is not None and not isinstance(family_members_json, str):
             family_members_json = json.dumps(family_members_json, ensure_ascii=False)
@@ -3384,7 +3459,7 @@ def manage_beneficiary(id):
                 return jsonify({'success': False, 'message': f'Ward must be between 1 and {len(get_ward_list())}'}), 400
             data['ward'] = ward
         if 'family_members' in data:
-            data['family_members'] = parse_int_field(data, 'family_members', minimum=1, default=1)
+            data['family_members'] = parse_int_field(data, 'family_members', minimum=0, default=1)
         for bool_field in ['in_social_security_fund', 'poverty_card_holder']:
             if bool_field in data:
                 data[bool_field] = bool(data[bool_field])
@@ -5130,7 +5205,41 @@ def print_distribution(id):
         return jsonify({'success': False, 'message': 'Distribution not found'}), 404
     office = AppSettings.get_setting('office_name', 'LEOC')
     address = AppSettings.get_setting('address', '')
-    return render_template('print_distribution.html', dist=dist, office=office, address=address)
+
+    ben_data = []
+    for b in dist.beneficiaries:
+        ben = b.beneficiary
+        fm_list = []
+        male_count = 0
+        female_count = 0
+        child_count = 0
+        pregnant_count = 0
+        old_ssf_count = 0
+        if ben and ben.family_members_json:
+            try:
+                raw = json.loads(ben.family_members_json) if isinstance(ben.family_members_json, str) else ben.family_members_json
+                for m in raw:
+                    age = int(m.get('age') or 0)
+                    gender = (m.get('gender') or '').lower()
+                    if gender == 'male': male_count += 1
+                    if gender == 'female': female_count += 1
+                    if 0 < age < 13: child_count += 1
+                    if m.get('is_pregnant'): pregnant_count += 1
+                    if age >= 60: old_ssf_count += 1
+                    fm_list.append({**m, 'is_old_ssf': age >= 60})
+            except (json.JSONDecodeError, TypeError):
+                fm_list = []
+        ben_data.append({
+            'beneficiary': ben.to_dict() if ben else None,
+            'family_members': fm_list,
+            'family_stats': {
+                'male_count': male_count, 'female_count': female_count,
+                'child_count': child_count, 'pregnant_count': pregnant_count,
+                'old_ssf_count': old_ssf_count, 'total_members': len(fm_list)
+            }
+        })
+
+    return render_template('print_distribution.html', dist=dist, office=office, address=address, ben_data=ben_data)
 
 @app.route('/api/dispatch/<int:id>/print', methods=['GET'])
 @login_required
