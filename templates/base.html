@@ -127,6 +127,11 @@
                     <span class="nav-label">Daily Bulletin</span>
                 </a>
 
+                <a href="{{ url_for('weekly_forecast_page') }}" class="nav-item {% if request.path == '/weekly-forecast' %}active{% endif %}">
+                    <i class="bi bi-calendar-week-fill"></i>
+                    <span class="nav-label">Weekly Forecast</span>
+                </a>
+
                 <div class="sidebar-divider">People</div>
 
                 <a href="{{ url_for('beneficiaries_page') }}" class="nav-item {% if request.path == '/beneficiaries' %}active{% endif %}">

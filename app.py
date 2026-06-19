@@ -1037,6 +1037,32 @@ class DailyBulletin(db.Model):
             'updated_at': ad_to_bs_date(self.updated_at),
         }
 
+class WeeklyForecast(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    date_from = db.Column(db.String(10), nullable=False, index=True)
+    date_to = db.Column(db.String(10))
+    rainfall_snowfall = db.Column(db.String(100))
+    high_temperature = db.Column(db.String(50))
+    low_temperature = db.Column(db.String(50))
+    forecast_status = db.Column(db.String(100))
+    forecast_info = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=utc_now)
+    updated_at = db.Column(db.DateTime, default=utc_now, onupdate=utc_now)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'date_from': self.date_from,
+            'date_to': self.date_to or '',
+            'rainfall_snowfall': self.rainfall_snowfall or '',
+            'high_temperature': self.high_temperature or '',
+            'low_temperature': self.low_temperature or '',
+            'forecast_status': self.forecast_status or '',
+            'forecast_info': self.forecast_info or '',
+            'created_at': ad_to_bs_date(self.created_at),
+            'updated_at': ad_to_bs_date(self.updated_at),
+        }
+
 # ============ DISTRIBUTION MODEL (Module 12) ============
 class Distribution(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -1690,6 +1716,11 @@ def reports_page():
 def disaster_reports_page():
     return render_template('disaster_reports.html')
 
+@app.route('/weekly-forecast')
+@login_required
+def weekly_forecast_page():
+    return render_template('weekly_forecast.html')
+
 @app.route('/cash-funds')
 @login_required
 def cash_funds_page():
@@ -2007,17 +2038,12 @@ def reset_database():
         pre_reset_backup = os.path.join(BACKUP_DIR, f'pre_reset_{ts}.sql')
         _dump_sqlite_to_sql(db_path, pre_reset_backup)
 
-        db.session.close_all()
-        db.engine.dispose()
+        db.session.rollback()
 
         from init_db import drop_all_tables, create_tables, seed_all_data
         drop_all_tables()
         create_tables()
         seed_all_data()
-
-        from sqlalchemy import create_engine
-        temp_engine = create_engine(f'sqlite:///{db_path}')
-        temp_engine.dispose()
 
         return jsonify({
             'success': True,
@@ -4765,6 +4791,72 @@ def manage_daily_bulletin(id):
         db.session.rollback()
         return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
+# --- Weekly Forecast API ---
+@app.route('/api/weekly-forecasts', methods=['GET', 'POST'])
+@login_required
+def handle_weekly_forecasts():
+    if request.method == 'GET':
+        try:
+            forecasts = WeeklyForecast.query.order_by(WeeklyForecast.date_from.desc()).all()
+            return jsonify({'success': True, 'forecasts': [f.to_dict() for f in forecasts]})
+        except Exception as e:
+            return jsonify({'success': False, 'message': friendly_message(e)}), 500
+
+    try:
+        data = request.get_json()
+        if not data or not data.get('date_from'):
+            return jsonify({'success': False, 'message': 'Date from is required'}), 400
+
+        forecast = WeeklyForecast(
+            date_from=data['date_from'],
+            date_to=data.get('date_to', ''),
+            rainfall_snowfall=data.get('rainfall_snowfall', ''),
+            high_temperature=data.get('high_temperature', ''),
+            low_temperature=data.get('low_temperature', ''),
+            forecast_status=data.get('forecast_status', ''),
+            forecast_info=data.get('forecast_info', ''),
+        )
+        db.session.add(forecast)
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Forecast saved successfully', 'data': forecast.to_dict()}), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
+
+@app.route('/api/weekly-forecasts/<int:id>', methods=['GET', 'PUT', 'DELETE'])
+@login_required
+def manage_weekly_forecast(id):
+    forecast = WeeklyForecast.query.get(id)
+    if not forecast:
+        return jsonify({'success': False, 'message': 'Forecast not found'}), 404
+
+    if request.method == 'GET':
+        return jsonify({'success': True, 'data': forecast.to_dict()})
+
+    if request.method == 'DELETE':
+        try:
+            db.session.delete(forecast)
+            db.session.commit()
+            return jsonify({'success': True, 'message': 'Forecast deleted'})
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'success': False, 'message': friendly_message(e)}), 500
+
+    try:
+        data = request.get_json()
+        forecast.date_from = data.get('date_from', forecast.date_from)
+        forecast.date_to = data.get('date_to', forecast.date_to)
+        forecast.rainfall_snowfall = data.get('rainfall_snowfall', forecast.rainfall_snowfall)
+        forecast.high_temperature = data.get('high_temperature', forecast.high_temperature)
+        forecast.low_temperature = data.get('low_temperature', forecast.low_temperature)
+        forecast.forecast_status = data.get('forecast_status', forecast.forecast_status)
+        forecast.forecast_info = data.get('forecast_info', forecast.forecast_info)
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Forecast updated', 'data': forecast.to_dict()})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
+
 # ============ FILE UPLOAD ============
 @app.route('/api/upload', methods=['POST'])
 @login_required
@@ -6467,6 +6559,31 @@ def init_db():
                         db.session.commit()
                     except Exception:
                         pass
+            if 'weekly_forecast' in inspector.get_table_names():
+                wf_cols = [c['name'] for c in inspector.get_columns('weekly_forecast')]
+                if 'date_from' not in wf_cols:
+                    try:
+                        db.session.execute(db.text("DROP INDEX IF EXISTS ix_weekly_forecast_date"))
+                        db.session.execute(db.text("ALTER TABLE weekly_forecast ADD COLUMN date_from VARCHAR(10)"))
+                        db.session.execute(db.text("ALTER TABLE weekly_forecast ADD COLUMN date_to VARCHAR(10)"))
+                        db.session.execute(db.text("UPDATE weekly_forecast SET date_from = date"))
+                        db.session.execute(db.text("ALTER TABLE weekly_forecast DROP COLUMN date"))
+                        db.session.commit()
+                        print("[MIGRATE] Renamed 'date' to 'date_from' and added 'date_to' in weekly_forecast")
+                    except Exception as e:
+                        db.session.rollback()
+                        print(f"[WARN] Could not migrate weekly_forecast: {e}")
+                elif 'date' in wf_cols:
+                    try:
+                        db.session.execute(db.text("DROP INDEX IF EXISTS ix_weekly_forecast_date"))
+                        db.session.execute(db.text("UPDATE weekly_forecast SET date_from = date WHERE date_from IS NULL"))
+                        db.session.execute(db.text("ALTER TABLE weekly_forecast DROP COLUMN date"))
+                        db.session.commit()
+                        print("[MIGRATE] Cleaned up old 'date' column in weekly_forecast")
+                    except Exception as e:
+                        db.session.rollback()
+                        print(f"[WARN] Could not cleanup old date column in weekly_forecast: {e}")
+
             if 'user' not in inspector.get_table_names():
                 db.session.execute(db.text("""
                     CREATE TABLE "user" (

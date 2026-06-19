@@ -16,7 +16,10 @@ from datetime import datetime, date
 # Ensure we're in the project directory
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
-from app import app, db
+try:
+    from __main__ import app, db
+except (ImportError, AttributeError):
+    from app import app, db
 from sqlalchemy import inspect, text
 
 def create_user_table():
@@ -73,7 +76,10 @@ def seed_roles_and_permissions():
 
 def seed_item_categories():
     """Seed default item categories."""
-    from app import Category
+    try:
+        from __main__ import Category
+    except (ImportError, AttributeError):
+        from app import Category
     
     categories = [
         'Food', 'Shelter', 'Relief Supplies',
@@ -117,7 +123,10 @@ def seed_item_categories():
 
 def seed_non_distributable_items():
     """Seed standard non-distributable items for rescue, medical equipment, vehicles, and preparedness."""
-    from app import Category, Item
+    try:
+        from __main__ import Category, Item
+    except (ImportError, AttributeError):
+        from app import Category, Item
     import uuid as uuid_lib
 
     if Item.query.filter(Item.is_distributable == False).first():
@@ -294,7 +303,10 @@ def seed_non_distributable_items():
 
 def seed_default_settings():
     """Seed default application settings."""
-    from app import AppSettings
+    try:
+        from __main__ import AppSettings
+    except (ImportError, AttributeError):
+        from app import AppSettings
     defaults = {
         'relief_items': [
             'खाद्य सामाग्री (Food Packages)', 'पानीको बोतल (Water Bottles)',
@@ -335,7 +347,10 @@ def seed_default_settings():
 
 def seed_wards():
     try:
-        from app import Ward
+        try:
+            from __main__ import Ward
+        except (ImportError, AttributeError):
+            from app import Ward
         if Ward.query.first():
             print("[SKIP] Wards already seeded")
             return
