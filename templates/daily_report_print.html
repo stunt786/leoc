@@ -365,6 +365,31 @@
             color: white;
         }
 
+        .btn-image {
+            background-color: #28a745;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 11pt;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            text-decoration: none;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn-image:hover {
+            background-color: #218838;
+            color: white;
+        }
+
+        .btn-download:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
         .date-selector {
             position: fixed;
             top: 20px;
@@ -449,11 +474,14 @@
     <!-- Print Actions -->
     <div class="print-actions no-print">
         <button class="btn-print" onclick="window.print()">
-            <i class="bi bi-printer"></i> प्रतिवेदन प्रिन्ट गर्नुहोस्
+            <i class="bi bi-printer"></i> प्रिन्ट गर्नुहोस्
         </button>
-        <a href="/api/generate-daily-report?from_bs_date={{ start_bs }}&to_bs_date={{ end_bs }}" class="btn-pdf">
-            <i class="bi bi-file-earmark-pdf"></i> PDF मा सुरक्षित गर्नुहोस्
-        </a>
+        <button class="btn-pdf btn-download" onclick="downloadPDF()" id="btnPdf">
+            <i class="bi bi-file-earmark-pdf"></i> PDF डाउनलोड
+        </button>
+        <button class="btn-image btn-download" onclick="downloadImage()" id="btnImg">
+            <i class="bi bi-image"></i> तस्वीर डाउनलोड
+        </button>
     </div>
 
     <!-- Date Selector -->
@@ -475,7 +503,7 @@
         <small class="text-muted d-block mt-2" style="font-size: 8pt;">Format: YYYY-MM-DD</small>
     </div>
 
-    <div class="container mt-5">
+    <div class="container mt-5" id="reportContainer">
         <!-- Report Header -->
         <div class="report-header">
             {% if sit_rep_no is not none %}
@@ -484,7 +512,7 @@
             </div>
             {% endif %}
             <img src="{{ url_for('static', filename='Emblem_of_Nepal.png') }}" alt="Logo">
-            <h1>{{ office_name or 'थलारा गाउँपालिका' }}</h1>
+            <h1>{{ office_name }}</h1>
             <h2>गाउँकार्यपालिकाको कार्यालय</h2>
             <h3>खोली, बझाङ</h3>
             <h4>स्थानीय आपतकालिन कार्य संचालन केन्द्र (LEOC)</h4>
@@ -501,25 +529,10 @@
                 {% if weather_status %}
                 {{ weather_status }}
                 {% else %}
-                खुलेको छैन
+                -
                 {% endif %}
             </div>
         </div>
-
-        <!-- Public Notice -->
-        {% if notice_title %}
-        <div class="notice-box">
-            <div class="notice-priority">
-                <span class="badge {% if notice_priority == 'critical' %}bg-danger{% elif notice_priority == 'high' %}bg-warning text-dark{% elif notice_priority == 'medium' %}bg-info{% else %}bg-secondary{% endif %}">
-                    {{ notice_priority|upper }}
-                </span>
-            </div>
-            <div class="notice-title">{{ notice_title }}</div>
-            {% if notice_description %}
-            <div style="font-size: 8pt; margin-top: 4px;">{{ notice_description }}</div>
-            {% endif %}
-        </div>
-        {% endif %}
 
         <!-- Summary Statistics -->
         <div class="stats-cards">
@@ -568,16 +581,14 @@
                 </div>
             </div>
 
-            <!-- Reporting Status Card -->
-            {% if incident_reporting_status %}
-            <div class="stat-card {% if incident_reporting_status in ['Critical','Severe'] %}danger{% elif incident_reporting_status == 'Moderate' %}warning{% else %}success{% endif %}">
-                <i class="bi bi-shield-check"></i>
+            <!-- Livestock Loss -->
+            <div class="stat-card" style="background: linear-gradient(135deg, #6b4226 0%, #a0522d 100%);">
+                <i class="bi bi-paw"></i>
                 <div class="stat-info">
-                    <span class="number" style="font-size:14pt">{{ incident_reporting_status }}</span>
-                    <span class="label">रिपोर्टिङ स्थिति</span>
+                    <span class="number">{{ livestock_total }}</span>
+                    <span class="label">पशुचौपाया क्षति</span>
                 </div>
             </div>
-            {% endif %}
         </div>
 
         <!-- Incident Overview by Ward -->
@@ -648,7 +659,6 @@
         </div>
 
         <!-- Disaster Type Summary -->
-        {% if disaster_type_stats %}
         <div class="report-content">
             <div class="section-title brown">
                 <i class="bi bi-graph-up"></i> विपद् प्रकार अनुसार विवरण
@@ -658,33 +668,55 @@
                     <tr>
                         <th class="brown">विपद्</th>
                         <th class="brown">जम्मा</th>
-                        <th class="brown">मृत्यु</th>
+                        <th class="brown">मृत्यु<br>पुरुष</th>
+                        <th class="brown">मृत्यु<br>महिला</th>
                         <th class="brown">बेपत्ता</th>
-                        <th class="brown">घाइते</th>
+                        <th class="brown">घाइते<br>पुरुष</th>
+                        <th class="brown">घाइते<br>महिला</th>
                         <th class="brown">प्रभावित<br>परिवार</th>
-                        <th class="brown">घर<br>पूर्ण.क्षति</th>
                         <th class="brown">घर<br>आं.क्षति</th>
+                        <th class="brown">घर<br>पूर्ण.क्षति</th>
+                        <th class="brown">सा.भवन<br>आं.क्षति</th>
+                        <th class="brown">सा.भवन<br>पुर्ण.क्षति</th>
+                        <th class="brown">पशु</th>
                         <th class="brown">अ.क्षति</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for dtype, stats in disaster_type_stats.items() %}
+                    {% if stats.get('count', 0) > 0 or stats.get('total', 0) > 0 %}
                     <tr>
                         <td><strong>{{ dtype }}</strong></td>
                         <td>{{ stats.get('count', 0) }}</td>
-                        <td>{{ stats.get('deaths', 0) }}</td>
+                        <td>{{ stats.get('male_death', 0) }}</td>
+                        <td>{{ stats.get('female_death', 0) }}</td>
                         <td>{{ stats.get('missing', 0) }}</td>
-                        <td>{{ stats.get('injured', 0) }}</td>
-                        <td>{{ stats.get('affected_households', 0) }}</td>
-                        <td>{{ stats.get('house_destroyed', 0) }}</td>
+                        <td>{{ stats.get('male_injured', 0) }}</td>
+                        <td>{{ stats.get('female_injured', 0) }}</td>
+                        <td>{{ stats.get('affected_households', stats.get('affected_families', 0)) }}</td>
                         <td>{{ stats.get('house_damaged', 0) }}</td>
+                        <td>{{ stats.get('house_destroyed', 0) }}</td>
+                        <td>{{ stats.get('public_building_damaged', 0) }}</td>
+                        <td>{{ stats.get('public_building_destroyed', 0) }}</td>
+                        <td>{{ stats.get('livestock_loss', 0) }}</td>
                         <td>{{ "%.0f"|format(stats.get('estimated_loss', 0)) }}</td>
                     </tr>
+                    {% endif %}
                     {% endfor %}
+                    {% set has_data = namespace(found=false) %}
+                    {% for dtype, stats in disaster_type_stats.items() %}
+                    {% if stats.get('count', 0) > 0 or stats.get('total', 0) > 0 %}
+                    {% set has_data.found = true %}
+                    {% endif %}
+                    {% endfor %}
+                    {% if not has_data.found %}
+                    <tr>
+                        <td colspan="14" class="text-center text-muted">कुनै घटना रिपोर्ट गरिएको छैन</td>
+                    </tr>
+                    {% endif %}
                 </tbody>
             </table>
         </div>
-        {% endif %}
 
         <!-- Infrastructure Status -->
         <div class="report-content">
@@ -693,27 +725,70 @@
             </div>
             <div class="infrastructure-grid">
                 <div class="infrastructure-item">
+                    {% if infra_status and infra_status.get('electricity_blocked') %}
+                    <i class="bi bi-lightning-charge-fill status-disrupted"></i>
+                    <span class="label">विद्युत:</span>
+                    <span class="status-disrupted"><i class="bi bi-exclamation-triangle-fill"></i> अबरुद्ध</span>
+                    {% else %}
                     <i class="bi bi-lightning-charge-fill status-normal"></i>
                     <span class="label">विद्युत:</span>
                     <span class="status-normal">सामान्य</span>
+                    {% endif %}
                 </div>
                 <div class="infrastructure-item">
+                    {% if infra_status and infra_status.get('road_blocked') %}
+                    <i class="bi bi-signpost-split-fill status-disrupted"></i>
+                    <span class="label">सडक:</span>
+                    <span class="status-disrupted"><i class="bi bi-exclamation-triangle-fill"></i> अबरुद्ध</span>
+                    {% else %}
                     <i class="bi bi-signpost-split-fill status-normal"></i>
                     <span class="label">सडक:</span>
                     <span class="status-normal">सामान्य</span>
+                    {% endif %}
                 </div>
                 <div class="infrastructure-item">
+                    {% if infra_status and infra_status.get('communication_blocked') %}
+                    <i class="bi bi-wifi status-disrupted"></i>
+                    <span class="label">संचार:</span>
+                    <span class="status-disrupted"><i class="bi bi-exclamation-triangle-fill"></i> अबरुद्ध</span>
+                    {% else %}
                     <i class="bi bi-wifi status-normal"></i>
                     <span class="label">संचार:</span>
                     <span class="status-normal">सामान्य</span>
+                    {% endif %}
                 </div>
                 <div class="infrastructure-item">
+                    {% if infra_status and infra_status.get('drinking_water_disrupted') %}
+                    <i class="bi bi-droplet-fill status-disrupted"></i>
+                    <span class="label">खानेपानी:</span>
+                    <span class="status-disrupted"><i class="bi bi-exclamation-triangle-fill"></i> अबरुद्ध</span>
+                    {% else %}
                     <i class="bi bi-droplet-fill status-normal"></i>
                     <span class="label">खानेपानी:</span>
                     <span class="status-normal">सामान्य</span>
+                    {% endif %}
                 </div>
             </div>
         </div>
+
+        <!-- Public Advisories -->
+        {% if public_advisories %}
+        <div class="report-content">
+            <div class="section-title" style="background-color: #d69e2e;">
+                <i class="bi bi-megaphone"></i> सार्वजनिक सूचना/सल्लाह
+            </div>
+            {% for advisory in public_advisories %}
+            <div class="advisory-item {% if advisory.priority == 'critical' %}critical{% elif advisory.priority == 'high' %}high{% endif %}">
+                <strong>{{ advisory.title }}</strong>
+                <span class="badge {% if advisory.priority == 'critical' %}bg-danger{% elif advisory.priority == 'high' %}bg-warning{% elif advisory.priority == 'medium' %}bg-info{% else %}bg-secondary{% endif %}">
+                    {{ 'अत्यन्त जरुरी' if advisory.priority == 'critical' else 'उच्च' if advisory.priority == 'high' else 'सामान्य' if advisory.priority == 'medium' else 'सूचित' if advisory.priority == 'low' else advisory.priority }}
+                </span>
+                <br>
+                <small>{{ advisory.content[:200] }}{% if advisory.content|length > 200 %}...{% endif %}</small>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
 
         <!-- Situation Report Summary -->
         <div class="report-content" style="margin-bottom: 5px;">
@@ -721,7 +796,7 @@
                 <i class="bi bi-clipboard-data"></i> स्थितिको सारांश
             </div>
             <div style="padding: 10px; background-color: #f0fff4; border-radius: 4px; font-size: 9pt;">
-                <p><strong>वर्तमान अवस्था:</strong> {{ situation_summary or 'खुलेको छैन' }}</p>
+                <p><strong>वर्तमान अवस्था:</strong> {{ situation_summary or '-' }}</p>
                 {% if resources_deployed %}
                 <p><strong>परिचालित स्रोतहरू:</strong> {{ resources_deployed }}</p>
                 {% endif %}
@@ -731,9 +806,49 @@
             </div>
         </div>
 
+        <!-- Recent Events / Event Logs -->
+        {% if event_logs %}
+        <div class="report-content" style="margin-bottom: 5px;">
+            <div class="section-title gray">
+                <i class="bi bi-journal-text"></i> हालका घटनाहरू
+            </div>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th class="gray">समय</th>
+                        <th class="gray">प्रकार</th>
+                        <th class="gray">विवरण</th>
+                        <th class="gray">स्थान</th>
+                        <th class="gray">स्थिति</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for event in event_logs[:5] %}
+                    <tr>
+                        <td>{{ event.timestamp.split()[1][:5] if ' ' in event.timestamp else event.timestamp[:5] }}</td>
+                        <td>{{ event.event_type }}</td>
+                        <td style="text-align: left;">{{ event.description[:60] }}{% if event.description|length > 60 %}...{% endif %}</td>
+                        <td>{{ event.location or '-' }}</td>
+                        <td>
+                            <span class="badge-status
+                                {% if event.status == 'Active' %}badge-active
+                                {% elif event.status == 'Completed' %}badge-completed
+                                {% else %}badge-pending{% endif %}">
+                                {% if event.status == 'Active' %}सक्रिय
+                                {% elif event.status == 'Completed' %}सम्पन्न
+                                {% else %}बाँकी{% endif %}
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+
         <!-- Report Footer -->
         <div class="report-footer">
-            <p>प्रतिवेदन तयार गरिएको मिति: {{ generated_at.strftime('%Y-%m-%d %H:%M') if generated_at is not string else generated_at }} | LEOC थलारा गाउँपालिका</p>
+            <p>प्रतिवेदन तयार गरिएको मिति: {{ generated_at.strftime('%Y-%m-%d %H:%M') if generated_at is not string else generated_at }} | LEOC {{ office_name }}</p>
             <p style="font-size: 8pt; margin-top: 5px;">
                 यो स्थानीय आपतकालीन कार्य केन्द्रको आधिकारिक कागजात हो।
                 आपतकालीन अवस्थाका लागि LEOC सञ्चालन कक्षमा सम्पर्क गर्नुहोस्।
@@ -742,7 +857,10 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script>
+        const reportEl = document.getElementById('reportContainer');
+
         function applyFilter() {
             const fromDate = document.getElementById('fromDateBS').value;
             const toDate = document.getElementById('toDateBS').value;
@@ -754,8 +872,60 @@
                     window.location.href = '/daily-report-preview?from_bs_date=' + fromDate + '&to_bs_date=' + toDate;
                 }
             } else {
-                alert('Please enter both From and To dates');
+                alert('कृपया दुबै मिति भर्नुहोस्');
             }
+        }
+
+        function setLoading(btnId, loading) {
+            const btn = document.getElementById(btnId);
+            if (loading) {
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> तयार हुँदै...';
+            } else {
+                btn.disabled = false;
+                btn.innerHTML = btnId === 'btnPdf'
+                    ? '<i class="bi bi-file-earmark-pdf"></i> PDF डाउनलोड'
+                    : '<i class="bi bi-image"></i> तस्वीर डाउनलोड';
+            }
+        }
+
+        function downloadPDF() {
+            setLoading('btnPdf', true);
+            const opt = {
+                margin:       5,
+                filename:     'daily_bulletin_{{ start_bs }}_{{ end_bs }}.pdf',
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2, useCORS: true, logging: false },
+                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
+                pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }
+            };
+            html2pdf().set(opt).from(reportEl).save().then(() => {
+                setLoading('btnPdf', false);
+            }).catch(() => {
+                setLoading('btnPdf', false);
+            });
+        }
+
+        function downloadImage() {
+            setLoading('btnImg', true);
+            html2canvas(reportEl, {
+                scale: 2,
+                useCORS: true,
+                logging: false,
+                allowTaint: false,
+                width: reportEl.scrollWidth,
+                height: reportEl.scrollHeight,
+                windowWidth: reportEl.scrollWidth,
+                windowHeight: reportEl.scrollHeight,
+            }).then(canvas => {
+                const link = document.createElement('a');
+                link.download = 'daily_bulletin_{{ start_bs }}_{{ end_bs }}.png';
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+                setLoading('btnImg', false);
+            }).catch(() => {
+                setLoading('btnImg', false);
+            });
         }
 
         // Auto-print on load if requested

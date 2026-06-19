@@ -27,20 +27,23 @@
   - Priority guide
   - Recent bulletins list (placeholder)
 
-### 2. `templates/daily_report_print.html` — Full Print Template
-- Replaced the basic 79-line template with the full **858-line reference design**
-- Features:
-  - Nepali-language header with office name, LEOC branding, emblem
-  - "दैनिक विपद् बुलेटीन" title
-  - Sit-Rep number box
-  - Date filter selector (fixed position, no-print)
-  - Print & PDF buttons (fixed position, no-print)
-  - Public notice section (conditional, shown when notice exists)
-  - 6-card stats row with gradient backgrounds (incidents, deaths, missing, injured, loss, reporting status)
+### 2. `templates/daily_report_print.html` — Full Print Template (851 lines)
+- Replaced with full reference design matching `incident.md` specification
+- **Disaster Type Summary** now has all 14 columns (matching reference):
+  - विपद्, जम्मा, मृत्यु पुरुष, मृत्यु महिला, बेपत्ता, घाइते पुरुष, घाइते महिला
+  - प्रभावित परिवार, घर आं.क्षति, घर पूर्ण.क्षति, सा.भवन आं.क्षति, सा.भवन पुर्ण.क्षति, पशु, अ.क्षति
+  - Empty state: "कुनै घटना रिपोर्ट गरिएको छैन" row when no data
+- Other sections matching reference:
+  - Nepali-language header with LEOC branding, emblem
+  - "दैनिक विपद् बुलेटीन" title, Sit-Rep number box
+  - Date filter selector (fixed, no-print) + Print & PDF buttons
+  - Public notice section (conditional)
+  - 6-card stats row with gradient backgrounds
   - Ward-wise incident table with infrastructure icons
-  - Disaster-type summary table
   - Infrastructure status grid
-  - Situation report summary section
+  - Situation report summary
+  - **Recent Events / Event Logs** table (conditional)
+  - **Public Advisories** section (conditional)
   - Footer with generation timestamp
   - Full A4 print CSS (@page, @media print)
 

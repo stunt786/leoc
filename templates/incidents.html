@@ -162,16 +162,28 @@
                                     <input type="number" class="form-control" id="inc_affected_people_female" min="0" value="0">
                                 </div>
                                 <div class="col-md-3">
-                                    <label class="form-label">Deaths</label>
-                                    <input type="number" class="form-control" id="inc_deaths" min="0" value="0">
+                                    <label class="form-label">Death (Male)</label>
+                                    <input type="number" class="form-control" id="inc_death_male" min="0" value="0">
                                 </div>
                                 <div class="col-md-3">
-                                    <label class="form-label">Injured</label>
-                                    <input type="number" class="form-control" id="inc_injured" min="0" value="0">
+                                    <label class="form-label">Death (Female)</label>
+                                    <input type="number" class="form-control" id="inc_death_female" min="0" value="0">
                                 </div>
                                 <div class="col-md-3">
-                                    <label class="form-label">Missing Persons</label>
-                                    <input type="number" class="form-control" id="inc_missing_persons" min="0" value="0">
+                                    <label class="form-label">Injured (Male)</label>
+                                    <input type="number" class="form-control" id="inc_injured_male" min="0" value="0">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Injured (Female)</label>
+                                    <input type="number" class="form-control" id="inc_injured_female" min="0" value="0">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Missing (Male)</label>
+                                    <input type="number" class="form-control" id="inc_missing_male" min="0" value="0">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Missing (Female)</label>
+                                    <input type="number" class="form-control" id="inc_missing_female" min="0" value="0">
                                 </div>
                             </div>
                         </div>
@@ -427,7 +439,7 @@ document.getElementById('statusFilter').addEventListener('change', loadIncidents
 const FIELD_MAP = [
     'incident_name', 'incident_type', 'ward', 'fiscal_year', 'status', 'description',
     'disaster_date_bs', 'incident_time', 'coordinates', 'tole', 'severity',
-    'affected_people', 'injured', 'deaths', 'missing_persons', 'affected_people_male',
+    'affected_people', 'injured', 'injured_male', 'injured_female', 'deaths', 'death_male', 'death_female', 'missing_persons', 'missing_male', 'missing_female', 'affected_people_male',
     'affected_people_female', 'affected_households', 'house_damaged', 'house_destroyed',
     'public_building_damaged', 'public_building_destroyed', 'estimated_loss',
     'agriculture_crop_damage', 'road_blocked', 'electricity_blocked', 'communication_blocked',

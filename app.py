@@ -718,8 +718,14 @@ class Incident(db.Model):
     # Human Impact
     affected_people = db.Column(db.Integer, default=0)
     injured = db.Column(db.Integer, default=0)
+    injured_male = db.Column(db.Integer, default=0)
+    injured_female = db.Column(db.Integer, default=0)
     deaths = db.Column(db.Integer, default=0)
+    death_male = db.Column(db.Integer, default=0)
+    death_female = db.Column(db.Integer, default=0)
     missing_persons = db.Column(db.Integer, default=0)
+    missing_male = db.Column(db.Integer, default=0)
+    missing_female = db.Column(db.Integer, default=0)
     affected_people_male = db.Column(db.Integer, default=0)
     affected_people_female = db.Column(db.Integer, default=0)
     affected_households = db.Column(db.Integer, default=0)
@@ -770,8 +776,14 @@ class Incident(db.Model):
             'severity': self.severity,
             'affected_people': self.affected_people,
             'injured': self.injured,
+            'injured_male': self.injured_male,
+            'injured_female': self.injured_female,
             'deaths': self.deaths,
+            'death_male': self.death_male,
+            'death_female': self.death_female,
             'missing_persons': self.missing_persons,
+            'missing_male': self.missing_male,
+            'missing_female': self.missing_female,
             'affected_people_male': self.affected_people_male,
             'affected_people_female': self.affected_people_female,
             'affected_households': self.affected_households,
@@ -980,6 +992,50 @@ class DailyReportLog(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     report_date_bs = db.Column(db.String(10), unique=True, nullable=False, index=True)
     created_at = db.Column(db.DateTime, default=utc_now)
+
+bulletin_incidents = db.Table('bulletin_incidents',
+    db.Column('bulletin_id', db.Integer, db.ForeignKey('daily_bulletin.id'), primary_key=True),
+    db.Column('incident_id', db.Integer, db.ForeignKey('incident.id'), primary_key=True)
+)
+
+class DailyBulletin(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    notice_title = db.Column(db.String(300), nullable=False)
+    notice_description = db.Column(db.Text)
+    priority = db.Column(db.String(20), default='medium')
+    report_status = db.Column(db.String(20), default='draft')
+    valid_from = db.Column(db.String(10), nullable=False, index=True)
+    valid_to = db.Column(db.String(10))
+    weather_status = db.Column(db.String(100))
+    incident_reporting_status = db.Column(db.String(50))
+    next_update_date = db.Column(db.String(10))
+    next_update_time = db.Column(db.String(10))
+    situation_summary = db.Column(db.Text)
+    resources_deployed = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=utc_now)
+    updated_at = db.Column(db.DateTime, default=utc_now, onupdate=utc_now)
+    incidents = db.relationship('Incident', secondary=bulletin_incidents, lazy='subquery',
+                                backref=db.backref('bulletins', lazy=True))
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'notice_title': self.notice_title,
+            'notice_description': self.notice_description,
+            'priority': self.priority,
+            'report_status': self.report_status,
+            'valid_from': self.valid_from,
+            'valid_to': self.valid_to or '',
+            'weather_status': self.weather_status or '',
+            'incident_reporting_status': self.incident_reporting_status or '',
+            'next_update_date': self.next_update_date or '',
+            'next_update_time': self.next_update_time or '',
+            'situation_summary': self.situation_summary or '',
+            'resources_deployed': self.resources_deployed or '',
+            'incident_ids': [i.id for i in self.incidents],
+            'created_at': ad_to_bs_date(self.created_at),
+            'updated_at': ad_to_bs_date(self.updated_at),
+        }
 
 # ============ DISTRIBUTION MODEL (Module 12) ============
 class Distribution(db.Model):
@@ -2810,7 +2866,7 @@ def handle_adjustments():
 # ============ INCIDENT API ============
 INCIDENT_FIELDS = [
     'disaster_date_bs', 'incident_time', 'coordinates', 'tole', 'severity',
-    'affected_people', 'injured', 'deaths', 'missing_persons', 'affected_people_male',
+    'affected_people', 'injured', 'injured_male', 'injured_female', 'deaths', 'death_male', 'death_female', 'missing_persons', 'missing_male', 'missing_female', 'affected_people_male',
     'affected_people_female', 'affected_households', 'house_damaged', 'house_destroyed',
     'public_building_damaged', 'public_building_destroyed', 'estimated_loss',
     'agriculture_crop_damage', 'road_blocked', 'electricity_blocked', 'communication_blocked',
@@ -4299,44 +4355,79 @@ def generate_daily_report():
         ).all() if start_bs else []
 
         incidents = Incident.query.filter(
-            db.func.date(Incident.start_date) >= start_date,
-            db.func.date(Incident.start_date) <= end_date
-        ).all()
+            Incident.disaster_date_bs >= start_bs,
+            Incident.disaster_date_bs <= end_bs
+        ).all() if start_bs else []
 
         total = {
-            'deaths': sum(a.deaths for a in assessments),
-            'missing': sum(a.missing_persons for a in assessments),
-            'injured': sum(a.injured for a in assessments),
-            'affected_households': sum(a.affected_households for a in assessments),
-            'affected_people': sum(a.affected_people for a in assessments),
-            'house_destroyed': sum(a.house_destroyed for a in assessments),
-            'estimated_loss': sum(a.estimated_loss for a in assessments),
             'incidents': len(incidents),
+            'deaths': sum((i.death_male or 0) + (i.death_female or 0) for i in incidents),
+            'death_male': sum(i.death_male or 0 for i in incidents),
+            'death_female': sum(i.death_female or 0 for i in incidents),
+            'missing': sum((i.missing_male or 0) + (i.missing_female or 0) for i in incidents),
+            'injured': sum((i.injured_male or 0) + (i.injured_female or 0) for i in incidents),
+            'injured_male': sum(i.injured_male or 0 for i in incidents),
+            'injured_female': sum(i.injured_female or 0 for i in incidents),
+            'affected_households': sum(i.affected_households or 0 for i in incidents),
+            'house_destroyed': sum(i.house_destroyed or 0 for i in incidents),
+            'house_damaged': sum(i.house_damaged or 0 for i in incidents),
+            'estimated_loss': sum(i.estimated_loss or 0 for i in incidents),
         }
+        livestock_total = sum(
+            (i.cattle_lost or 0) + (i.poultry_lost or 0) +
+            (i.goats_sheep_lost or 0) + (i.other_livestock_lost or 0)
+            for i in incidents
+        )
 
         ward_stats = {}
         for w in get_ward_list():
             w_incidents = [i for i in incidents if i.ward == w.id]
-            w_assess = [a for a in assessments if a.incident and a.incident.ward == w.id]
             ward_stats[str(w.id)] = {
-                'incidents': len(w_incidents),
-                'deaths': sum(a.deaths for a in w_assess),
-                'missing': sum(a.missing_persons for a in w_assess),
-                'injured': sum(a.injured for a in w_assess),
-                'house_destroyed': sum(a.house_destroyed for a in w_assess),
-                'estimated_loss': sum(a.estimated_loss for a in w_assess),
+                'deaths': sum((i.death_male or 0) + (i.death_female or 0) for i in w_incidents),
+                'death_male': sum(i.death_male or 0 for i in w_incidents),
+                'death_female': sum(i.death_female or 0 for i in w_incidents),
+                'missing': sum((i.missing_male or 0) + (i.missing_female or 0) for i in w_incidents),
+                'injured': sum((i.injured_male or 0) + (i.injured_female or 0) for i in w_incidents),
+                'injured_male': sum(i.injured_male or 0 for i in w_incidents),
+                'injured_female': sum(i.injured_female or 0 for i in w_incidents),
+                'house_destroyed': sum(i.house_destroyed or 0 for i in w_incidents),
+                'house_damaged': sum(i.house_damaged or 0 for i in w_incidents),
+                'estimated_loss': sum(i.estimated_loss or 0 for i in w_incidents),
+                'road_blocked': any(i.road_blocked for i in w_incidents),
+                'electricity_blocked': any(i.electricity_blocked for i in w_incidents),
+                'communication_blocked': any(i.communication_blocked for i in w_incidents),
+                'drinking_water_disrupted': any(i.drinking_water_disrupted for i in w_incidents),
             }
 
         disaster_type_stats = {}
-        for a in assessments:
-            t = a.disaster_type or 'Unknown'
+        for i in incidents:
+            t = i.incident_type or 'Unknown'
             if t not in disaster_type_stats:
-                disaster_type_stats[t] = {'count': 0, 'deaths': 0, 'injured': 0, 'affected_households': 0, 'house_destroyed': 0}
+                disaster_type_stats[t] = {'count': 0, 'male_death': 0, 'female_death': 0,
+                    'missing': 0, 'male_injured': 0, 'female_injured': 0,
+                    'affected_households': 0, 'house_damaged': 0, 'house_destroyed': 0,
+                    'public_building_damaged': 0, 'public_building_destroyed': 0,
+                    'livestock_loss': 0, 'estimated_loss': 0}
             disaster_type_stats[t]['count'] += 1
-            disaster_type_stats[t]['deaths'] += a.deaths
-            disaster_type_stats[t]['injured'] += a.injured
-            disaster_type_stats[t]['affected_households'] += a.affected_households
-            disaster_type_stats[t]['house_destroyed'] += a.house_destroyed
+            disaster_type_stats[t]['male_death'] += i.death_male or 0
+            disaster_type_stats[t]['female_death'] += i.death_female or 0
+            disaster_type_stats[t]['missing'] += (i.missing_male or 0) + (i.missing_female or 0)
+            disaster_type_stats[t]['male_injured'] += i.injured_male or 0
+            disaster_type_stats[t]['female_injured'] += i.injured_female or 0
+            disaster_type_stats[t]['affected_households'] += i.affected_households or 0
+            disaster_type_stats[t]['house_damaged'] += i.house_damaged or 0
+            disaster_type_stats[t]['house_destroyed'] += i.house_destroyed or 0
+            disaster_type_stats[t]['public_building_damaged'] += i.public_building_damaged or 0
+            disaster_type_stats[t]['public_building_destroyed'] += i.public_building_destroyed or 0
+            disaster_type_stats[t]['livestock_loss'] += (i.cattle_lost or 0) + (i.poultry_lost or 0) + (i.goats_sheep_lost or 0) + (i.other_livestock_lost or 0)
+            disaster_type_stats[t]['estimated_loss'] += i.estimated_loss or 0
+
+        infra_status = {
+            'road_blocked': any(i.road_blocked for i in incidents),
+            'electricity_blocked': any(i.electricity_blocked for i in incidents),
+            'communication_blocked': any(i.communication_blocked for i in incidents),
+            'drinking_water_disrupted': any(i.drinking_water_disrupted for i in incidents),
+        }
 
         office_name = AppSettings.get_setting('office_name', 'थलारा गाउँपालिका')
 
@@ -4349,8 +4440,8 @@ def generate_daily_report():
                 db.session.commit()
             sit_rep_no = log.id
 
-        pdf = generate_disaster_pdf(assessments, incidents, total, ward_stats, disaster_type_stats,
-                                     start_bs, end_bs, office_name, sit_rep_no)
+        pdf = generate_disaster_pdf(incidents, total, ward_stats, disaster_type_stats,
+                                     start_bs, end_bs, office_name, sit_rep_no, livestock_total)
         response = make_response(pdf.getvalue())
         response.headers['Content-Type'] = 'application/pdf'
         fname = f"daily_report_{start_bs}"
@@ -4361,7 +4452,7 @@ def generate_daily_report():
     except Exception as e:
         return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
-def generate_disaster_pdf(assessments, incidents, total, ward_stats, type_stats, start_bs, end_bs, office_name, sit_rep_no):
+def generate_disaster_pdf(incidents, total, ward_stats, type_stats, start_bs, end_bs, office_name, sit_rep_no, livestock_total=0):
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=15*mm, leftMargin=15*mm, topMargin=15*mm, bottomMargin=15*mm)
     elements = []
@@ -4395,7 +4486,7 @@ def generate_disaster_pdf(assessments, incidents, total, ward_stats, type_stats,
     header_data.append(['जम्मा', str(total['incidents']), str(total['deaths']), str(total['missing']),
                         str(total['injured']), str(total['house_destroyed']),
                         str(total['estimated_loss'])])
-    tbl = Table(header_data, colWidths=[20*mm, 20*mm, 20*mm, 20*mm, 20*mm, 20*mm, 30*mm])
+    tbl = Table(header_data, colWidths=[18*mm, 14*mm, 14*mm, 14*mm, 14*mm, 18*mm, 28*mm])
     tbl.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2c5282')),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
@@ -4411,11 +4502,16 @@ def generate_disaster_pdf(assessments, incidents, total, ward_stats, type_stats,
     if type_stats:
         elements.append(Paragraph("<b>विपद् प्रकार अनुसार</b>", normal))
         elements.append(Spacer(1, 3))
-        td = [['प्रकार', 'जम्मा', 'मृतक', 'घाइते', 'परिवार', 'घर नष्ट']]
+        td = [['प्रकार', 'जम्मा', 'मृत्यु\nपुरुष', 'मृत्यु\nमहिला', 'बेपत्ता',
+               'घाइते\nपुरुष', 'घाइते\nमहिला', 'प्रभावित\nपरिवार',
+               'घर\nआं.क्षति', 'घर\nपूर्ण.क्षति', 'पशु', 'अ.क्षति']]
         for t, s in type_stats.items():
-            td.append([t, str(s['count']), str(s['deaths']), str(s['injured']),
-                       str(s['affected_households']), str(s['house_destroyed'])])
-        tbl2 = Table(td, colWidths=[35*mm, 25*mm, 25*mm, 25*mm, 25*mm, 25*mm])
+            td.append([t, str(s['count']), str(s.get('male_death', 0)), str(s.get('female_death', 0)),
+                       str(s.get('missing', 0)), str(s.get('male_injured', 0)), str(s.get('female_injured', 0)),
+                       str(s.get('affected_households', 0)), str(s.get('house_damaged', 0)),
+                       str(s.get('house_destroyed', 0)), str(s.get('livestock_loss', 0)),
+                       str(s.get('estimated_loss', 0))])
+        tbl2 = Table(td, colWidths=[22*mm, 12*mm, 14*mm, 14*mm, 12*mm, 14*mm, 14*mm, 16*mm, 14*mm, 14*mm, 14*mm, 20*mm])
         tbl2.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#744210')),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
@@ -4435,8 +4531,11 @@ def generate_disaster_pdf(assessments, incidents, total, ward_stats, type_stats,
 @app.route('/daily-report-preview', methods=['GET'])
 @login_required
 def daily_report_preview():
-    from_bs = request.args.get('from_bs_date')
-    to_bs = request.args.get('to_bs_date')
+    bulletin_id = request.args.get('bulletin_id', type=int)
+    bulletin = DailyBulletin.query.get(bulletin_id) if bulletin_id else None
+
+    from_bs = request.args.get('from_bs_date') or (bulletin.valid_from if bulletin else None)
+    to_bs = request.args.get('to_bs_date') or (bulletin.valid_to or from_bs if bulletin else None)
     bs_date = request.args.get('bs_date')
     start_date, end_date = date.today(), date.today()
     start_bs = end_bs = ad_to_bs(start_date.year, start_date.month, start_date.day)
@@ -4459,42 +4558,80 @@ def daily_report_preview():
     ).all() if start_bs else []
 
     incidents = Incident.query.filter(
-        db.func.date(Incident.start_date) >= start_date,
-        db.func.date(Incident.start_date) <= end_date
-    ).all()
+        Incident.disaster_date_bs >= start_bs,
+        Incident.disaster_date_bs <= end_bs
+    ).all() if start_bs else []
 
     total = {
         'incidents': len(incidents),
-        'deaths': sum(a.deaths for a in assessments),
-        'missing': sum(a.missing_persons for a in assessments),
-        'injured': sum(a.injured for a in assessments),
-        'affected_households': sum(a.affected_households for a in assessments),
-        'house_destroyed': sum(a.house_destroyed for a in assessments),
-        'estimated_loss': sum(a.estimated_loss for a in assessments),
+        'deaths': sum((i.death_male or 0) + (i.death_female or 0) for i in incidents),
+        'death_male': sum(i.death_male or 0 for i in incidents),
+        'death_female': sum(i.death_female or 0 for i in incidents),
+        'missing': sum((i.missing_male or 0) + (i.missing_female or 0) for i in incidents),
+        'injured': sum((i.injured_male or 0) + (i.injured_female or 0) for i in incidents),
+        'injured_male': sum(i.injured_male or 0 for i in incidents),
+        'injured_female': sum(i.injured_female or 0 for i in incidents),
+        'affected_households': sum(i.affected_households or 0 for i in incidents),
+        'house_destroyed': sum(i.house_destroyed or 0 for i in incidents),
+        'house_damaged': sum(i.house_damaged or 0 for i in incidents),
+        'estimated_loss': sum(i.estimated_loss or 0 for i in incidents),
     }
+    livestock_total = sum(
+        (i.cattle_lost or 0) + (i.poultry_lost or 0) +
+        (i.goats_sheep_lost or 0) + (i.other_livestock_lost or 0)
+        for i in incidents
+    )
 
     ward_stats = {}
     for w in get_ward_list():
         w_incidents = [i for i in incidents if i.ward == w.id]
-        w_assess = [a for a in assessments if a.incident and a.incident.ward == w.id]
         ward_stats[str(w.id)] = {
-            'incidents': len(w_incidents), 'deaths': sum(a.deaths for a in w_assess),
-            'missing': sum(a.missing_persons for a in w_assess), 'injured': sum(a.injured for a in w_assess),
-            'house_destroyed': sum(a.house_destroyed for a in w_assess),
-            'estimated_loss': sum(a.estimated_loss for a in w_assess),
+            'incidents': len(w_incidents),
+            'deaths': sum((i.death_male or 0) + (i.death_female or 0) for i in w_incidents),
+            'death_male': sum(i.death_male or 0 for i in w_incidents),
+            'death_female': sum(i.death_female or 0 for i in w_incidents),
+            'missing': sum((i.missing_male or 0) + (i.missing_female or 0) for i in w_incidents),
+            'injured': sum((i.injured_male or 0) + (i.injured_female or 0) for i in w_incidents),
+            'injured_male': sum(i.injured_male or 0 for i in w_incidents),
+            'injured_female': sum(i.injured_female or 0 for i in w_incidents),
+            'house_destroyed': sum(i.house_destroyed or 0 for i in w_incidents),
+            'house_damaged': sum(i.house_damaged or 0 for i in w_incidents),
+            'estimated_loss': sum(i.estimated_loss or 0 for i in w_incidents),
+            'road_blocked': any(i.road_blocked for i in w_incidents),
+            'electricity_blocked': any(i.electricity_blocked for i in w_incidents),
+            'communication_blocked': any(i.communication_blocked for i in w_incidents),
+            'drinking_water_disrupted': any(i.drinking_water_disrupted for i in w_incidents),
         }
 
     disaster_type_stats = {}
-    for a in assessments:
-        t = a.disaster_type or 'Unknown'
+    for i in incidents:
+        t = i.incident_type or 'Unknown'
         if t not in disaster_type_stats:
-            disaster_type_stats[t] = {'count': 0, 'deaths': 0, 'injured': 0, 'affected_households': 0, 'house_destroyed': 0, 'estimated_loss': 0}
+            disaster_type_stats[t] = {'count': 0, 'male_death': 0, 'female_death': 0,
+                'missing': 0, 'male_injured': 0, 'female_injured': 0,
+                'affected_households': 0, 'house_damaged': 0, 'house_destroyed': 0,
+                'public_building_damaged': 0, 'public_building_destroyed': 0,
+                'livestock_loss': 0, 'estimated_loss': 0}
         disaster_type_stats[t]['count'] += 1
-        disaster_type_stats[t]['deaths'] += a.deaths
-        disaster_type_stats[t]['injured'] += a.injured
-        disaster_type_stats[t]['affected_households'] += a.affected_households
-        disaster_type_stats[t]['house_destroyed'] += a.house_destroyed
-        disaster_type_stats[t]['estimated_loss'] += a.estimated_loss
+        disaster_type_stats[t]['male_death'] += i.death_male or 0
+        disaster_type_stats[t]['female_death'] += i.death_female or 0
+        disaster_type_stats[t]['missing'] += (i.missing_male or 0) + (i.missing_female or 0)
+        disaster_type_stats[t]['male_injured'] += i.injured_male or 0
+        disaster_type_stats[t]['female_injured'] += i.injured_female or 0
+        disaster_type_stats[t]['affected_households'] += i.affected_households or 0
+        disaster_type_stats[t]['house_damaged'] += i.house_damaged or 0
+        disaster_type_stats[t]['house_destroyed'] += i.house_destroyed or 0
+        disaster_type_stats[t]['public_building_damaged'] += i.public_building_damaged or 0
+        disaster_type_stats[t]['public_building_destroyed'] += i.public_building_destroyed or 0
+        disaster_type_stats[t]['livestock_loss'] += (i.cattle_lost or 0) + (i.poultry_lost or 0) + (i.goats_sheep_lost or 0) + (i.other_livestock_lost or 0)
+        disaster_type_stats[t]['estimated_loss'] += i.estimated_loss or 0
+
+    infra_status = {
+        'road_blocked': any(i.road_blocked for i in incidents),
+        'electricity_blocked': any(i.electricity_blocked for i in incidents),
+        'communication_blocked': any(i.communication_blocked for i in incidents),
+        'drinking_water_disrupted': any(i.drinking_water_disrupted for i in incidents),
+    }
 
     office_name = AppSettings.get_setting('office_name', 'थलारा गाउँपालिका')
 
@@ -4507,30 +4644,126 @@ def daily_report_preview():
             db.session.commit()
         sit_rep_no = log.id
 
-    return render_template('daily_report_print.html', total=total, ward_stats=ward_stats,
-                           disaster_type_stats=disaster_type_stats, assessments=assessments,
-                           incidents=incidents, start_bs=start_bs, end_bs=end_bs,
-                           office_name=office_name, sit_rep_no=sit_rep_no, generated_at=datetime.now(),
-                           weather_status=request.args.get('weather', ''),
-                           notice_title=request.args.get('notice_title', ''),
-                           notice_description=request.args.get('notice_description', ''),
-                           notice_priority=request.args.get('notice_priority', 'medium'),
-                           incident_reporting_status=request.args.get('reporting_status', ''),
-                           situation_summary=request.args.get('situation_summary', ''),
-                           resources_deployed=request.args.get('resources_deployed', ''),
-                           next_update=request.args.get('next_update', ''))
+    weather_status = request.args.get('weather', bulletin.weather_status if bulletin else '')
+    notice_title = request.args.get('notice_title', bulletin.notice_title if bulletin else '')
+    notice_description = request.args.get('notice_description', bulletin.notice_description if bulletin else '')
+    notice_priority = request.args.get('notice_priority', bulletin.priority if bulletin else 'medium')
+    incident_reporting_status = request.args.get('reporting_status', bulletin.incident_reporting_status if bulletin else '')
+    situation_summary = request.args.get('situation_summary', bulletin.situation_summary if bulletin else '')
+    resources_deployed = request.args.get('resources_deployed', bulletin.resources_deployed if bulletin else '')
+    next_update_val = request.args.get('next_update', '')
+    if not next_update_val and bulletin:
+        parts = []
+        if bulletin.next_update_date: parts.append(bulletin.next_update_date)
+        if bulletin.next_update_time: parts.append(bulletin.next_update_time)
+        next_update_val = ' '.join(parts)
 
-# --- Daily Bulletin API (stub - DB integration in next step) ---
-@app.route('/api/daily-bulletins', methods=['POST'])
+    return render_template('daily_report_print.html', total=total, ward_stats=ward_stats,
+                           disaster_type_stats=disaster_type_stats, incidents=incidents,
+                           start_bs=start_bs, end_bs=end_bs,
+                           office_name=office_name, sit_rep_no=sit_rep_no, generated_at=datetime.now(),
+                           weather_status=weather_status,
+                           notice_title=notice_title,
+                           notice_description=notice_description,
+                           notice_priority=notice_priority,
+                           incident_reporting_status=incident_reporting_status,
+                           situation_summary=situation_summary,
+                           resources_deployed=resources_deployed,
+                           next_update=next_update_val,
+                           event_logs=[],
+                           public_advisories=[{
+                               'title': notice_title,
+                               'priority': notice_priority,
+                               'content': notice_description or ''
+                           }] if notice_title else [],
+                           infra_status=infra_status,
+                           livestock_total=livestock_total)
+
+# --- Daily Bulletin API ---
+@app.route('/api/daily-bulletins', methods=['GET', 'POST'])
 @login_required
-def save_daily_bulletin():
+def handle_daily_bulletins():
+    if request.method == 'GET':
+        try:
+            bulletins = DailyBulletin.query.order_by(DailyBulletin.created_at.desc()).all()
+            return jsonify({'success': True, 'bulletins': [b.to_dict() for b in bulletins]})
+        except Exception as e:
+            return jsonify({'success': False, 'message': friendly_message(e)}), 500
+
     try:
         data = request.get_json()
         if not data or not data.get('notice_title'):
             return jsonify({'success': False, 'message': 'Notice title is required'}), 400
-        return jsonify({'success': True, 'message': 'Bulletin saved successfully', 'id': None})
+        if not data.get('valid_from'):
+            return jsonify({'success': False, 'message': 'Valid from date is required'}), 400
+
+        incident_ids = data.get('incident_ids', [])
+        incidents = Incident.query.filter(Incident.id.in_(incident_ids)).all() if incident_ids else []
+
+        bulletin = DailyBulletin(
+            notice_title=data['notice_title'],
+            notice_description=data.get('notice_description', ''),
+            priority=data.get('priority', 'medium'),
+            report_status=data.get('report_status', 'draft'),
+            valid_from=data['valid_from'],
+            valid_to=data.get('valid_to', ''),
+            weather_status=data.get('weather_status', ''),
+            incident_reporting_status=data.get('incident_reporting_status', ''),
+            next_update_date=data.get('next_update_date', ''),
+            next_update_time=data.get('next_update_time', ''),
+            situation_summary=data.get('situation_summary', ''),
+            resources_deployed=data.get('resources_deployed', ''),
+        )
+        bulletin.incidents = incidents
+        db.session.add(bulletin)
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Bulletin saved successfully', 'data': bulletin.to_dict()}), 201
     except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 500
+        db.session.rollback()
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
+
+@app.route('/api/daily-bulletins/<int:id>', methods=['GET', 'PUT', 'DELETE'])
+@login_required
+def manage_daily_bulletin(id):
+    bulletin = DailyBulletin.query.get(id)
+    if not bulletin:
+        return jsonify({'success': False, 'message': 'Bulletin not found'}), 404
+
+    if request.method == 'GET':
+        return jsonify({'success': True, 'data': bulletin.to_dict()})
+
+    if request.method == 'DELETE':
+        try:
+            db.session.delete(bulletin)
+            db.session.commit()
+            return jsonify({'success': True, 'message': 'Bulletin deleted'})
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'success': False, 'message': friendly_message(e)}), 500
+
+    try:
+        data = request.get_json()
+        bulletin.notice_title = data.get('notice_title', bulletin.notice_title)
+        bulletin.notice_description = data.get('notice_description', bulletin.notice_description)
+        bulletin.priority = data.get('priority', bulletin.priority)
+        bulletin.report_status = data.get('report_status', bulletin.report_status)
+        bulletin.valid_from = data.get('valid_from', bulletin.valid_from)
+        bulletin.valid_to = data.get('valid_to', bulletin.valid_to)
+        bulletin.weather_status = data.get('weather_status', bulletin.weather_status)
+        bulletin.incident_reporting_status = data.get('incident_reporting_status', bulletin.incident_reporting_status)
+        bulletin.next_update_date = data.get('next_update_date', bulletin.next_update_date)
+        bulletin.next_update_time = data.get('next_update_time', bulletin.next_update_time)
+        bulletin.situation_summary = data.get('situation_summary', bulletin.situation_summary)
+        bulletin.resources_deployed = data.get('resources_deployed', bulletin.resources_deployed)
+
+        incident_ids = data.get('incident_ids', [])
+        bulletin.incidents = Incident.query.filter(Incident.id.in_(incident_ids)).all() if incident_ids else []
+
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Bulletin updated', 'data': bulletin.to_dict()})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 # ============ FILE UPLOAD ============
 @app.route('/api/upload', methods=['POST'])

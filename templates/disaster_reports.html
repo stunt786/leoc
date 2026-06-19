@@ -1,14 +1,13 @@
 {% extends "base.html" %}
-{% block title %}Daily Bulletin - LEOC{% endblock %}
+{% block title %}दैनिक बुलेटिन - LEOC{% endblock %}
 {% block breadcrumb %}
 <li class="breadcrumb-item"><a href="{{ url_for('index') }}"><i class="bi bi-house-fill"></i></a></li>
-<li class="breadcrumb-item active">Daily Bulletin</li>
+<li class="breadcrumb-item active">दैनिक बुलेटिन</li>
 {% endblock %}
 {% block content %}
 <style>
   .bulletin-form .card-header { font-weight: 600; }
   .bulletin-form .form-label { font-weight: 500; font-size: 0.85rem; }
-  .priority-badge { width: fit-content; }
   .incident-checkbox:checked + label { background-color: #e8f4fd; }
   .selected-count { font-size: 0.85rem; }
   .stat-mini { text-align: center; padding: 8px; border-radius: 6px; background: #f8f9fa; }
@@ -18,64 +17,62 @@
 
 <div class="page-header d-flex justify-content-between align-items-center flex-wrap gap-2">
   <div>
-    <h4 class="mb-0"><i class="bi bi-megaphone-fill me-2"></i>Daily Bulletin</h4>
-    <p class="text-muted mb-0 small">Create and manage daily disaster bulletins</p>
+    <h4 class="mb-0"><i class="bi bi-megaphone-fill me-2"></i>दैनिक बुलेटिन</h4>
+    <p class="text-muted mb-0 small">दैनिक विपद् बुलेटिन सिर्जना र व्यवस्थापन गर्नुहोस्</p>
   </div>
   <div class="d-flex gap-2">
-    <button class="btn btn-outline-primary btn-sm" onclick="showPrintPreview()" title="Print Preview">
-      <i class="bi bi-eye me-1"></i>Print Preview
+    <button class="btn btn-outline-primary btn-sm" onclick="showPrintPreview()" title="प्रिन्ट पूर्वावलोकन">
+      <i class="bi bi-eye me-1"></i>प्रिन्ट पूर्वावलोकन
     </button>
-    <button class="btn btn-outline-success btn-sm" onclick="downloadPDF()" title="Download PDF">
+    <button class="btn btn-outline-success btn-sm" onclick="downloadPDF()" title="PDF डाउनलोड">
       <i class="bi bi-file-earmark-pdf me-1"></i>PDF
-    </button>
-    <button class="btn btn-primary btn-sm" onclick="saveBulletin()" id="btnSave">
-      <i class="bi bi-save me-1"></i>Save Bulletin
     </button>
   </div>
 </div>
 
-<form id="bulletinForm" class="bulletin-form">
-  <div class="row g-3 mt-1">
+<form id="bulletinForm" class="bulletin-form mt-3">
+  <input type="hidden" id="bulletin_id" value="">
+  <div class="row g-3">
     <!-- Main Form -->
     <div class="col-lg-8">
       <!-- Bulletin Details -->
       <div class="card mb-3">
         <div class="card-header py-2">
-          <i class="bi bi-info-circle me-1 text-primary"></i> Bulletin Details
+          <i class="bi bi-info-circle me-1 text-primary"></i> बुलेटिन विवरण
         </div>
         <div class="card-body">
           <div class="row g-3">
             <div class="col-md-6">
-              <label class="form-label">Public Notice Title <span class="text-danger">*</span></label>
-              <input type="text" class="form-control" id="notice_title" placeholder="e.g. आगलागी सम्बन्धी सूचना" required>
+              <label class="form-label">सार्वजनिक सूचना शीर्षक <span class="text-danger">*</span></label>
+              <input type="text" class="form-control" id="notice_title" placeholder="जस्तै: आगलागी सम्बन्धी सूचना" required>
             </div>
             <div class="col-md-3">
-              <label class="form-label">Priority</label>
+              <label class="form-label">प्राथमिकता</label>
               <select class="form-select" id="priority">
-                <option value="low">Low</option>
-                <option value="medium" selected>Medium</option>
-                <option value="high">High</option>
-                <option value="critical">Critical</option>
+                <option value="low">न्यून</option>
+                <option value="medium" selected>मध्यम</option>
+                <option value="high">उच्च</option>
+                <option value="critical">अत्यन्त जरुरी</option>
               </select>
             </div>
             <div class="col-md-3">
-              <label class="form-label">Status</label>
+              <label class="form-label">स्थिति</label>
               <select class="form-select" id="report_status">
-                <option value="draft">Draft</option>
-                <option value="published" selected>Published</option>
+                <option value="draft">मस्यौदा</option>
+                <option value="published" selected>प्रकाशित</option>
               </select>
             </div>
             <div class="col-md-6">
-              <label class="form-label">Public Notice Description</label>
-              <textarea class="form-control" id="notice_description" rows="2" placeholder="Brief description of the public notice"></textarea>
+              <label class="form-label">सार्वजनिक सूचना विवरण</label>
+              <textarea class="form-control" id="notice_description" rows="2" placeholder="सार्वजनिक सूचनाको संक्षिप्त विवरण"></textarea>
             </div>
             <div class="col-md-3">
-              <label class="form-label">Valid Date From (BS) <span class="text-danger">*</span></label>
-              <input type="text" class="form-control nepali-date" id="valid_from" placeholder="2081-12-25" required>
+              <label class="form-label">मान्य मिति (बाट) <span class="text-danger">*</span></label>
+              <input type="text" class="form-control nepali-date" id="valid_from" placeholder="२०८१-१२-२५" required>
             </div>
             <div class="col-md-3">
-              <label class="form-label">Valid Date To (BS)</label>
-              <input type="text" class="form-control nepali-date" id="valid_to" placeholder="2081-12-30">
+              <label class="form-label">मान्य मिति (सम्म)</label>
+              <input type="text" class="form-control nepali-date" id="valid_to" placeholder="२०८१-१२-३०">
             </div>
           </div>
         </div>
@@ -84,41 +81,41 @@
       <!-- Weather & Status -->
       <div class="card mb-3">
         <div class="card-header py-2">
-          <i class="bi bi-cloud-sun me-1 text-warning"></i> Weather & Reporting Status
+          <i class="bi bi-cloud-sun me-1 text-warning"></i> मौसम र प्रतिवेदन स्थिति
         </div>
         <div class="card-body">
           <div class="row g-3">
             <div class="col-md-4">
-              <label class="form-label">Today's Weather Status</label>
+              <label class="form-label">आजको मौसम</label>
               <select class="form-select" id="weather_status">
-                <option value="">Select weather</option>
-                <option value="Sunny">Sunny / घाम लागेको</option>
-                <option value="Cloudy">Cloudy / बादल लागेको</option>
-                <option value="Rainy">Rainy / वर्षा</option>
-                <option value="Heavy Rain">Heavy Rain / भारी वर्षा</option>
-                <option value="Storm">Storm / आँधी</option>
-                <option value="Foggy">Foggy / कुहिरो</option>
-                <option value="Cold Wave">Cold Wave / शीतलहर</option>
-                <option value="Heat Wave">Heat Wave / गर्मी लहर</option>
+                <option value="">मौसम चयन गर्नुहोस्</option>
+                <option value="आज मौसम सफा रहेको छ">आज मौसम सफा रहेको छ</option>
+                <option value="आज बादल लागेको छ">आज बादल लागेको छ</option>
+                <option value="आज हल्का वर्षा भइरहेको छ">आज हल्का वर्षा भइरहेको छ</option>
+                <option value="आज भारी वर्षा भइरहेको छ">आज भारी वर्षा भइरहेको छ</option>
+                <option value="आज आँधी चलिरहेको छ">आज आँधी चलिरहेको छ</option>
+                <option value="आज कुहिरो लागेको छ">आज कुहिरो लागेको छ</option>
+                <option value="आज शीतलहर चलिरहेको छ">आज शीतलहर चलिरहेको छ</option>
+                <option value="आज गर्मी लहर चलिरहेको छ">आज गर्मी लहर चलिरहेको छ</option>
               </select>
             </div>
             <div class="col-md-4">
-              <label class="form-label">Incidents Reporting Status</label>
+              <label class="form-label">घटना प्रतिवेदन स्थिति</label>
               <select class="form-select" id="incident_reporting_status">
                 <option value="All Normal">All Normal / सबै सामान्य</option>
-                <option value="Minor Incidents">Minor Incidents / सानातिना घटना</option>
-                <option value="Moderate">Moderate / मध्यम</option>
-                <option value="Severe">Severe / गम्भीर</option>
-                <option value="Critical">Critical / अत्यन्त गम्भीर</option>
+                <option value="Minor Incidents">Minor Incidents / सानातिना घटनाहरू</option>
+                <option value="Moderate">Moderate / मध्यम खालको</option>
+                <option value="Severe">Severe / गम्भीर अवस्था</option>
+                <option value="Critical">Critical / अत्यन्तै गम्भीर</option>
               </select>
             </div>
             <div class="col-md-4">
-              <label class="form-label">Next Update</label>
+              <label class="form-label">अर्को अपडेट</label>
               <div class="input-group">
-                <input type="text" class="form-control" id="next_update_date" placeholder="2081-12-26">
-                <input type="time" class="form-control" id="next_update_time" placeholder="15:00" style="max-width:100px">
+                <input type="text" class="form-control" id="next_update_date" placeholder="२०८१-१२-२६">
+                <input type="time" class="form-control" id="next_update_time" placeholder="१५:००" style="max-width:100px">
               </div>
-              <small class="text-muted">Date (BS) and time for next bulletin</small>
+              <small class="text-muted">अर्को बुलेटिनको मिति (BS) र समय</small>
             </div>
           </div>
         </div>
@@ -127,24 +124,24 @@
       <!-- Incident Selection -->
       <div class="card mb-3">
         <div class="card-header py-2 d-flex justify-content-between align-items-center">
-          <span><i class="bi bi-list-check me-1 text-success"></i> Select Incidents</span>
-          <span class="selected-count"><span id="selectedIncidentCount">0</span> selected</span>
+          <span><i class="bi bi-list-check me-1 text-success"></i> घटनाहरू चयन गर्नुहोस्</span>
+          <span class="selected-count"><span id="selectedIncidentCount">०</span> चयन गरियो</span>
         </div>
         <div class="card-body p-0">
           <div class="p-2 border-bottom d-flex gap-2">
             <select class="form-select form-select-sm" style="width:auto;min-width:140px" id="incidentFilterWard" onchange="filterIncidentsForBulletin()">
-              <option value="">All Wards</option>
+              <option value="">सबै वडा</option>
               {% for w in ward_list %}
               <option value="{{ w.id }}">{{ w.name }}</option>
               {% endfor %}
             </select>
             <select class="form-select form-select-sm" style="width:auto;min-width:140px" id="incidentFilterType" onchange="filterIncidentsForBulletin()">
-              <option value="">All Types</option>
+              <option value="">सबै प्रकार</option>
             </select>
-            <input type="text" class="form-control form-control-sm" style="width:200px" id="incidentFilterSearch" placeholder="Search incidents..." oninput="filterIncidentsForBulletin()">
+            <input type="text" class="form-control form-control-sm" style="width:200px" id="incidentFilterSearch" placeholder="घटनाहरू खोज्नुहोस्..." oninput="filterIncidentsForBulletin()">
             <div class="ms-auto">
-              <button type="button" class="btn btn-sm btn-outline-primary" onclick="selectAllIncidents(true)">Select All</button>
-              <button type="button" class="btn btn-sm btn-outline-secondary" onclick="selectAllIncidents(false)">Clear</button>
+              <button type="button" class="btn btn-sm btn-outline-primary" onclick="selectAllIncidents(true)">सबै चयन गर्नुहोस्</button>
+              <button type="button" class="btn btn-sm btn-outline-secondary" onclick="selectAllIncidents(false)">खाली गर्नुहोस्</button>
             </div>
           </div>
           <div class="table-responsive" style="max-height:350px;overflow-y:auto">
@@ -154,16 +151,16 @@
                   <th style="width:40px">
                     <input type="checkbox" class="form-check-input" id="selectAllIncidents" onchange="toggleAllIncidents(this)">
                   </th>
-                  <th>Name</th>
-                  <th>Type</th>
-                  <th>Ward</th>
-                  <th>Date (BS)</th>
-                  <th>Severity</th>
-                  <th>Status</th>
+                  <th>नाम</th>
+                  <th>प्रकार</th>
+                  <th>वडा</th>
+                  <th>मिति (BS)</th>
+                  <th>गम्भीरता</th>
+                  <th>स्थिति</th>
                 </tr>
               </thead>
               <tbody id="incidentSelectBody">
-                <tr><td colspan="7" class="text-center py-3"><div class="spinner-border spinner-border-sm text-primary"></div> Loading...</td></tr>
+                <tr><td colspan="7" class="text-center py-3"><div class="spinner-border spinner-border-sm text-primary"></div> लोड हुँदै...</td></tr>
               </tbody>
             </table>
           </div>
@@ -173,17 +170,17 @@
       <!-- Situation Report -->
       <div class="card mb-3">
         <div class="card-header py-2">
-          <i class="bi bi-clipboard-data me-1 text-info"></i> Situation Report
+          <i class="bi bi-clipboard-data me-1 text-info"></i> स्थिति प्रतिवेदन
         </div>
         <div class="card-body">
           <div class="row g-3">
             <div class="col-md-6">
-              <label class="form-label">Current Situation Summary</label>
-              <textarea class="form-control" id="situation_summary" rows="2" placeholder="Brief summary of current situation"></textarea>
+              <label class="form-label">वर्तमान अवस्थाको सारांश</label>
+              <textarea class="form-control" id="situation_summary" rows="2" placeholder="वर्तमान अवस्थाको संक्षिप्त सारांश"></textarea>
             </div>
             <div class="col-md-6">
-              <label class="form-label">Resources Deployed</label>
-              <textarea class="form-control" id="resources_deployed" rows="2" placeholder="Details of resources deployed"></textarea>
+              <label class="form-label">परिचालित स्रोतहरू</label>
+              <textarea class="form-control" id="resources_deployed" rows="2" placeholder="परिचालित स्रोतहरूको विवरण"></textarea>
             </div>
           </div>
         </div>
@@ -195,16 +192,16 @@
       <!-- Quick Stats -->
       <div class="card mb-3">
         <div class="card-header py-2">
-          <i class="bi bi-bar-chart me-1 text-primary"></i> Selected Stats
+          <i class="bi bi-bar-chart me-1 text-primary"></i> चयन तथ्यांक
         </div>
         <div class="card-body">
           <div class="row g-2" id="selectedStats">
-            <div class="col-6"><div class="stat-mini"><div class="number" id="selCount">0</div><div class="label">Incidents</div></div></div>
-            <div class="col-6"><div class="stat-mini"><div class="number text-danger" id="selDeaths">0</div><div class="label">Deaths</div></div></div>
-            <div class="col-6"><div class="stat-mini"><div class="number text-warning" id="selMissing">0</div><div class="label">Missing</div></div></div>
-            <div class="col-6"><div class="stat-mini"><div class="number text-info" id="selInjured">0</div><div class="label">Injured</div></div></div>
-            <div class="col-6"><div class="stat-mini"><div class="number text-success" id="selAffected">0</div><div class="label">Affected HH</div></div></div>
-            <div class="col-6"><div class="stat-mini"><div class="number text-secondary" id="selLoss">0</div><div class="label">Est. Loss</div></div></div>
+            <div class="col-6"><div class="stat-mini"><div class="number" id="selCount">०</div><div class="label">घटनाहरू</div></div></div>
+            <div class="col-6"><div class="stat-mini"><div class="number text-danger" id="selDeaths">०</div><div class="label">मृत्यु</div></div></div>
+            <div class="col-6"><div class="stat-mini"><div class="number text-warning" id="selMissing">०</div><div class="label">बेपत्ता</div></div></div>
+            <div class="col-6"><div class="stat-mini"><div class="number text-info" id="selInjured">०</div><div class="label">घाइते</div></div></div>
+            <div class="col-6"><div class="stat-mini"><div class="number text-success" id="selAffected">०</div><div class="label">प्रभावित घर</div></div></div>
+            <div class="col-6"><div class="stat-mini"><div class="number text-secondary" id="selLoss">०</div><div class="label">क्षति (रु.)</div></div></div>
           </div>
         </div>
       </div>
@@ -212,20 +209,20 @@
       <!-- Priority Guide -->
       <div class="card mb-3">
         <div class="card-header py-2">
-          <i class="bi bi-flag me-1 text-warning"></i> Priority Guide
+          <i class="bi bi-flag me-1 text-warning"></i> प्राथमिकता मार्गदर्शन
         </div>
         <div class="card-body py-2 small">
-          <div class="d-flex align-items-center mb-1"><span class="badge bg-secondary me-2">Low</span> Routine information</div>
-          <div class="d-flex align-items-center mb-1"><span class="badge bg-info me-2">Medium</span> General alert</div>
-          <div class="d-flex align-items-center mb-1"><span class="badge bg-warning text-dark me-2">High</span> Urgent attention</div>
-          <div class="d-flex align-items-center"><span class="badge bg-danger me-2">Critical</span> Immediate action</div>
+          <div class="d-flex align-items-center mb-1"><span class="badge bg-secondary me-2">न्यून</span> सामान्य जानकारी</div>
+          <div class="d-flex align-items-center mb-1"><span class="badge bg-info me-2">मध्यम</span> सामान्य सतर्कता</div>
+          <div class="d-flex align-items-center mb-1"><span class="badge bg-warning text-dark me-2">उच्च</span> तत्काल ध्यान</div>
+          <div class="d-flex align-items-center"><span class="badge bg-danger me-2">अत्यन्त जरुरी</span> तुरुन्त कारबाही</div>
         </div>
       </div>
 
       <!-- Recent Bulletins -->
       <div class="card mb-3">
         <div class="card-header py-2">
-          <i class="bi bi-clock-history me-1 text-secondary"></i> Recent Bulletins
+          <i class="bi bi-clock-history me-1 text-secondary"></i> हालका बुलेटिनहरू
         </div>
         <div class="card-body p-0">
           <div id="recentBulletinsList">
@@ -235,7 +232,44 @@
       </div>
     </div>
   </div>
+  <div class="d-flex justify-content-end mt-3">
+    <button class="btn btn-primary" onclick="saveBulletin()" id="btnSave">
+      <i class="bi bi-save me-1"></i><span id="btnSaveText">बुलेटिन सुरक्षित गर्नुहोस्</span>
+    </button>
+  </div>
 </form>
+
+<!-- Saved Bulletins Table -->
+<div class="card mt-3">
+  <div class="card-header d-flex justify-content-between align-items-center py-2">
+    <span><i class="bi bi-list-table me-1 text-primary"></i> सुरक्षित बुलेटिनहरू</span>
+    <button class="btn btn-sm btn-outline-primary" onclick="resetBulletinForm()">
+      <i class="bi bi-plus-lg"></i> नयाँ बुलेटिन
+    </button>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0 table-sm">
+        <thead class="table-light">
+          <tr>
+            <th>क्र.सं.</th>
+            <th>शीर्षक</th>
+            <th>प्राथमिकता</th>
+            <th>स्थिति</th>
+            <th>मिति (बाट)</th>
+            <th>मौसम</th>
+            <th>घटना</th>
+            <th>सिर्जना मिति</th>
+            <th class="text-end">कार्यहरू</th>
+          </tr>
+        </thead>
+        <tbody id="bulletinTableBody">
+          <tr><td colspan="9" class="text-center py-3"><div class="spinner-border spinner-border-sm text-primary"></div> लोड हुँदै...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
@@ -243,6 +277,12 @@
 const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 let allIncidents = [];
 let incidentTypes = [];
+let bulletins = [];
+let editingBulletinId = null;
+
+function toDev(n) {
+  return String(n).replace(/\d/g, d => '०१२३४५६७८९'[d]);
+}
 
 // --- Load incident types for filter ---
 async function loadIncidentTypes() {
@@ -254,7 +294,7 @@ async function loadIncidentTypes() {
     incidentTypes = ['Flood', 'Earthquake', 'Landslide', 'Fire', 'Storm', 'Other'];
   }
   const sel = document.getElementById('incidentFilterType');
-  sel.innerHTML = '<option value="">All Types</option>' +
+  sel.innerHTML = '<option value="">सबै प्रकार</option>' +
     incidentTypes.map(t => `<option value="${t}">${t}</option>`).join('');
 }
 
@@ -268,14 +308,14 @@ async function loadIncidents() {
     renderIncidentTable(allIncidents);
   } catch(e) {
     document.getElementById('incidentSelectBody').innerHTML =
-      '<tr><td colspan="7" class="text-center py-3 text-danger">Failed to load incidents</td></tr>';
+      '<tr><td colspan="7" class="text-center py-3 text-danger">घटनाहरू लोड गर्न असफल</td></tr>';
   }
 }
 
 function renderIncidentTable(incidents) {
   const tbody = document.getElementById('incidentSelectBody');
   if (!incidents.length) {
-    tbody.innerHTML = '<tr><td colspan="7" class="text-center py-3 text-muted">No incidents found</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" class="text-center py-3 text-muted">कुनै घटना फेला परेन</td></tr>';
     updateStats();
     return;
   }
@@ -322,18 +362,18 @@ function selectAllIncidents(select) {
 
 function onIncidentSelect() {
   const checked = document.querySelectorAll('.incident-checkbox:checked');
-  document.getElementById('selectedIncidentCount').textContent = checked.length;
+  document.getElementById('selectedIncidentCount').textContent = toDev(checked.length);
   updateStats(Array.from(checked).map(cb => JSON.parse(cb.dataset.incident)));
 }
 
 function updateStats(selected = []) {
-  document.getElementById('selCount').textContent = selected.length;
-  document.getElementById('selDeaths').textContent = selected.reduce((s, i) => s + (parseInt(i.deaths) || 0), 0);
-  document.getElementById('selMissing').textContent = selected.reduce((s, i) => s + (parseInt(i.missing_persons) || 0), 0);
-  document.getElementById('selInjured').textContent = selected.reduce((s, i) => s + (parseInt(i.injured) || 0), 0);
-  document.getElementById('selAffected').textContent = selected.reduce((s, i) => s + (parseInt(i.affected_households) || 0), 0);
+  document.getElementById('selCount').textContent = toDev(selected.length);
+  document.getElementById('selDeaths').textContent = toDev(selected.reduce((s, i) => s + (parseInt(i.deaths) || 0), 0));
+  document.getElementById('selMissing').textContent = toDev(selected.reduce((s, i) => s + (parseInt(i.missing_persons) || 0), 0));
+  document.getElementById('selInjured').textContent = toDev(selected.reduce((s, i) => s + (parseInt(i.injured) || 0), 0));
+  document.getElementById('selAffected').textContent = toDev(selected.reduce((s, i) => s + (parseInt(i.affected_households) || 0), 0));
   const loss = selected.reduce((s, i) => s + (parseFloat(i.estimated_loss) || 0), 0);
-  document.getElementById('selLoss').textContent = loss.toLocaleString();
+  document.getElementById('selLoss').textContent = toDev(Math.round(loss).toLocaleString());
 }
 
 function esc(s) {
@@ -344,12 +384,141 @@ function esc(s) {
   return d.innerHTML;
 }
 
+// --- Load Bulletins ---
+async function loadBulletins() {
+  try {
+    const r = await fetch('/api/daily-bulletins');
+    const d = await r.json();
+    if (!d.success) { showToast('danger', d.message); return; }
+    bulletins = d.bulletins || [];
+    renderBulletinTable();
+    renderRecentBulletins();
+  } catch(e) {
+    document.getElementById('bulletinTableBody').innerHTML =
+      '<tr><td colspan="9" class="text-center py-3 text-danger">बुलेटिनहरू लोड गर्न असफल</td></tr>';
+  }
+}
+
+function renderBulletinTable() {
+  const tbody = document.getElementById('bulletinTableBody');
+  if (!bulletins.length) {
+    tbody.innerHTML = '<tr><td colspan="9" class="text-center py-3 text-muted">कुनै बुलेटिन सुरक्षित गरिएको छैन</td></tr>';
+    return;
+  }
+  tbody.innerHTML = bulletins.map(b => {
+    const priorityColor = b.priority === 'critical' ? 'danger' : b.priority === 'high' ? 'warning text-dark' : b.priority === 'medium' ? 'info' : 'secondary';
+    const statusColor = b.report_status === 'published' ? 'success' : 'secondary';
+    const incidentCount = (b.incident_ids || []).length;
+    return `<tr>
+      <td>${toDev(b.id)}</td>
+      <td><strong>${esc(b.notice_title)}</strong></td>
+      <td><span class="badge bg-${priorityColor}">${esc(b.priority)}</span></td>
+      <td><span class="badge bg-${statusColor}">${esc(b.report_status)}</span></td>
+      <td>${esc(b.valid_from)}</td>
+      <td>${b.weather_status ? esc(b.weather_status) : '-'}</td>
+      <td>${toDev(incidentCount)}</td>
+      <td><small>${b.created_at || '-'}</small></td>
+      <td class="text-end">
+        <button class="btn btn-sm btn-outline-primary" onclick="editBulletin(${b.id})" title="सम्पादन"><i class="bi bi-pencil"></i></button>
+        <button class="btn btn-sm btn-outline-danger" onclick="deleteBulletin(${b.id})" title="मेटाउनुहोस्"><i class="bi bi-trash"></i></button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function renderRecentBulletins() {
+  const container = document.getElementById('recentBulletinsList');
+  if (!bulletins.length) {
+    container.innerHTML = '<div class="text-center text-muted py-3 small">कुनै बुलेटिन सुरक्षित गरिएको छैन</div>';
+    return;
+  }
+  const recent = bulletins.slice(0, 5);
+  container.innerHTML = recent.map(b => {
+    const priorityColor = b.priority === 'critical' ? 'danger' : b.priority === 'high' ? 'warning text-dark' : b.priority === 'medium' ? 'info' : 'secondary';
+    return `<div class="border-bottom p-2" style="cursor:pointer" onclick="editBulletin(${b.id})">
+      <div class="d-flex justify-content-between align-items-center">
+        <strong class="small">${esc(b.notice_title)}</strong>
+        <span class="badge bg-${priorityColor}" style="font-size:0.6rem">${esc(b.priority)}</span>
+      </div>
+      <small class="text-muted">${esc(b.valid_from)}</small>
+    </div>`;
+  }).join('');
+}
+
+// --- Reset / Edit ---
+function resetBulletinForm() {
+  document.getElementById('bulletin_id').value = '';
+  editingBulletinId = null;
+  document.getElementById('bulletinForm').reset();
+  document.getElementById('priority').value = 'medium';
+  document.getElementById('report_status').value = 'published';
+  document.getElementById('valid_from').value = today_bs;
+  document.getElementById('next_update_date').value = today_bs;
+  document.getElementById('btnSaveText').textContent = 'बुलेटिन सुरक्षित गर्नुहोस्';
+  selectAllIncidents(false);
+}
+
+async function editBulletin(id) {
+  try {
+    const r = await fetch('/api/daily-bulletins/' + id);
+    const d = await r.json();
+    if (!d.success) { showToast('danger', d.message); return; }
+    const b = d.data;
+    editingBulletinId = b.id;
+    document.getElementById('bulletin_id').value = b.id;
+    document.getElementById('notice_title').value = b.notice_title || '';
+    document.getElementById('notice_description').value = b.notice_description || '';
+    document.getElementById('priority').value = b.priority || 'medium';
+    document.getElementById('report_status').value = b.report_status || 'draft';
+    document.getElementById('valid_from').value = b.valid_from || '';
+    document.getElementById('valid_to').value = b.valid_to || '';
+    document.getElementById('weather_status').value = b.weather_status || '';
+    document.getElementById('incident_reporting_status').value = b.incident_reporting_status || '';
+    document.getElementById('next_update_date').value = b.next_update_date || '';
+    document.getElementById('next_update_time').value = b.next_update_time || '';
+    document.getElementById('situation_summary').value = b.situation_summary || '';
+    document.getElementById('resources_deployed').value = b.resources_deployed || '';
+    document.getElementById('btnSaveText').textContent = 'बुलेटिन अद्यावधिक गर्नुहोस्';
+
+    selectAllIncidents(false);
+    const incidentIds = b.incident_ids || [];
+    document.querySelectorAll('.incident-checkbox').forEach(cb => {
+      if (incidentIds.includes(parseInt(cb.value))) {
+        cb.checked = true;
+      }
+    });
+    onIncidentSelect();
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    showToast('success', 'बुलेटिन सम्पादनको लागि लोड गरियो');
+  } catch(e) {
+    showToast('danger', 'Error: ' + e.message);
+  }
+}
+
+async function deleteBulletin(id) {
+  if (!confirm('यो बुलेटिन मेटाउने हो?')) return;
+  try {
+    const r = await fetch('/api/daily-bulletins/' + id, { method: 'DELETE', headers: { 'X-CSRFToken': csrf } });
+    const d = await r.json();
+    if (d.success) {
+      showToast('success', 'बुलेटिन मेटाइयो');
+      if (editingBulletinId === id) resetBulletinForm();
+      loadBulletins();
+    } else {
+      showToast('danger', d.message);
+    }
+  } catch(e) {
+    showToast('danger', 'Error: ' + e.message);
+  }
+}
+
 // --- Save Bulletin ---
 async function saveBulletin() {
   const title = document.getElementById('notice_title').value.trim();
-  if (!title) { showToast('danger', 'Public Notice Title is required'); return; }
+  if (!title) { showToast('danger', 'सार्वजनिक सूचना शीर्षक आवश्यक छ'); return; }
   const validFrom = document.getElementById('valid_from').value.trim();
-  if (!validFrom) { showToast('danger', 'Valid Date From is required'); return; }
+  if (!validFrom) { showToast('danger', 'मान्य मिति (बाट) आवश्यक छ'); return; }
 
   const selectedIncidents = Array.from(document.querySelectorAll('.incident-checkbox:checked'))
     .map(cb => parseInt(cb.value));
@@ -371,14 +540,19 @@ async function saveBulletin() {
   };
 
   try {
-    const r = await fetch('/api/daily-bulletins', {
-      method: 'POST',
+    const isUpdate = !!editingBulletinId;
+    const url = isUpdate ? '/api/daily-bulletins/' + editingBulletinId : '/api/daily-bulletins';
+    const method = isUpdate ? 'PUT' : 'POST';
+    const r = await fetch(url, {
+      method: method,
       headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
       body: JSON.stringify(payload),
     });
     const d = await r.json();
     if (d.success) {
-      showToast('success', 'Bulletin saved successfully');
+      showToast('success', isUpdate ? 'बुलेटिन अद्यावधिक गरियो' : 'बुलेटिन सुरक्षित गरियो');
+      resetBulletinForm();
+      loadBulletins();
     } else {
       showToast('danger', d.message || 'Failed to save bulletin');
     }
@@ -388,30 +562,46 @@ async function saveBulletin() {
 }
 
 // --- Print Preview / PDF ---
-function showPrintPreview() {
+function getFormParams() {
+  const params = new URLSearchParams();
+  const bulletinId = document.getElementById('bulletin_id').value;
+  if (bulletinId) { params.set('bulletin_id', bulletinId); return params.toString(); }
   const validFrom = document.getElementById('valid_from').value.trim();
   const validTo = document.getElementById('valid_to').value.trim();
-  let url = '/daily-report-preview?';
-  if (validFrom && validTo) url += 'from_bs_date=' + validFrom + '&to_bs_date=' + validTo;
-  else if (validFrom) url += 'bs_date=' + validFrom;
-  else url += 'bs_date=' + today_bs;
-  window.open(url, '_blank');
+  if (validFrom && validTo) { params.set('from_bs_date', validFrom); params.set('to_bs_date', validTo); }
+  else if (validFrom) { params.set('bs_date', validFrom); }
+  else { params.set('bs_date', today_bs); }
+  const weather = document.getElementById('weather_status').value;
+  if (weather) params.set('weather', weather);
+  const title = document.getElementById('notice_title').value.trim();
+  if (title) params.set('notice_title', title);
+  const desc = document.getElementById('notice_description').value.trim();
+  if (desc) params.set('notice_description', desc);
+  const priority = document.getElementById('priority').value;
+  if (priority) params.set('notice_priority', priority);
+  const summary = document.getElementById('situation_summary').value.trim();
+  if (summary) params.set('situation_summary', summary);
+  const resources = document.getElementById('resources_deployed').value.trim();
+  if (resources) params.set('resources_deployed', resources);
+  const nextDate = document.getElementById('next_update_date').value.trim();
+  const nextTime = document.getElementById('next_update_time').value;
+  if (nextDate || nextTime) params.set('next_update', (nextDate + ' ' + nextTime).trim());
+  return params.toString();
+}
+
+function showPrintPreview() {
+  window.open('/daily-report-preview?' + getFormParams(), '_blank');
 }
 
 function downloadPDF() {
-  const validFrom = document.getElementById('valid_from').value.trim();
-  const validTo = document.getElementById('valid_to').value.trim();
-  let url = '/api/generate-daily-report?';
-  if (validFrom && validTo) url += 'from_bs_date=' + validFrom + '&to_bs_date=' + validTo;
-  else if (validFrom) url += 'bs_date=' + validFrom;
-  else url += 'bs_date=' + today_bs;
-  window.open(url, '_blank');
+  window.open('/api/generate-daily-report?' + getFormParams(), '_blank');
 }
 
 // --- Init ---
 document.addEventListener('DOMContentLoaded', () => {
   loadIncidentTypes();
   loadIncidents();
+  loadBulletins();
   document.getElementById('valid_from').value = today_bs;
   document.getElementById('next_update_date').value = today_bs;
 });
