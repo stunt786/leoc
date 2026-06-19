@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="ne">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Incident Report - LEOC</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        @page { size: A4; margin: 15mm; }
+        body { font-family: 'Noto Sans Devanagari', 'Inter', sans-serif; padding: 20px; font-size: 12px; color: #1e293b; }
+        @media print { body { padding: 0; } .no-print { display: none !important; } }
+        .header { text-align: center; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 3px double #1e3a5f; }
+        .header h3 { margin-bottom: 2px; color: #1e3a5f; font-weight: 700; }
+        .header h5 { color: #2c5282; font-weight: 600; }
+        .header .report-title { font-size: 16px; font-weight: 700; color: #1e3a5f; margin-top: 8px; text-transform: uppercase; letter-spacing: 1px; }
+        .section-title { font-size: 13px; font-weight: 700; color: #1e3a5f; border-bottom: 2px solid #1e3a5f; padding-bottom: 4px; margin-top: 20px; margin-bottom: 12px; }
+        table { font-size: 11px; }
+        .table-bordered { border-color: #d1d5db; }
+        .table-bordered th, .table-bordered td { border-color: #d1d5db; padding: 6px 8px; }
+        .field-label { font-weight: 600; color: #495057; width: 180px; }
+        .dl-row { display: flex; padding: 4px 0; border-bottom: 1px dotted #e5e7eb; }
+        .dl-label { font-weight: 600; color: #495057; min-width: 200px; }
+        .dl-value { flex: 1; }
+        .status-badge { display: inline-block; padding: 2px 12px; border-radius: 50px; font-weight: 600; font-size: 11px; }
+        .status-active { background: #dcfce7; color: #166534; }
+        .status-inactive { background: #f3f4f6; color: #6b7280; }
+        .footer { text-align: center; margin-top: 30px; padding-top: 12px; border-top: 1px solid #e5e7eb; font-size: 10px; color: #666; }
+        .severity-high { color: #dc2626; font-weight: 600; }
+        .severity-medium { color: #d97706; font-weight: 600; }
+        .severity-low { color: #2563eb; font-weight: 600; }
+        .value-box { font-weight: 600; font-size: 13px; }
+        .check-yes { color: #16a34a; }
+        .check-no { color: #9ca3af; }
+    </style>
+</head>
+<body>
+    <div class="no-print mb-3 text-center">
+        <button class="btn btn-primary btn-sm" onclick="window.print()"><i class="bi bi-printer"></i> Print</button>
+        <button class="btn btn-secondary btn-sm" onclick="window.close()"><i class="bi bi-x-lg"></i> Close</button>
+    </div>
+
+    <div class="header">
+        <h3>{{ office or 'थलारा गाउँपालिका' }}</h3>
+        <h5>स्थानीय आपतकालीन कार्य केन्द्र (LEOC)</h5>
+        <p class="text-muted mb-0">{{ address }}</p>
+        <div class="report-title"><i class="bi bi-lightning-charge-fill"></i> Incident Report</div>
+    </div>
+
+    <div class="section-title"><i class="bi bi-info-circle"></i> Basic Information</div>
+    <div class="row mb-2">
+        <div class="col-6">
+            <div class="dl-row"><span class="dl-label">Incident Name:</span><span class="dl-value">{{ incident.incident_name }}</span></div>
+            <div class="dl-row"><span class="dl-label">Incident Type:</span><span class="dl-value"><span class="badge bg-info">{{ incident.incident_type }}</span></span></div>
+            <div class="dl-row"><span class="dl-label">Ward:</span><span class="dl-value">{{ incident.ward|ward_name if incident.ward else 'N/A' }}</span></div>
+            <div class="dl-row"><span class="dl-label">Location (Tole):</span><span class="dl-value">{{ incident.tole or 'N/A' }}</span></div>
+            <div class="dl-row"><span class="dl-label">Coordinates:</span><span class="dl-value">{{ incident.coordinates or 'N/A' }}</span></div>
+        </div>
+        <div class="col-6">
+            <div class="dl-row"><span class="dl-label">Start Date:</span><span class="dl-value">{{ incident.start_date|nepali_date if incident.start_date else 'N/A' }}</span></div>
+            <div class="dl-row"><span class="dl-label">Disaster Date (BS):</span><span class="dl-value">{{ incident.disaster_date_bs or 'N/A' }}</span></div>
+            <div class="dl-row"><span class="dl-label">Time:</span><span class="dl-value">{{ incident.incident_time or 'N/A' }}</span></div>
+            <div class="dl-row"><span class="dl-label">Fiscal Year:</span><span class="dl-value">{{ incident.fiscal_year or 'N/A' }}</span></div>
+            <div class="dl-row">
+                <span class="dl-label">Status:</span>
+                <span class="dl-value"><span class="status-badge {% if incident.status == 'Active' %}status-active{% else %}status-inactive{% endif %}">{{ incident.status }}</span></span>
+            </div>
+            <div class="dl-row">
+                <span class="dl-label">Severity:</span>
+                <span class="dl-value"><span class="severity-{{ incident.severity }}">{{ incident.severity|upper if incident.severity else 'N/A' }}</span></span>
+            </div>
+        </div>
+    </div>
+
+    {% if incident.description %}
+    <div class="mb-2">
+        <strong>Description:</strong>
+        <p class="mb-0 mt-1" style="white-space:pre-wrap">{{ incident.description }}</p>
+    </div>
+    {% endif %}
+
+    <div class="section-title"><i class="bi bi-heart-pulse"></i> Human Impact</div>
+    <div class="row mb-2">
+        <div class="col-6">
+            <table class="table table-bordered table-sm">
+                <thead class="table-light">
+                    <tr><th>Category</th><th class="text-center">Male</th><th class="text-center">Female</th><th class="text-center">Total</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td class="field-label">Affected People</td><td class="text-center">{{ incident.affected_people_male or 0 }}</td><td class="text-center">{{ incident.affected_people_female or 0 }}</td><td class="text-center"><strong>{{ incident.affected_people or 0 }}</strong></td></tr>
+                    <tr><td class="field-label">Deaths</td><td class="text-center">{{ incident.death_male or 0 }}</td><td class="text-center">{{ incident.death_female or 0 }}</td><td class="text-center"><strong>{{ incident.deaths or 0 }}</strong></td></tr>
+                    <tr><td class="field-label">Injured</td><td class="text-center">{{ incident.injured_male or 0 }}</td><td class="text-center">{{ incident.injured_female or 0 }}</td><td class="text-center"><strong>{{ incident.injured or 0 }}</strong></td></tr>
+                    <tr><td class="field-label">Missing</td><td class="text-center">{{ incident.missing_male or 0 }}</td><td class="text-center">{{ incident.missing_female or 0 }}</td><td class="text-center"><strong>{{ incident.missing_persons or 0 }}</strong></td></tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="col-6">
+            <table class="table table-bordered table-sm">
+                <thead class="table-light">
+                    <tr><th>Metric</th><th class="text-center">Count</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td class="field-label">Affected Households</td><td class="text-center"><strong>{{ incident.affected_households or 0 }}</strong></td></tr>
+                    <tr><td class="field-label">Affected People</td><td class="text-center"><strong>{{ incident.affected_people or 0 }}</strong></td></tr>
+                    <tr><td class="field-label">Total Deaths</td><td class="text-center"><strong class="text-danger">{{ incident.deaths or 0 }}</strong></td></tr>
+                    <tr><td class="field-label">Total Injured</td><td class="text-center"><strong class="text-warning">{{ incident.injured or 0 }}</strong></td></tr>
+                    <tr><td class="field-label">Total Missing</td><td class="text-center"><strong class="text-info">{{ incident.missing_persons or 0 }}</strong></td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="section-title"><i class="bi bi-building"></i> Property &amp; Infrastructure Damage</div>
+    <div class="row mb-2">
+        <div class="col-6">
+            <table class="table table-bordered table-sm">
+                <thead class="table-light">
+                    <tr><th>Category</th><th class="text-center">Destroyed</th><th class="text-center">Damaged</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td class="field-label">Houses</td><td class="text-center"><strong class="text-danger">{{ incident.house_destroyed or 0 }}</strong></td><td class="text-center"><strong class="text-warning">{{ incident.house_damaged or 0 }}</strong></td></tr>
+                    <tr><td class="field-label">Public Buildings</td><td class="text-center"><strong class="text-danger">{{ incident.public_building_destroyed or 0 }}</strong></td><td class="text-center"><strong class="text-warning">{{ incident.public_building_damaged or 0 }}</strong></td></tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="col-6">
+            <table class="table table-bordered table-sm">
+                <thead class="table-light">
+                    <tr><th>Metric</th><th class="text-center">Value</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td class="field-label">Estimated Loss (NPR)</td><td class="text-center"><strong>{{ "{:,.2f}".format(incident.estimated_loss) if incident.estimated_loss else '0.00' }}</strong></td></tr>
+                    <tr><td class="field-label">Crop Damage</td><td class="text-center">{{ incident.agriculture_crop_damage or 'None' }}</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <table class="table table-bordered table-sm">
+        <thead class="table-light">
+            <tr><th>Infrastructure</th><th class="text-center">Status</th></tr>
+        </thead>
+        <tbody>
+            <tr><td class="field-label">Road Blocked</td><td class="text-center">{% if incident.road_blocked %}<span class="check-yes"><i class="bi bi-check-circle-fill"></i> Yes</span>{% else %}<span class="check-no"><i class="bi bi-x-circle"></i> No</span>{% endif %}</td></tr>
+            <tr><td class="field-label">Electricity Blocked</td><td class="text-center">{% if incident.electricity_blocked %}<span class="check-yes"><i class="bi bi-check-circle-fill"></i> Yes</span>{% else %}<span class="check-no"><i class="bi bi-x-circle"></i> No</span>{% endif %}</td></tr>
+            <tr><td class="field-label">Communication Blocked</td><td class="text-center">{% if incident.communication_blocked %}<span class="check-yes"><i class="bi bi-check-circle-fill"></i> Yes</span>{% else %}<span class="check-no"><i class="bi bi-x-circle"></i> No</span>{% endif %}</td></tr>
+            <tr><td class="field-label">Drinking Water Disrupted</td><td class="text-center">{% if incident.drinking_water_disrupted %}<span class="check-yes"><i class="bi bi-check-circle-fill"></i> Yes</span>{% else %}<span class="check-no"><i class="bi bi-x-circle"></i> No</span>{% endif %}</td></tr>
+        </tbody>
+    </table>
+
+    <div class="section-title"><i class="bi bi-github"></i> Livestock Impact</div>
+    <table class="table table-bordered table-sm">
+        <thead class="table-light">
+            <tr><th>Type</th><th class="text-center">Lost</th><th class="text-center">Injured</th><th class="text-center">Total</th></tr>
+        </thead>
+        <tbody>
+            <tr><td>Cattle</td><td class="text-center">{{ incident.cattle_lost or 0 }}</td><td class="text-center">{{ incident.cattle_injured or 0 }}</td><td class="text-center"><strong>{{ (incident.cattle_lost or 0) + (incident.cattle_injured or 0) }}</strong></td></tr>
+            <tr><td>Poultry</td><td class="text-center">{{ incident.poultry_lost or 0 }}</td><td class="text-center">{{ incident.poultry_injured or 0 }}</td><td class="text-center"><strong>{{ (incident.poultry_lost or 0) + (incident.poultry_injured or 0) }}</strong></td></tr>
+            <tr><td>Goats/Sheep</td><td class="text-center">{{ incident.goats_sheep_lost or 0 }}</td><td class="text-center">{{ incident.goats_sheep_injured or 0 }}</td><td class="text-center"><strong>{{ (incident.goats_sheep_lost or 0) + (incident.goats_sheep_injured or 0) }}</strong></td></tr>
+            <tr><td>Other Livestock</td><td class="text-center">{{ incident.other_livestock_lost or 0 }}</td><td class="text-center">{{ incident.other_livestock_injured or 0 }}</td><td class="text-center"><strong>{{ (incident.other_livestock_lost or 0) + (incident.other_livestock_injured or 0) }}</strong></td></tr>
+        </tbody>
+    </table>
+
+    {% if incident.rescue_operations %}
+    <div class="section-title"><i class="bi bi-tools"></i> Rescue Operations</div>
+    <p style="white-space:pre-wrap">{{ incident.rescue_operations }}</p>
+    {% endif %}
+
+    <div class="footer">
+        <p>Generated on {{ now()|nepali_date }} | {{ office or 'थलारा गाउँपालिका' }} - LEOC</p>
+    </div>
+</body>
+</html>

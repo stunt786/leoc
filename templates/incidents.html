@@ -417,6 +417,7 @@ function renderIncidents(data) {
             <td>${i.start_date || '-'}</td>
             <td><span class="badge bg-${statusColor}">${i.status}</span></td>
             <td class="text-end">
+                <button class="btn btn-sm btn-outline-secondary" onclick="viewIncident(${i.id})" title="View"><i class="bi bi-eye"></i></button>
                 <button class="btn btn-sm btn-outline-info" onclick="showIncidentHistory(${i.id})" title="History"><i class="bi bi-clock-history"></i></button>
                 <button class="btn btn-sm btn-outline-primary" onclick="editIncident(${i.id})" title="Edit"><i class="bi bi-pencil"></i></button>
                 <button class="btn btn-sm btn-outline-danger" onclick="deleteIncident(${i.id})" title="Delete"><i class="bi bi-trash"></i></button>
@@ -464,6 +465,9 @@ function serializeForm() {
         }
     });
     body.ward = parseInt(document.getElementById('inc_ward').value) || null;
+    body.deaths = (body.death_male || 0) + (body.death_female || 0);
+    body.injured = (body.injured_male || 0) + (body.injured_female || 0);
+    body.missing_persons = (body.missing_male || 0) + (body.missing_female || 0);
     return body;
 }
 
@@ -494,6 +498,10 @@ function resetIncidentForm() {
     document.querySelectorAll('#incidentForm input[type="number"]').forEach(el => el.value = 0);
     // Reset fiscal year to active
     loadIncidentTypes();
+}
+
+function viewIncident(id) {
+    window.open('/api/incidents/' + id + '/print', '_blank');
 }
 
 async function editIncident(id) {

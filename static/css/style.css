@@ -750,3 +750,43 @@ h1,h2,h3,h4,h5,h6,p,span,div,td,th,label,.card-title,.stat-label {
     background: var(--primary) !important;
     box-shadow: 0 2px 8px rgba(30,58,95,0.3);
 }
+
+/* ============ SECTION LABELS ============ */
+.section-label {
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--secondary);
+    margin: 0;
+    padding: 8px 4px 4px;
+    border-bottom: 2px solid var(--border-color);
+    display: flex;
+    align-items: center;
+}
+.section-label i {
+    font-size: 1rem;
+}
+
+/* ============ INCIDENT FILTERS ============ */
+.incident-filters {
+    background: #fff;
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    box-shadow: var(--card-shadow);
+    border: 1px solid var(--border-color);
+    transition: var(--transition);
+}
+.incident-filters:hover {
+    box-shadow: var(--card-shadow-hover);
+}
+[data-theme="dark"] .incident-filters {
+    background: #1e293b;
+    border-color: #334155;
+}
+
+/* ============ STAT CARD EXTRA COLORS ============ */
+.stat-card .stat-sub {
+    font-size: 0.75rem;
+    line-height: 1.3;
+}

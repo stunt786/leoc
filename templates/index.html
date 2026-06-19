@@ -15,6 +15,7 @@
         <select class="form-select form-select-sm" style="width:auto" id="dashboardView" onchange="switchDashboardView()">
             <option value="overview">General Overview</option>
             <option value="relief">Relief Dashboard</option>
+            <option value="incident">Incident Dashboard</option>
         </select>
     </div>
 </div>
@@ -323,6 +324,383 @@
         </div>
     </div>
 </div>
+
+<div id="incidentDashboard" style="display:none">
+    <div class="incident-filters mb-4">
+        <div class="row g-2 align-items-end">
+            <div class="col-md-3 col-6">
+                <label class="form-label mb-1 small text-muted">Fiscal Year</label>
+                <select class="form-select form-select-sm" id="incidentFiscalYear" onchange="loadIncidentDashboard()">
+                    <option value="">All Fiscal Years</option>
+                </select>
+            </div>
+            <div class="col-md-3 col-6">
+                <label class="form-label mb-1 small text-muted">Ward</label>
+                <select class="form-select form-select-sm" id="incidentWard" onchange="loadIncidentDashboard()">
+                    <option value="">All Wards</option>
+                </select>
+            </div>
+            <div class="col-md-3 col-6">
+                <label class="form-label mb-1 small text-muted">Disaster Type</label>
+                <select class="form-select form-select-sm" id="incidentType" onchange="loadIncidentDashboard()">
+                    <option value="">All Types</option>
+                </select>
+            </div>
+            <div class="col-md-3 col-6 d-flex align-items-end gap-2">
+                <button class="btn btn-outline-primary btn-sm flex-grow-1" onclick="loadIncidentDashboard()"><i class="bi bi-funnel me-1"></i>Apply Filters</button>
+                <button class="btn btn-outline-secondary btn-sm" onclick="resetIncidentFilters()"><i class="bi bi-arrow-counterclockwise"></i></button>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-12">
+            <h6 class="section-label"><i class="bi bi-clipboard-data me-2"></i>Overview</h6>
+        </div>
+        <div class="col-md-2 col-4 col-6">
+            <div class="stat-card stat-card-primary">
+                <div class="stat-icon"><i class="bi bi-lightning-charge"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">Total Incidents</div>
+                    <div class="stat-value" id="incTotalIncidents">0</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2 col-4 col-6">
+            <div class="stat-card stat-card-danger">
+                <div class="stat-icon"><i class="bi bi-exclamation-triangle"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">Active</div>
+                    <div class="stat-value" id="incActiveIncidents">0</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2 col-4 col-6">
+            <div class="stat-card stat-card-info">
+                <div class="stat-icon"><i class="bi bi-geo-alt"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">Affected Wards</div>
+                    <div class="stat-value" id="incAffectedWards">0</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="stat-card stat-card-warning">
+                <div class="stat-icon"><i class="bi bi-people"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">Affected People</div>
+                    <div class="stat-value" id="incAffectedPeople">0</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="stat-card" style="border-left:4px solid #8b5cf6">
+                <div class="stat-icon" style="background:rgba(139,92,246,0.1);color:#8b5cf6"><i class="bi bi-house-door"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">Households</div>
+                    <div class="stat-value" id="incHouseholds">0</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-12">
+            <h6 class="section-label"><i class="bi bi-heart-pulse me-2"></i>Human Impact</h6>
+        </div>
+        <div class="col-md-4 col-6">
+            <div class="stat-card stat-card-danger">
+                <div class="stat-icon"><i class="bi bi-x-circle"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">Deaths</div>
+                    <div class="stat-value" id="incDeaths">0</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 col-6">
+            <div class="stat-card stat-card-warning">
+                <div class="stat-icon"><i class="bi bi-bandage"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">Injured</div>
+                    <div class="stat-value" id="incInjured">0</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 col-6">
+            <div class="stat-card stat-card-info">
+                <div class="stat-icon"><i class="bi bi-person-x"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">Missing</div>
+                    <div class="stat-value" id="incMissing">0</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-12">
+            <h6 class="section-label"><i class="bi bi-building me-2"></i>Houses &amp; Buildings</h6>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="stat-card stat-card-danger">
+                <div class="stat-icon"><i class="bi bi-house-x"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">Houses Destroyed</div>
+                    <div class="stat-value" id="incHousesDestroyed">0</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="stat-card stat-card-warning">
+                <div class="stat-icon"><i class="bi bi-house-damage"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">Houses Damaged</div>
+                    <div class="stat-value" id="incHousesDamaged">0</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="stat-card stat-card-danger">
+                <div class="stat-icon"><i class="bi bi-bank"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">Pub. Bldgs Destroyed</div>
+                    <div class="stat-value" id="incPubBldgDestroyed">0</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="stat-card stat-card-warning">
+                <div class="stat-icon"><i class="bi bi-bank"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">Pub. Bldgs Damaged</div>
+                    <div class="stat-value" id="incPubBldgDamaged">0</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-12">
+            <h6 class="section-label"><i class="bi bi-piggy-bank me-2"></i>Fund &amp; Estimated Loss</h6>
+        </div>
+        <div class="col-md-6">
+            <div class="stat-card stat-card-info">
+                <div class="stat-icon"><i class="bi bi-currency-rupee"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">Estimated Loss (NPR)</div>
+                    <div class="stat-value" id="incEstimatedLoss">0</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="stat-card stat-card-warning">
+                <div class="stat-icon"><i class="bi bi-tree"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">Crop Damage</div>
+                    <div class="stat-value" id="incCropDamage">0</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="stat-card" style="border-left:4px solid #14b8a6">
+                <div class="stat-icon" style="background:rgba(20,184,166,0.1);color:#14b8a6"><i class="bi bi-water"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">Agriculture Impact</div>
+                    <div class="stat-value" id="incAgricultureImpact">0</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-12">
+            <h6 class="section-label"><i class="bi bi-github me-2"></i>Livestock Impact</h6>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="stat-card stat-card-warning">
+                <div class="stat-icon"><i class="bi bi-github"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">Cattle</div>
+                    <div class="stat-value" id="incCattleTotal">0</div>
+                    <div class="stat-sub small text-muted mt-1">Lost: <span id="incCattleLost">0</span> | Injured: <span id="incCattleInjured">0</span></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="stat-card" style="border-left:4px solid #f97316">
+                <div class="stat-icon" style="background:rgba(249,115,22,0.1);color:#f97316"><i class="bi bi-egg"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">Poultry</div>
+                    <div class="stat-value" id="incPoultryTotal">0</div>
+                    <div class="stat-sub small text-muted mt-1">Lost: <span id="incPoultryLost">0</span> | Injured: <span id="incPoultryInjured">0</span></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="stat-card" style="border-left:4px solid #14b8a6">
+                <div class="stat-icon" style="background:rgba(20,184,166,0.1);color:#14b8a6"><i class="bi bi-gitlab"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">Goats/Sheep</div>
+                    <div class="stat-value" id="incGoatsTotal">0</div>
+                    <div class="stat-sub small text-muted mt-1">Lost: <span id="incGoatsLost">0</span> | Injured: <span id="incGoatsInjured">0</span></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="stat-card" style="border-left:4px solid #8b5cf6">
+                <div class="stat-icon" style="background:rgba(139,92,246,0.1);color:#8b5cf6"><i class="bi bi-archive"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">Other Livestock</div>
+                    <div class="stat-value" id="incOtherTotal">0</div>
+                    <div class="stat-sub small text-muted mt-1">Lost: <span id="incOtherLost">0</span> | Injured: <span id="incOtherInjured">0</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-12">
+            <h6 class="section-label"><i class="bi bi-diagram-3 me-2"></i>Infrastructure Impact</h6>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="stat-card stat-card-danger">
+                <div class="stat-icon"><i class="bi bi-signpost-2"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">Road Blocked</div>
+                    <div class="stat-value" id="incRoadBlocked">0</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="stat-card stat-card-warning">
+                <div class="stat-icon"><i class="bi bi-lightbulb"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">Electricity Blocked</div>
+                    <div class="stat-value" id="incElectricity">0</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="stat-card stat-card-info">
+                <div class="stat-icon"><i class="bi bi-wifi"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">Communication Blocked</div>
+                    <div class="stat-value" id="incCommunication">0</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="stat-card" style="border-left:4px solid #06b6d4">
+                <div class="stat-icon" style="background:rgba(6,182,212,0.1);color:#06b6d4"><i class="bi bi-droplet"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">Water Disrupted</div>
+                    <div class="stat-value" id="incWater">0</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header">
+                    <span><i class="bi bi-pie-chart-fill me-2 text-primary"></i>Incidents by Type</span>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container"><canvas id="incTypeChart"></canvas></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header">
+                    <span><i class="bi bi-bar-chart-fill me-2 text-success"></i>Incidents by Ward</span>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container"><canvas id="incWardChart"></canvas></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header">
+                    <span><i class="bi bi-bar-chart-fill me-2 text-warning"></i>Incidents by Fiscal Year</span>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container"><canvas id="incFiscalYearChart"></canvas></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header">
+                    <span><i class="bi bi-bar-chart-fill me-2 text-danger"></i>Human Impact by Type</span>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container"><canvas id="incHumanImpactChart"></canvas></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header">
+                    <span><i class="bi bi-bar-chart-fill me-2 text-info"></i>Property Damage by Ward</span>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container"><canvas id="incPropertyChart"></canvas></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header">
+                    <span><i class="bi bi-bar-chart-fill me-2" style="color:#f97316"></i>Livestock Impact</span>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container"><canvas id="incLivestockChart"></canvas></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-md-8">
+            <div class="card h-100">
+                <div class="card-header">
+                    <span><i class="bi bi-bar-chart-fill me-2" style="color:#06b6d4"></i>Infrastructure Impact</span>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container"><canvas id="incInfraChart"></canvas></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <span><i class="bi bi-list-check me-2 text-primary"></i>Recent Incidents</span>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead>
+                                <tr><th>Incident</th><th>Type</th><th>Status</th></tr>
+                            </thead>
+                            <tbody id="incRecentIncidents">
+                                <tr><td colspan="3" class="text-center py-3"><span class="spinner-border spinner-border-sm"></span> Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_css %}
@@ -393,6 +771,13 @@ let reliefWardChartInstance = null;
 let reliefFiscalYearChartInstance = null;
 let refreshInterval = null;
 let reliefMapInstance = null;
+let incTypeChartInstance = null;
+let incWardChartInstance = null;
+let incFiscalYearChartInstance = null;
+let incHumanImpactChartInstance = null;
+let incPropertyChartInstance = null;
+let incLivestockChartInstance = null;
+let incInfraChartInstance = null;
 
 function getPriorityBadge(priority) {
     const map = { 'Urgent': 'danger', 'High': 'warning', 'Medium': 'info', 'Low': 'secondary' };
@@ -408,9 +793,13 @@ function switchDashboardView() {
     const view = document.getElementById('dashboardView').value;
     document.getElementById('overviewDashboard').style.display = view === 'overview' ? '' : 'none';
     document.getElementById('reliefDashboard').style.display = view === 'relief' ? '' : 'none';
+    document.getElementById('incidentDashboard').style.display = view === 'incident' ? '' : 'none';
     if (view === 'relief') {
         loadReliefDashboard();
         setTimeout(() => { if (reliefMapInstance) reliefMapInstance.invalidateSize(); }, 300);
+    }
+    if (view === 'incident') {
+        loadIncidentDashboard();
     }
 }
 
@@ -776,6 +1165,288 @@ async function loadMapData() {
     } catch (e) {
         console.error('Map load error:', e);
     }
+}
+
+async function loadIncidentDashboard() {
+    try {
+        const fy = document.getElementById('incidentFiscalYear').value;
+        const ward = document.getElementById('incidentWard').value;
+        const type = document.getElementById('incidentType').value;
+        const params = new URLSearchParams();
+        if (fy) params.set('fiscal_year', fy);
+        if (ward) params.set('ward', ward);
+        if (type) params.set('incident_type', type);
+        const qs = params.toString();
+        const resp = await fetch('/api/dashboard/incident' + (qs ? '?' + qs : ''));
+        const data = await resp.json();
+        if (!data || !data.success) return;
+
+        document.getElementById('incTotalIncidents').textContent = data.total_incidents ?? 0;
+        document.getElementById('incActiveIncidents').textContent = data.active_incidents ?? 0;
+        document.getElementById('incAffectedWards').textContent = data.affected_wards ?? 0;
+        document.getElementById('incAffectedPeople').textContent = (data.total_affected_people ?? 0).toLocaleString();
+        document.getElementById('incHouseholds').textContent = (data.total_households ?? 0).toLocaleString();
+        document.getElementById('incDeaths').textContent = data.total_deaths ?? 0;
+        document.getElementById('incInjured').textContent = data.total_injured ?? 0;
+        document.getElementById('incMissing').textContent = data.total_missing ?? 0;
+        document.getElementById('incHousesDestroyed').textContent = data.houses_destroyed ?? 0;
+        document.getElementById('incHousesDamaged').textContent = data.houses_damaged ?? 0;
+        document.getElementById('incPubBldgDestroyed').textContent = data.public_buildings_destroyed ?? 0;
+        document.getElementById('incPubBldgDamaged').textContent = data.public_buildings_damaged ?? 0;
+        document.getElementById('incEstimatedLoss').textContent = (data.estimated_loss ?? 0).toLocaleString();
+
+        const agCount = data.agriculture_crop_damage ?? 0;
+        document.getElementById('incCropDamage').textContent = agCount;
+        document.getElementById('incAgricultureImpact').textContent = agCount > 0 ? agCount + ' affected' : 'None';
+
+        document.getElementById('incCattleLost').textContent = data.cattle_lost ?? 0;
+        document.getElementById('incCattleInjured').textContent = data.cattle_injured ?? 0;
+        document.getElementById('incCattleTotal').textContent = (data.cattle_lost ?? 0) + (data.cattle_injured ?? 0);
+
+        document.getElementById('incPoultryLost').textContent = data.poultry_lost ?? 0;
+        document.getElementById('incPoultryInjured').textContent = data.poultry_injured ?? 0;
+        document.getElementById('incPoultryTotal').textContent = (data.poultry_lost ?? 0) + (data.poultry_injured ?? 0);
+
+        document.getElementById('incGoatsLost').textContent = data.goats_sheep_lost ?? 0;
+        document.getElementById('incGoatsInjured').textContent = data.goats_sheep_injured ?? 0;
+        document.getElementById('incGoatsTotal').textContent = (data.goats_sheep_lost ?? 0) + (data.goats_sheep_injured ?? 0);
+
+        document.getElementById('incOtherLost').textContent = data.other_livestock_lost ?? 0;
+        document.getElementById('incOtherInjured').textContent = data.other_livestock_injured ?? 0;
+        document.getElementById('incOtherTotal').textContent = (data.other_livestock_lost ?? 0) + (data.other_livestock_injured ?? 0);
+
+        document.getElementById('incRoadBlocked').textContent = data.road_blocked ?? 0;
+        document.getElementById('incElectricity').textContent = data.electricity_blocked ?? 0;
+        document.getElementById('incCommunication').textContent = data.communication_blocked ?? 0;
+        document.getElementById('incWater').textContent = data.drinking_water_disrupted ?? 0;
+
+        // Charts
+        const ict = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#f97316', '#14b8a6', '#f43f5e', '#6366f1'];
+
+        // Incidents by Type (doughnut)
+        if (data.by_type && data.by_type.labels && data.by_type.labels.length) {
+            if (incTypeChartInstance) incTypeChartInstance.destroy();
+            incTypeChartInstance = new Chart(document.getElementById('incTypeChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: data.by_type.labels,
+                    datasets: [{
+                        data: data.by_type.counts,
+                        backgroundColor: ict.slice(0, data.by_type.labels.length)
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: true,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { padding: 12, boxWidth: 12 } }
+                    }
+                }
+            });
+        }
+
+        // Incidents by Ward (bar)
+        if (data.by_ward && data.by_ward.labels && data.by_ward.labels.length) {
+            if (incWardChartInstance) incWardChartInstance.destroy();
+            incWardChartInstance = new Chart(document.getElementById('incWardChart'), {
+                type: 'bar',
+                data: {
+                    labels: data.by_ward.labels,
+                    datasets: [{
+                        label: 'Incidents',
+                        data: data.by_ward.counts,
+                        backgroundColor: '#3b82f6', borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: true,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { beginAtZero: true, grid: { display: false } },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+        }
+
+        // Incidents by Fiscal Year (bar)
+        if (data.by_fiscal_year && data.by_fiscal_year.labels && data.by_fiscal_year.labels.length) {
+            if (incFiscalYearChartInstance) incFiscalYearChartInstance.destroy();
+            incFiscalYearChartInstance = new Chart(document.getElementById('incFiscalYearChart'), {
+                type: 'bar',
+                data: {
+                    labels: data.by_fiscal_year.labels,
+                    datasets: [{
+                        label: 'Incidents',
+                        data: data.by_fiscal_year.counts,
+                        backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#f97316', '#14b8a6', '#f43f5e', '#6366f1'],
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: true,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { beginAtZero: true, grid: { display: false } },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+        }
+
+        // Human Impact by Type (grouped bar)
+        if (data.human_impact_by_type && data.human_impact_by_type.types && data.human_impact_by_type.types.length) {
+            if (incHumanImpactChartInstance) incHumanImpactChartInstance.destroy();
+            incHumanImpactChartInstance = new Chart(document.getElementById('incHumanImpactChart'), {
+                type: 'bar',
+                data: {
+                    labels: data.human_impact_by_type.types,
+                    datasets: [
+                        { label: 'Deaths', data: data.human_impact_by_type.deaths, backgroundColor: '#ef4444', borderRadius: 4 },
+                        { label: 'Injured', data: data.human_impact_by_type.injured, backgroundColor: '#f59e0b', borderRadius: 4 },
+                        { label: 'Missing', data: data.human_impact_by_type.missing, backgroundColor: '#3b82f6', borderRadius: 4 }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: true,
+                    plugins: { legend: { position: 'bottom', labels: { padding: 10, boxWidth: 12 } } },
+                    scales: {
+                        y: { beginAtZero: true, grid: { display: false } },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+        }
+
+        // Property Damage by Ward (grouped bar)
+        if (data.property_by_ward && data.property_by_ward.wards && data.property_by_ward.wards.length) {
+            if (incPropertyChartInstance) incPropertyChartInstance.destroy();
+            incPropertyChartInstance = new Chart(document.getElementById('incPropertyChart'), {
+                type: 'bar',
+                data: {
+                    labels: data.property_by_ward.wards,
+                    datasets: [
+                        { label: 'Destroyed', data: data.property_by_ward.destroyed, backgroundColor: '#ef4444', borderRadius: 4 },
+                        { label: 'Damaged', data: data.property_by_ward.damaged, backgroundColor: '#f59e0b', borderRadius: 4 }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: true,
+                    plugins: { legend: { position: 'bottom', labels: { padding: 10, boxWidth: 12 } } },
+                    scales: {
+                        y: { beginAtZero: true, grid: { display: false } },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+        }
+
+        // Livestock Impact (bar)
+        if (data.livestock_totals) {
+            const lLabels = Object.keys(data.livestock_totals);
+            const lValues = Object.values(data.livestock_totals);
+            if (incLivestockChartInstance) incLivestockChartInstance.destroy();
+            incLivestockChartInstance = new Chart(document.getElementById('incLivestockChart'), {
+                type: 'bar',
+                data: {
+                    labels: lLabels,
+                    datasets: [{
+                        label: 'Total Affected',
+                        data: lValues,
+                        backgroundColor: ['#f59e0b', '#f97316', '#14b8a6', '#8b5cf6'],
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: true,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { beginAtZero: true, grid: { display: false } },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+        }
+
+        // Infrastructure Impact (bar)
+        if (data.infrastructure && data.infrastructure.labels && data.infrastructure.labels.length) {
+            if (incInfraChartInstance) incInfraChartInstance.destroy();
+            incInfraChartInstance = new Chart(document.getElementById('incInfraChart'), {
+                type: 'bar',
+                data: {
+                    labels: data.infrastructure.labels,
+                    datasets: [{
+                        label: 'Incidents',
+                        data: data.infrastructure.counts,
+                        backgroundColor: ['#ef4444', '#f59e0b', '#3b82f6', '#06b6d4'],
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: true,
+                    indexAxis: 'y',
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { beginAtZero: true, grid: { display: false } },
+                        y: { grid: { display: false } }
+                    }
+                }
+            });
+        }
+
+        // Recent incidents table
+        if (data.recent_incidents && data.recent_incidents.length) {
+            document.getElementById('incRecentIncidents').innerHTML = data.recent_incidents.slice(0, 8).map(i =>
+                `<tr><td class="fw-medium">${i.incident_name}</td><td>${i.incident_type}</td><td>${getStatusBadge(i.status)}</td></tr>`
+            ).join('');
+        } else {
+            document.getElementById('incRecentIncidents').innerHTML = '<tr><td colspan="3" class="text-center text-muted py-3">No incidents found</td></tr>';
+        }
+
+        // Populate filters on first load
+        populateIncidentFilters(data);
+    } catch (e) {
+        console.error('Incident dashboard load error:', e);
+    }
+}
+
+function populateIncidentFilters(data) {
+    const fySel = document.getElementById('incidentFiscalYear');
+    const wardSel = document.getElementById('incidentWard');
+    const typeSel = document.getElementById('incidentType');
+
+    if (data.filter_options && fySel.options.length <= 1) {
+        if (data.filter_options.fiscal_years && data.filter_options.fiscal_years.length) {
+            data.filter_options.fiscal_years.forEach(fy => {
+                const opt = document.createElement('option');
+                opt.value = fy;
+                opt.textContent = fy;
+                fySel.appendChild(opt);
+            });
+        }
+        if (data.filter_options.wards && data.filter_options.wards.length) {
+            data.filter_options.wards.forEach(w => {
+                const opt = document.createElement('option');
+                opt.value = w.id;
+                opt.textContent = w.name;
+                wardSel.appendChild(opt);
+            });
+        }
+        if (data.filter_options.disaster_types && data.filter_options.disaster_types.length) {
+            data.filter_options.disaster_types.forEach(t => {
+                const opt = document.createElement('option');
+                opt.value = t;
+                opt.textContent = t;
+                typeSel.appendChild(opt);
+            });
+        }
+    }
+}
+
+function resetIncidentFilters() {
+    document.getElementById('incidentFiscalYear').value = '';
+    document.getElementById('incidentWard').value = '';
+    document.getElementById('incidentType').value = '';
+    loadIncidentDashboard();
 }
 
 document.addEventListener('DOMContentLoaded', () => {

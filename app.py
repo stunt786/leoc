@@ -2905,6 +2905,12 @@ def _apply_incident_fields(incident, data):
     for field in INCIDENT_FIELDS:
         if field in data:
             setattr(incident, field, data[field])
+    if 'deaths' not in data:
+        incident.deaths = (incident.death_male or 0) + (incident.death_female or 0)
+    if 'injured' not in data:
+        incident.injured = (incident.injured_male or 0) + (incident.injured_female or 0)
+    if 'missing_persons' not in data:
+        incident.missing_persons = (incident.missing_male or 0) + (incident.missing_female or 0)
 
 @app.route('/api/incidents', methods=['GET', 'POST'])
 @permission_required('edit')
@@ -5294,6 +5300,210 @@ def get_relief_dashboard():
     except Exception as e:
         return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
+# ============ INCIDENT DASHBOARD API ============
+@app.route('/api/dashboard/incident', methods=['GET'])
+@login_required
+def get_incident_dashboard():
+    try:
+        fiscal_year = request.args.get('fiscal_year', '')
+        ward = request.args.get('ward', '')
+        incident_type = request.args.get('incident_type', '')
+
+        query = Incident.query
+
+        if fiscal_year:
+            query = query.filter(Incident.fiscal_year == fiscal_year)
+        if ward:
+            query = query.filter(Incident.ward == int(ward))
+        if incident_type:
+            query = query.filter(Incident.incident_type == incident_type)
+
+        incidents = query.all()
+
+        total_incidents = len(incidents)
+        active_incidents = sum(1 for i in incidents if i.status == 'Active')
+
+        total_affected_people = sum(i.affected_people or 0 for i in incidents)
+        total_deaths = sum(i.deaths or 0 for i in incidents)
+        total_injured = sum(i.injured or 0 for i in incidents)
+        total_missing = sum(i.missing_persons or 0 for i in incidents)
+        total_households = sum(i.affected_households or 0 for i in incidents)
+
+        houses_destroyed = sum(i.house_destroyed or 0 for i in incidents)
+        houses_damaged = sum(i.house_damaged or 0 for i in incidents)
+        pub_buildings_destroyed = sum(i.public_building_destroyed or 0 for i in incidents)
+        pub_buildings_damaged = sum(i.public_building_damaged or 0 for i in incidents)
+        estimated_loss = sum(i.estimated_loss or 0 for i in incidents)
+
+        cattle_lost = sum(i.cattle_lost or 0 for i in incidents)
+        cattle_injured = sum(i.cattle_injured or 0 for i in incidents)
+        poultry_lost = sum(i.poultry_lost or 0 for i in incidents)
+        poultry_injured = sum(i.poultry_injured or 0 for i in incidents)
+        goats_sheep_lost = sum(i.goats_sheep_lost or 0 for i in incidents)
+        goats_sheep_injured = sum(i.goats_sheep_injured or 0 for i in incidents)
+        other_livestock_lost = sum(i.other_livestock_lost or 0 for i in incidents)
+        other_livestock_injured = sum(i.other_livestock_injured or 0 for i in incidents)
+
+        road_blocked = sum(1 for i in incidents if i.road_blocked)
+        electricity_blocked = sum(1 for i in incidents if i.electricity_blocked)
+        communication_blocked = sum(1 for i in incidents if i.communication_blocked)
+        drinking_water_disrupted = sum(1 for i in incidents if i.drinking_water_disrupted)
+
+        affected_wards = len(set(i.ward for i in incidents if i.ward))
+
+        # By incident type
+        type_map = {}
+        for i in incidents:
+            t = i.incident_type or 'Unknown'
+            type_map[t] = type_map.get(t, 0) + 1
+
+        # By ward
+        ward_map = {}
+        for i in incidents:
+            w = i.ward or 0
+            ward_map[w] = ward_map.get(w, 0) + 1
+
+        # By fiscal year
+        fy_map = {}
+        for i in incidents:
+            fy = i.fiscal_year or 'Unknown'
+            fy_map[fy] = fy_map.get(fy, 0) + 1
+
+        # Human impact by type
+        impact_by_type = {}
+        for i in incidents:
+            t = i.incident_type or 'Unknown'
+            if t not in impact_by_type:
+                impact_by_type[t] = {'deaths': 0, 'injured': 0, 'missing': 0}
+            impact_by_type[t]['deaths'] += i.deaths or 0
+            impact_by_type[t]['injured'] += i.injured or 0
+            impact_by_type[t]['missing'] += i.missing_persons or 0
+
+        # Property damage by ward
+        prop_by_ward = {}
+        for i in incidents:
+            w = str(i.ward) if i.ward else 'Unknown'
+            if w not in prop_by_ward:
+                prop_by_ward[w] = {'destroyed': 0, 'damaged': 0}
+            prop_by_ward[w]['destroyed'] += i.house_destroyed or 0
+            prop_by_ward[w]['damaged'] += i.house_damaged or 0
+
+        # Livestock totals for chart
+        livestock_totals = {
+            'Cattle': cattle_lost + cattle_injured,
+            'Poultry': poultry_lost + poultry_injured,
+            'Goats/Sheep': goats_sheep_lost + goats_sheep_injured,
+            'Other': other_livestock_lost + other_livestock_injured
+        }
+
+        # Infrastructure impact for chart
+        infra_data = {
+            'labels': ['Road Blocked', 'Electricity Blocked', 'Communication Blocked', 'Water Disrupted'],
+            'counts': [road_blocked, electricity_blocked, communication_blocked, drinking_water_disrupted]
+        }
+
+        # Filter options
+        fiscal_years = [r[0] for r in db.session.query(Incident.fiscal_year).distinct().filter(
+            Incident.fiscal_year.isnot(None), Incident.fiscal_year != ''
+        ).order_by(Incident.fiscal_year.desc()).all()]
+
+        disaster_types = AppSettings.get_setting('disaster_types',
+            ['Flood', 'Earthquake', 'Landslide', 'Fire', 'Storm', 'Epidemic', 'Other'])
+        wards_list = [w.to_dict() for w in get_ward_list()]
+
+        # Recent incidents for table
+        recent_incidents = [{
+            'incident_name': i.incident_name,
+            'incident_type': i.incident_type,
+            'status': i.status,
+            'ward': i.ward,
+            'start_date': ad_to_bs_date(i.start_date) if i.start_date else None,
+            'severity': i.severity
+        } for i in sorted(incidents, key=lambda x: x.updated_at or x.created_at or x.start_date or date(2000,1,1), reverse=True)[:10]]
+
+        # Sort ward keys for property chart
+        def ward_sort_key(k):
+            try:
+                return int(k)
+            except ValueError:
+                return 999
+        sorted_prop_wards = sorted(prop_by_ward.keys(), key=ward_sort_key)
+
+        # Crop damage summary
+        crop_damage_count = 0
+        for i in incidents:
+            if i.agriculture_crop_damage:
+                try:
+                    cd = json.loads(i.agriculture_crop_damage) if isinstance(i.agriculture_crop_damage, str) else i.agriculture_crop_damage
+                    if isinstance(cd, list):
+                        crop_damage_count += len(cd)
+                except (json.JSONDecodeError, TypeError):
+                    if i.agriculture_crop_damage and i.agriculture_crop_damage.strip():
+                        crop_damage_count += 1
+
+        return jsonify({
+            'success': True,
+            'total_incidents': total_incidents,
+            'active_incidents': active_incidents,
+            'total_affected_people': total_affected_people,
+            'total_deaths': total_deaths,
+            'total_injured': total_injured,
+            'total_missing': total_missing,
+            'total_households': total_households,
+            'houses_destroyed': houses_destroyed,
+            'houses_damaged': houses_damaged,
+            'public_buildings_destroyed': pub_buildings_destroyed,
+            'public_buildings_damaged': pub_buildings_damaged,
+            'estimated_loss': estimated_loss,
+            'cattle_lost': cattle_lost,
+            'cattle_injured': cattle_injured,
+            'poultry_lost': poultry_lost,
+            'poultry_injured': poultry_injured,
+            'goats_sheep_lost': goats_sheep_lost,
+            'goats_sheep_injured': goats_sheep_injured,
+            'other_livestock_lost': other_livestock_lost,
+            'other_livestock_injured': other_livestock_injured,
+            'road_blocked': road_blocked,
+            'electricity_blocked': electricity_blocked,
+            'communication_blocked': communication_blocked,
+            'drinking_water_disrupted': drinking_water_disrupted,
+            'affected_wards': affected_wards,
+            'by_type': {
+                'labels': list(type_map.keys()),
+                'counts': list(type_map.values())
+            },
+            'by_ward': {
+                'labels': [f"Ward {w}" for w in sorted(ward_map.keys())],
+                'counts': [ward_map[w] for w in sorted(ward_map.keys())]
+            },
+            'by_fiscal_year': {
+                'labels': list(fy_map.keys()),
+                'counts': list(fy_map.values())
+            },
+            'human_impact_by_type': {
+                'types': list(impact_by_type.keys()),
+                'deaths': [impact_by_type[t]['deaths'] for t in impact_by_type],
+                'injured': [impact_by_type[t]['injured'] for t in impact_by_type],
+                'missing': [impact_by_type[t]['missing'] for t in impact_by_type]
+            },
+            'property_by_ward': {
+                'wards': [f"Ward {w}" if w.isdigit() else w for w in sorted_prop_wards],
+                'destroyed': [prop_by_ward[w]['destroyed'] for w in sorted_prop_wards],
+                'damaged': [prop_by_ward[w]['damaged'] for w in sorted_prop_wards]
+            },
+            'livestock_totals': livestock_totals,
+            'infrastructure': infra_data,
+            'recent_incidents': recent_incidents,
+            'agriculture_crop_damage': crop_damage_count,
+            'filter_options': {
+                'fiscal_years': fiscal_years,
+                'wards': wards_list,
+                'disaster_types': disaster_types
+            }
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
+
 # ============ GIS MAP API ============
 MAP_BOUNDARY_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'thalara_boundary.json')
 MAP_WARDS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'thalara_wards.json')
@@ -6200,6 +6410,16 @@ def print_request(id):
     office = AppSettings.get_setting('office_name', 'LEOC')
     address = AppSettings.get_setting('address', '')
     return render_template('print_request.html', req=req, office=office, address=address)
+
+@app.route('/api/incidents/<int:id>/print', methods=['GET'])
+@login_required
+def print_incident(id):
+    incident = db_get(Incident, id)
+    if not incident:
+        return jsonify({'success': False, 'message': 'Incident not found'}), 404
+    office = AppSettings.get_setting('office_name', 'LEOC')
+    address = AppSettings.get_setting('address', '')
+    return render_template('print_incident.html', incident=incident, office=office, address=address)
 
 @app.route('/api/inventory/bin-card', methods=['GET'])
 @login_required
