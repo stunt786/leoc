@@ -767,18 +767,30 @@ async function viewDistribution(id) {
     const inc = dist.incident || {};
 
     let benCards = '';
+    let families = [];
     if (dist.beneficiaries && dist.beneficiaries.length > 0) {
-        dist.beneficiaries.forEach((b, idx) => {
+        const grouped = {};
+        dist.beneficiaries.forEach(b => {
+            const key = b.family_name + '|' + (b.id_number || '');
+            if (!grouped[key]) {
+                grouped[key] = { ...b, items: [], photo_url: b.photo_url, document_url: b.document_url };
+            }
+            grouped[key].items.push({ item: b.item || '-', quantity: b.quantity || 0 });
+        });
+        families = Object.values(grouped);
+        families.forEach((b, idx) => {
             const ben = b.beneficiary || {};
             const fs = b.family_stats || {};
             const ss = b.social_security || {};
             const fm = b.family_members || [];
 
-            const photoHtml = b.photo_url
-                ? `<a href="${b.photo_url}" target="_blank" class="btn btn-sm btn-outline-info" title="View Photo"><i class="bi bi-eye"></i></a>`
+            const photoHtml = b.photo
+                ? `<a href="${b.photo_url}" target="_blank" class="text-decoration-none" title="View Photo">
+                    <span class="badge bg-light text-dark fw-normal border"><i class="bi bi-eye text-primary me-1"></i>${b.photo}</span></a>`
                 : `<span class="text-muted small">—</span>`;
-            const docHtml = b.document_url
-                ? `<a href="${b.document_url}" target="_blank" class="btn btn-sm btn-outline-info" title="View Document"><i class="bi bi-eye"></i></a>`
+            const docHtml = b.document
+                ? `<a href="${b.document_url}" target="_blank" class="text-decoration-none" title="View Document">
+                    <span class="badge bg-light text-dark fw-normal border"><i class="bi bi-eye text-primary me-1"></i>${b.document}</span></a>`
                 : `<span class="text-muted small">—</span>`;
 
             const fmRows = fm.map(m => `<tr>
@@ -790,6 +802,10 @@ async function viewDistribution(id) {
                 <td>${m.is_pregnant ? '<span class="badge bg-warning">Yes</span>' : 'No'}</td>
                 <td>${m.is_old_ssf ? '<span class="badge bg-info">Yes</span>' : 'No'}</td>
             </tr>`).join('');
+
+            const itemsHtml = b.items.map(it =>
+                `<span class="badge bg-info me-1">${it.item} × ${it.quantity}</span>`
+            ).join('');
 
             benCards += `<div class="card mb-3 border-success">
                 <div class="card-header bg-success text-white py-2 d-flex justify-content-between align-items-center">
@@ -836,8 +852,8 @@ async function viewDistribution(id) {
                         </table>
                     </div>
                     <hr class="my-1">
-                    <div class="d-flex gap-3 align-items-center">
-                        <div><strong class="small">Relief Items:</strong> ${b.item || '-'} × ${b.quantity || 0}</div>
+                    <div class="d-flex gap-3 align-items-center flex-wrap">
+                        <div><strong class="small">Relief Items:</strong> ${itemsHtml}</div>
                         <div><strong class="small">Photo:</strong> ${photoHtml}</div>
                         <div><strong class="small">Document:</strong> ${docHtml}</div>
                     </div>
@@ -905,7 +921,7 @@ async function viewDistribution(id) {
             </div>
 
             <!-- Beneficiaries -->
-            <h6 class="fw-bold"><i class="bi bi-people me-1"></i>Beneficiaries (${dist.beneficiaries ? dist.beneficiaries.length : 0})</h6>
+            <h6 class="fw-bold"><i class="bi bi-people me-1"></i>Beneficiaries (${families ? families.length : 0})</h6>
             ${benCards || '<p class="text-muted">No beneficiaries</p>'}
             <div id="distViewCashInfo_${dist.id}"></div>
         </div>

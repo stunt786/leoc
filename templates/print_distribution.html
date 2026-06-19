@@ -104,42 +104,38 @@
 
     <!-- Beneficiaries -->
     <div class="section-title">लाभग्राही विवरण (Beneficiary Details)</div>
-    {% for b in dist.beneficiaries %}
-    {% set bd = ben_data[loop.index0] if ben_data and loop.index0 < ben_data|length else None %}
-    {% set ben_dict = bd.beneficiary if bd else None %}
-    {% set fm_list = bd.family_members if bd else [] %}
-    {% set fs = bd.family_stats if bd else {} %}
+    {% for b in grouped_bens %}
     <div class="ben-card">
         <div class="ben-header">{{ loop.index }}. {{ b.family_name }} ({{ b.id_number or 'No ID' }}) — Status: {{ b.status }}</div>
 
         <table class="table table-sm table-borderless mb-1" style="font-size:10px">
             <tr>
-                <td class="field-label" style="width:15%">Name:</td><td style="width:35%">{{ ben_dict.name if ben_dict else b.family_name }}</td>
-                <td class="field-label" style="width:15%">Father's Name:</td><td style="width:35%">{{ ben_dict.father_name if ben_dict else '-' }}</td>
+                <td class="field-label" style="width:15%">Name:</td><td style="width:35%">{{ b.beneficiary.name if b.beneficiary else b.family_name }}</td>
+                <td class="field-label" style="width:15%">Father's Name:</td><td style="width:35%">{{ b.beneficiary.father_name if b.beneficiary else '-' }}</td>
             </tr>
             <tr>
-                <td class="field-label">National ID:</td><td>{{ ben_dict.national_id if ben_dict else '-' }}</td>
-                <td class="field-label">Phone:</td><td>{{ ben_dict.phone if ben_dict else '-' }}</td>
+                <td class="field-label">National ID:</td><td>{{ b.beneficiary.national_id if b.beneficiary else '-' }}</td>
+                <td class="field-label">Phone:</td><td>{{ b.beneficiary.phone if b.beneficiary else '-' }}</td>
             </tr>
             <tr>
-                <td class="field-label">Ward:</td><td>{{ ben_dict.ward|ward_name if ben_dict else '-' }}</td>
-                <td class="field-label">Tole:</td><td>{{ ben_dict.tole if ben_dict else '-' }}</td>
+                <td class="field-label">Ward:</td><td>{{ b.beneficiary.ward_name if b.beneficiary else '-' }}</td>
+                <td class="field-label">Tole:</td><td>{{ b.beneficiary.tole if b.beneficiary else '-' }}</td>
             </tr>
             <tr>
-                <td class="field-label">Current Shelter:</td><td>{{ ben_dict.current_shelter_location if ben_dict else '-' }}</td>
-                <td class="field-label">Coordinates:</td><td>{{ ben_dict.coordinates if ben_dict else '-' }}</td>
+                <td class="field-label">Current Shelter:</td><td>{{ b.beneficiary.current_shelter_location if b.beneficiary else '-' }}</td>
+                <td class="field-label">Coordinates:</td><td>{{ b.beneficiary.coordinates if b.beneficiary else '-' }}</td>
             </tr>
         </table>
 
         <!-- Social Security -->
         <table class="table table-sm table-borderless mb-1" style="font-size:10px">
             <tr>
-                <td class="field-label" style="width:15%">Social Security:</td><td style="width:35%">{{ 'Yes' if ben_dict and ben_dict.in_social_security_fund else 'No' }}</td>
-                <td class="field-label" style="width:15%">SSF Type:</td><td style="width:35%">{{ ben_dict.ssf_type if ben_dict else '-' }}</td>
+                <td class="field-label" style="width:15%">Social Security:</td><td style="width:35%">{{ 'Yes' if b.social_security.in_social_security_fund else 'No' }}</td>
+                <td class="field-label" style="width:15%">SSF Type:</td><td style="width:35%">{{ b.social_security.ssf_type or '-' }}</td>
             </tr>
             <tr>
-                <td class="field-label">Poverty Card:</td><td>{{ 'Yes' if ben_dict and ben_dict.poverty_card_holder else 'No' }}</td>
-                <td class="field-label">Relief Items:</td><td>{{ b.item or '-' }} × {{ b.quantity or 0 }}</td>
+                <td class="field-label">Poverty Card:</td><td>{{ 'Yes' if b.social_security.poverty_card_holder else 'No' }}</td>
+                <td class="field-label">Relief Items:</td><td>{% for it in b['items'] %}<span class="badge bg-info me-1">{{ it.item }} × {{ it.quantity }}</span>{% endfor %}</td>
             </tr>
         </table>
 
@@ -149,8 +145,8 @@
                 <tr><th>Name</th><th>Relation</th><th>Age</th><th>Gender</th><th>Disabled</th><th>Pregnant</th><th>SSF(60+)</th></tr>
             </thead>
             <tbody>
-                {% if fm_list %}
-                {% for m in fm_list %}
+                {% if b.family_members %}
+                {% for m in b.family_members %}
                 <tr>
                     <td>{{ m.name or '' }}</td>
                     <td>{{ m.relation or '' }}</td>
@@ -169,8 +165,8 @@
         <!-- Family Summary -->
         <div style="font-size:9px;margin-bottom:4px">
             <strong>Family Summary:</strong>
-            Male: {{ fs.male_count or 0 }} | Female: {{ fs.female_count or 0 }} | Children (<13): {{ fs.child_count or 0 }} |
-            Pregnant: {{ fs.pregnant_count or 0 }} | SSF Age (60+): {{ fs.old_ssf_count or 0 }} | Total: {{ fs.total_members or 0 }}
+            Male: {{ b.family_stats.male_count or 0 }} | Female: {{ b.family_stats.female_count or 0 }} | Children (<13): {{ b.family_stats.child_count or 0 }} |
+            Pregnant: {{ b.family_stats.pregnant_count or 0 }} | SSF Age (60+): {{ b.family_stats.old_ssf_count or 0 }} | Total: {{ b.family_stats.total_members or 0 }}
         </div>
 
         <!-- Photo & Document -->

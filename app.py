@@ -3467,6 +3467,26 @@ def handle_distributions():
                 status=ben_data.get('status', 'Received')
             )
             db.session.add(ben)
+        db.session.flush()
+        # Update linked relief request status if applicable
+        if dispatch.relief_request_id:
+            req = db_get(ReliefRequest, dispatch.relief_request_id)
+            if req:
+                all_dispatched = all(
+                    ri.quantity_dispatched >= ri.quantity_requested for ri in req.items
+                ) if req.items else True
+                cash_done = (
+                    req.distributed_cash_amount >= req.requested_cash_amount
+                    if req.requested_cash_amount > 0 else True
+                )
+                anything_done = (
+                    any(ri.quantity_dispatched > 0 for ri in req.items)
+                    if req.items else False
+                ) or req.distributed_cash_amount > 0
+                if all_dispatched and cash_done:
+                    req.status = 'Completed'
+                elif anything_done:
+                    req.status = 'Partial'
         db.session.commit()
         return jsonify({'success': True, 'message': 'Distribution recorded', 'data': dist.to_dict()}), 201
     except Exception as e:
@@ -6346,40 +6366,57 @@ def print_distribution(id):
     office = AppSettings.get_setting('office_name', 'LEOC')
     address = AppSettings.get_setting('address', '')
 
-    ben_data = []
+    grouped_bens = {}
     for b in dist.beneficiaries:
-        ben = b.beneficiary
-        fm_list = []
-        male_count = 0
-        female_count = 0
-        child_count = 0
-        pregnant_count = 0
-        old_ssf_count = 0
-        if ben and ben.family_members_json:
-            try:
-                raw = json.loads(ben.family_members_json) if isinstance(ben.family_members_json, str) else ben.family_members_json
-                for m in raw:
-                    age = int(m.get('age') or 0)
-                    gender = (m.get('gender') or '').lower()
-                    if gender == 'male': male_count += 1
-                    if gender == 'female': female_count += 1
-                    if 0 < age < 13: child_count += 1
-                    if m.get('is_pregnant'): pregnant_count += 1
-                    if age >= 60: old_ssf_count += 1
-                    fm_list.append({**m, 'is_old_ssf': age >= 60})
-            except (json.JSONDecodeError, TypeError):
-                fm_list = []
-        ben_data.append({
-            'beneficiary': ben.to_dict() if ben else None,
-            'family_members': fm_list,
-            'family_stats': {
-                'male_count': male_count, 'female_count': female_count,
-                'child_count': child_count, 'pregnant_count': pregnant_count,
-                'old_ssf_count': old_ssf_count, 'total_members': len(fm_list)
+        key = (b.family_name or '') + '|' + (b.id_number or '')
+        if key not in grouped_bens:
+            ben = b.beneficiary
+            fm_list = []
+            male_count = 0
+            female_count = 0
+            child_count = 0
+            pregnant_count = 0
+            old_ssf_count = 0
+            if ben and ben.family_members_json:
+                try:
+                    raw = json.loads(ben.family_members_json) if isinstance(ben.family_members_json, str) else ben.family_members_json
+                    for m in raw:
+                        age = int(m.get('age') or 0)
+                        gender = (m.get('gender') or '').lower()
+                        if gender == 'male': male_count += 1
+                        if gender == 'female': female_count += 1
+                        if 0 < age < 13: child_count += 1
+                        if m.get('is_pregnant'): pregnant_count += 1
+                        if age >= 60: old_ssf_count += 1
+                        fm_list.append({**m, 'is_old_ssf': age >= 60})
+                except (json.JSONDecodeError, TypeError):
+                    fm_list = []
+            grouped_bens[key] = {
+                'family_name': b.family_name,
+                'id_number': b.id_number or '',
+                'status': b.status or '',
+                'photo': b.photo or '',
+                'document': b.document or '',
+                'beneficiary': ben.to_dict() if ben else None,
+                'family_members': fm_list,
+                'family_stats': {
+                    'male_count': male_count, 'female_count': female_count,
+                    'child_count': child_count, 'pregnant_count': pregnant_count,
+                    'old_ssf_count': old_ssf_count, 'total_members': len(fm_list)
+                },
+                'social_security': {
+                    'in_social_security_fund': b.in_social_security_fund if hasattr(b, 'in_social_security_fund') else False,
+                    'ssf_type': b.ssf_type if hasattr(b, 'ssf_type') else '',
+                    'poverty_card_holder': b.poverty_card_holder if hasattr(b, 'poverty_card_holder') else False,
+                },
+                'items': []
             }
+        grouped_bens[key]['items'].append({
+            'item': b.item or '-',
+            'quantity': b.quantity or 0
         })
 
-    return render_template('print_distribution.html', dist=dist, office=office, address=address, ben_data=ben_data)
+    return render_template('print_distribution.html', dist=dist, office=office, address=address, grouped_bens=list(grouped_bens.values()))
 
 @app.route('/api/dispatch/<int:id>/print', methods=['GET'])
 @login_required

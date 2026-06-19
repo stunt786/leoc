@@ -9646,3 +9646,44 @@ RuntimeError: The current Flask app is not registered with this 'SQLAlchemy' ins
 2026-06-19 16:45:59,718 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:114]
 2026-06-19 16:48:30,360 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:114]
 2026-06-19 16:49:34,269 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:114]
+2026-06-19 17:09:47,388 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:114]
+2026-06-19 17:09:47,608 ERROR: Exception on /api/distributions/1/print [GET] [in /home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py:825]
+Traceback (most recent call last):
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py", line 1455, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py", line 869, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py", line 867, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py", line 852, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/auth_helpers.py", line 71, in decorated_function
+    return f(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/app.py", line 6399, in print_distribution
+    return render_template('print_distribution.html', dist=dist, office=office, address=address, grouped_bens=list(grouped_bens.values()))
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/templating.py", line 152, in render_template
+    return _render(app, template, context)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/templating.py", line 133, in _render
+    rv = template.render(context)
+         ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/jinja2/environment.py", line 1295, in render
+    self.environment.handle_exception()
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/jinja2/environment.py", line 942, in handle_exception
+    raise rewrite_traceback_stack(source=source)
+  File "/home/prakash/Documents/App Development/leoc/templates/print_distribution.html", line 138, in top-level template code
+    <td class="field-label">Relief Items:</td><td>{% for it in b.items %}<span class="badge bg-info me-1">{{ it.item }} × {{ it.quantity }}</span>{% endfor %}</td>
+    ^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: 'builtin_function_or_method' object is not iterable
+2026-06-19 17:09:58,455 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:114]
+2026-06-19 17:10:05,405 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:114]
+2026-06-19 17:10:18,908 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:114]
+2026-06-19 17:14:10,828 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:114]
+2026-06-19 17:20:58,142 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:114]
+2026-06-19 17:21:11,877 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:114]
