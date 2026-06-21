@@ -341,7 +341,7 @@ function renderRR(data) {
                 ${r.status === 'Completed'
                     ? '<button class="btn btn-sm btn-outline-secondary" disabled title="Completed requests cannot be edited"><i class="bi bi-pencil"></i></button>'
                     : '<button class="btn btn-sm btn-outline-primary" onclick="editRR(' + r.id + ')"><i class="bi bi-pencil"></i></button>'}
-                <button class="btn btn-sm btn-outline-secondary" onclick='window.open("/api/relief-requests/' + r.id + '/print","_blank")' title="Print"><i class="bi bi-printer"></i></button>
+                <button class="btn btn-sm btn-outline-secondary" onclick="window.open('/api/relief-requests/${r.id}/print','_blank')" title="Print"><i class="bi bi-printer"></i></button>
                 <button class="btn btn-sm btn-outline-danger" onclick="deleteRR(${r.id})"><i class="bi bi-trash"></i></button>
             </td>
         </tr>`;

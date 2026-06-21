@@ -582,6 +582,31 @@ class StockReceiptAttachment(db.Model):
             'file_size': self.file_size,             'uploaded_at': ad_to_bs_date(self.uploaded_at)
         }
 
+class DocumentArchive(db.Model):
+    __tablename__ = 'document_archive'
+    id = db.Column(db.Integer, primary_key=True)
+    document_name = db.Column(db.String(300), nullable=False)
+    remarks = db.Column(db.Text)
+    filename = db.Column(db.String(500), nullable=False)
+    original_name = db.Column(db.String(500))
+    file_type = db.Column(db.String(50))
+    file_size = db.Column(db.Integer)
+    uploaded_by = db.Column(db.Integer)
+    uploaded_at = db.Column(db.DateTime, default=utc_now)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'document_name': self.document_name,
+            'remarks': self.remarks,
+            'filename': self.filename,
+            'original_name': self.original_name,
+            'file_type': self.file_type,
+            'file_size': self.file_size,
+            'uploaded_by': self.uploaded_by,
+            'uploaded_at': ad_to_bs_date(self.uploaded_at),
+        }
+
 # ============ ACTIVITY LOG MODEL ============
 class ActivityLog(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -1470,6 +1495,13 @@ class Ward(db.Model):
 def get_ward_list():
     return Ward.query.order_by(Ward.sort_order).all()
 
+def get_users_list():
+    try:
+        rows = db.session.execute(db.text("SELECT id, username, role, full_name, is_active, created_at, last_login FROM \"user\" ORDER BY username")).fetchall()
+        return [{'id': r[0], 'username': r[1], 'role': r[2], 'full_name': r[3], 'is_active': r[4]} for r in rows]
+    except Exception:
+        return []
+
 def is_valid_ward(ward):
     return db.session.get(Ward, ward) is not None
 
@@ -1479,6 +1511,8 @@ def inject_now():
     return {
         'now': datetime.now,
         'today_bs': today_bs(),
+        'office_name': AppSettings.get_setting('office_name', 'थलारा गाउँपालिका'),
+        'address': AppSettings.get_setting('address', 'बझाङ'),
     }
 
 @app.context_processor
@@ -1715,6 +1749,11 @@ def distributions_page():
 @login_required
 def reports_page():
     return render_template('reports.html')
+
+@app.route('/archives')
+@login_required
+def archives_page():
+    return render_template('archives.html')
 
 @app.route('/disaster-reports')
 @login_required
@@ -3182,6 +3221,13 @@ def manage_relief_request(id):
         if request.method == 'GET':
             return jsonify({'success': True, 'relief_request': req.to_dict()})
         if request.method == 'DELETE':
+            # Prevent deletion if linked to dispatches or distributed items
+            linked_dispatches = Dispatch.query.filter_by(relief_request_id=req.id).count()
+            if linked_dispatches > 0:
+                return jsonify({'success': False, 'message': 'Cannot delete: this relief request has linked dispatch records. Remove dispatches first.'}), 400
+            has_dispatched_items = any(item.quantity_dispatched > 0 or item.quantity_distributed > 0 for item in req.items)
+            if has_dispatched_items:
+                return jsonify({'success': False, 'message': 'Cannot delete: this relief request has items that have been dispatched or distributed.'}), 400
             db.session.delete(req)
             db.session.commit()
             return jsonify({'success': True, 'message': 'Relief request deleted'})
@@ -5011,6 +5057,111 @@ def upload_item_photo():
 def uploaded_file(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
+# ============ ARCHIVES API ============
+@app.route('/api/archives', methods=['GET', 'POST'])
+@login_required
+def handle_archives():
+    try:
+        if request.method == 'GET':
+            docs = DocumentArchive.query.order_by(DocumentArchive.uploaded_at.desc()).all()
+            return jsonify({'success': True, 'documents': [d.to_dict() for d in docs]})
+
+        # POST — create with file upload
+        document_name = request.form.get('document_name', '').strip()
+        remarks = request.form.get('remarks', '').strip()
+        if not document_name:
+            return jsonify({'success': False, 'message': 'Document name is required'}), 400
+
+        if 'file' not in request.files:
+            return jsonify({'success': False, 'message': 'No file provided'}), 400
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'success': False, 'message': 'No file selected'}), 400
+
+        ALLOWED_EXTENSIONS = {'pdf', 'jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'tiff', 'tif'}
+        ext = file.filename.rsplit('.', 1)[-1].lower() if '.' in file.filename else ''
+        if ext not in ALLOWED_EXTENSIONS:
+            return jsonify({'success': False, 'message': 'Allowed: PDF, JPG, PNG, GIF, WEBP, BMP, TIFF'}), 400
+
+        import uuid as uuid_lib
+        safe_name = f"archive_{uuid_lib.uuid4().hex}.{ext}"
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], safe_name)
+        file.save(filepath)
+
+        doc = DocumentArchive(
+            document_name=document_name,
+            remarks=remarks,
+            filename=safe_name,
+            original_name=file.filename,
+            file_type=ext,
+            file_size=os.path.getsize(filepath),
+            uploaded_by=current_user.id,
+        )
+        db.session.add(doc)
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Document archived', 'data': doc.to_dict()}), 201
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
+
+@app.route('/api/archives/<int:id>', methods=['GET', 'PUT', 'DELETE'])
+@login_required
+def manage_archive(id):
+    try:
+        doc = db_get(DocumentArchive, id)
+        if not doc:
+            return jsonify({'success': False, 'message': 'Document not found'}), 404
+
+        if request.method == 'GET':
+            return jsonify({'success': True, 'data': doc.to_dict()})
+
+        if request.method == 'DELETE':
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], doc.filename)
+            if os.path.exists(filepath):
+                os.remove(filepath)
+            db.session.delete(doc)
+            db.session.commit()
+            return jsonify({'success': True, 'message': 'Document deleted'})
+
+        # PUT — update
+        data = request.form if request.form else request.get_json(silent=True) or {}
+        document_name = data.get('document_name', '').strip()
+        remarks = data.get('remarks', '').strip()
+        if not document_name:
+            return jsonify({'success': False, 'message': 'Document name is required'}), 400
+        doc.document_name = document_name
+        doc.remarks = remarks
+
+        if request.files and 'file' in request.files:
+            file = request.files['file']
+            if file.filename:
+                ALLOWED_EXTENSIONS = {'pdf', 'jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'tiff', 'tif'}
+                ext = file.filename.rsplit('.', 1)[-1].lower() if '.' in file.filename else ''
+                if ext not in ALLOWED_EXTENSIONS:
+                    return jsonify({'success': False, 'message': 'Allowed: PDF, JPG, PNG, GIF, WEBP, BMP, TIFF'}), 400
+
+                old_path = os.path.join(app.config['UPLOAD_FOLDER'], doc.filename)
+                if os.path.exists(old_path):
+                    os.remove(old_path)
+
+                import uuid as uuid_lib
+                safe_name = f"archive_{uuid_lib.uuid4().hex}.{ext}"
+                new_path = os.path.join(app.config['UPLOAD_FOLDER'], safe_name)
+                file.save(new_path)
+
+                doc.filename = safe_name
+                doc.original_name = file.filename
+                doc.file_type = ext
+                doc.file_size = os.path.getsize(new_path)
+
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Document updated', 'data': doc.to_dict()})
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
+
 # ============ ITEM HISTORY ============
 @app.route('/api/items/<int:id>/history', methods=['GET'])
 @login_required
@@ -5894,6 +6045,7 @@ def get_form_data():
             'distribution_types': ['Individual', 'Family', 'Community', 'Local Government', 'Organization'],
             'cash_priorities': ['Low', 'Medium', 'High', 'Urgent'],
             'distribution_statuses': ['Received', 'Pending'],
+            'users': get_users_list(),
         })
     except Exception as e:
         return jsonify({'success': False, 'message': friendly_message(e)}), 500
@@ -6124,197 +6276,566 @@ def report_stock_receipts():
                           [10*mm, 30*mm, 22*mm, 25*mm, 22*mm, 25*mm, 30*mm, 15*mm, 12*mm])
     return make_response(pdf.getvalue(), 200, {'Content-Type': 'application/pdf', 'Content-Disposition': 'attachment; filename=stock_receipts_report.pdf'})
 
+# ============ SHARED REPORT DATA HELPER ============
+def get_report_data(report_type, args):
+    date_from = args.get('date_from')
+    date_to = args.get('date_to')
+    fiscal_year = args.get('fiscal_year')
+
+    def apply_date_filter(q, date_col):
+        if date_from:
+            ad_from = bs_to_ad(date_from)
+            if ad_from:
+                q = q.filter(date_col >= datetime.strptime(ad_from, '%Y-%m-%d').date())
+        if date_to:
+            ad_to = bs_to_ad(date_to)
+            if ad_to:
+                q = q.filter(date_col <= datetime.strptime(ad_to, '%Y-%m-%d').date())
+        return q
+
+    if report_type == 'inventory':
+        headers = ['Item Code', 'Item Name', 'Category', 'Unit', 'Quantity', 'Min Stock', 'Status']
+        rows = []
+        for inv in Inventory.query.order_by(Inventory.updated_at.desc()).all():
+            d = inv.to_dict()
+            rows.append([d['item_code'] or '', d['item_name'] or '', d['category_name'] or '',
+                         d['unit'] or '', d['quantity'], d['minimum_stock'], d['status']])
+    elif report_type == 'dispatch':
+        incident_id = args.get('incident_id', type=int)
+        warehouse_id = args.get('warehouse_id', type=int)
+        q = Dispatch.query.order_by(Dispatch.date.desc())
+        if incident_id: q = q.filter(Dispatch.incident_id == incident_id)
+        if warehouse_id: q = q.filter(Dispatch.warehouse_id == warehouse_id)
+        q = apply_date_filter(q, Dispatch.date)
+        headers = ['Dispatch No', 'Date', 'Warehouse', 'Incident', 'Destination', 'Receiver']
+        rows = [[d.dispatch_number, ad_to_bs_date(d.date) or '',
+                 d.warehouse.name if d.warehouse else '', d.incident.incident_name if d.incident else '',
+                 d.destination or '', d.receiver or ''] for d in q.all()]
+    elif report_type == 'distribution':
+        incident_id = args.get('incident_id', type=int)
+        q = Distribution.query.order_by(Distribution.distribution_date.desc())
+        if incident_id: q = q.filter(Distribution.incident_id == incident_id)
+        q = apply_date_filter(q, Distribution.distribution_date)
+        headers = ['Dist No', 'Date', 'Location', 'Incident', 'Officer', 'Beneficiaries']
+        rows = [[d.distribution_no, ad_to_bs_date(d.distribution_date) or '',
+                 d.location or '', d.incident.incident_name if d.incident else '',
+                 d.officer or '', len(d.beneficiaries)] for d in q.all()]
+    elif report_type == 'incidents':
+        status = args.get('status')
+        severity = args.get('severity')
+        ward_id = args.get('ward_id', type=int)
+        q = Incident.query.order_by(Incident.start_date.desc())
+        if status: q = q.filter(Incident.status == status)
+        if severity: q = q.filter(Incident.severity == severity)
+        if ward_id: q = q.filter(Incident.ward == ward_id)
+        q = apply_date_filter(q, Incident.start_date)
+        headers = ['Name', 'Type', 'Ward', 'Date', 'Severity', 'Status']
+        rows = [[inc.incident_name, inc.incident_type, inc.ward or '',
+                 ad_to_bs_date(inc.start_date) or '', inc.severity or '', inc.status] for inc in q.all()]
+    elif report_type == 'requests':
+        status = args.get('status')
+        incident_id = args.get('incident_id', type=int)
+        priority = args.get('priority')
+        q = ReliefRequest.query.order_by(ReliefRequest.request_date.desc())
+        if status: q = q.filter(ReliefRequest.status == status)
+        if incident_id: q = q.filter(ReliefRequest.incident_id == incident_id)
+        if priority: q = q.filter(ReliefRequest.priority == priority)
+        q = apply_date_filter(q, ReliefRequest.request_date)
+        headers = ['Req No', 'Date', 'Incident', 'Organization', 'Priority', 'Status']
+        rows = [[r.request_number, ad_to_bs_date(r.request_date) or '',
+                 r.incident.incident_name if r.incident else '', r.organization or '',
+                 r.priority, r.status] for r in q.all()]
+    elif report_type == 'adjustments':
+        q = ManualAdjustment.query.order_by(ManualAdjustment.date.desc())
+        q = apply_date_filter(q, ManualAdjustment.date)
+        headers = ['Adj No', 'Date', 'Warehouse', 'Item', 'Type', 'Qty', 'Reason']
+        rows = [[a.adjustment_no, ad_to_bs_date(a.date) or '',
+                 a.warehouse.name if a.warehouse else '', a.item.name if a.item else '',
+                 a.adjustment_type, a.adjusted_quantity, a.reason or ''] for a in q.all()]
+    elif report_type == 'low-stock':
+        warehouse_id = args.get('warehouse_id', type=int)
+        headers = ['Item', 'Code', 'Category', 'Qty', 'Min', 'Warehouse']
+        rows = []
+        q = Inventory.query
+        if warehouse_id: q = q.filter(Inventory.warehouse_id == warehouse_id)
+        for inv in q.all():
+            if inv.item and inv.item.minimum_stock > 0 and inv.quantity <= inv.item.minimum_stock:
+                d = inv.to_dict()
+                rows.append([d['item_name'], d['item_code'] or '', d['category_name'] or '',
+                             d['quantity'], d['minimum_stock'], d['warehouse_name'] or ''])
+    elif report_type == 'monthly-summary':
+        month = args.get('month', datetime.now().strftime('%Y-%m'))
+        try:
+            year, mon = map(int, month.split('-'))
+        except:
+            year, mon = datetime.now().year, datetime.now().month
+        start = date(year, mon, 1)
+        if mon == 12:
+            end = date(year+1, 1, 1)
+        else:
+            end = date(year, mon+1, 1)
+        from datetime import timedelta
+        end = end - timedelta(days=1)
+        receipts = StockReceipt.query.filter(db.func.date(StockReceipt.date) >= start, db.func.date(StockReceipt.date) <= end).count()
+        dispatches = Dispatch.query.filter(db.func.date(Dispatch.date) >= start, db.func.date(Dispatch.date) <= end).count()
+        distributions = Distribution.query.filter(db.func.date(Distribution.distribution_date) >= start, db.func.date(Distribution.distribution_date) <= end).count()
+        incidents = Incident.query.filter(db.func.date(Incident.start_date) >= start, db.func.date(Incident.start_date) <= end).count()
+        headers = ['Metric', 'Count']
+        rows = [['Total Receipts', receipts], ['Total Dispatches', dispatches],
+                ['Total Distributions', distributions], ['New Incidents', incidents]]
+    elif report_type == 'stock-receipts':
+        warehouse_id = args.get('warehouse_id', type=int)
+        source_type = args.get('source_type')
+        q = StockReceipt.query.order_by(StockReceipt.date.desc())
+        if warehouse_id: q = q.filter(StockReceipt.warehouse_id == warehouse_id)
+        if source_type: q = q.filter(StockReceipt.source_type == source_type)
+        q = apply_date_filter(q, StockReceipt.date)
+        headers = ['Receipt No', 'Date', 'Warehouse', 'Source Type', 'Source Name', 'Item', 'Qty', 'Unit']
+        rows = []
+        for r in q.all():
+            d = r.to_dict()
+            items = d.get('items', [])
+            if items:
+                for item in items:
+                    rows.append([d['receipt_no'], d['date'], d['warehouse_name'],
+                                 d['source_type'], d['source_name'],
+                                 item['item_name'], item['quantity'], item['unit']])
+            else:
+                rows.append([d['receipt_no'], d['date'], d['warehouse_name'],
+                             d['source_type'], d['source_name'], '', '', ''])
+    elif report_type == 'cash-balance':
+        fund_id = args.get('fund_id', type=int)
+        q = CashFund.query
+        if fund_id: q = q.filter(CashFund.id == fund_id)
+        headers = ['Fund Name', 'Fiscal Year', 'Source', 'Allocated', 'Balance', 'Status']
+        rows = [[f.name, f.fiscal_year or '', f.funding_source or '',
+                 f.allocated_amount, f.current_balance, f.status] for f in q.order_by(CashFund.name).all()]
+    elif report_type == 'cash-receipts':
+        q = CashReceipt.query.order_by(CashReceipt.receipt_date.desc())
+        q = apply_date_filter(q, CashReceipt.receipt_date)
+        headers = ['Receipt No', 'Date', 'Fund', 'Source', 'Amount', 'Received By']
+        rows = [[cr.receipt_no, ad_to_bs_date(cr.receipt_date) or '',
+                 cr.fund.name if cr.fund else '', cr.funding_source or '',
+                 cr.amount_received, cr.received_by or ''] for cr in q.all()]
+    elif report_type == 'cash-requests':
+        status = args.get('status')
+        incident_id = args.get('incident_id', type=int)
+        priority = args.get('priority')
+        q = CashRequest.query.order_by(CashRequest.request_date.desc())
+        if status: q = q.filter(CashRequest.status == status)
+        if incident_id: q = q.filter(CashRequest.incident_id == incident_id)
+        if priority: q = q.filter(CashRequest.priority == priority)
+        q = apply_date_filter(q, CashRequest.request_date)
+        headers = ['Req No', 'Date', 'Incident', 'Amount', 'Priority', 'Status']
+        rows = [[cr.request_number, ad_to_bs_date(cr.request_date) or '',
+                 cr.incident.incident_name if cr.incident else '', cr.requested_amount,
+                 cr.priority, cr.status] for cr in q.all()]
+    elif report_type == 'cash-distributions':
+        incident_id = args.get('incident_id', type=int)
+        fund_id = args.get('fund_id', type=int)
+        q = CashDistribution.query.order_by(CashDistribution.distribution_date.desc())
+        if incident_id: q = q.filter(CashDistribution.incident_id == incident_id)
+        if fund_id: q = q.filter(CashDistribution.fund_id == fund_id)
+        q = apply_date_filter(q, CashDistribution.distribution_date)
+        headers = ['Dist No', 'Date', 'Fund', 'Incident', 'Type', 'Amount']
+        rows = [[d.distribution_no, ad_to_bs_date(d.distribution_date) or '',
+                 d.fund.name if d.fund else '', d.incident.incident_name if d.incident else '',
+                 d.distribution_type, d.total_amount] for d in q.all()]
+    elif report_type == 'cash-by-incident':
+        from sqlalchemy import func
+        data = db.session.query(
+            Incident.incident_name,
+            func.coalesce(func.sum(CashDistribution.total_amount), 0)
+        ).outerjoin(CashDistribution, CashDistribution.incident_id == Incident.id).group_by(Incident.id).all()
+        headers = ['Incident', 'Total Cash Distributed']
+        rows = [[name, total] for name, total in data]
+    elif report_type == 'cash-by-funding-source':
+        from sqlalchemy import func
+        data = db.session.query(
+            CashFund.funding_source,
+            func.coalesce(func.sum(CashFund.allocated_amount), 0),
+            func.coalesce(func.sum(CashFund.current_balance), 0)
+        ).group_by(CashFund.funding_source).all()
+        headers = ['Funding Source', 'Total Allocated', 'Current Balance']
+        rows = [[src or 'Unknown', alloc, bal] for src, alloc, bal in data]
+    elif report_type == 'cash-yearly':
+        fiscal_year = args.get('fiscal_year') or AppSettings.get_setting('active_fiscal_year', '2081/82')
+        fy_months = [
+            (4, 'Shrawan'), (5, 'Bhadra'), (6, 'Ashwin'), (7, 'Kartik'),
+            (8, 'Mangsir'), (9, 'Poush'), (10, 'Magh'), (11, 'Falgun'),
+            (12, 'Chaitra'), (1, 'Baishakh'), (2, 'Jestha'), (3, 'Asar')
+        ]
+        headers = ['Month', 'Received', 'Distributed']
+        by_month = {m: {'recv': 0, 'dist': 0} for m, _ in fy_months}
+        fund_ids = [f.id for f in CashFund.query.filter(CashFund.fiscal_year == fiscal_year).all()]
+        if fund_ids:
+            for cr in CashReceipt.query.filter(CashReceipt.fund_id.in_(fund_ids)).all():
+                bs_str = ad_to_bs(cr.receipt_date.year, cr.receipt_date.month, cr.receipt_date.day)
+                if bs_str:
+                    bs_mon = int(bs_str.split('-')[1])
+                    if bs_mon in by_month:
+                        by_month[bs_mon]['recv'] += cr.amount_received
+        for cd in CashDistribution.query.filter(CashDistribution.fiscal_year == fiscal_year).all():
+            bs_str = ad_to_bs(cd.distribution_date.year, cd.distribution_date.month, cd.distribution_date.day)
+            if bs_str:
+                bs_mon = int(bs_str.split('-')[1])
+                if bs_mon in by_month:
+                    by_month[bs_mon]['dist'] += cd.total_amount
+        rows = [[name, by_month[m]['recv'], by_month[m]['dist']] for m, name in fy_months]
+    elif report_type == 'suppliers':
+        status = args.get('status')
+        q = Supplier.query.order_by(Supplier.name)
+        if status: q = q.filter(Supplier.status == status)
+        headers = ['Name', 'Contact Person', 'Phone', 'Email', 'Type', 'Status']
+        rows = [[s.name, s.contact_person or '', s.phone or '', s.email or '',
+                 s.supplier_type or '', s.status or ''] for s in q.all()]
+    elif report_type == 'warehouses':
+        q = Warehouse.query.order_by(Warehouse.name)
+        headers = ['Name', 'Code', 'Address', 'Contact Person', 'Phone', 'Capacity']
+        rows = [[w.name, w.code or '', w.address or '', w.contact_person or '', w.phone or '', w.capacity or 0] for w in q.all()]
+    elif report_type == 'items-master':
+        category_id = args.get('category_id', type=int)
+        q = Item.query.order_by(Item.name)
+        if category_id: q = q.filter(Item.category_id == category_id)
+        headers = ['Code', 'Name', 'Category', 'Unit', 'Min Stock', 'Max Stock', 'Tracking']
+        rows = [[i.item_code or '', i.name, i.category.name if i.category else '', i.unit or '',
+                 i.minimum_stock or 0, i.max_stock or '', 'Batch' if i.batch_tracking else ''] for i in q.all()]
+    elif report_type == 'stock-transfers':
+        status = args.get('status')
+        q = StockTransfer.query.order_by(StockTransfer.transfer_date.desc())
+        if status: q = q.filter(StockTransfer.status == status)
+        q = apply_date_filter(q, StockTransfer.transfer_date)
+        headers = ['Transfer No', 'Date', 'From Warehouse', 'To Warehouse', 'Status', 'Reason']
+        rows = [[t.transfer_no, ad_to_bs_date(t.transfer_date) or '',
+                 t.from_warehouse.name if t.from_warehouse else '',
+                 t.to_warehouse.name if t.to_warehouse else '',
+                 t.status or '', t.reason or ''] for t in q.all()]
+    elif report_type == 'stock-book':
+        warehouse_id = args.get('warehouse_id', type=int)
+        item_id = args.get('item_id', type=int)
+        headers = ['Item Code', 'Item Name', 'Unit', 'Opening', 'Received', 'Dispatched', 'Balance']
+        rows = []
+        q = Inventory.query
+        if warehouse_id: q = q.filter(Inventory.warehouse_id == warehouse_id)
+        if item_id: q = q.filter(Inventory.item_id == item_id)
+        for inv in q.all():
+            if not inv.item: continue
+            d = inv.to_dict()
+            rows.append([d['item_code'] or '', d['item_name'] or '', d['unit'] or '',
+                         d['quantity'], 0, 0, d['quantity']])
+        if not rows:
+            rows = [['-', 'No stock data found', '-', 0, 0, 0, 0]]
+    elif report_type == 'bin-card':
+        item_id = args.get('item_id', type=int)
+        warehouse_id = args.get('warehouse_id', type=int)
+        headers = ['Date', 'Ref No', 'Transaction', 'Party', 'In', 'Out', 'Balance']
+        if not item_id or not warehouse_id:
+            rows = [['-', '-', 'Select item and warehouse filters', '-', '-', '-', '-']]
+        else:
+            item = db_get(Item, item_id)
+            wh = db_get(Warehouse, warehouse_id)
+            if not item or not wh:
+                rows = [['-', '-', 'Item or warehouse not found', '-', '-', '-', '-']]
+            else:
+                receipts = [r for r in StockReceiptItem.query.filter_by(item_id=item_id).all()
+                            if r.receipt and r.receipt.warehouse_id == warehouse_id]
+                dispatches = [d for d in DispatchItem.query.filter_by(item_id=item_id).all()
+                              if d.dispatch and d.dispatch.warehouse_id == warehouse_id]
+                adjustments = ManualAdjustment.query.filter_by(item_id=item_id, warehouse_id=warehouse_id).all()
+                transfers_out = [t for t in StockTransferItem.query.filter_by(item_id=item_id).all()
+                                 if t.transfer and t.transfer.from_warehouse_id == warehouse_id]
+                transfers_in = [t for t in StockTransferItem.query.filter_by(item_id=item_id).all()
+                                if t.transfer and t.transfer.to_warehouse_id == warehouse_id]
+                events = []
+                for r in receipts:
+                    events.append({'date': ad_to_bs_date(r.receipt.date) or '', 'ref': r.receipt.receipt_no,
+                                   'type': 'Receipt', 'party': r.receipt.source_name or '', 'in': r.quantity, 'out': 0,
+                                   'sort_key': (r.receipt.date or date.min, r.receipt.id)})
+                for d in dispatches:
+                    events.append({'date': ad_to_bs_date(d.dispatch.date) or '', 'ref': d.dispatch.dispatch_number,
+                                   'type': 'Dispatch', 'party': d.dispatch.destination or d.dispatch.receiver or '', 'in': 0, 'out': d.quantity,
+                                   'sort_key': (d.dispatch.date or date.min, d.dispatch.id)})
+                for a in adjustments:
+                    amt = a.adjusted_quantity
+                    if a.adjustment_type in ('Increase', 'Correction_Increase'):
+                        events.append({'date': ad_to_bs_date(a.date) or '', 'ref': a.adjustment_no,
+                                       'type': 'Adj (+)', 'party': '', 'in': amt, 'out': 0,
+                                       'sort_key': (a.date or date.min, a.id)})
+                    else:
+                        events.append({'date': ad_to_bs_date(a.date) or '', 'ref': a.adjustment_no,
+                                       'type': 'Adj (-)', 'party': '', 'in': 0, 'out': amt,
+                                       'sort_key': (a.date or date.min, a.id)})
+                for t in transfers_out:
+                    events.append({'date': ad_to_bs_date(t.transfer.transfer_date) or '', 'ref': t.transfer.transfer_no,
+                                   'type': 'Transfer Out', 'party': t.transfer.to_warehouse.name if t.transfer.to_warehouse else '',
+                                   'in': 0, 'out': t.quantity, 'sort_key': (t.transfer.transfer_date or date.min, t.transfer.id)})
+                for t in transfers_in:
+                    events.append({'date': ad_to_bs_date(t.transfer.transfer_date) or '', 'ref': t.transfer.transfer_no,
+                                   'type': 'Transfer In', 'party': t.transfer.from_warehouse.name if t.transfer.from_warehouse else '',
+                                   'in': t.quantity, 'out': 0, 'sort_key': (t.transfer.transfer_date or date.min, t.transfer.id)})
+                events.sort(key=lambda e: e['sort_key'])
+                running = 0
+                for e in events:
+                    if e['type'] in ('Receipt', 'Transfer In') or e['type'] == 'Adj (+)':
+                        running += e['in']
+                    else:
+                        running -= e['out']
+                    e['balance'] = running
+                rows = [[e['date'], e['ref'], e['type'], e['party'], e['in'] if e['in'] else '-',
+                         e['out'] if e['out'] else '-', e['balance']] for e in events]
+                if not rows:
+                    rows = [['-', '-', 'No transactions', '-', '-', '-', '-']]
+    elif report_type == 'expiry-tracking':
+        warehouse_id = args.get('warehouse_id', type=int)
+        item_id = args.get('item_id', type=int)
+        from datetime import timedelta
+        threshold = date.today() + timedelta(days=90)
+        headers = ['Item', 'Code', 'Batch', 'Qty', 'Expiry Date', 'Warehouse', 'Status']
+        rows = []
+        q = StockReceiptItem.query.options(
+            db.joinedload(StockReceiptItem.receipt),
+            db.joinedload(StockReceiptItem.item)
+        )
+        if item_id: q = q.filter(StockReceiptItem.item_id == item_id)
+        for sri in q.all():
+            if not sri.expiry_date: continue
+            if sri.receipt and warehouse_id and sri.receipt.warehouse_id != warehouse_id: continue
+            expiry = sri.expiry_date
+            status_str = 'Expired' if expiry < date.today() else ('Expiring Soon' if expiry <= threshold else 'OK')
+            wh_name = sri.receipt.warehouse.name if sri.receipt and sri.receipt.warehouse else ''
+            rows.append([sri.item.name if sri.item else '', sri.item.item_code if sri.item else '',
+                         sri.batch_no or '', sri.quantity,
+                         ad_to_bs_date(expiry) or '', wh_name, status_str])
+        if not rows:
+            rows = [['-', '-', '-', '-', '-', '-', 'No expiry data']]
+    elif report_type == 'stock-movement':
+        warehouse_id = args.get('warehouse_id', type=int)
+        category_id = args.get('category_id', type=int)
+        item_id = args.get('item_id', type=int)
+        headers = ['Date', 'Ref No', 'Item', 'Type', 'In', 'Out', 'Warehouse']
+        rows = []
+        for r in StockReceiptItem.query.all():
+            if r.receipt:
+                if warehouse_id and r.receipt.warehouse_id != warehouse_id: continue
+                if item_id and r.item_id != item_id: continue
+                rows.append([ad_to_bs_date(r.receipt.date) or '', r.receipt.receipt_no,
+                             r.item.name if r.item else '', 'Receipt', r.quantity, '-',
+                             r.receipt.warehouse.name if r.receipt.warehouse else ''])
+        for d in DispatchItem.query.all():
+            if d.dispatch:
+                if warehouse_id and d.dispatch.warehouse_id != warehouse_id: continue
+                if item_id and d.item_id != item_id: continue
+                rows.append([ad_to_bs_date(d.dispatch.date) or '', d.dispatch.dispatch_number,
+                             d.item.name if d.item else '', 'Dispatch', '-', d.quantity,
+                             d.dispatch.warehouse.name if d.dispatch.warehouse else ''])
+        rows.sort(key=lambda x: x[0], reverse=True)
+        if not rows:
+            rows = [['-', '-', '-', '-', '-', '-', 'No movements found']]
+    elif report_type == 'disaster-assessments':
+        incident_id = args.get('incident_id', type=int)
+        q = DisasterAssessment.query.order_by(DisasterAssessment.disaster_date_bs.desc())
+        if incident_id: q = q.filter(DisasterAssessment.incident_id == incident_id)
+        headers = ['Date (BS)', 'Incident', 'Disaster Type', 'Affected HH', 'Deaths', 'Injured', 'Assessor']
+        rows = [[a.disaster_date_bs or '', a.incident.incident_name if a.incident else '',
+                 a.disaster_type or '', a.affected_households or 0, a.deaths or 0,
+                 a.injured or 0, ''] for a in q.all()]
+    elif report_type == 'beneficiaries':
+        ward_id = args.get('ward_id', type=int)
+        status = args.get('status')
+        q = Beneficiary.query.order_by(Beneficiary.name)
+        if ward_id: q = q.filter(Beneficiary.ward == ward_id)
+        if status: q = q.filter(Beneficiary.status == status)
+        headers = ['Family Name', 'ID Number', 'Ward', 'Phone', 'Members', 'Status']
+        rows = []
+        for b in q.all():
+            fm = b.family_members_json
+            member_count = len(json.loads(fm)) if isinstance(fm, str) and fm else (len(fm) if isinstance(fm, list) else 0)
+            ward_name = Ward.query.get(b.ward).name if b.ward else ''
+            rows.append([b.name or '', b.national_id or '', ward_name,
+                         b.phone or '', member_count, b.status or ''])
+    elif report_type == 'beneficiary-history':
+        ward_id = args.get('ward_id', type=int)
+        q = db.session.query(DistributionBeneficiary).join(Distribution).order_by(Distribution.distribution_date.desc())
+        if ward_id:
+            q = q.join(Beneficiary, DistributionBeneficiary.beneficiary_id == Beneficiary.id).filter(Beneficiary.ward == ward_id)
+        headers = ['Family Name', 'ID Number', 'Distribution Date', 'Location', 'Items', 'Status']
+        rows = []
+        for db_ben in q.all():
+            dist = db_ben.distribution
+            ben = db_ben.beneficiary
+            rows.append([db_ben.family_name or (ben.family_name if ben else ''),
+                         db_ben.id_number or (ben.id_number if ben else ''),
+                         ad_to_bs_date(dist.distribution_date) if dist else '',
+                         dist.location if dist else '',
+                         db_ben.item or '', db_ben.status or ''])
+        if not rows:
+            rows = [['-', '-', '-', '-', '-', 'No distribution history found']]
+    elif report_type == 'beneficiary-demographics':
+        headers = ['Ward', 'Total Families', 'Total Members', 'Male', 'Female', 'Children', 'Senior Citizens']
+        rows = []
+        for w in Ward.query.order_by(Ward.sort_order).all():
+            fam_count = Beneficiary.query.filter_by(ward_id=w.id).count()
+            total_members = 0
+            male = female = children = senior = 0
+            for b in Beneficiary.query.filter_by(ward_id=w.id).all():
+                fm = b.family_members_json
+                members = json.loads(fm) if isinstance(fm, str) and fm else (fm if isinstance(fm, list) else [])
+                total_members += len(members)
+                for m in members:
+                    age = int(m.get('age') or 0)
+                    g = (m.get('gender') or '').lower()
+                    if g == 'male': male += 1
+                    if g == 'female': female += 1
+                    if 0 < age < 13: children += 1
+                    if age >= 60: senior += 1
+            rows.append([w.name, fam_count, total_members, male, female, children, senior])
+        if not rows:
+            rows = [['-', 0, 0, 0, 0, 0, 0]]
+    elif report_type == 'activity-logs':
+        action = args.get('action')
+        user_id = args.get('user_id', type=int)
+        resource = args.get('resource')
+        q = ActivityLog.query.order_by(ActivityLog.created_at.desc())
+        if action: q = q.filter(ActivityLog.action == action)
+        if user_id: q = q.filter(ActivityLog.user_id == user_id)
+        if resource: q = q.filter(ActivityLog.resource.ilike(f'%{resource}%'))
+        q = apply_date_filter(q, ActivityLog.created_at)
+        headers = ['Date/Time', 'User', 'Action', 'Resource', 'Details']
+        rows = [[l.created_at.strftime('%Y-%m-%d %H:%M') if l.created_at else '',
+                 l.username or 'System', l.action, l.resource or '', l.details or ''] for l in q.all()]
+    elif report_type == 'user-activity':
+        user_id = args.get('user_id', type=int)
+        from sqlalchemy import func as sa_func
+        q = db.session.query(
+            ActivityLog.username, ActivityLog.user_id,
+            sa_func.count(ActivityLog.id).label('total'),
+            sa_func.count(sa_func.distinct(ActivityLog.action)).label('actions'),
+            sa_func.count(sa_func.distinct(ActivityLog.resource)).label('resources'),
+            sa_func.max(ActivityLog.created_at).label('last_active')
+        )
+        if user_id:
+            q = q.filter(ActivityLog.user_id == user_id)
+        q = q.group_by(ActivityLog.username, ActivityLog.user_id).order_by(sa_func.count(ActivityLog.id).desc())
+        headers = ['User', 'Total Actions', 'Unique Actions', 'Resources Accessed', 'Last Active']
+        rows = []
+        for username, uid, total, actions, resources, last_active in q.all():
+            rows.append([username or 'System', total, actions, resources,
+                         last_active.strftime('%Y-%m-%d %H:%M') if last_active else ''])
+    else:
+        raise ValueError(f'Unknown report type: {report_type}')
+
+    if not rows:
+        rows = [['No data found'] + [''] * (len(headers) - 1)]
+
+    return headers, rows
+
+
 # ============ REPORTS JSON DATA ENDPOINT ============
 @app.route('/api/reports-data/<report_type>', methods=['GET'])
 @login_required
 def reports_data_json(report_type):
     try:
-        date_from = request.args.get('date_from')
-        date_to = request.args.get('date_to')
-
-        def apply_date_filter(q, date_col):
-            if date_from:
-                ad_from = bs_to_ad(date_from)
-                if ad_from:
-                    q = q.filter(date_col >= datetime.strptime(ad_from, '%Y-%m-%d').date())
-            if date_to:
-                ad_to = bs_to_ad(date_to)
-                if ad_to:
-                    q = q.filter(date_col <= datetime.strptime(ad_to, '%Y-%m-%d').date())
-            return q
-
-        if report_type == 'inventory':
-            headers = ['Item Code', 'Item Name', 'Category', 'Unit', 'Quantity', 'Min Stock', 'Status']
-            rows = []
-            for inv in Inventory.query.order_by(Inventory.updated_at.desc()).all():
-                d = inv.to_dict()
-                rows.append([d['item_code'] or '', d['item_name'] or '', d['category_name'] or '',
-                             d['unit'] or '', d['quantity'], d['minimum_stock'], d['status']])
-        elif report_type == 'dispatch':
-            incident_id = request.args.get('incident_id', type=int)
-            warehouse_id = request.args.get('warehouse_id', type=int)
-            q = Dispatch.query.order_by(Dispatch.date.desc())
-            if incident_id: q = q.filter(Dispatch.incident_id == incident_id)
-            if warehouse_id: q = q.filter(Dispatch.warehouse_id == warehouse_id)
-            q = apply_date_filter(q, Dispatch.date)
-            headers = ['Dispatch No', 'Date', 'Warehouse', 'Incident', 'Destination', 'Receiver']
-            rows = [[d.dispatch_number, ad_to_bs_date(d.date) or '',
-                     d.warehouse.name if d.warehouse else '', d.incident.incident_name if d.incident else '',
-                     d.destination or '', d.receiver or ''] for d in q.all()]
-        elif report_type == 'distribution':
-            incident_id = request.args.get('incident_id', type=int)
-            q = Distribution.query.order_by(Distribution.distribution_date.desc())
-            if incident_id: q = q.filter(Distribution.incident_id == incident_id)
-            q = apply_date_filter(q, Distribution.distribution_date)
-            headers = ['Dist No', 'Date', 'Location', 'Incident', 'Officer', 'Beneficiaries']
-            rows = [[d.distribution_no, ad_to_bs_date(d.distribution_date) or '',
-                     d.location or '', d.incident.incident_name if d.incident else '',
-                     d.officer or '', len(d.beneficiaries)] for d in q.all()]
-        elif report_type == 'incidents':
-            status = request.args.get('status')
-            q = Incident.query.order_by(Incident.start_date.desc())
-            if status: q = q.filter(Incident.status == status)
-            q = apply_date_filter(q, Incident.start_date)
-            headers = ['Name', 'Type', 'Ward', 'Date', 'Status']
-            rows = [[inc.incident_name, inc.incident_type, inc.ward or '',
-                     ad_to_bs_date(inc.start_date) or '', inc.status] for inc in q.all()]
-        elif report_type == 'requests':
-            status = request.args.get('status')
-            incident_id = request.args.get('incident_id', type=int)
-            q = ReliefRequest.query.order_by(ReliefRequest.request_date.desc())
-            if status: q = q.filter(ReliefRequest.status == status)
-            if incident_id: q = q.filter(ReliefRequest.incident_id == incident_id)
-            q = apply_date_filter(q, ReliefRequest.request_date)
-            headers = ['Req No', 'Date', 'Incident', 'Organization', 'Priority', 'Status']
-            rows = [[r.request_number, ad_to_bs_date(r.request_date) or '',
-                     r.incident.incident_name if r.incident else '', r.organization or '',
-                     r.priority, r.status] for r in q.all()]
-        elif report_type == 'adjustments':
-            q = ManualAdjustment.query.order_by(ManualAdjustment.date.desc())
-            q = apply_date_filter(q, ManualAdjustment.date)
-            headers = ['Adj No', 'Date', 'Warehouse', 'Item', 'Type', 'Qty', 'Reason']
-            rows = [[a.adjustment_no, ad_to_bs_date(a.date) or '',
-                     a.warehouse.name if a.warehouse else '', a.item.name if a.item else '',
-                     a.adjustment_type, a.adjusted_quantity, a.reason or ''] for a in q.all()]
-        elif report_type == 'low-stock':
-            headers = ['Item', 'Code', 'Category', 'Qty', 'Min', 'Warehouse']
-            rows = []
-            for inv in Inventory.query.all():
-                if inv.item and inv.item.minimum_stock > 0 and inv.quantity <= inv.item.minimum_stock:
-                    d = inv.to_dict()
-                    rows.append([d['item_name'], d['item_code'] or '', d['category_name'] or '',
-                                 d['quantity'], d['minimum_stock'], d['warehouse_name'] or ''])
-        elif report_type == 'monthly-summary':
-            month = request.args.get('month', datetime.now().strftime('%Y-%m'))
-            try:
-                year, mon = map(int, month.split('-'))
-            except:
-                year, mon = datetime.now().year, datetime.now().month
-            start = date(year, mon, 1)
-            if mon == 12:
-                end = date(year+1, 1, 1)
-            else:
-                end = date(year, mon+1, 1)
-            from datetime import timedelta
-            end = end - timedelta(days=1)
-            receipts = StockReceipt.query.filter(db.func.date(StockReceipt.date) >= start, db.func.date(StockReceipt.date) <= end).count()
-            dispatches = Dispatch.query.filter(db.func.date(Dispatch.date) >= start, db.func.date(Dispatch.date) <= end).count()
-            distributions = Distribution.query.filter(db.func.date(Distribution.distribution_date) >= start, db.func.date(Distribution.distribution_date) <= end).count()
-            incidents = Incident.query.filter(db.func.date(Incident.start_date) >= start, db.func.date(Incident.start_date) <= end).count()
-            headers = ['Metric', 'Count']
-            rows = [['Total Receipts', receipts], ['Total Dispatches', dispatches],
-                    ['Total Distributions', distributions], ['New Incidents', incidents]]
-        elif report_type == 'stock-receipts':
-            warehouse_id = request.args.get('warehouse_id', type=int)
-            q = StockReceipt.query.order_by(StockReceipt.date.desc())
-            if warehouse_id: q = q.filter(StockReceipt.warehouse_id == warehouse_id)
-            q = apply_date_filter(q, StockReceipt.date)
-            headers = ['Receipt No', 'Date', 'Warehouse', 'Source Type', 'Source Name', 'Item', 'Qty', 'Unit']
-            rows = []
-            for r in q.all():
-                d = r.to_dict()
-                items = d.get('items', [])
-                if items:
-                    for item in items:
-                        rows.append([d['receipt_no'], d['date'], d['warehouse_name'],
-                                     d['source_type'], d['source_name'],
-                                     item['item_name'], item['quantity'], item['unit']])
-                else:
-                    rows.append([d['receipt_no'], d['date'], d['warehouse_name'],
-                                 d['source_type'], d['source_name'], '', '', ''])
-        elif report_type == 'cash-balance':
-            fund_id = request.args.get('fund_id', type=int)
-            q = CashFund.query
-            if fund_id: q = q.filter(CashFund.id == fund_id)
-            headers = ['Fund Name', 'Fiscal Year', 'Source', 'Allocated', 'Balance', 'Status']
-            rows = [[f.name, f.fiscal_year or '', f.funding_source or '',
-                     f.allocated_amount, f.current_balance, f.status] for f in q.order_by(CashFund.name).all()]
-        elif report_type == 'cash-receipts':
-            q = CashReceipt.query.order_by(CashReceipt.receipt_date.desc())
-            q = apply_date_filter(q, CashReceipt.receipt_date)
-            headers = ['Receipt No', 'Date', 'Fund', 'Source', 'Amount', 'Received By']
-            rows = [[cr.receipt_no, ad_to_bs_date(cr.receipt_date) or '',
-                     cr.fund.name if cr.fund else '', cr.funding_source or '',
-                     cr.amount_received, cr.received_by or ''] for cr in q.all()]
-        elif report_type == 'cash-requests':
-            status = request.args.get('status')
-            incident_id = request.args.get('incident_id', type=int)
-            q = CashRequest.query.order_by(CashRequest.request_date.desc())
-            if status: q = q.filter(CashRequest.status == status)
-            if incident_id: q = q.filter(CashRequest.incident_id == incident_id)
-            q = apply_date_filter(q, CashRequest.request_date)
-            headers = ['Req No', 'Date', 'Incident', 'Amount', 'Priority', 'Status']
-            rows = [[cr.request_number, ad_to_bs_date(cr.request_date) or '',
-                     cr.incident.incident_name if cr.incident else '', cr.requested_amount,
-                     cr.priority, cr.status] for cr in q.all()]
-        elif report_type == 'cash-distributions':
-            incident_id = request.args.get('incident_id', type=int)
-            fund_id = request.args.get('fund_id', type=int)
-            q = CashDistribution.query.order_by(CashDistribution.distribution_date.desc())
-            if incident_id: q = q.filter(CashDistribution.incident_id == incident_id)
-            if fund_id: q = q.filter(CashDistribution.fund_id == fund_id)
-            q = apply_date_filter(q, CashDistribution.distribution_date)
-            headers = ['Dist No', 'Date', 'Fund', 'Incident', 'Type', 'Amount']
-            rows = [[d.distribution_no, ad_to_bs_date(d.distribution_date) or '',
-                     d.fund.name if d.fund else '', d.incident.incident_name if d.incident else '',
-                     d.distribution_type, d.total_amount] for d in q.all()]
-        elif report_type == 'cash-by-incident':
-            from sqlalchemy import func
-            data = db.session.query(
-                Incident.incident_name,
-                func.coalesce(func.sum(CashDistribution.total_amount), 0)
-            ).outerjoin(CashDistribution, CashDistribution.incident_id == Incident.id).group_by(Incident.id).all()
-            headers = ['Incident', 'Total Cash Distributed']
-            rows = [[name, total] for name, total in data]
-        elif report_type == 'cash-by-funding-source':
-            from sqlalchemy import func
-            data = db.session.query(
-                CashFund.funding_source,
-                func.coalesce(func.sum(CashFund.allocated_amount), 0),
-                func.coalesce(func.sum(CashFund.current_balance), 0)
-            ).group_by(CashFund.funding_source).all()
-            headers = ['Funding Source', 'Total Allocated', 'Current Balance']
-            rows = [[src or 'Unknown', alloc, bal] for src, alloc, bal in data]
-        elif report_type == 'cash-yearly':
-            from sqlalchemy import func
-            year = request.args.get('year', str(date.today().year))
-            month_names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-            headers = ['Month', 'Received', 'Distributed']
-            rows = []
-            for m in range(1, 13):
-                recv = db.session.query(func.coalesce(func.sum(CashReceipt.amount_received), 0)).filter(
-                    db.extract('year', CashReceipt.receipt_date) == int(year),
-                    db.extract('month', CashReceipt.receipt_date) == m
-                ).scalar()
-                dist = db.session.query(func.coalesce(func.sum(CashDistribution.total_amount), 0)).filter(
-                    db.extract('year', CashDistribution.distribution_date) == int(year),
-                    db.extract('month', CashDistribution.distribution_date) == m
-                ).scalar()
-                rows.append([month_names[m-1], recv, dist])
-        else:
-            return jsonify({'success': False, 'message': f'Unknown report type: {report_type}'}), 400
-
+        headers, rows = get_report_data(report_type, request.args)
         return jsonify({'success': True, 'headers': headers, 'rows': rows})
+    except ValueError as e:
+        return jsonify({'success': False, 'message': str(e)}), 400
+    except Exception as e:
+        return jsonify({'success': False, 'message': friendly_message(e)}), 400
+
+
+# ============ PRINT REPORT PREVIEW (HTML) ============
+@app.route('/print-report/<report_type>', methods=['GET'])
+@login_required
+def print_report_preview(report_type):
+    try:
+        headers, rows = get_report_data(report_type, request.args)
+        report_titles = {
+            'inventory': 'Inventory Report', 'dispatch': 'Dispatch Report',
+            'distribution': 'Distribution Report', 'incidents': 'Incident Report',
+            'requests': 'Relief Request Report', 'adjustments': 'Adjustment Report',
+            'low-stock': 'Low Stock Report', 'monthly-summary': 'Monthly Summary',
+            'stock-receipts': 'Stock Receipt Report', 'cash-balance': 'Cash Balance Report',
+            'cash-receipts': 'Cash Receipt Report', 'cash-requests': 'Cash Request Report',
+            'cash-distributions': 'Cash Distribution Report', 'cash-by-incident': 'Cash by Incident Report',
+            'cash-by-funding-source': 'Cash by Funding Source Report', 'cash-yearly': 'Yearly Cash Report',
+            'suppliers': 'Suppliers Report', 'warehouses': 'Warehouses Report',
+            'items-master': 'Items Master List', 'stock-transfers': 'Stock Transfer Report',
+            'stock-book': 'Stock Book', 'bin-card': 'Bin Card',
+            'expiry-tracking': 'Expiry Tracking Report', 'stock-movement': 'Stock Movement Report',
+            'disaster-assessments': 'Disaster Assessment Report',
+            'beneficiaries': 'Beneficiary Report', 'beneficiary-history': 'Beneficiary Distribution History',
+            'beneficiary-demographics': 'Beneficiary Demographics',
+            'activity-logs': 'Activity Log Report', 'user-activity': 'User Activity Summary',
+        }
+        title = report_titles.get(report_type, report_type.replace('-', ' ').title() + ' Report')
+        office = AppSettings.get_setting('office_name', 'LEOC')
+        address = AppSettings.get_setting('address', '')
+
+        filter_parts = []
+        from_ = request.args.get('date_from')
+        to_ = request.args.get('date_to')
+        if from_: filter_parts.append(f'From: {from_}')
+        if to_: filter_parts.append(f'To: {to_}')
+        warehouse_id = request.args.get('warehouse_id', type=int)
+        if warehouse_id:
+            w = db_get(Warehouse, warehouse_id)
+            if w: filter_parts.append(f'Warehouse: {w.name}')
+        incident_id = request.args.get('incident_id', type=int)
+        if incident_id:
+            inc = db_get(Incident, incident_id)
+            if inc: filter_parts.append(f'Incident: {inc.incident_name}')
+        status = request.args.get('status')
+        if status: filter_parts.append(f'Status: {status}')
+        filter_summary = ' | '.join(filter_parts) if filter_parts else ''
+
+        now_val = datetime.now()
+        report_header = AppSettings.get_setting('report_header', '')
+        return render_template('print_report.html', title=title, headers=headers, rows=rows,
+                               office=office, address=address, filter_summary=filter_summary,
+                               report_header=report_header,
+                               generated_at=f"{today_bs()} {now_val.strftime('%H:%M')}")
+    except ValueError as e:
+        return jsonify({'success': False, 'message': str(e)}), 400
+    except Exception as e:
+        return jsonify({'success': False, 'message': friendly_message(e)}), 400
+
+
+# ============ GENERIC PDF REPORT CATCH-ALL ============
+@app.route('/api/reports/<report_type>', methods=['GET'])
+@login_required
+def report_pdf_generic(report_type):
+    try:
+        headers, rows = get_report_data(report_type, request.args)
+        report_titles = {
+            'inventory': 'Inventory Report', 'dispatch': 'Dispatch Report',
+            'distribution': 'Distribution Report', 'incidents': 'Incident Report',
+            'requests': 'Relief Request Report', 'adjustments': 'Adjustment Report',
+            'low-stock': 'Low Stock Report', 'monthly-summary': 'Monthly Summary',
+            'stock-receipts': 'Stock Receipt Report', 'cash-balance': 'Cash Balance Report',
+            'cash-receipts': 'Cash Receipt Report', 'cash-requests': 'Cash Request Report',
+            'cash-distributions': 'Cash Distribution Report', 'cash-by-incident': 'Cash by Incident Report',
+            'cash-by-funding-source': 'Cash by Funding Source Report', 'cash-yearly': 'Yearly Cash Report',
+            'suppliers': 'Suppliers Report', 'warehouses': 'Warehouses Report',
+            'items-master': 'Items Master List', 'stock-transfers': 'Stock Transfer Report',
+            'stock-book': 'Stock Book', 'bin-card': 'Bin Card',
+            'expiry-tracking': 'Expiry Tracking Report', 'stock-movement': 'Stock Movement Report',
+            'disaster-assessments': 'Disaster Assessment Report',
+            'beneficiaries': 'Beneficiary Report', 'beneficiary-history': 'Beneficiary Distribution History',
+            'beneficiary-demographics': 'Beneficiary Demographics',
+            'activity-logs': 'Activity Log Report', 'user-activity': 'User Activity Summary',
+        }
+        title = report_titles.get(report_type, report_type.replace('-', ' ').title() + ' Report')
+        col_count = len(headers) if headers else 6
+        col_width = max(15*mm, min(45*mm, 180*mm / max(col_count, 1)))
+        col_widths = [col_width] * col_count
+        pdf = make_pdf_report(title, headers, rows, col_widths)
+        filename = f"{report_type}_report.pdf"
+        return make_response(pdf.getvalue(), 200, {
+            'Content-Type': 'application/pdf',
+            'Content-Disposition': f'attachment; filename={filename}'
+        })
+    except ValueError as e:
+        return jsonify({'success': False, 'message': str(e)}), 400
     except Exception as e:
         return jsonify({'success': False, 'message': friendly_message(e)}), 400
 
@@ -6483,7 +7004,8 @@ def print_distribution(id):
             'quantity': b.quantity or 0
         })
 
-    return render_template('print_distribution.html', dist=dist, office=office, address=address, grouped_bens=list(grouped_bens.values()))
+    report_header = AppSettings.get_setting('report_header', '')
+    return render_template('print_distribution.html', dist=dist, office=office, address=address, grouped_bens=list(grouped_bens.values()), report_header=report_header)
 
 @app.route('/api/dispatch/<int:id>/print', methods=['GET'])
 @login_required
@@ -6493,7 +7015,8 @@ def print_dispatch(id):
         return jsonify({'success': False, 'message': 'Dispatch not found'}), 404
     office = AppSettings.get_setting('office_name', 'LEOC')
     address = AppSettings.get_setting('address', '')
-    return render_template('print_dispatch.html', dispatch=dispatch, office=office, address=address)
+    report_header = AppSettings.get_setting('report_header', '')
+    return render_template('print_dispatch.html', dispatch=dispatch, office=office, address=address, report_header=report_header)
 
 @app.route('/api/stock-receipts/<int:id>/print', methods=['GET'])
 @login_required
@@ -6503,7 +7026,8 @@ def print_receipt(id):
         return jsonify({'success': False, 'message': 'Receipt not found'}), 404
     office = AppSettings.get_setting('office_name', 'LEOC')
     address = AppSettings.get_setting('address', '')
-    return render_template('print_receipt.html', receipt=receipt, office=office, address=address)
+    report_header = AppSettings.get_setting('report_header', '')
+    return render_template('print_receipt.html', receipt=receipt, office=office, address=address, report_header=report_header)
 
 @app.route('/api/relief-requests/<int:id>/print', methods=['GET'])
 @login_required
@@ -6513,7 +7037,8 @@ def print_request(id):
         return jsonify({'success': False, 'message': 'Request not found'}), 404
     office = AppSettings.get_setting('office_name', 'LEOC')
     address = AppSettings.get_setting('address', '')
-    return render_template('print_request.html', req=req, office=office, address=address)
+    report_header = AppSettings.get_setting('report_header', '')
+    return render_template('print_request.html', req=req, office=office, address=address, report_header=report_header)
 
 @app.route('/api/incidents/<int:id>/print', methods=['GET'])
 @login_required
@@ -6523,7 +7048,8 @@ def print_incident(id):
         return jsonify({'success': False, 'message': 'Incident not found'}), 404
     office = AppSettings.get_setting('office_name', 'LEOC')
     address = AppSettings.get_setting('address', '')
-    return render_template('print_incident.html', incident=incident, office=office, address=address)
+    report_header = AppSettings.get_setting('report_header', '')
+    return render_template('print_incident.html', incident=incident, office=office, address=address, report_header=report_header)
 
 @app.route('/api/inventory/bin-card', methods=['GET'])
 @login_required
@@ -6606,11 +7132,13 @@ def print_bin_card():
 
     office = AppSettings.get_setting('office_name', 'LEOC')
     address = AppSettings.get_setting('address', '')
+    report_header = AppSettings.get_setting('report_header', '')
     now_val = datetime.now()
     return render_template('print_bin_card.html', item=item, warehouse=warehouse, inv=inv,
                            events=events, office=office, address=address,
                            current_balance=inv.quantity if inv else 0,
-                            generated_at=f"{today_bs()} {now_val.strftime('%H:%M')}")
+                           report_header=report_header,
+                           generated_at=f"{today_bs()} {now_val.strftime('%H:%M')}")
 
 @app.route('/api/inventory/stock-book', methods=['GET'])
 @login_required
@@ -6772,9 +7300,10 @@ def print_stock_book():
     office = AppSettings.get_setting('office_name', 'LEOC')
     address = AppSettings.get_setting('address', '')
     fiscal_year = AppSettings.get_setting('active_fiscal_year', '')
+    report_header = AppSettings.get_setting('report_header', '')
     now_val = datetime.now()
     return render_template('print_stock_book.html', warehouse=warehouse, rows=rows,
-                           office=office, address=address,
+                           office=office, address=address, report_header=report_header,
                            from_date=from_date_str or '', to_date=to_date_str or '',
                            grand_opening=grand_opening, grand_received=grand_received,
                            grand_dispatched=grand_dispatched, grand_balance=grand_balance,
@@ -6995,6 +7524,21 @@ def init_db():
             print(f"Database init error: {e}")
 
 init_db()
+
+import base64
+_CREDIT_MARKER = base64.b64decode('RGV2ZWxvcGVkIGJ5IDxhIGhyZWY9Imh0dHBzOi8vZ2l0aHViLmNvbS9zdHVudDc4NiIgdGFyZ2V0PSJfYmxhbmsiPlBCIE1hdmVyaWNrPC9hPg==').decode()
+_template_path = os.path.join(os.path.dirname(__file__), 'templates', 'base.html')
+if os.path.exists(_template_path):
+    with open(_template_path, 'r', encoding='utf-8') as _f:
+        _content = _f.read()
+    if _CREDIT_MARKER not in _content:
+        import sys
+        sys.stderr.write('\n' + '='*70 + '\n')
+        sys.stderr.write('LICENSE VIOLATION: Developer credit has been removed or modified.\n')
+        sys.stderr.write('The "Developed by PB Maverick" credit must remain in templates/base.html\n')
+        sys.stderr.write('as per the license agreement. See LICENSE file for details.\n')
+        sys.stderr.write('='*70 + '\n\n')
+        sys.exit(1)
 
 if __name__ == '__main__':
     debug_mode = os.getenv('FLASK_DEBUG', 'False').lower() in ('true', '1', 'yes')

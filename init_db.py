@@ -446,6 +446,9 @@ def run_migrations():
         ],
         'event_log': [('is_locked', 'BOOLEAN DEFAULT 0')],
         'category': [('is_predefined', 'BOOLEAN DEFAULT 0')],
+        'document_archive': [
+            ('uploaded_by', 'INTEGER'),
+        ],
         'situation_report': [('is_locked', 'BOOLEAN DEFAULT 0')],
         'public_information': [('is_locked', 'BOOLEAN DEFAULT 0')],
     }

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stock Book - LEOC</title>
+    <title>{{ title }} - LEOC</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
     <style>
@@ -14,13 +14,14 @@
         .header h4 { margin-bottom: 2px; font-weight: 700; color: #1a365d; }
         .header h5 { color: #2c5282; font-weight: 600; }
         .header h6 { color: #4a5568; font-weight: 600; }
-        table { font-size: 10px; }
-        table th { white-space: nowrap; font-size: 10px; }
-        .footer { margin-top: 25px; }
-        .field-label { font-weight: 600; color: #495057; }
+        .header .filter-summary { font-size: 10px; color: #6c757d; margin-top: 4px; }
+        table { font-size: 9px; width: 100%; }
+        table th { white-space: nowrap; font-size: 9px; vertical-align: middle; text-align: center; background-color: #2c5282; color: #fff; }
+        table td { vertical-align: middle; }
+        .footer { margin-top: 20px; }
         .signature-line { border-top: 1px solid #000; width: 200px; display: inline-block; margin-top: 5px; }
-        .totals-row { font-weight: 700; background-color: #e9ecef; }
         .striped tbody tr:nth-of-type(even) { background-color: #f8f9fa; }
+        .totals-row { font-weight: 700; background-color: #e9ecef; }
     </style>
 </head>
 <body>
@@ -40,30 +41,21 @@
         {% else %}
         <h4>{{ office or 'थलारा गाउँपालिका' }}</h4>
         <h5>स्थानीय आपतकालिन कार्यसञ्चालन केन्द्र (LEOC)</h5>
-        {% endif %}
         {% if address %}<small class="text-muted">{{ address }}</small>{% endif %}
-        <h6 class="mt-2">स्टक बुक (Stock Book)</h6>
-        <p class="mb-0">
-            <strong>Warehouse / गोदाम:</strong> {{ warehouse.name }} &nbsp;|&nbsp;
-            {% if from_date or to_date %}
-            <strong>Period / अवधि:</strong> {{ from_date or 'Start' }} to {{ to_date or 'End' }} &nbsp;|&nbsp;
-            {% endif %}
-            <strong>Fiscal Year:</strong> {{ fiscal_year or '' }}
-        </p>
+        {% endif %}
+        <h6 class="mt-2">{{ title }}</h6>
+        {% if filter_summary %}
+        <div class="filter-summary">{{ filter_summary }}</div>
+        {% endif %}
     </div>
 
     <table class="table table-bordered table-sm striped mb-0">
-        <thead class="table-dark">
+        <thead>
             <tr>
                 <th style="width:30px;">S.No</th>
-                <th style="width:100px;">Item Code / कोड</th>
-                <th style="width:200px;">Item Name / सामानको नाम</th>
-                <th style="width:50px;">Unit / एकाइ</th>
-                <th style="width:70px;">Opening / मौ. वा</th>
-                <th style="width:70px;">Received / प्राप्त</th>
-                <th style="width:70px;">Dispatched / खर्च</th>
-                <th style="width:70px;">Closing / मौ. जि</th>
-                <th>Remarks / टिप्पणी</th>
+                {% for h in headers %}
+                <th>{{ h }}</th>
+                {% endfor %}
             </tr>
         </thead>
         <tbody>
@@ -71,39 +63,24 @@
                 {% for row in rows %}
                 <tr>
                     <td class="text-center">{{ loop.index }}</td>
-                    <td><small>{{ row.item_code }}</small></td>
-                    <td>{{ row.item_name }}{% if row.local_name %} ({{ row.local_name }}){% endif %}</td>
-                    <td class="text-center">{{ row.unit }}</td>
-                    <td class="text-end">{{ row.opening }}</td>
-                    <td class="text-end">{{ row.received }}</td>
-                    <td class="text-end">{{ row.dispatched }}</td>
-                    <td class="text-end fw-bold">{{ row.balance }}</td>
-                    <td></td>
+                    {% for cell in row %}
+                    <td{% if cell is number %} class="text-end"{% endif %}>{{ cell if cell is not none else '' }}</td>
+                    {% endfor %}
                 </tr>
                 {% endfor %}
             {% else %}
                 <tr>
-                    <td colspan="9" class="text-center py-3 text-muted">No stock records found for this warehouse.</td>
+                    <td colspan="{{ headers|length + 1 }}" class="text-center py-3 text-muted">No data found.</td>
                 </tr>
             {% endif %}
         </tbody>
-        <tfoot>
-            <tr class="totals-row">
-                <td colspan="4" class="text-end fw-bold">Total / जम्मा</td>
-                <td class="text-end">{{ grand_opening }}</td>
-                <td class="text-end">{{ grand_received }}</td>
-                <td class="text-end">{{ grand_dispatched }}</td>
-                <td class="text-end">{{ grand_balance }}</td>
-                <td></td>
-            </tr>
-        </tfoot>
     </table>
 
     <div class="footer">
         <div class="row mt-3">
             <div class="col-3 text-center">
                 <div class="signature-line"></div>
-                <div class="mt-1"><strong>Recorded By / लेखा गर्ने</strong></div>
+                <div class="mt-1"><strong>Prepared By / तयार गर्ने</strong></div>
                 <small class="text-muted">(Name & Signature)</small>
             </div>
             <div class="col-3 text-center">
@@ -113,7 +90,7 @@
             </div>
             <div class="col-3 text-center">
                 <div class="signature-line"></div>
-                <div class="mt-1"><strong>Store Keeper / भण्डारपाल</strong></div>
+                <div class="mt-1"><strong>Approved By / स्वीकृत गर्ने</strong></div>
                 <small class="text-muted">(Name & Signature)</small>
             </div>
             <div class="col-3 text-center">

@@ -8,27 +8,58 @@
 <div class="page-header d-flex justify-content-between align-items-center flex-wrap gap-2">
     <h4><i class="bi bi-file-text me-2"></i>Reports</h4>
     <div class="d-flex gap-2 flex-wrap">
-        <select class="form-select form-select-sm" id="reportType" style="width:auto" onchange="onTypeChange()">
+        <select class="form-select form-select-sm" id="reportType" style="width:auto;min-width:260px" onchange="onTypeChange()">
             <option value="">-- Select Report --</option>
-            <option value="inventory">Inventory Report</option>
-            <option value="stock-receipts">Stock Receipt Report</option>
-            <option value="dispatch">Dispatch Report</option>
-            <option value="distribution">Distribution Report</option>
-            <option value="incidents">Incident Report</option>
-            <option value="requests">Relief Request Report</option>
-            <option value="adjustments">Adjustment Report</option>
-            <option value="low-stock">Low Stock Report</option>
-            <option value="monthly-summary">Monthly Summary</option>
-            <option value="cash-balance">Cash Balance</option>
-            <option value="cash-receipts">Cash Receipt</option>
-            <option value="cash-requests">Cash Request</option>
-            <option value="cash-distributions">Cash Distribution</option>
-            <option value="cash-by-incident">Cash by Incident</option>
-            <option value="cash-by-funding-source">Cash by Funding Source</option>
-            <option value="cash-yearly">Yearly Cash Report</option>
+            <optgroup label="--- Master Data ---">
+                <option value="suppliers">Suppliers Report</option>
+                <option value="warehouses">Warehouses Report</option>
+                <option value="items-master">Items Master List</option>
+            </optgroup>
+            <optgroup label="--- Inventory ---">
+                <option value="inventory">Inventory Report</option>
+                <option value="stock-receipts">Stock Receipt Report</option>
+                <option value="stock-transfers">Stock Transfer Report</option>
+                <option value="stock-book">Stock Book</option>
+                <option value="bin-card">Bin Card</option>
+                <option value="adjustments">Adjustment Report</option>
+                <option value="low-stock">Low Stock Report</option>
+                <option value="expiry-tracking">Expiry Tracking</option>
+                <option value="stock-movement">Stock Movement Report</option>
+            </optgroup>
+            <optgroup label="--- Operations ---">
+                <option value="dispatch">Dispatch Report</option>
+                <option value="distribution">Distribution Report</option>
+                <option value="incidents">Incident Report</option>
+                <option value="requests">Relief Request Report</option>
+                <option value="disaster-assessments">Disaster Assessment Report</option>
+            </optgroup>
+            <optgroup label="--- Finance ---">
+                <option value="cash-balance">Cash Balance</option>
+                <option value="cash-receipts">Cash Receipt</option>
+                <option value="cash-requests">Cash Request</option>
+                <option value="cash-distributions">Cash Distribution</option>
+                <option value="cash-by-incident">Cash by Incident</option>
+                <option value="cash-by-funding-source">Cash by Funding Source</option>
+                <option value="cash-yearly">Yearly Cash Report</option>
+            </optgroup>
+            <optgroup label="--- People ---">
+                <option value="beneficiaries">Beneficiary Report</option>
+                <option value="beneficiary-history">Beneficiary Distribution History</option>
+                <option value="beneficiary-demographics">Beneficiary Demographics</option>
+            </optgroup>
+            <optgroup label="--- System ---">
+                <option value="activity-logs">Activity Log Report</option>
+                <option value="user-activity">User Activity Summary</option>
+            </optgroup>
+            <optgroup label="--- Analytics ---">
+                <option value="monthly-summary">Monthly Summary</option>
+            </optgroup>
         </select>
+        <button class="btn btn-outline-primary btn-sm" onclick="printPreview()" id="printBtn" disabled title="Print Preview">
+            <i class="bi bi-printer me-1"></i>Print
+        </button>
         <button class="btn btn-primary btn-sm" onclick="downloadReport()" id="downloadBtn" disabled>
-            <i class="bi bi-download me-1"></i>Download PDF
+            <i class="bi bi-download me-1"></i>PDF
         </button>
     </div>
 </div>
@@ -44,40 +75,103 @@
                 <label class="form-label small">Date To</label>
                 <input type="text" class="form-control form-control-sm nepali-date" placeholder="YYYY-MM-DD" id="dateTo" onchange="loadReportData()">
             </div>
-            <div class="col-auto filter-optional" data-types="inventory,dispatch,stock-receipts,adjustments,low-stock">
+            <div class="col-auto filter-optional" data-types="inventory,stock-receipts,dispatch,adjustments,low-stock,stock-transfers,stock-book,bin-card,expiry-tracking,stock-movement">
                 <label class="form-label small">Warehouse</label>
                 <select class="form-select form-select-sm" id="filterWarehouse" onchange="loadReportData()"><option value="">All</option></select>
             </div>
-            <div class="col-auto filter-optional" data-types="inventory,items,dispatch,requests">
+            <div class="col-auto filter-optional" data-types="inventory,dispatch,requests,items-master,stock-receipts,expiry-tracking,stock-movement,low-stock">
                 <label class="form-label small">Category</label>
                 <select class="form-select form-select-sm" id="filterCategory" onchange="loadReportData()"><option value="">All</option></select>
             </div>
-            <div class="col-auto filter-optional" data-types="dispatch,distribution,incidents,requests,cash-distributions,cash-requests">
+            <div class="col-auto filter-optional" data-types="dispatch,distribution,incidents,requests,cash-distributions,cash-requests,disaster-assessments">
                 <label class="form-label small">Incident</label>
                 <select class="form-select form-select-sm" id="filterIncident" onchange="loadReportData()"><option value="">All</option></select>
             </div>
-            <div class="col-auto filter-optional" data-types="incidents,requests,cash-requests">
+            <div class="col-auto filter-optional" data-types="incidents,requests,cash-requests,disaster-assessments,suppliers,warehouses,beneficiaries,cash-funds">
                 <label class="form-label small">Status</label>
                 <select class="form-select form-select-sm" id="filterStatus" onchange="loadReportData()"><option value="">All</option>
-                    <option value="Active">Active</option><option value="Closed">Closed</option>
-                    <option value="Pending">Pending</option><option value="Completed">Completed</option>
+                    <option value="Active">Active</option><option value="Inactive">Inactive</option>
+                    <option value="Closed">Closed</option><option value="Pending">Pending</option>
+                    <option value="Completed">Completed</option><option value="Approved">Approved</option>
+                    <option value="Rejected">Rejected</option>
+                </select>
+            </div>
+            <div class="col-auto filter-optional" data-types="incidents,disaster-assessments">
+                <label class="form-label small">Severity</label>
+                <select class="form-select form-select-sm" id="filterSeverity" onchange="loadReportData()"><option value="">All</option>
+                    <option value="low">Low</option><option value="medium">Medium</option>
+                    <option value="high">High</option><option value="critical">Critical</option>
+                </select>
+            </div>
+            <div class="col-auto filter-optional" data-types="requests,dispatch,cash-requests,stock-transfers">
+                <label class="form-label small">Priority</label>
+                <select class="form-select form-select-sm" id="filterPriority" onchange="loadReportData()"><option value="">All</option>
+                    <option value="Low">Low</option><option value="Medium">Medium</option>
+                    <option value="High">High</option><option value="Urgent">Urgent</option>
+                </select>
+            </div>
+            <div class="col-auto filter-optional" data-types="distribution,beneficiary-history,beneficiaries,incidents,disaster-assessments">
+                <label class="form-label small">Ward</label>
+                <select class="form-select form-select-sm" id="filterWard" onchange="loadReportData()"><option value="">All</option></select>
+            </div>
+            <div class="col-auto filter-optional" data-types="stock-receipts">
+                <label class="form-label small">Source Type</label>
+                <select class="form-select form-select-sm" id="filterSourceType" onchange="loadReportData()"><option value="">All</option>
+                    <option value="Government Supply">Government Supply</option>
+                    <option value="Donation">Donation</option>
+                    <option value="NGO">NGO</option>
+                    <option value="Purchase">Purchase</option>
+                    <option value="Supplier">Supplier</option>
+                    <option value="Transfer">Transfer</option>
+                    <option value="Other">Other</option>
+                </select>
+            </div>
+            <div class="col-auto filter-optional" data-types="stock-receipts">
+                <label class="form-label small">Supplier</label>
+                <select class="form-select form-select-sm" id="filterSupplier" onchange="loadReportData()"><option value="">All</option></select>
+            </div>
+            <div class="col-auto filter-optional" data-types="bin-card,expiry-tracking,stock-movement,stock-book">
+                <label class="form-label small">Item</label>
+                <select class="form-select form-select-sm" id="filterItem" onchange="loadReportData()"><option value="">All</option></select>
+            </div>
+            <div class="col-auto filter-optional" data-types="distribution,cash-distributions">
+                <label class="form-label small">Distribution Type</label>
+                <select class="form-select form-select-sm" id="filterDistType" onchange="loadReportData()"><option value="">All</option>
+                    <option value="Individual">Individual</option>
+                    <option value="Family">Family</option>
+                    <option value="Community">Community</option>
+                    <option value="Local Government">Local Government</option>
+                    <option value="Organization">Organization</option>
                 </select>
             </div>
             <div class="col-auto filter-optional" data-types="monthly-summary">
                 <label class="form-label small">Month</label>
                 <input type="month" class="form-control form-control-sm" id="filterMonth" onchange="loadReportData()">
             </div>
-            <div class="col-auto filter-optional" data-types="cash-yearly">
-                <label class="form-label small">Year</label>
-                <input type="number" class="form-control form-control-sm" id="filterYear" value="{{ now().year }}" onchange="loadReportData()">
-            </div>
             <div class="col-auto filter-optional" data-types="cash-distributions,cash-requests,cash-balance">
                 <label class="form-label small">Fund</label>
                 <select class="form-select form-select-sm" id="filterFund" onchange="loadReportData()"><option value="">All</option></select>
             </div>
-            <div class="col-auto filter-optional" data-types="inventory,dispatch,distribution,incidents,requests,adjustments,low-stock,stock-receipts">
+            <div class="col-auto filter-optional" data-types="inventory,dispatch,distribution,incidents,requests,adjustments,low-stock,stock-receipts,stock-transfers,stock-book,expiry-tracking,cash-balance,cash-receipts,cash-requests,cash-distributions,cash-yearly">
                 <label class="form-label small">Fiscal Year</label>
                 <select class="form-select form-select-sm" id="filterFiscalYear" onchange="loadReportData()"><option value="">All</option></select>
+            </div>
+            <div class="col-auto filter-optional" data-types="activity-logs">
+                <label class="form-label small">Action</label>
+                <select class="form-select form-select-sm" id="filterAction" onchange="loadReportData()"><option value="">All</option>
+                    <option value="create">Create</option><option value="update">Update</option>
+                    <option value="delete">Delete</option><option value="login">Login</option>
+                    <option value="logout">Logout</option><option value="download">Download</option>
+                    <option value="print">Print</option><option value="clear_logs">Clear Logs</option>
+                </select>
+            </div>
+            <div class="col-auto filter-optional" data-types="activity-logs,user-activity">
+                <label class="form-label small">User</label>
+                <select class="form-select form-select-sm" id="filterUser" onchange="loadReportData()"><option value="">All</option></select>
+            </div>
+            <div class="col-auto filter-optional" data-types="activity-logs">
+                <label class="form-label small">Resource</label>
+                <input type="text" class="form-control form-control-sm" id="filterResource" placeholder="e.g. item, incident" onchange="loadReportData()" style="width:140px">
             </div>
         </div>
     </div>
@@ -112,7 +206,12 @@ async function loadFormData() {
         populateSelect('filterIncident', data.incidents, 'id', 'incident_name');
         populateSelect('filterFiscalYear', (data.fiscal_years || []).map(y => ({value: y, label: y})), 'value', 'label');
         populateSelect('filterFund', data.cash_funds || [], 'id', 'name');
+        populateSelect('filterWard', data.wards || [], 'id', 'name');
+        populateSelect('filterSupplier', data.suppliers || [], 'id', 'name');
+        populateSelect('filterItem', data.items || [], 'id', 'name');
+        populateSelect('filterUser', data.users || [], 'id', 'username');
         document.getElementById('filterMonth').value = new Date().toISOString().slice(0, 7);
+        document.getElementById('filterYear').value = new Date().getFullYear();
     } catch(e) { console.error(e); }
 }
 
@@ -143,19 +242,39 @@ function getFilterParams() {
     const category = document.getElementById('filterCategory').value;
     const incident = document.getElementById('filterIncident').value;
     const status = document.getElementById('filterStatus').value;
+    const severity = document.getElementById('filterSeverity').value;
+    const priority = document.getElementById('filterPriority').value;
+    const ward = document.getElementById('filterWard').value;
     const fiscalYear = document.getElementById('filterFiscalYear').value;
     const month = document.getElementById('filterMonth').value;
     const fund = document.getElementById('filterFund').value;
+    const sourceType = document.getElementById('filterSourceType').value;
+    const supplier = document.getElementById('filterSupplier').value;
+    const item = document.getElementById('filterItem').value;
+    const distType = document.getElementById('filterDistType').value;
+    const action = document.getElementById('filterAction').value;
+    const user = document.getElementById('filterUser').value;
+    const resource = document.getElementById('filterResource').value;
 
     if (dateFrom) params.set('date_from', dateFrom);
     if (dateTo) params.set('date_to', dateTo);
-    if (warehouse && type !== 'monthly-summary' && !type.startsWith('cash-')) params.set('warehouse_id', warehouse);
-    if (category && ['inventory','dispatch','requests'].includes(type)) params.set('category_id', category);
-    if (incident && ['dispatch','distribution','incidents','requests','cash-requests','cash-distributions'].includes(type)) params.set('incident_id', incident);
-    if (status && ['incidents','requests','cash-requests'].includes(type)) params.set('status', status);
+    if (warehouse) params.set('warehouse_id', warehouse);
+    if (category) params.set('category_id', category);
+    if (incident) params.set('incident_id', incident);
+    if (status) params.set('status', status);
+    if (severity) params.set('severity', severity);
+    if (priority) params.set('priority', priority);
+    if (ward) params.set('ward_id', ward);
     if (month && type === 'monthly-summary') params.set('month', month);
-    if (type === 'cash-yearly') params.set('year', document.getElementById('filterYear').value || new Date().getFullYear());
-    if (fund && ['cash-distributions','cash-balance'].includes(type)) params.set('fund_id', fund);
+    if (fiscalYear) params.set('fiscal_year', fiscalYear);
+    if (fund) params.set('fund_id', fund);
+    if (sourceType) params.set('source_type', sourceType);
+    if (supplier) params.set('supplier_id', supplier);
+    if (item) params.set('item_id', item);
+    if (distType) params.set('distribution_type', distType);
+    if (action) params.set('action', action);
+    if (user) params.set('user_id', user);
+    if (resource) params.set('resource', resource);
     return params.toString();
 }
 
@@ -163,6 +282,7 @@ async function onTypeChange() {
     toggleFilters();
     const type = document.getElementById('reportType').value;
     document.getElementById('downloadBtn').disabled = !type;
+    document.getElementById('printBtn').disabled = !type;
     if (type) {
         await loadReportData();
     } else {
@@ -199,12 +319,18 @@ async function loadReportData() {
     }
 }
 
-async function downloadReport() {
+function downloadReport() {
     const type = document.getElementById('reportType').value;
     if (!type) return;
     const params = getFilterParams();
-    const url = `/api/reports/${type}${params ? '?' + params : ''}`;
-    window.open(url, '_blank');
+    window.open(`/api/reports/${type}${params ? '?' + params : ''}`, '_blank');
+}
+
+function printPreview() {
+    const type = document.getElementById('reportType').value;
+    if (!type) return;
+    const params = getFilterParams();
+    window.open(`/print-report/${type}${params ? '?' + params : ''}`, '_blank');
 }
 
 document.addEventListener('DOMContentLoaded', async function() {

@@ -34,8 +34,17 @@
     </div>
 
     <div class="header">
+        {% if report_header %}
+        {% for line in report_header.strip().split('\n') %}
+        {% set l = line.strip() %}
+        {% if l %}
+        {% if loop.first %}<h4>{{ l }}</h4>{% else %}<h5>{{ l }}</h5>{% endif %}
+        {% endif %}
+        {% endfor %}
+        {% else %}
         <h4>{{ office or 'थलारा गाउँपालिका' }}</h4>
-        <h5>स्थानीय आपतकालीन कार्य केन्द्र (LEOC)</h5>
+        <h5>स्थानीय आपतकालिन कार्यसञ्चालन केन्द्र (LEOC)</h5>
+        {% endif %}
         {% if address %}<small class="text-muted">{{ address }}</small>{% endif %}
         <h6 class="mt-1">बिन कार्ड (Bin Card)</h6>
     </div>

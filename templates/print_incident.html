@@ -41,8 +41,17 @@
     </div>
 
     <div class="header">
+        {% if report_header %}
+        {% for line in report_header.strip().split('\n') %}
+        {% set l = line.strip() %}
+        {% if l %}
+        {% if loop.first %}<h3>{{ l }}</h3>{% else %}<h5>{{ l }}</h5>{% endif %}
+        {% endif %}
+        {% endfor %}
+        {% else %}
         <h3>{{ office or 'थलारा गाउँपालिका' }}</h3>
-        <h5>स्थानीय आपतकालीन कार्य केन्द्र (LEOC)</h5>
+        <h5>स्थानीय आपतकालिन कार्यसञ्चालन केन्द्र (LEOC)</h5>
+        {% endif %}
         <p class="text-muted mb-0">{{ address }}</p>
         <div class="report-title"><i class="bi bi-lightning-charge-fill"></i> Incident Report</div>
     </div>
