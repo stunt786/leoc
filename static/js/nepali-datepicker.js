@@ -282,6 +282,9 @@
         });
     }
 
+    window.getTodayBS = getTodayBS;
+    window.adToBS = adToBS;
+
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', initNepaliDatepicker);
     } else {

@@ -6143,7 +6143,7 @@ def get_form_data():
             'cash_requests': [r.to_dict() for r in CashRequest.query.all()],
             'beneficiaries': [b.to_dict() for b in Beneficiary.query.all()],
             'suppliers': [s.to_dict() for s in Supplier.query.all()],
-            'supplier_types': ['Government', 'NGO', 'Private', 'Individual', 'Other'],
+            'supplier_types': ['Government Supply', 'Donation', 'NGO', 'Local Government', 'Purchase', 'Supplier', 'Transfer', 'Other'],
             'warehouse_zones': [z.to_dict() for z in WarehouseZone.query.all()],
             'funding_sources': ['Federal Government', 'Provincial Government', 'Municipality', 'Disaster Relief Fund', 'Donor Agency', 'NGO', 'Other'],
             'cash_purposes': ['Medical Support', 'Immediate Relief', 'Temporary Shelter', 'Funeral Support', 'Food Assistance', 'Livelihood Support', 'Other'],

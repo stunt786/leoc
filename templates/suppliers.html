@@ -22,11 +22,6 @@
         <div class="d-flex gap-2">
             <select class="form-select form-select-sm" style="width:auto" id="typeFilter" onchange="filterSuppliers()">
                 <option value="">All Types</option>
-                <option value="Government">Government</option>
-                <option value="NGO">NGO</option>
-                <option value="Private">Private</option>
-                <option value="Individual">Individual</option>
-                <option value="Other">Other</option>
             </select>
             <select class="form-select form-select-sm" style="width:auto" id="statusFilter" onchange="filterSuppliers()">
                 <option value="">All Status</option>
@@ -91,11 +86,6 @@
                             <label class="form-label">Supplier Type</label>
                             <select class="form-select" id="sup_type">
                                 <option value="">Select Type</option>
-                                <option value="Government">Government</option>
-                                <option value="NGO">NGO</option>
-                                <option value="Private">Private</option>
-                                <option value="Individual">Individual</option>
-                                <option value="Other">Other</option>
                             </select>
                         </div>
                         <div class="col-md-6">
@@ -133,12 +123,14 @@ let receiptCounts = {};
 
 async function loadSuppliers() {
     try {
-        const [supRes, recRes] = await Promise.all([
+        const [supRes, recRes, dataRes] = await Promise.all([
             fetch('/api/suppliers'),
-            fetch('/api/stock-receipts')
+            fetch('/api/stock-receipts'),
+            fetch('/api/data')
         ]);
         const supData = await supRes.json();
         const recData = await recRes.json();
+        const data = await dataRes.json();
         if (!supData.success) { showToast('danger', supData.message); return; }
         suppliers = supData.suppliers || [];
         receiptCounts = {};
@@ -147,6 +139,19 @@ async function loadSuppliers() {
                 receiptCounts[r.supplier_id] = (receiptCounts[r.supplier_id] || 0) + 1;
             }
         });
+        const types = data.supplier_types || [];
+        const filterEl = document.getElementById('typeFilter');
+        if (filterEl) {
+            const current = filterEl.value;
+            filterEl.innerHTML = '<option value="">All Types</option>' +
+                types.map(t => '<option value="' + t + '">' + t + '</option>').join('');
+            filterEl.value = current;
+        }
+        const formEl = document.getElementById('sup_type');
+        if (formEl) {
+            formEl.innerHTML = '<option value="">Select Type</option>' +
+                types.map(t => '<option value="' + t + '">' + t + '</option>').join('');
+        }
         renderSuppliers(suppliers);
     } catch (e) { showToast('danger', 'Error loading suppliers: ' + e.message);
     }

@@ -297,10 +297,8 @@ function onSupplierChange() {
             document.getElementById('receipt_email').value = sup.email || '';
         if (!document.getElementById('receipt_address').value)
             document.getElementById('receipt_address').value = sup.address || '';
-        const typeMap = {'Government': 'Government Supply', 'NGO': 'NGO', 'Private': 'Purchase', 'Individual': 'Donation', 'Other': 'Supplier'};
-        const sourceType = typeMap[sup.supplier_type] || 'Supplier';
         const stSelect = document.getElementById('receipt_source_type');
-        if (stSelect && !stSelect.value) stSelect.value = sourceType;
+        if (stSelect && sup.supplier_type) stSelect.value = sup.supplier_type;
     }
 }
 
@@ -324,14 +322,28 @@ function calcRowTotal(row) {
     row.querySelector('.receipt-total-cost').value = (qty * cost).toFixed(2);
 }
 
+function checkDuplicateItem(select) {
+    const itemId = select.value;
+    if (!itemId) return;
+    const rows = document.querySelectorAll('#itemsBody tr');
+    for (const row of rows) {
+        const sel = row.querySelector('.receipt-item');
+        if (sel && sel !== select && sel.value === itemId) {
+            showToast('warning', 'Item already selected — edit the existing row instead');
+            select.value = '';
+            return;
+        }
+    }
+}
+
 function addItemRow(itemId = '', unit = '', qty = '', batchNo = '', serialNo = '', mfgDate = '', expiryDate = '', unitCost = '') {
     const tr = document.createElement('tr');
     const itemOpts = itemsList.map(i =>
-        `<option value="${i.id}" data-unit="${i.unit || ''}" ${i.id == itemId ? 'selected' : ''}>${i.item_code ? i.item_code + ' - ' : ''}${i.name}</option>`
+        `<option value="${i.id}" data-unit="${i.unit || ''}" data-storage-life-days="${i.storage_life_days || ''}" ${i.id == itemId ? 'selected' : ''}>${i.item_code ? i.item_code + ' - ' : ''}${i.name}</option>`
     ).join('');
     tr.innerHTML = `
         <td>
-            <select class="form-select form-select-sm receipt-item" onchange="updateItemUnit(this); autoFillUnitCost(this);">
+            <select class="form-select form-select-sm receipt-item" onchange="checkDuplicateItem(this); updateItemUnit(this); autoFillUnitCost(this); autoFillDates(this);">
                 <option value="">Select Item</option>
                 ${itemOpts}
             </select>
@@ -363,6 +375,21 @@ function autoFillUnitCost(select) {
     const tr = select.closest('tr');
     tr.querySelector('.receipt-unit-cost').value = cost;
     calcRowTotal(tr);
+}
+
+function autoFillDates(select) {
+    const opt = select.options[select.selectedIndex];
+    const days = parseInt(opt?.getAttribute('data-storage-life-days'));
+    if (!days) return;
+    const tr = select.closest('tr');
+    const mfgInput = tr.querySelector('.receipt-mfg-date');
+    const expInput = tr.querySelector('.receipt-expiry-date');
+    const today = new Date();
+    const todayBS = typeof window.adToBS === 'function' ? window.adToBS(today) : '';
+    const expiry = new Date(today.getTime() + days * 86400000);
+    const expiryBS = typeof window.adToBS === 'function' ? window.adToBS(expiry) : '';
+    if (mfgInput) mfgInput.value = todayBS;
+    if (expInput) expInput.value = expiryBS;
 }
 
 async function saveReceipt() {
