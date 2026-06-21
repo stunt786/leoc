@@ -1375,12 +1375,14 @@ class CashRequest(db.Model):
     priority = db.Column(db.String(20), default='Medium')
     requested_amount = db.Column(db.Float, nullable=False, default=0)
     purpose = db.Column(db.String(100))
+    beneficiary_id = db.Column(db.Integer, db.ForeignKey('beneficiary.id'), nullable=True, index=True)
     remarks = db.Column(db.Text)
     status = db.Column(db.String(20), default='Pending')
     created_by = db.Column(db.Integer)
     created_at = db.Column(db.DateTime, default=utc_now)
     updated_at = db.Column(db.DateTime, default=utc_now, onupdate=utc_now)
     incident = db.relationship('Incident', backref=db.backref('cash_requests', lazy=True))
+    beneficiary = db.relationship('Beneficiary', backref=db.backref('cash_requests', lazy=True))
 
     def to_dict(self):
         return {
@@ -1391,6 +1393,8 @@ class CashRequest(db.Model):
             'requesting_office': self.requesting_office, 'requester_name': self.requester_name,
             'phone': self.phone, 'priority': self.priority,
             'requested_amount': self.requested_amount, 'purpose': self.purpose,
+            'beneficiary_id': self.beneficiary_id,
+            'beneficiary_name': self.beneficiary.name if self.beneficiary else None,
             'remarks': self.remarks, 'status': self.status
         }
 
@@ -4083,7 +4087,8 @@ def handle_cash_requests():
             requester_name=data.get('requester_name'), phone=data.get('phone'),
             priority=data.get('priority', 'Medium'),
             requested_amount=requested_amount,
-            purpose=data.get('purpose'), remarks=data.get('remarks')
+            purpose=data.get('purpose'), beneficiary_id=data.get('beneficiary_id') or None,
+            remarks=data.get('remarks')
         )
         db.session.add(req)
         db.session.commit()
@@ -4117,7 +4122,7 @@ def manage_cash_request(id):
             if not incident:
                 return jsonify({'success': False, 'message': 'Incident not found'}), 404
             req.incident_id = incident.id
-        for field in ['requesting_office', 'requester_name', 'phone', 'priority', 'purpose', 'remarks', 'status']:
+        for field in ['requesting_office', 'requester_name', 'phone', 'priority', 'purpose', 'remarks', 'status', 'beneficiary_id']:
             if field in data:
                 setattr(req, field, data[field])
         if 'requested_amount' in data:
@@ -6702,23 +6707,34 @@ def get_report_data(report_type, args):
         warehouse_id = args.get('warehouse_id', type=int)
         item_id = args.get('item_id', type=int)
         from datetime import timedelta
-        threshold = date.today() + timedelta(days=90)
+        today = date.today()
+        threshold = today + timedelta(days=90)
         headers = ['Item', 'Code', 'Batch', 'Qty', 'Expiry Date', 'Warehouse', 'Status']
         rows = []
         q = StockReceiptItem.query.options(
             db.joinedload(StockReceiptItem.receipt),
             db.joinedload(StockReceiptItem.item)
+        ).join(Item, StockReceiptItem.item_id == Item.id).filter(
+            Item.expiry_tracking == True
         )
         if item_id: q = q.filter(StockReceiptItem.item_id == item_id)
         for sri in q.all():
             if not sri.expiry_date: continue
             if sri.receipt and warehouse_id and sri.receipt.warehouse_id != warehouse_id: continue
             expiry = sri.expiry_date
-            status_str = 'Expired' if expiry < date.today() else ('Expiring Soon' if expiry <= threshold else 'OK')
+            days = (expiry - today).days
+            if days < 0:
+                status = f'Expired ({-days}d ago)'
+            elif days <= 30:
+                status = f'{days}d left'
+            elif days <= 90:
+                status = f'{days}d left'
+            else:
+                status = f'{days}d remaining'
             wh_name = sri.receipt.warehouse.name if sri.receipt and sri.receipt.warehouse else ''
             rows.append([sri.item.name if sri.item else '', sri.item.item_code if sri.item else '',
                          sri.batch_no or '', sri.quantity,
-                         ad_to_bs_date(expiry) or '', wh_name, status_str])
+                         ad_to_bs_date(expiry) or '', wh_name, status])
         if not rows:
             rows = [['-', '-', '-', '-', '-', '-', 'No expiry data']]
     elif report_type == 'stock-movement':

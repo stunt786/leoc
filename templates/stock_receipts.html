@@ -339,7 +339,7 @@ function checkDuplicateItem(select) {
 function addItemRow(itemId = '', unit = '', qty = '', batchNo = '', serialNo = '', mfgDate = '', expiryDate = '', unitCost = '') {
     const tr = document.createElement('tr');
     const itemOpts = itemsList.map(i =>
-        `<option value="${i.id}" data-unit="${i.unit || ''}" data-storage-life-days="${i.storage_life_days || ''}" ${i.id == itemId ? 'selected' : ''}>${i.item_code ? i.item_code + ' - ' : ''}${i.name}</option>`
+        `<option value="${i.id}" data-unit="${i.unit || ''}" data-storage-life-days="${i.storage_life_days || ''}" data-expiry-tracking="${!!i.expiry_tracking}" ${i.id == itemId ? 'selected' : ''}>${i.item_code ? i.item_code + ' - ' : ''}${i.name}</option>`
     ).join('');
     tr.innerHTML = `
         <td>
@@ -379,11 +379,17 @@ function autoFillUnitCost(select) {
 
 function autoFillDates(select) {
     const opt = select.options[select.selectedIndex];
-    const days = parseInt(opt?.getAttribute('data-storage-life-days'));
-    if (!days) return;
+    const tracking = opt?.getAttribute('data-expiry-tracking') === 'true';
     const tr = select.closest('tr');
     const mfgInput = tr.querySelector('.receipt-mfg-date');
     const expInput = tr.querySelector('.receipt-expiry-date');
+    if (!tracking) {
+        [mfgInput, expInput].forEach(el => { if (el) { el.value = ''; el.disabled = true; el.readOnly = true; } });
+        return;
+    }
+    [mfgInput, expInput].forEach(el => { if (el) { el.disabled = false; el.readOnly = false; } });
+    const days = parseInt(opt?.getAttribute('data-storage-life-days'));
+    if (!days) return;
     const today = new Date();
     const todayBS = typeof window.adToBS === 'function' ? window.adToBS(today) : '';
     const expiry = new Date(today.getTime() + days * 86400000);

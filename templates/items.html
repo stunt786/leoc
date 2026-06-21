@@ -160,6 +160,7 @@
                                 <div class="col-md-4">
                                     <label class="form-label">Storage Life (Days)</label>
                                     <input type="number" class="form-control" id="item_storage_life_days" min="0">
+                                    <small class="text-muted" id="storageLifeHint">Set to 0 or leave blank for non-expiry items</small>
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label">Storage Requirement</label>
@@ -582,7 +583,9 @@ async function saveItem() {
         description: document.getElementById('item_description').value,
         minimum_stock: parseInt(document.getElementById('item_minimum_stock').value) || 0,
         max_stock: parseInt(document.getElementById('item_max_stock').value) || 0,
-        storage_life_days: parseInt(document.getElementById('item_storage_life_days').value) || 0,
+        storage_life_days: document.getElementById('item_expiry_tracking').checked
+            ? parseInt(document.getElementById('item_storage_life_days').value) || null
+            : null,
         storage_requirement: document.getElementById('item_storage_requirement').value,
         is_consumable: document.getElementById('item_is_consumable').checked,
         is_distributable: document.getElementById('item_is_distributable').checked,

@@ -76,7 +76,7 @@
                 <td>{{ item.unit or item.item.unit }}</td>
                 <td>{{ item.quantity }}</td>
                 <td>{{ item.batch_no or '' }}</td>
-                <td>{{ item.expiry_date|nepali_date if item.expiry_date else '' }}</td>
+                <td>{% if item.item and item.item.expiry_tracking %}{{ item.expiry_date|nepali_date if item.expiry_date else '' }}{% else %}-{% endif %}</td>
             </tr>
             {% endfor %}
         </tbody>

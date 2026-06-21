@@ -38,10 +38,15 @@
                     </div>
                     <div class="row g-2">
                         <div class="col-md-6 mb-3"><label class="form-label">Requesting Office</label><input class="form-control" name="requesting_office" id="crqOffice"></div>
-                        <div class="col-md-6 mb-3"><label class="form-label">Requester Name</label><input class="form-control" name="requester_name" id="crqRequester"></div>
+                        <div class="col-md-6 mb-3"><label class="form-label">Beneficiary</label>
+                            <select class="form-select" id="crqBeneficiary" onchange="onBeneficiaryChange()">
+                                <option value="">Select Beneficiary</option>
+                            </select>
+                        </div>
                     </div>
                     <div class="row g-2">
-                        <div class="col-md-4 mb-3"><label class="form-label">Phone</label><input class="form-control" name="phone" id="crqPhone"></div>
+                        <div class="col-md-6 mb-3"><label class="form-label">Requester Name</label><input class="form-control" name="requester_name" id="crqRequester"></div>
+                        <div class="col-md-6 mb-3"><label class="form-label">Phone</label><input class="form-control" name="phone" id="crqPhone"></div>
                         <div class="col-md-4 mb-3"><label class="form-label">Priority</label><select class="form-select" name="priority" id="crqPriority"></select></div>
                         <div class="col-md-4 mb-3"><label class="form-label">Purpose</label><select class="form-select" name="purpose" id="crqPurpose"></select></div>
                     </div>
@@ -63,6 +68,16 @@
 {% block extra_js %}
 <script>
 const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+let beneficiaries = [];
+
+function onBeneficiaryChange() {
+    const id = parseInt(document.getElementById('crqBeneficiary').value);
+    const ben = beneficiaries.find(b => b.id === id);
+    if (ben) {
+        if (!document.getElementById('crqRequester').value) document.getElementById('crqRequester').value = ben.name;
+        if (!document.getElementById('crqPhone').value) document.getElementById('crqPhone').value = ben.phone || '';
+    }
+}
 
 async function loadRequests() {
     const r = await fetch('/api/cash-requests');
@@ -94,9 +109,11 @@ async function loadData() {
     const r = await fetch('/api/data');
     const d = await r.json();
     if (!d.success) return;
+    beneficiaries = d.beneficiaries || [];
     document.getElementById('crqIncident').innerHTML = '<option value="">Select Incident</option>' + (d.incidents||[]).map(i => `<option value="${i.id}">${i.incident_name}</option>`).join('');
     document.getElementById('crqPriority').innerHTML = (d.cash_priorities||d.priorities||['Low','Medium','High','Urgent']).map(p => `<option value="${p}" ${p==='Medium'?'selected':''}>${p}</option>`).join('');
     document.getElementById('crqPurpose').innerHTML = '<option value="">Select Purpose</option>' + (d.cash_purposes||[]).map(p => `<option value="${p}">${p}</option>`).join('');
+    document.getElementById('crqBeneficiary').innerHTML = '<option value="">Select Beneficiary</option>' + beneficiaries.map(b => `<option value="${b.id}">${b.name}${b.phone ? ' - ' + b.phone : ''}${b.ward_name ? ' (' + b.ward_name + ')' : ''}</option>`).join('');
 }
 
 document.getElementById('crqForm').addEventListener('submit', async function(e) {
@@ -111,6 +128,7 @@ document.getElementById('crqForm').addEventListener('submit', async function(e) 
         priority: document.getElementById('crqPriority').value,
         purpose: document.getElementById('crqPurpose').value,
         requested_amount: parseFloat(document.getElementById('crqAmount').value),
+        beneficiary_id: parseInt(document.getElementById('crqBeneficiary').value) || null,
         status: document.getElementById('crqStatus').value,
         remarks: document.getElementById('crqRemarks').value
     };
@@ -124,7 +142,7 @@ document.getElementById('crqForm').addEventListener('submit', async function(e) 
     } catch(e) { showToast('danger', e.message); }
 });
 
-function openCrqModal() { document.getElementById('crqForm').reset(); document.getElementById('crqId').value = ''; }
+function openCrqModal() { document.getElementById('crqForm').reset(); document.getElementById('crqId').value = ''; document.getElementById('crqBeneficiary').value = ''; }
 
 async function editCrq(id) {
     const r = await fetch(`/api/cash-requests/${id}`);
@@ -137,6 +155,7 @@ async function editCrq(id) {
     document.getElementById('crqOffice').value = cr.requesting_office || '';
     document.getElementById('crqRequester').value = cr.requester_name || '';
     document.getElementById('crqPhone').value = cr.phone || '';
+    document.getElementById('crqBeneficiary').value = cr.beneficiary_id || '';
     document.getElementById('crqPriority').value = cr.priority;
     document.getElementById('crqPurpose').value = cr.purpose || '';
     document.getElementById('crqAmount').value = cr.requested_amount;

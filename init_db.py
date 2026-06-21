@@ -473,6 +473,9 @@ def run_migrations():
             ('failed_login_attempts', 'INTEGER DEFAULT 0'),
             ('locked_until', 'DATETIME'),
         ],
+        'cash_request': [
+            ('beneficiary_id', 'INTEGER REFERENCES beneficiary(id)'),
+        ],
         'document_archive': [
             ('uploaded_by', 'INTEGER'),
         ],

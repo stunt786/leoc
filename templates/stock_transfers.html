@@ -203,8 +203,13 @@ function resetForm() {
 
 function addItemRow(itemId = '', qty = '', unit = '', batchNo = '') {
     const tr = document.createElement('tr');
-    const itemOpts = itemsList.map(i =>
-        `<option value="${i.id}" data-unit="${i.unit || ''}" ${i.id == itemId ? 'selected' : ''}>${i.item_code ? i.item_code + ' - ' : ''}${i.name}</option>`
+    const whId = parseInt(document.getElementById('from_warehouse_id').value);
+    const availableItemIds = whId && inventoryByWarehouse[whId]
+        ? new Set(inventoryByWarehouse[whId].filter(inv => inv.available_quantity > 0).map(inv => inv.item_id))
+        : null;
+    const filtered = availableItemIds ? itemsList.filter(i => availableItemIds.has(i.id)) : itemsList;
+    const itemOpts = filtered.map(i =>
+        `<option value="${i.id}" data-unit="${i.unit || ''}" ${i.id == itemId ? 'selected' : ''}>${i.item_code ? i.item_code + ' - ' : ''}${i.name}${whId ? ' (' + ((inventoryByWarehouse[whId]?.find(inv => inv.item_id === i.id)?.available_quantity) || 0) + ' in stock)' : ''}</option>`
     ).join('');
     tr.innerHTML = `
         <td>

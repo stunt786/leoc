@@ -155,6 +155,8 @@ async function loadFormData() {
 
         const distItems = (d.items || []).filter(i => i.is_distributable !== false);
         window.distributableItemIds = new Set(distItems.map(i => i.id));
+        window.itemTrackingMap = {};
+        (d.items || []).forEach(i => { window.itemTrackingMap[i.id] = !!i.expiry_tracking; });
 
         document.getElementById('dp_date').value = today_bs;
         document.getElementById('dp_dispatch_number').value = 'DSP-' + String(Date.now()).slice(-4);
@@ -202,16 +204,18 @@ document.getElementById('dp_relief_request_id').addEventListener('change', funct
 async function addItemRow(item, availQty) {
     const tbody = document.getElementById('dispatchItemsBody');
     const tr = document.createElement('tr');
+    const tracking = window.itemTrackingMap && window.itemTrackingMap[item.item_id];
     tr.innerHTML = `<td><input type="text" class="form-control form-control-sm" value="${item.item_name}" readonly>
         <input type="hidden" class="dp-item-id" value="${item.item_id}"></td>
         <td><input type="number" class="form-control form-control-sm" value="${item.quantity_requested || 0}" readonly></td>
         <td><input type="number" class="form-control form-control-sm dp-avail-qty" value="${availQty}" readonly></td>
         <td><input type="number" class="form-control form-control-sm dp-dispatch-qty" value="0" min="0" max="${availQty}" oninput="validateQty(this)"></td>
         <td><input type="text" class="form-control form-control-sm dp-unit" value="${item.unit || 'pcs'}" readonly></td>
-        <td><input type="text" class="form-control form-control-sm dp-batch-no" placeholder="Auto-fill"></td>
-        <td><input type="text" class="form-control form-control-sm dp-expiry-date nepali-date" placeholder="YYYY-MM-DD"></td>`;
+        <td><input type="text" class="form-control form-control-sm dp-batch-no" placeholder="Batch" ${tracking ? '' : 'disabled'}></td>
+        <td><input type="text" class="form-control form-control-sm dp-expiry-date${tracking ? ' nepali-date' : ''}" placeholder="${tracking ? 'YYYY-MM-DD' : 'N/A'}" ${tracking ? '' : 'disabled'}></td>`;
     tbody.appendChild(tr);
 
+    if (!tracking) return;
     try {
         const res = await fetch(`/api/items/${item.item_id}/history`);
         const data = await res.json();
@@ -417,6 +421,7 @@ async function editDispatch(id) {
                 const avail = inventoryMap[item.item_id] || 0;
                 const rrItem = rr ? rr.items.find(i => i.item_id === item.item_id) : null;
                 const reqQty = rrItem ? rrItem.quantity_requested : 0;
+                const tracking = window.itemTrackingMap && window.itemTrackingMap[item.item_id];
                 const tr = document.createElement('tr');
                 tr.innerHTML = `<td><input type="text" class="form-control form-control-sm" value="${item.item_name}" readonly>
                     <input type="hidden" class="dp-item-id" value="${item.item_id}"></td>
@@ -424,8 +429,8 @@ async function editDispatch(id) {
                     <td><input type="number" class="form-control form-control-sm dp-avail-qty" value="${avail}" readonly></td>
                     <td><input type="number" class="form-control form-control-sm dp-dispatch-qty" value="${item.quantity}" min="0" max="${avail}" oninput="validateQty(this)"></td>
                     <td><input type="text" class="form-control form-control-sm dp-unit" value="${item.unit || 'pcs'}" readonly></td>
-                    <td><input type="text" class="form-control form-control-sm dp-batch-no" value="${item.batch_no || ''}"></td>
-                    <td><input type="text" class="form-control form-control-sm dp-expiry-date nepali-date" placeholder="YYYY-MM-DD" value="${item.expiry_date || ''}"></td>`;
+                    <td><input type="text" class="form-control form-control-sm dp-batch-no" value="${item.batch_no || ''}" ${tracking ? '' : 'disabled'}></td>
+                    <td><input type="text" class="form-control form-control-sm dp-expiry-date${tracking ? ' nepali-date' : ''}" placeholder="${tracking ? 'YYYY-MM-DD' : 'N/A'}" value="${tracking ? (item.expiry_date || '') : ''}" ${tracking ? '' : 'disabled'}></td>`;
                 tbody.appendChild(tr);
             }
             if (!editHasItems) {

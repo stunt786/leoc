@@ -307,8 +307,17 @@ async function loadReportData() {
             if (data.rows.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="' + (data.headers.length + 1) + '" class="text-center text-muted py-4">No data found</td></tr>';
             } else {
+                const statusCol = type === 'expiry-tracking' ? 6 : -1;
                 tbody.innerHTML = data.rows.map((row, i) =>
-                    '<tr>' + row.map((c, j) => '<td>' + (c ?? '') + '</td>').join('') + '</tr>'
+                    '<tr>' + row.map((c, j) => {
+                        if (j === statusCol) {
+                            const cls = c.startsWith('Expired') ? 'danger' :
+                                parseInt(c) <= 30 ? 'danger' :
+                                c.includes('d left') ? 'warning' : 'success';
+                            return `<td><span class="badge bg-${cls}">${c ?? ''}</span></td>`;
+                        }
+                        return '<td>' + (c ?? '') + '</td>';
+                    }).join('') + '</tr>'
                 ).join('');
             }
         } else {
