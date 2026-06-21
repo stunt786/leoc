@@ -26,18 +26,27 @@ def create_user_table():
     """Create the user table if it doesn't exist (raw SQL for compatibility)."""
     inspector = inspect(db.engine)
     if 'user' not in inspector.get_table_names():
-        db.session.execute(text("""
+        dialect = db.engine.dialect.name
+        if dialect == 'postgresql':
+            pk_type = 'SERIAL'
+            bool_true = 'TRUE'
+            ts_type = 'TIMESTAMP'
+        else:
+            pk_type = 'INTEGER PRIMARY KEY AUTOINCREMENT'
+            bool_true = '1'
+            ts_type = 'DATETIME'
+        db.session.execute(text(f"""
             CREATE TABLE "user" (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id {pk_type},
                 username VARCHAR(80) UNIQUE NOT NULL,
                 password_hash VARCHAR(256) NOT NULL,
                 role VARCHAR(20) NOT NULL DEFAULT 'viewer',
                 full_name VARCHAR(200),
-                is_active BOOLEAN DEFAULT 1,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                last_login DATETIME,
+                is_active BOOLEAN DEFAULT {bool_true},
+                created_at {ts_type} DEFAULT CURRENT_TIMESTAMP,
+                last_login {ts_type},
                 failed_login_attempts INTEGER DEFAULT 0,
-                locked_until DATETIME
+                locked_until {ts_type}
             )
         """))
         db.session.commit()
@@ -72,8 +81,8 @@ def seed_default_users():
         ]
         for username, pwhash, role, fullname in users:
             db.session.execute(
-                text("INSERT INTO \"user\" (username, password_hash, role, full_name, is_active) VALUES (:u, :p, :r, :f, 1)"),
-                {'u': username, 'p': pwhash, 'r': role, 'f': fullname}
+                text("INSERT INTO \"user\" (username, password_hash, role, full_name, is_active) VALUES (:u, :p, :r, :f, :active)"),
+                {'u': username, 'p': pwhash, 'r': role, 'f': fullname, 'active': True}
             )
         db.session.commit()
         print(f"[OK] Seeded {len(users)} default users")
@@ -475,7 +484,7 @@ def run_migrations():
     for table_name, columns in tables_to_migrate.items():
         if table_name not in inspector.get_table_names():
             continue
-        existing_cols = [row[1] for row in db.session.execute(text(f"PRAGMA table_info({table_name})")).fetchall()]
+        existing_cols = [c['name'] for c in inspector.get_columns(table_name)]
         for col_name, col_type in columns:
             if col_name not in existing_cols:
                 try:
@@ -517,11 +526,11 @@ def drop_all_tables():
     """Drop all tables (DANGER: destroys data)."""
     inspector = inspect(db.engine)
     tables = inspector.get_table_names()
-    # Disable FK checks for SQLite
-    db.session.execute(text("PRAGMA foreign_keys = OFF"))
+    if not tables:
+        print("[SKIP] No tables to drop")
+        return
     for table in tables:
-        db.session.execute(text(f"DROP TABLE IF EXISTS \"{table}\""))
-    db.session.execute(text("PRAGMA foreign_keys = ON"))
+        db.session.execute(db.text(f"DROP TABLE IF EXISTS \"{table}\" CASCADE"))
     db.session.commit()
     print(f"[DROP] Dropped {len(tables)} tables")
 

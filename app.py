@@ -9,7 +9,6 @@ import os
 import json
 import io
 import logging
-import sqlite3
 from sqlalchemy.exc import IntegrityError
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash
@@ -100,8 +99,7 @@ def db_get_or_404(model, ident):
 def utc_now():
     return datetime.now(timezone.utc)
 
-sqlite3.register_adapter(datetime, lambda val: val.isoformat(sep=' '))
-sqlite3.register_adapter(date, lambda val: val.isoformat())
+
 
 app = Flask(__name__)
 
@@ -1620,7 +1618,7 @@ def add_security_headers(response):
     response.headers['X-Frame-Options'] = 'DENY'
     response.headers['X-XSS-Protection'] = '1; mode=block'
     response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
-    csp = "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'"
+    csp = "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com https://unpkg.com; font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net; img-src 'self' data: https://*.tile.openstreetmap.org; connect-src 'self' https://cdn.jsdelivr.net https://unpkg.com"
     response.headers['Content-Security-Policy'] = csp
     return response
 
@@ -2055,37 +2053,76 @@ def manage_ward(id):
         return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 # ============ BACKUP / RESTORE ============
-import sqlite3 as sqlite3_module
 
 BACKUP_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'backups')
 os.makedirs(BACKUP_DIR, exist_ok=True)
 
-def _dump_sqlite_to_sql(db_path, output_path):
-    conn = sqlite3_module.connect(db_path)
-    with open(output_path, 'w', encoding='utf-8') as f:
-        for line in conn.iterdump():
-            f.write(line + '\n')
-    conn.close()
+def _serialize_value(val):
+    if isinstance(val, (datetime, date)):
+        return val.isoformat()
+    return val
 
-def _execute_sql_script(db_path, sql_path):
-    conn = sqlite3_module.connect(db_path)
-    cur = conn.cursor()
-    with open(sql_path, 'r', encoding='utf-8') as f:
-        sql = f.read()
-    cur.executescript(sql)
-    conn.commit()
-    conn.close()
+def _dump_db_to_json(output_path):
+    """Serialize all model data to a portable JSON file."""
+    import json as _json
+    models = {}
+    for mapper in db.Model.registry.mappers:
+        table = mapper.entity.__tablename__ if hasattr(mapper.entity, '__tablename__') else mapper.entity.__name__
+        rows = db.session.query(mapper.entity).all()
+        if rows:
+            models[table] = [
+                {c.key: _serialize_value(getattr(r, c.key)) for c in mapper.entity.__table__.columns}
+                for r in rows
+            ]
+    with open(output_path, 'w', encoding='utf-8') as f:
+        _json.dump(models, f, ensure_ascii=False, indent=2, default=str)
+
+def _load_db_from_json(input_path):
+    """Restore data from a JSON backup file."""
+    import json as _json
+    with open(input_path, 'r', encoding='utf-8') as f:
+        models_data = _json.load(f)
+    for mapper in db.Model.registry.mappers:
+        table_name = mapper.entity.__tablename__ if hasattr(mapper.entity, '__tablename__') else mapper.entity.__name__
+        rows = models_data.get(table_name, [])
+        for row in rows:
+            obj = mapper.entity(**row)
+            db.session.add(obj)
+    db.session.commit()
+
+def _get_db_stats():
+    """Get database file/connection statistics."""
+    try:
+        from sqlalchemy import inspect as _inspect
+        inspector = _inspect(db.engine)
+        tables = inspector.get_table_names()
+        row_counts = {}
+        for table in tables:
+            try:
+                count = db.session.execute(db.text(f"SELECT COUNT(*) FROM \"{table}\"")).scalar()
+                if count:
+                    row_counts[table] = count
+            except Exception:
+                pass
+        total_rows = sum(row_counts.values())
+        return {
+            'tables': len(tables),
+            'total_rows': total_rows,
+            'table_counts': row_counts,
+        }
+    except Exception:
+        return {'tables': 0, 'total_rows': 0, 'table_counts': {}}
 
 @app.route('/api/backup', methods=['GET'])
 @permission_required('manage_users')
 def create_backup():
     try:
         ts = datetime.now().strftime('%Y%m%d_%H%M%S')
-        backup_name = f'leoc_backup_{ts}.sql'
+        backup_name = f'leoc_backup_{ts}.json'
         backup_path = os.path.join(BACKUP_DIR, backup_name)
-        _dump_sqlite_to_sql(db_path, backup_path)
+        _dump_db_to_json(backup_path)
         return send_file(backup_path, as_attachment=True, download_name=backup_name,
-                         mimetype='application/sql')
+                         mimetype='application/json')
     except Exception as e:
         return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
@@ -2093,14 +2130,11 @@ def create_backup():
 @permission_required('manage_users')
 def get_backup_info():
     try:
-        size = os.path.getsize(db_path)
-        ts = os.path.getmtime(db_path)
+        stats = _get_db_stats()
         return jsonify({
             'success': True,
-            'db_path': db_path,
-            'size': size,
-            'size_str': f'{size / 1024:.1f} KB' if size < 1024 * 1024 else f'{size / (1024 * 1024):.1f} MB',
-            'modified': datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
+            'database_url': app.config['SQLALCHEMY_DATABASE_URI'],
+            'stats': stats,
         })
     except Exception as e:
         return jsonify({'success': False, 'message': friendly_message(e)}), 500
@@ -2114,35 +2148,32 @@ def restore_backup():
         f = request.files['file']
         if f.filename == '':
             return jsonify({'success': False, 'message': 'No file selected'}), 400
-        if not f.filename.endswith('.sql'):
-            return jsonify({'success': False, 'message': 'Please upload a .sql backup file'}), 400
+        if not f.filename.endswith('.json'):
+            return jsonify({'success': False, 'message': 'Please upload a .json backup file'}), 400
 
-        upload_path = os.path.join(BACKUP_DIR, 'restore_upload_temp.sql')
+        upload_path = os.path.join(BACKUP_DIR, 'restore_upload_temp.json')
         f.save(upload_path)
 
         try:
-            conn = sqlite3_module.connect(':memory:')
+            import json as _json
             with open(upload_path, 'r', encoding='utf-8') as sf:
-                conn.executescript(sf.read())
-            conn.close()
+                _json.load(sf)
         except Exception:
             os.remove(upload_path)
-            return jsonify({'success': False, 'message': 'Invalid or corrupted SQL backup file'}), 400
+            return jsonify({'success': False, 'message': 'Invalid or corrupted JSON backup file'}), 400
 
         ts = datetime.now().strftime('%Y%m%d_%H%M%S')
-        pre_restore_backup = os.path.join(BACKUP_DIR, f'pre_restore_{ts}.sql')
-        _dump_sqlite_to_sql(db_path, pre_restore_backup)
+        pre_restore_backup = os.path.join(BACKUP_DIR, f'pre_restore_{ts}.json')
+        _dump_db_to_json(pre_restore_backup)
 
-        db.session.close_all()
-        db.engine.dispose()
+        db.session.rollback()
 
-        os.remove(db_path)
-        _execute_sql_script(db_path, upload_path)
+        from init_db import drop_all_tables, create_tables
+        drop_all_tables()
+        create_tables()
+
+        _load_db_from_json(upload_path)
         os.remove(upload_path)
-
-        from sqlalchemy import create_engine
-        temp_engine = create_engine(f'sqlite:///{db_path}')
-        temp_engine.dispose()
 
         return jsonify({
             'success': True,
@@ -2157,8 +2188,8 @@ def restore_backup():
 def reset_database():
     try:
         ts = datetime.now().strftime('%Y%m%d_%H%M%S')
-        pre_reset_backup = os.path.join(BACKUP_DIR, f'pre_reset_{ts}.sql')
-        _dump_sqlite_to_sql(db_path, pre_reset_backup)
+        pre_reset_backup = os.path.join(BACKUP_DIR, f'pre_reset_{ts}.json')
+        _dump_db_to_json(pre_reset_backup)
 
         db.session.rollback()
 
@@ -7514,35 +7545,44 @@ def init_db():
                         print(f"[WARN] Could not cleanup old date column in weekly_forecast: {e}")
 
             if 'user' not in inspector.get_table_names():
-                db.session.execute(db.text("""
+                dialect = db.engine.dialect.name
+                if dialect == 'postgresql':
+                    pk_type = 'SERIAL'
+                    bool_true = 'TRUE'
+                    ts_type = 'TIMESTAMP'
+                else:
+                    pk_type = 'INTEGER PRIMARY KEY AUTOINCREMENT'
+                    bool_true = '1'
+                    ts_type = 'DATETIME'
+                db.session.execute(db.text(f"""
                     CREATE TABLE "user" (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        id {pk_type},
                         username VARCHAR(80) UNIQUE NOT NULL,
                         password_hash VARCHAR(256) NOT NULL,
                         role VARCHAR(20) NOT NULL DEFAULT 'viewer',
                         full_name VARCHAR(200),
-                        is_active BOOLEAN DEFAULT 1,
-                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                        last_login DATETIME
+                        is_active BOOLEAN DEFAULT {bool_true},
+                        created_at {ts_type} DEFAULT CURRENT_TIMESTAMP,
+                        last_login {ts_type}
                     )
                 """))
                 import secrets as _sec
                 admin_pw = os.getenv('ADMIN_PASSWORD') or _sec.token_urlsafe(16)
                 if not os.getenv('ADMIN_PASSWORD'): print(f"[!] ADMIN_PASSWORD not set. Generated: {admin_pw}")
-                db.session.execute(db.text("INSERT INTO \"user\" (username, password_hash, role, full_name, is_active) VALUES (:u, :p, :r, :f, 1)"),
-                    {'u': 'admin', 'p': generate_password_hash(admin_pw), 'r': 'admin', 'f': 'System Administrator'})
+                db.session.execute(db.text("INSERT INTO \"user\" (username, password_hash, role, full_name, is_active) VALUES (:u, :p, :r, :f, :active)"),
+                    {'u': 'admin', 'p': generate_password_hash(admin_pw), 'r': 'admin', 'f': 'System Administrator', 'active': True})
                 mgr_pw = os.getenv('MANAGER_PASSWORD') or _sec.token_urlsafe(16)
                 if not os.getenv('MANAGER_PASSWORD'): print(f"[!] MANAGER_PASSWORD not set. Generated: {mgr_pw}")
-                db.session.execute(db.text("INSERT INTO \"user\" (username, password_hash, role, full_name, is_active) VALUES (:u, :p, :r, :f, 1)"),
-                    {'u': 'manager', 'p': generate_password_hash(mgr_pw), 'r': 'warehouse_manager', 'f': 'Warehouse Manager'})
+                db.session.execute(db.text("INSERT INTO \"user\" (username, password_hash, role, full_name, is_active) VALUES (:u, :p, :r, :f, :active)"),
+                    {'u': 'manager', 'p': generate_password_hash(mgr_pw), 'r': 'warehouse_manager', 'f': 'Warehouse Manager', 'active': True})
                 de_pw = os.getenv('DATAENTRY_PASSWORD') or _sec.token_urlsafe(16)
                 if not os.getenv('DATAENTRY_PASSWORD'): print(f"[!] DATAENTRY_PASSWORD not set. Generated: {de_pw}")
-                db.session.execute(db.text("INSERT INTO \"user\" (username, password_hash, role, full_name, is_active) VALUES (:u, :p, :r, :f, 1)"),
-                    {'u': 'dataentry', 'p': generate_password_hash(de_pw), 'r': 'data_entry', 'f': 'Data Entry Operator'})
+                db.session.execute(db.text("INSERT INTO \"user\" (username, password_hash, role, full_name, is_active) VALUES (:u, :p, :r, :f, :active)"),
+                    {'u': 'dataentry', 'p': generate_password_hash(de_pw), 'r': 'data_entry', 'f': 'Data Entry Operator', 'active': True})
                 vw_pw = os.getenv('VIEWER_PASSWORD') or _sec.token_urlsafe(16)
                 if not os.getenv('VIEWER_PASSWORD'): print(f"[!] VIEWER_PASSWORD not set. Generated: {vw_pw}")
-                db.session.execute(db.text("INSERT INTO \"user\" (username, password_hash, role, full_name, is_active) VALUES (:u, :p, :r, :f, 1)"),
-                    {'u': 'viewer', 'p': generate_password_hash(vw_pw), 'r': 'viewer', 'f': 'Read Only User'})
+                db.session.execute(db.text("INSERT INTO \"user\" (username, password_hash, role, full_name, is_active) VALUES (:u, :p, :r, :f, :active)"),
+                    {'u': 'viewer', 'p': generate_password_hash(vw_pw), 'r': 'viewer', 'f': 'Read Only User', 'active': True})
                 db.session.commit()
             else:
                 existing = db.session.execute(db.text("SELECT id FROM \"user\" WHERE username = 'admin'")).fetchone()
@@ -7550,8 +7590,8 @@ def init_db():
                     import secrets as _sec
                     admin_pw = os.getenv('ADMIN_PASSWORD') or _sec.token_urlsafe(16)
                     if not os.getenv('ADMIN_PASSWORD'): print(f"[!] ADMIN_PASSWORD not set. Generated: {admin_pw}")
-                    db.session.execute(db.text("INSERT INTO \"user\" (username, password_hash, role, full_name, is_active) VALUES (:u, :p, :r, :f, 1)"),
-                        {'u': 'admin', 'p': generate_password_hash(admin_pw), 'r': 'admin', 'f': 'System Administrator'})
+                    db.session.execute(db.text("INSERT INTO \"user\" (username, password_hash, role, full_name, is_active) VALUES (:u, :p, :r, :f, :active)"),
+                        {'u': 'admin', 'p': generate_password_hash(admin_pw), 'r': 'admin', 'f': 'System Administrator', 'active': True})
                     db.session.commit()
             if 'category' in inspector.get_table_names():
                 cat_cols = [c['name'] for c in inspector.get_columns('category')]
