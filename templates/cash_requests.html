@@ -99,6 +99,7 @@ async function loadRequests() {
         <td><span class="badge ${cr.priority === 'Urgent' ? 'bg-danger' : cr.priority === 'High' ? 'bg-warning' : cr.priority === 'Medium' ? 'bg-info' : 'bg-secondary'}">${cr.priority}</span></td>
         <td><span class="badge ${cr.status === 'Completed' ? 'bg-success' : cr.status === 'Approved' ? 'bg-primary' : cr.status === 'Rejected' ? 'bg-danger' : cr.status === 'Partial' ? 'bg-warning' : 'bg-secondary'}">${cr.status}</span></td>
         <td>
+            <button class="btn btn-sm btn-outline-primary" onclick="viewCrq(${cr.id})" title="View"><i class="bi bi-eye"></i></button>
             <button class="btn btn-sm btn-outline-primary" onclick="editCrq(${cr.id})"><i class="bi bi-pencil"></i></button>
             <button class="btn btn-sm btn-outline-danger" onclick="deleteCrq(${cr.id})"><i class="bi bi-trash"></i></button>
         </td>
@@ -141,6 +142,25 @@ document.getElementById('crqForm').addEventListener('submit', async function(e) 
         else showToast('danger', d.message);
     } catch(e) { showToast('danger', e.message); }
 });
+
+async function viewCrq(id) {
+    const r = await fetch(`/api/cash-requests/${id}`);
+    const d = await r.json();
+    if (!d.success) return;
+    const cr = d.cash_request;
+    const distInfo = cr.distributed_amount > 0 ? (cr.distributions||[]).map(cd =>
+        `${cd.distribution_no} (${cd.distribution_date}, ${cd.fund_name||'-'}, Amt: ${Number(cd.total_amount).toLocaleString()})`
+    ).join('; ') : 'None';
+    const lines = [
+        `<strong>Request:</strong> ${cr.request_number} | ${cr.request_date}`,
+        `<strong>Incident:</strong> ${cr.incident_name || '-'} | <strong>Priority:</strong> ${cr.priority} | <strong>Status:</strong> ${cr.status}`,
+        `<strong>Requester:</strong> ${cr.requester_name || '-'} | ${cr.phone || '-'} | ${cr.requesting_office || '-'}`,
+        `<strong>Amount:</strong> Requested ${Number(cr.requested_amount).toLocaleString()} | Distributed ${Number(cr.distributed_amount || 0).toLocaleString()}`,
+        `<strong>Purpose:</strong> ${cr.purpose || '-'}${cr.beneficiary_name ? ' | <strong>Beneficiary:</strong> ' + cr.beneficiary_name : ''}`,
+        `<strong>Distributions:</strong> ${distInfo}`
+    ];
+    showToast('info', lines.join(' | '));
+}
 
 function openCrqModal() { document.getElementById('crqForm').reset(); document.getElementById('crqId').value = ''; document.getElementById('crqBeneficiary').value = ''; }
 

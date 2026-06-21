@@ -1412,6 +1412,8 @@ class CashDistribution(db.Model):
     fiscal_year = db.Column(db.String(20), index=True)
     officer = db.Column(db.String(200))
     remarks = db.Column(db.Text)
+    photo = db.Column(db.String(500))
+    document = db.Column(db.String(500))
     created_by = db.Column(db.Integer)
     created_at = db.Column(db.DateTime, default=utc_now)
     incident = db.relationship('Incident', backref=db.backref('cash_distributions', lazy=True))
@@ -1433,6 +1435,10 @@ class CashDistribution(db.Model):
             'distribution_type': self.distribution_type, 'total_amount': self.total_amount,
             'fiscal_year': self.fiscal_year,
             'officer': self.officer, 'remarks': self.remarks,
+            'photo': self.photo,
+            'photo_url': f'/uploads/{self.photo}' if self.photo else None,
+            'document': self.document,
+            'document_url': f'/uploads/{self.document}' if self.document else None,
             'beneficiaries': [b.to_dict() for b in self.beneficiaries]
         }
 
@@ -3958,12 +3964,15 @@ def manage_cash_fund(id):
         if request.method == 'DELETE':
             related_receipts = CashReceipt.query.filter_by(fund_id=fund.id).count()
             related_distributions = CashDistribution.query.filter_by(fund_id=fund.id).count()
-            if related_receipts or related_distributions:
+            related_requests = db.session.query(CashRequest).join(CashDistribution).filter(CashDistribution.fund_id == fund.id).distinct().count()
+            if related_receipts or related_distributions or related_requests:
                 parts = []
                 if related_receipts:
                     parts.append(f'{related_receipts} receipt(s)')
                 if related_distributions:
                     parts.append(f'{related_distributions} distribution(s)')
+                if related_requests:
+                    parts.append(f'{related_requests} request(s)')
                 return jsonify({'success': False, 'message': f'Cannot delete: Fund has {" and ".join(parts)}. Remove all related records first.'}), 400
             db.session.delete(fund)
             db.session.commit()
@@ -4108,7 +4117,12 @@ def manage_cash_request(id):
         return jsonify({'success': False, 'message': 'Cash request not found'}), 404
     try:
         if request.method == 'GET':
-            return jsonify({'success': True, 'cash_request': req.to_dict()})
+            cr_dict = req.to_dict()
+            cr_dict['distributions'] = [d.to_dict() for d in CashDistribution.query.filter_by(cash_request_id=req.id).order_by(CashDistribution.distribution_date.desc()).all()]
+            cr_dict['distributed_amount'] = db.session.query(db.func.coalesce(db.func.sum(CashDistribution.total_amount), 0)).filter(
+                CashDistribution.cash_request_id == req.id
+            ).scalar()
+            return jsonify({'success': True, 'cash_request': cr_dict})
         if request.method == 'DELETE':
             related_dists = CashDistribution.query.filter_by(cash_request_id=req.id).count()
             if related_dists:
@@ -4185,7 +4199,7 @@ def handle_cash_distributions():
                 return jsonify({'success': False, 'message': 'Cash request not found'}), 404
             if cash_req.incident_id != incident.id:
                 return jsonify({'success': False, 'message': 'Cash request does not match selected incident'}), 400
-            max_amount = cash_req.requested_amount
+        
         if data.get('relief_request_id'):
             relief_req = db_get(ReliefRequest, data['relief_request_id'])
             if not relief_req:
@@ -4204,6 +4218,21 @@ def handle_cash_distributions():
         if total > fund.current_balance:
             return jsonify({'success': False, 'message': f'Insufficient fund balance. Available: {fund.current_balance}, Required: {total}'}), 400
         fiscal_year = AppSettings.get_setting('active_fiscal_year', '2081/82')
+        for ben_data in beneficiaries_payload:
+            ben_name = (ben_data.get('name') or '').strip()
+            ben_id = ben_data.get('beneficiary_id')
+            existing = db.session.query(CashDistributionBeneficiary).join(
+                CashDistribution
+            ).filter(
+                CashDistribution.incident_id == incident.id,
+                CashDistribution.fiscal_year == fiscal_year,
+                db.or_(
+                    CashDistributionBeneficiary.beneficiary_id == ben_id,
+                    CashDistributionBeneficiary.name.ilike(ben_name)
+                )
+            ).first()
+            if existing:
+                return jsonify({'success': False, 'message': f'Beneficiary "{ben_name}" already received a distribution for this incident in fiscal year {fiscal_year}'}), 400
         dist = CashDistribution(
             distribution_no=data.get('distribution_no') or generate_cash_distribution_no(),
             distribution_date=parse_bs_date_field(data, 'distribution_date', default=date.today()),
@@ -4213,6 +4242,7 @@ def handle_cash_distributions():
             distribution_type=data.get('distribution_type', 'Individual'),
             total_amount=total, fiscal_year=fiscal_year,
             officer=data.get('officer'), remarks=data.get('remarks'),
+            photo=data.get('photo'), document=data.get('document'),
             created_by=current_user.id
         )
         db.session.add(dist)
@@ -4281,6 +4311,69 @@ def get_cash_distribution(id):
     if not dist:
         return jsonify({'success': False, 'message': 'Cash distribution not found'}), 404
     return jsonify({'success': True, 'distribution': dist.to_dict()})
+
+@app.route('/api/cash-distributions/<int:id>/upload-file', methods=['POST'])
+@login_required
+def upload_cash_distribution_file(id):
+    dist = db_get(CashDistribution, id)
+    if not dist:
+        return jsonify({'success': False, 'message': 'Cash distribution not found'}), 404
+    if 'file' not in request.files:
+        return jsonify({'success': False, 'message': 'No file provided'}), 400
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'success': False, 'message': 'No file selected'}), 400
+    file_type = request.form.get('type', 'photo')
+    if file_type not in ('photo', 'document'):
+        return jsonify({'success': False, 'message': 'Type must be photo or document'}), 400
+    ext = file.filename.rsplit('.', 1)[-1].lower() if '.' in file.filename else ''
+    if file_type == 'photo' and ext not in ('jpg', 'jpeg', 'png', 'gif'):
+        return jsonify({'success': False, 'message': 'Allowed photo formats: JPG, JPEG, PNG, GIF'}), 400
+    if file_type == 'document' and ext not in ('pdf',):
+        return jsonify({'success': False, 'message': 'Document must be a PDF'}), 400
+    import uuid as uuid_lib
+    prefix = f"cd_{file_type}_"
+    safe_name = f"{prefix}{uuid_lib.uuid4().hex}.{ext}"
+    filepath = os.path.join(app.config['UPLOAD_FOLDER'], safe_name)
+    file.save(filepath)
+    old_field = getattr(dist, file_type)
+    if old_field:
+        old_path = os.path.join(app.config['UPLOAD_FOLDER'], old_field)
+        if os.path.exists(old_path):
+            os.remove(old_path)
+    setattr(dist, file_type, safe_name)
+    db.session.commit()
+    return jsonify({
+        'success': True, 'message': f'{file_type.title()} uploaded',
+        'data': {'filename': safe_name, 'url': f'/uploads/{safe_name}'}
+    }), 201
+
+# ============ UPLOAD ENDPOINT (for pre-creation file upload) ============
+
+@app.route('/api/upload/cash-distribution-file', methods=['POST'])
+@login_required
+def upload_cash_distribution_file_temp():
+    if 'file' not in request.files:
+        return jsonify({'success': False, 'message': 'No file provided'}), 400
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'success': False, 'message': 'No file selected'}), 400
+    file_type = request.form.get('type', 'photo')
+    if file_type not in ('photo', 'document'):
+        return jsonify({'success': False, 'message': 'Type must be photo or document'}), 400
+    ext = file.filename.rsplit('.', 1)[-1].lower() if '.' in file.filename else ''
+    if file_type == 'photo' and ext not in ('jpg', 'jpeg', 'png', 'gif'):
+        return jsonify({'success': False, 'message': 'Allowed photo formats: JPG, JPEG, PNG, GIF'}), 400
+    if file_type == 'document' and ext not in ('pdf',):
+        return jsonify({'success': False, 'message': 'Document must be a PDF'}), 400
+    import uuid as uuid_lib
+    safe_name = f"cd_{file_type}_{uuid_lib.uuid4().hex}.{ext}"
+    filepath = os.path.join(app.config['UPLOAD_FOLDER'], safe_name)
+    file.save(filepath)
+    return jsonify({
+        'success': True, 'message': f'{file_type.title()} uploaded',
+        'data': {'filename': safe_name, 'url': f'/uploads/{safe_name}'}
+    }), 201
 
 # ============ BENEFICIARY API ============
 @app.route('/api/beneficiaries', methods=['GET', 'POST'])
@@ -7532,6 +7625,18 @@ def init_db():
                 if 'fiscal_year' not in cdcols:
                     try:
                         db.session.execute(db.text("ALTER TABLE cash_distribution ADD COLUMN fiscal_year VARCHAR(20)"))
+                        db.session.commit()
+                    except Exception:
+                        pass
+                if 'photo' not in cdcols:
+                    try:
+                        db.session.execute(db.text("ALTER TABLE cash_distribution ADD COLUMN photo VARCHAR(500)"))
+                        db.session.commit()
+                    except Exception:
+                        pass
+                if 'document' not in cdcols:
+                    try:
+                        db.session.execute(db.text("ALTER TABLE cash_distribution ADD COLUMN document VARCHAR(500)"))
                         db.session.commit()
                     except Exception:
                         pass
