@@ -28,13 +28,13 @@
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <div class="mb-3 text-start">
                         <label class="form-label"><i class="bi bi-person me-1"></i>Username</label>
-                        <input type="text" name="username" class="form-control" placeholder="Enter username" required autofocus>
+                        <input type="text" name="username" class="form-control" placeholder="Enter username" required autofocus{% if locked %} disabled{% endif %}>
                     </div>
                     <div class="mb-3 text-start">
                         <label class="form-label"><i class="bi bi-lock me-1"></i>Password</label>
-                        <input type="password" name="password" class="form-control" placeholder="Enter password" required>
+                        <input type="password" name="password" class="form-control" placeholder="Enter password" required{% if locked %} disabled{% endif %}>
                     </div>
-                    <button type="submit" class="btn btn-primary w-100 py-2">
+                    <button type="submit" class="btn btn-primary w-100 py-2"{% if locked %} disabled{% endif %}>
                         <i class="bi bi-box-arrow-in-right me-2"></i>Login
                     </button>
                 </form>

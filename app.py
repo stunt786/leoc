@@ -2,6 +2,8 @@ from flask import Flask, render_template, request, jsonify, send_from_directory,
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf.csrf import CSRFProtect
 from flask_login import login_user, logout_user, login_required as flask_login_required, current_user
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from datetime import datetime, date, timedelta, timezone
 import os
 import json
@@ -101,8 +103,19 @@ if not secret_key or secret_key == 'dev-key-please-change-in-production' or secr
         raise ValueError("ERROR: SECRET_KEY must be set to a strong random value in production.")
     secret_key = 'dev-key-change-in-production'
 app.config['SECRET_KEY'] = secret_key
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+is_prod = os.getenv('FLASK_ENV') == 'production'
+is_debug = os.getenv('FLASK_DEBUG', 'False').lower() in ('true', '1', 'yes')
+app.config['SESSION_COOKIE_SECURE'] = is_prod and not is_debug
 
 csrf = CSRFProtect(app)
+limiter = Limiter(
+    key_func=get_remote_address,
+    app=app,
+    default_limits=["1000 per hour", "200 per minute"],
+    storage_uri="memory://"
+)
 
 if not app.debug:
     os.makedirs('logs', exist_ok=True)
@@ -117,7 +130,7 @@ os.makedirs('instance', exist_ok=True)
 db_path = os.path.abspath('./instance/leoc.db')
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('SQLALCHEMY_DATABASE_URI', f'sqlite:///{db_path}')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['WTF_CSRF_CHECK_DEFAULT'] = False
+app.config['WTF_CSRF_CHECK_DEFAULT'] = True
 app.config['MAX_CONTENT_LENGTH'] = int(os.getenv('MAX_CONTENT_LENGTH', 16 * 1024 * 1024))
 app.config['UPLOAD_FOLDER'] = os.getenv('UPLOAD_FOLDER', 'static/uploads')
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
@@ -1643,29 +1656,76 @@ def log_api_activity(response):
 def login():
     if current_user.is_authenticated:
         return redirect(url_for('index'))
+
+    locked = False
+
     if request.method == 'POST':
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '')
-        user = authenticate_user(db, username, password)
-        if user:
-            login_user(user)
-            user.last_login = datetime.now(timezone.utc)
-            db.session.execute(
-                db.text("UPDATE \"user\" SET last_login = :last_login WHERE id = :id"),
-                {'last_login': datetime.now(timezone.utc), 'id': user.id}
-            )
-            db.session.commit()
-            log_activity('login', 'auth', details=f'User {username} logged in', ip=request.remote_addr)
-            next_page = request.args.get('next')
-            if next_page:
-                return redirect(next_page)
-            return redirect(url_for('index'))
-        log_activity('login_failed', 'auth', details=f'Failed login attempt for {username}', ip=request.remote_addr)
-        flash('Invalid username or password', 'danger')
-        return render_template('login.html')
-    return render_template('login.html')
 
-@app.route('/logout')
+        user = get_user_by_username(db, username)
+
+        if user:
+            if user.locked_until:
+                try:
+                    locked_until = datetime.fromisoformat(user.locked_until) if isinstance(user.locked_until, str) else user.locked_until
+                    if locked_until.tzinfo is None:
+                        locked_until = locked_until.replace(tzinfo=timezone.utc)
+                except Exception:
+                    locked_until = user.locked_until
+                if locked_until > datetime.now(timezone.utc):
+                    remaining = max(1, int((locked_until - datetime.now(timezone.utc)).total_seconds() // 60))
+                    flash(f'Account locked due to too many failed login attempts. Try again in {remaining} minute(s).', 'danger')
+                    return render_template('login.html', locked=True)
+
+            if authenticate_user(db, username, password):
+                db.session.execute(
+                    db.text("UPDATE \"user\" SET failed_login_attempts = 0, locked_until = NULL WHERE id = :id"),
+                    {'id': user.id}
+                )
+                db.session.commit()
+
+                login_user(user)
+                db.session.execute(
+                    db.text("UPDATE \"user\" SET last_login = :last_login WHERE id = :id"),
+                    {'last_login': datetime.now(timezone.utc), 'id': user.id}
+                )
+                db.session.commit()
+                log_activity('login', 'auth', details=f'User {username} logged in', ip=request.remote_addr)
+                next_page = request.args.get('next')
+                if next_page:
+                    return redirect(next_page)
+                return redirect(url_for('index'))
+            else:
+                new_count = (user.failed_login_attempts or 0) + 1
+                if new_count >= 10:
+                    locked_until = datetime.now(timezone.utc) + timedelta(minutes=15)
+                    db.session.execute(
+                        db.text("UPDATE \"user\" SET failed_login_attempts = :count, locked_until = :locked_until WHERE id = :id"),
+                        {'count': new_count, 'locked_until': locked_until, 'id': user.id}
+                    )
+                    db.session.commit()
+                    flash('Account locked due to too many failed login attempts. Try again in 15 minute(s).', 'danger')
+                    log_activity('login_failed', 'auth', details=f'Account locked for {username} after {new_count} failed attempts', ip=request.remote_addr)
+                    return render_template('login.html', locked=True)
+                else:
+                    db.session.execute(
+                        db.text("UPDATE \"user\" SET failed_login_attempts = :count WHERE id = :id"),
+                        {'count': new_count, 'id': user.id}
+                    )
+                    db.session.commit()
+                    remaining = 10 - new_count
+                    flash(f'Invalid username or password. {remaining} attempt(s) remaining before account lockout.', 'danger')
+                    log_activity('login_failed', 'auth', details=f'Failed login attempt for {username} ({remaining} attempts remaining)', ip=request.remote_addr)
+                    return render_template('login.html')
+        else:
+            flash('Invalid username or password', 'danger')
+            log_activity('login_failed', 'auth', details=f'Failed login attempt for unknown user {username}', ip=request.remote_addr)
+            return render_template('login.html')
+
+    return render_template('login.html', locked=False)
+
+@app.route('/logout', methods=['POST'])
 def logout():
     if current_user.is_authenticated:
         log_activity('logout', 'auth', details=f'User {current_user.username} logged out', user=current_user, ip=request.remote_addr)
@@ -5033,10 +5093,10 @@ def upload_item_photo():
         file = request.files['file']
         if file.filename == '':
             return jsonify({'success': False, 'message': 'No file selected'}), 400
-        ALLOWED_EXTENSIONS = {'jpg', 'jpeg', 'png', 'gif', 'svg', 'webp'}
+        ALLOWED_EXTENSIONS = {'jpg', 'jpeg', 'png', 'gif', 'webp'}
         ext = file.filename.rsplit('.', 1)[-1].lower() if '.' in file.filename else ''
         if ext not in ALLOWED_EXTENSIONS:
-            return jsonify({'success': False, 'message': 'Allowed: JPG, PNG, GIF, SVG, WEBP'}), 400
+            return jsonify({'success': False, 'message': 'Allowed: JPG, PNG, GIF, WEBP'}), 400
         import uuid as uuid_lib
         safe_name = f"item_{uuid_lib.uuid4().hex}.{ext}"
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], safe_name)
@@ -5054,6 +5114,7 @@ def upload_item_photo():
         return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 @app.route('/uploads/<filename>')
+@login_required
 def uploaded_file(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
@@ -5804,7 +5865,6 @@ def get_map_data():
 
 # ============ USER MANAGEMENT API ============
 @app.route('/api/users', methods=['GET'])
-@csrf.exempt
 @permission_required('manage_users')
 def api_get_users():
     try:
@@ -5817,7 +5877,6 @@ def api_get_users():
         return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 @app.route('/api/users', methods=['POST'])
-@csrf.exempt
 @permission_required('manage_users')
 def api_create_user():
     try:
@@ -5849,7 +5908,6 @@ def api_create_user():
         return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 @app.route('/api/users/<int:user_id>', methods=['PUT'])
-@csrf.exempt
 @permission_required('manage_users')
 def api_update_user(user_id):
     try:
@@ -5887,7 +5945,6 @@ def api_update_user(user_id):
         return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 @app.route('/api/users/<int:user_id>', methods=['DELETE'])
-@csrf.exempt
 @permission_required('manage_users')
 def api_delete_user(user_id):
     try:
@@ -5904,7 +5961,6 @@ def api_delete_user(user_id):
         return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 @app.route('/api/auth/change-password', methods=['POST'])
-@csrf.exempt
 @login_required
 def api_change_password():
     try:
@@ -6073,6 +6129,13 @@ def handle_403(e):
     if request.path.startswith('/api/'):
         return jsonify({'success': False, 'message': 'Forbidden'}), 403
     return e
+
+@app.errorhandler(429)
+def handle_429(e):
+    if request.path.startswith('/api/'):
+        return jsonify({'success': False, 'message': 'Too many requests. Please slow down.'}), 429
+    flash('Too many requests. Please wait before trying again.', 'danger')
+    return render_template('login.html', locked=False), 429
 
 # ============ REPORTS (PDF) ============
 def make_pdf_report(title, headers, rows, col_widths):

@@ -7,7 +7,7 @@ from datetime import datetime
 login_manager = LoginManager()
 
 class User(UserMixin):
-    def __init__(self, id, username, password_hash, role, full_name=None, is_active=True, created_at=None, last_login=None):
+    def __init__(self, id, username, password_hash, role, full_name=None, is_active=True, created_at=None, last_login=None, failed_login_attempts=0, locked_until=None):
         self.id = id
         self.username = username
         self.password_hash = password_hash
@@ -16,6 +16,8 @@ class User(UserMixin):
         self._is_active = is_active
         self.created_at = created_at
         self.last_login = last_login
+        self.failed_login_attempts = failed_login_attempts
+        self.locked_until = locked_until
 
     def get_id(self):
         return str(self.id)
@@ -42,6 +44,8 @@ class User(UserMixin):
             'is_active': self._is_active,
             'created_at': self._format_dt(self.created_at),
             'last_login': self._format_dt(self.last_login),
+            'failed_login_attempts': self.failed_login_attempts,
+            'locked_until': str(self.locked_until) if self.locked_until else None,
         }
 
 def user_loader(db):
@@ -49,14 +53,15 @@ def user_loader(db):
     def load_user(user_id):
         from app import db as app_db
         result = app_db.session.execute(
-            app_db.text("SELECT id, username, password_hash, role, full_name, is_active, created_at, last_login FROM \"user\" WHERE id = :id"),
+            app_db.text("SELECT id, username, password_hash, role, full_name, is_active, created_at, last_login, failed_login_attempts, locked_until FROM \"user\" WHERE id = :id"),
             {'id': int(user_id)}
         ).fetchone()
         if result:
             return User(
                 id=result[0], username=result[1], password_hash=result[2],
                 role=result[3], full_name=result[4], is_active=result[5],
-                created_at=result[6], last_login=result[7]
+                created_at=result[6], last_login=result[7],
+                failed_login_attempts=result[8], locked_until=result[9]
             )
         return None
     return load_user
@@ -102,27 +107,29 @@ def permission_required(action):
 
 def get_user_from_db(db, user_id):
     result = db.session.execute(
-        db.text("SELECT id, username, password_hash, role, full_name, is_active, created_at, last_login FROM \"user\" WHERE id = :id"),
+        db.text("SELECT id, username, password_hash, role, full_name, is_active, created_at, last_login, failed_login_attempts, locked_until FROM \"user\" WHERE id = :id"),
         {'id': user_id}
     ).fetchone()
     if result:
         return User(
             id=result[0], username=result[1], password_hash=result[2],
             role=result[3], full_name=result[4], is_active=result[5],
-            created_at=result[6], last_login=result[7]
+            created_at=result[6], last_login=result[7],
+            failed_login_attempts=result[8], locked_until=result[9]
         )
     return None
 
 def get_user_by_username(db, username):
     result = db.session.execute(
-        db.text("SELECT id, username, password_hash, role, full_name, is_active, created_at, last_login FROM \"user\" WHERE username = :username"),
+        db.text("SELECT id, username, password_hash, role, full_name, is_active, created_at, last_login, failed_login_attempts, locked_until FROM \"user\" WHERE username = :username"),
         {'username': username}
     ).fetchone()
     if result:
         return User(
             id=result[0], username=result[1], password_hash=result[2],
             role=result[3], full_name=result[4], is_active=result[5],
-            created_at=result[6], last_login=result[7]
+            created_at=result[6], last_login=result[7],
+            failed_login_attempts=result[8], locked_until=result[9]
         )
     return None
 

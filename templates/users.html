@@ -155,6 +155,7 @@
 
 {% block extra_js %}
 <script>
+const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 const VALID_ROLES = {
     'admin': 'Administrator',
     'warehouse_manager': 'Warehouse Manager',

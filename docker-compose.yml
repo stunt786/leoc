@@ -9,7 +9,6 @@ services:
     volumes:
       - ./instance:/app/instance
       - ./static/uploads:/app/static/uploads
-      - ./:/app  # Mount the entire app directory
     environment:
       - FLASK_ENV=production
       - SECRET_KEY=${SECRET_KEY:-your-default-secret-key}

@@ -9,4 +9,4 @@ python-dotenv==1.0.0
 reportlab==4.0.7
 weasyprint==60.2
 Pillow==10.1.0
-
+Flask-Limiter==3.5.0

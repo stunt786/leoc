@@ -9724,3 +9724,8 @@ TypeError: 'builtin_function_or_method' object is not iterable
 2026-06-21 13:42:40,016 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:114]
 2026-06-21 13:44:18,075 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:114]
 2026-06-21 13:48:28,754 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:114]
+2026-06-21 14:35:46,610 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:114]
+2026-06-21 14:51:42,836 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:127]
+2026-06-21 15:10:35,510 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:127]
+2026-06-21 15:11:32,402 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:127]
+2026-06-21 15:12:52,161 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:127]

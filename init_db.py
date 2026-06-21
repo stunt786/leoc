@@ -35,7 +35,9 @@ def create_user_table():
                 full_name VARCHAR(200),
                 is_active BOOLEAN DEFAULT 1,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                last_login DATETIME
+                last_login DATETIME,
+                failed_login_attempts INTEGER DEFAULT 0,
+                locked_until DATETIME
             )
         """))
         db.session.commit()
@@ -48,13 +50,15 @@ def seed_default_users():
     from werkzeug.security import generate_password_hash
     existing = db.session.execute(text("SELECT id FROM \"user\" WHERE username = 'admin'")).fetchone()
     if not existing:
-        admin_password = os.getenv('ADMIN_PASSWORD', 'admin123')
+        admin_password = os.getenv('ADMIN_PASSWORD')
+        if not admin_password or admin_password == 'admin123':
+            admin_password = 'AdminSec_leoc2026#'
         users = [
             ('admin', generate_password_hash(admin_password), 'admin', 'System Administrator'),
-            ('editor', generate_password_hash('editor123'), 'editor', 'Data Editor'),
-            ('viewer', generate_password_hash('viewer123'), 'viewer', 'Read Only User'),
-            ('operator', generate_password_hash('operator123'), 'operator', 'Operations Officer'),
-            ('finance', generate_password_hash('finance123'), 'finance', 'Finance Officer'),
+            ('editor', generate_password_hash(os.getenv('EDITOR_PASSWORD', 'EditorSec_leoc2026#')), 'editor', 'Data Editor'),
+            ('viewer', generate_password_hash(os.getenv('VIEWER_PASSWORD', 'ViewerSec_leoc2026#')), 'viewer', 'Read Only User'),
+            ('operator', generate_password_hash(os.getenv('OPERATOR_PASSWORD', 'OperatorSec_leoc2026#')), 'operator', 'Operations Officer'),
+            ('finance', generate_password_hash(os.getenv('FINANCE_PASSWORD', 'FinanceSec_leoc2026#')), 'finance', 'Finance Officer'),
         ]
         for username, pwhash, role, fullname in users:
             db.session.execute(
@@ -446,6 +450,10 @@ def run_migrations():
         ],
         'event_log': [('is_locked', 'BOOLEAN DEFAULT 0')],
         'category': [('is_predefined', 'BOOLEAN DEFAULT 0')],
+        'user': [
+            ('failed_login_attempts', 'INTEGER DEFAULT 0'),
+            ('locked_until', 'DATETIME'),
+        ],
         'document_archive': [
             ('uploaded_by', 'INTEGER'),
         ],
