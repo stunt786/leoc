@@ -90,6 +90,20 @@
                     <option value="expired">Expired Items</option>
                 </select>
             </div>
+            <div class="col-md-2">
+                <label class="form-label">Supplier</label>
+                <select class="form-select" id="filterSupplier" onchange="loadInventory()">
+                    <option value="">All Suppliers</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">From Date (BS)</label>
+                <input type="text" class="form-control nepali-date" id="filterFromDate" placeholder="YYYY-MM-DD" onchange="loadInventory()">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">To Date (BS)</label>
+                <input type="text" class="form-control nepali-date" id="filterToDate" placeholder="YYYY-MM-DD" onchange="loadInventory()">
+            </div>
             <div class="col-md-3">
                 <label class="form-label">Search</label>
                 <input type="text" class="form-control" id="filterSearch" placeholder="Search item name..." oninput="debounceSearch()">
@@ -217,6 +231,11 @@ async function loadFormData() {
             catSel.innerHTML += `<option value="${c.id}">${c.name}</option>`;
         });
 
+        const supSel = document.getElementById('filterSupplier');
+        (d.suppliers || []).forEach(s => {
+            supSel.innerHTML += `<option value="${s.id}">${s.name}</option>`;
+        });
+
         const itemSel = document.getElementById('filterItem');
         const printItemSel = document.getElementById('printItem');
         items.forEach(i => {
@@ -231,12 +250,18 @@ async function loadInventory() {
     try {
         const warehouse = document.getElementById('filterWarehouse').value;
         const category = document.getElementById('filterCategory').value;
+        const supplier = document.getElementById('filterSupplier').value;
+        const fromDate = document.getElementById('filterFromDate').value;
+        const toDate = document.getElementById('filterToDate').value;
         const status = document.getElementById('filterStatus').value;
         const search = document.getElementById('filterSearch').value;
 
         const params = new URLSearchParams();
         if (warehouse) params.append('warehouse_id', warehouse);
         if (category) params.append('category_id', category);
+        if (supplier) params.append('supplier_id', supplier);
+        if (fromDate) params.append('from_date', fromDate);
+        if (toDate) params.append('to_date', toDate);
         if (status) params.append('status', status);
         if (search) params.append('search', search);
 

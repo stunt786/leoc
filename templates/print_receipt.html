@@ -106,6 +106,21 @@
     </div>
     {% endif %}
 
+    <div class="row mt-4 mb-4">
+        <div class="col-6 text-center">
+            <div style="margin-top: 60px; border-top: 1px solid #000; display: inline-block; padding: 0 40px;">
+                <strong>{{ receipt.received_by or '______________' }}</strong>
+            </div>
+            <p class="mt-1 mb-0">Received By</p>
+        </div>
+        <div class="col-6 text-center">
+            <div style="margin-top: 60px; border-top: 1px solid #000; display: inline-block; padding: 0 40px;">
+                <strong>{{ receipt.verified_by or '______________' }}</strong>
+            </div>
+            <p class="mt-1 mb-0">Verified By</p>
+        </div>
+    </div>
+
     <div class="footer">
         <p>Generated on {{ receipt.created_at|nepali_date if receipt.created_at else '' }} | {{ office or 'थलारा गाउँपालिका' }} - LEOC</p>
     </div>

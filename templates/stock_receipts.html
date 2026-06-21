@@ -107,6 +107,10 @@
                             <input type="text" class="form-control" id="receipt_vehicle_no" placeholder="Vehicle number">
                         </div>
                         <div class="col-md-3">
+                            <label class="form-label">Received By</label>
+                            <input type="text" class="form-control" id="receipt_received_by" placeholder="Received by">
+                        </div>
+                        <div class="col-md-3">
                             <label class="form-label">Verified By</label>
                             <input type="text" class="form-control" id="receipt_verified_by" placeholder="Verified by">
                         </div>
@@ -293,6 +297,10 @@ function onSupplierChange() {
             document.getElementById('receipt_email').value = sup.email || '';
         if (!document.getElementById('receipt_address').value)
             document.getElementById('receipt_address').value = sup.address || '';
+        const typeMap = {'Government': 'Government Supply', 'NGO': 'NGO', 'Private': 'Purchase', 'Individual': 'Donation', 'Other': 'Supplier'};
+        const sourceType = typeMap[sup.supplier_type] || 'Supplier';
+        const stSelect = document.getElementById('receipt_source_type');
+        if (stSelect && !stSelect.value) stSelect.value = sourceType;
     }
 }
 
@@ -388,6 +396,7 @@ async function saveReceipt() {
         invoice_date: document.getElementById('receipt_invoice_date').value,
         delivery_note: document.getElementById('receipt_delivery_note').value,
         vehicle_no: document.getElementById('receipt_vehicle_no').value,
+        received_by: document.getElementById('receipt_received_by').value,
         verified_by: document.getElementById('receipt_verified_by').value,
         remarks: document.getElementById('receipt_remarks').value,
         items: items
@@ -436,6 +445,7 @@ async function editReceipt(id) {
         document.getElementById('receipt_invoice_date').value = rc.invoice_date || '';
         document.getElementById('receipt_delivery_note').value = rc.delivery_note || '';
         document.getElementById('receipt_vehicle_no').value = rc.vehicle_no || '';
+        document.getElementById('receipt_received_by').value = rc.received_by || '';
         document.getElementById('receipt_verified_by').value = rc.verified_by || '';
         document.getElementById('receipt_remarks').value = rc.remarks || '';
 
@@ -500,6 +510,7 @@ async function viewReceipt(id) {
                 <div class="col-md-4"><strong>Invoice Date:</strong><br>${rc.invoice_date || '-'}</div>
                 <div class="col-md-4"><strong>Delivery Note:</strong><br>${rc.delivery_note || '-'}</div>
                 <div class="col-md-4"><strong>Vehicle No:</strong><br>${rc.vehicle_no || '-'}</div>
+                <div class="col-md-4"><strong>Received By:</strong><br>${rc.received_by || '-'}</div>
                 <div class="col-md-4"><strong>Verified By:</strong><br>${rc.verified_by || '-'}</div>
                 <div class="col-md-4"><strong>Remarks:</strong><br>${rc.remarks || '-'}</div>
             </div>

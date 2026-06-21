@@ -110,9 +110,13 @@ def seed_item_categories():
     new_count = 0
     for cat_name in categories:
         if cat_name not in existing_names:
-            cat = Category(name=cat_name)
+            cat = Category(name=cat_name, is_predefined=True)
             db.session.add(cat)
             new_count += 1
+        else:
+            existing = Category.query.filter_by(name=cat_name).first()
+            if existing and not existing.is_predefined:
+                existing.is_predefined = True
 
     db.session.commit()
     if new_count:
@@ -441,6 +445,7 @@ def run_migrations():
             ('missing_female', 'INTEGER DEFAULT 0'),
         ],
         'event_log': [('is_locked', 'BOOLEAN DEFAULT 0')],
+        'category': [('is_predefined', 'BOOLEAN DEFAULT 0')],
         'situation_report': [('is_locked', 'BOOLEAN DEFAULT 0')],
         'public_information': [('is_locked', 'BOOLEAN DEFAULT 0')],
     }

@@ -440,10 +440,11 @@ class Category(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), unique=True, nullable=False, index=True)
     description = db.Column(db.Text)
+    is_predefined = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=utc_now)
 
     def to_dict(self):
-        return {'id': self.id, 'name': self.name, 'description': self.description}
+        return {'id': self.id, 'name': self.name, 'description': self.description, 'is_predefined': self.is_predefined}
 
 # ============ ITEM MASTER MODEL (Module 5) ============
 class Item(db.Model):
@@ -511,7 +512,7 @@ class StockReceipt(db.Model):
     invoice_date = db.Column(db.Date)
     delivery_note = db.Column(db.String(100))
     vehicle_no = db.Column(db.String(50))
-    received_by = db.Column(db.Integer)
+    received_by = db.Column(db.String(200))
     verified_by = db.Column(db.String(200))
     remarks = db.Column(db.Text)
     created_by = db.Column(db.Integer)
@@ -534,6 +535,7 @@ class StockReceipt(db.Model):
             'ref_number': self.ref_number, 'invoice_no': self.invoice_no,
             'invoice_date': ad_to_bs_date(self.invoice_date),
             'delivery_note': self.delivery_note, 'vehicle_no': self.vehicle_no,
+            'received_by': self.received_by,
             'verified_by': self.verified_by,
             'remarks': self.remarks, 'items': [i.to_dict() for i in self.items],
             'attachments': [a.to_dict() for a in self.attachments]
@@ -849,6 +851,7 @@ class ReliefRequestItem(db.Model):
     item_id = db.Column(db.Integer, db.ForeignKey('item.id'), nullable=False)
     quantity_requested = db.Column(db.Integer, nullable=False)
     quantity_dispatched = db.Column(db.Integer, default=0)
+    quantity_distributed = db.Column(db.Integer, default=0)
     unit = db.Column(db.String(50))
     item = db.relationship('Item', backref=db.backref('request_items', lazy=True))
 
@@ -858,6 +861,8 @@ class ReliefRequestItem(db.Model):
             'item_name': self.item.name if self.item else None,
             'quantity_requested': self.quantity_requested,
             'quantity_dispatched': self.quantity_dispatched,
+            'quantity_distributed': self.quantity_distributed,
+            'remaining_to_distribute': max(0, self.quantity_dispatched - self.quantity_distributed),
             'unit': self.unit or (self.item.unit if self.item else None)
         }
 
@@ -2162,6 +2167,11 @@ def manage_category(id):
         return jsonify({'success': False, 'message': 'Category not found'}), 404
     try:
         if request.method == 'DELETE':
+            if cat.is_predefined:
+                return jsonify({'success': False, 'message': 'Cannot delete a predefined system category'}), 400
+            linked_items = Item.query.filter_by(category_id=cat.id).count()
+            if linked_items > 0:
+                return jsonify({'success': False, 'message': f'Cannot delete category "{cat.name}" because {linked_items} item(s) are linked to it. Remove or reassign those items first.'}), 400
             db.session.delete(cat)
             db.session.commit()
             return jsonify({'success': True, 'message': 'Category deleted'})
@@ -2576,6 +2586,7 @@ def handle_stock_receipts():
             ref_number=data.get('ref_number'), invoice_no=data.get('invoice_no'),
             invoice_date=invoice_date, delivery_note=data.get('delivery_note'),
             vehicle_no=data.get('vehicle_no'),
+            received_by=data.get('received_by'),
             verified_by=data.get('verified_by'),
             remarks=data.get('remarks'),
             created_by=current_user.id
@@ -2637,12 +2648,26 @@ def update_stock_receipt(id):
             return jsonify({'success': False, 'message': 'No data provided'}), 400
 
         for ri in receipt.items[:]:
+            transfer_count = StockTransferItem.query.filter_by(item_id=ri.item_id).join(
+                StockTransfer, StockTransferItem.transfer_id == StockTransfer.id
+            ).filter(StockTransfer.from_warehouse_id == receipt.warehouse_id).count()
+            dispatch_count = DispatchItem.query.filter_by(item_id=ri.item_id).join(
+                Dispatch, DispatchItem.dispatch_id == Dispatch.id
+            ).filter(Dispatch.warehouse_id == receipt.warehouse_id).count()
+            if transfer_count > 0 or dispatch_count > 0:
+                return jsonify({'success': False, 'message': f'Cannot edit stock receipt: item "{ri.item.name}" has been transferred or dispatched from this warehouse. Reverse those transactions first.'}), 400
+        for ri in receipt.items[:]:
             update_inventory(ri.item_id, receipt.warehouse_id, -ri.quantity)
             db.session.delete(ri)
 
         receipt.date = parse_bs_date_field(data, 'date', default=receipt.date)
         if 'supplier_id' in data:
-            sid = data.get('supplier_id', type=int)
+            sid = data.get('supplier_id')
+            if sid is not None:
+                try:
+                    sid = int(sid)
+                except (ValueError, TypeError):
+                    return jsonify({'success': False, 'message': 'Invalid supplier ID'}), 400
             if sid:
                 supplier = db_get(Supplier, sid)
                 if not supplier:
@@ -2669,6 +2694,7 @@ def update_stock_receipt(id):
             receipt.invoice_date = None
         receipt.delivery_note = data.get('delivery_note', receipt.delivery_note)
         receipt.vehicle_no = data.get('vehicle_no', receipt.vehicle_no)
+        receipt.received_by = data.get('received_by', receipt.received_by)
         receipt.verified_by = data.get('verified_by', receipt.verified_by)
         receipt.remarks = data.get('remarks', receipt.remarks)
 
@@ -2719,6 +2745,9 @@ def get_inventory():
         query = Inventory.query
         warehouse_id = request.args.get('warehouse_id', type=int)
         category_id = request.args.get('category_id', type=int)
+        supplier_id = request.args.get('supplier_id', type=int)
+        from_date_str = request.args.get('from_date')
+        to_date_str = request.args.get('to_date')
         status = request.args.get('status')
         search = request.args.get('search')
         if warehouse_id:
@@ -2727,6 +2756,27 @@ def get_inventory():
             query = query.join(Item).filter(Item.category_id == category_id)
         if search:
             query = query.join(Item).filter(Item.name.ilike(f'%{search}%'))
+        if supplier_id or from_date_str or to_date_str:
+            receipt_item_ids = db.session.query(StockReceiptItem.item_id).join(
+                StockReceipt, StockReceiptItem.receipt_id == StockReceipt.id
+            )
+            if supplier_id:
+                receipt_item_ids = receipt_item_ids.filter(StockReceipt.supplier_id == supplier_id)
+            if from_date_str:
+                ad_from = bs_to_ad(from_date_str)
+                if ad_from:
+                    from_dt = datetime.strptime(ad_from, '%Y-%m-%d').date()
+                    receipt_item_ids = receipt_item_ids.filter(StockReceipt.date >= from_dt)
+            if to_date_str:
+                ad_to = bs_to_ad(to_date_str)
+                if ad_to:
+                    to_dt = datetime.strptime(ad_to, '%Y-%m-%d').date()
+                    receipt_item_ids = receipt_item_ids.filter(StockReceipt.date <= to_dt)
+            filtered_item_ids = {r.item_id for r in receipt_item_ids.all()}
+            if filtered_item_ids:
+                query = query.filter(Inventory.item_id.in_(filtered_item_ids))
+            else:
+                query = query.filter(Inventory.item_id == -1)
         inventory = query.order_by(Inventory.updated_at.desc()).all()
         results = [inv.to_dict() for inv in inventory]
 
@@ -3236,36 +3286,36 @@ def handle_dispatches():
             if item.is_distributable is False:
                 db.session.rollback()
                 return jsonify({'success': False, 'message': f'{item.name} is non-distributable equipment and cannot be dispatched. Use stock transfer instead.'}), 400
-            inv = Inventory.query.filter_by(item_id=item_id, warehouse_id=warehouse.id).first()
-            if not inv or inv.available_quantity < qty:
-                db.session.rollback()
-                item_name = item.name if item else 'Unknown'
-                return jsonify({'success': False, 'message': f'Insufficient stock for {item_name}. Available: {inv.available_quantity if inv else 0}, Required: {qty}'}), 400
-            batch = item_data.get('batch_no') or ''
-            expiry = None
-            if item_data.get('expiry_date'):
-                expiry = parse_bs_date_field(item_data, 'expiry_date')
-            di = DispatchItem(dispatch_id=dispatch.id, item_id=item_id, quantity=qty,
-                              unit=item_data.get('unit'), batch_no=batch, expiry_date=expiry)
-            db.session.add(di)
-            inv.quantity -= qty
             if data.get('relief_request_id'):
-                rr_items = ReliefRequestItem.query.filter_by(request_id=data['relief_request_id'], item_id=item_id).all()
-                for rr_item in rr_items:
-                    rr_item.quantity_dispatched = (rr_item.quantity_dispatched or 0) + qty
-        if data.get('relief_request_id'):
-            req = db_get(ReliefRequest, data['relief_request_id'])
-            if req:
-                if req.items:
-                    all_dispatched = all(ri.quantity_dispatched >= ri.quantity_requested for ri in req.items)
-                else:
-                    all_dispatched = True
-                cash_done = req.distributed_cash_amount >= req.requested_cash_amount if req.requested_cash_amount > 0 else True
-                anything_done = any(ri.quantity_dispatched > 0 for ri in req.items) if req.items else False
-                if all_dispatched and cash_done:
-                    req.status = 'Completed'
-                elif anything_done or req.distributed_cash_amount > 0:
-                    req.status = 'Partial'
+                rr_item = ReliefRequestItem.query.filter_by(request_id=data['relief_request_id'], item_id=item_id).first()
+                if rr_item:
+                    total_dispatched = (rr_item.quantity_dispatched or 0) + qty
+                    if total_dispatched > rr_item.quantity_requested:
+                            db.session.rollback()
+                            return jsonify({'success': False, 'message': f'Cannot dispatch {qty} of "{item.name}". Only {max(0, rr_item.quantity_requested - (rr_item.quantity_dispatched or 0))} remaining of requested {rr_item.quantity_requested}.'}), 400
+                inv = Inventory.query.filter_by(item_id=item_id, warehouse_id=warehouse.id).first()
+                if not inv or inv.available_quantity < qty:
+                    db.session.rollback()
+                    item_name = item.name if item else 'Unknown'
+                    return jsonify({'success': False, 'message': f'Insufficient stock for {item_name}. Available: {inv.available_quantity if inv else 0}, Required: {qty}'}), 400
+                batch = item_data.get('batch_no') or ''
+                expiry = None
+                if item_data.get('expiry_date'):
+                    expiry = parse_bs_date_field(item_data, 'expiry_date')
+                di = DispatchItem(dispatch_id=dispatch.id, item_id=item_id, quantity=qty,
+                                  unit=item_data.get('unit'), batch_no=batch, expiry_date=expiry)
+                db.session.add(di)
+                inv.quantity -= qty
+                if data.get('relief_request_id'):
+                    rr_items = ReliefRequestItem.query.filter_by(request_id=data['relief_request_id'], item_id=item_id).all()
+                    for rri in rr_items:
+                        rri.quantity_dispatched = (rri.quantity_dispatched or 0) + qty
+            if data.get('relief_request_id'):
+                req = db_get(ReliefRequest, data['relief_request_id'])
+                if req:
+                    anything_done = any(ri.quantity_dispatched > 0 for ri in req.items) if req.items else False
+                    if anything_done or req.distributed_cash_amount > 0:
+                        req.status = 'Partial'
         db.session.commit()
         return jsonify({'success': True, 'message': 'Dispatch created', 'data': dispatch.to_dict()}), 201
     except Exception as e:
@@ -3331,6 +3381,13 @@ def handle_dispatch(id):
             if item.is_distributable is False:
                 db.session.rollback()
                 return jsonify({'success': False, 'message': f'{item.name} is non-distributable equipment and cannot be dispatched. Use stock transfer instead.'}), 400
+            if data.get('relief_request_id'):
+                rr_item = ReliefRequestItem.query.filter_by(request_id=data['relief_request_id'], item_id=item_id).first()
+                if rr_item:
+                    total_disp = (rr_item.quantity_dispatched or 0) + qty
+                    if total_disp > rr_item.quantity_requested:
+                        db.session.rollback()
+                        return jsonify({'success': False, 'message': f'Cannot dispatch {qty} of "{item.name}". Only {max(0, rr_item.quantity_requested - (rr_item.quantity_dispatched or 0))} remaining of requested {rr_item.quantity_requested}.'}), 400
             inv = Inventory.query.filter_by(item_id=item_id, warehouse_id=warehouse.id).first()
             if not inv or inv.quantity < qty:
                 db.session.rollback()
@@ -3345,18 +3402,14 @@ def handle_dispatch(id):
             db.session.add(di)
             inv.quantity -= qty
             if data.get('relief_request_id'):
-                rr_item = ReliefRequestItem.query.filter_by(request_id=data['relief_request_id'], item_id=item_id).first()
-                if rr_item:
-                    rr_item.quantity_dispatched = (rr_item.quantity_dispatched or 0) + qty
+                rr_item_new = ReliefRequestItem.query.filter_by(request_id=data['relief_request_id'], item_id=item_id).first()
+                if rr_item_new:
+                    rr_item_new.quantity_dispatched = (rr_item_new.quantity_dispatched or 0) + qty
         if data.get('relief_request_id'):
             req = db_get(ReliefRequest, data['relief_request_id'])
             if req and req.items:
-                all_dispatched = all(ri.quantity_dispatched >= ri.quantity_requested for ri in req.items)
-                cash_done = req.distributed_cash_amount >= req.requested_cash_amount if req.requested_cash_amount > 0 else True
                 anything_done = any(ri.quantity_dispatched > 0 for ri in req.items)
-                if all_dispatched and cash_done:
-                    req.status = 'Completed'
-                elif anything_done or req.distributed_cash_amount > 0:
+                if anything_done or req.distributed_cash_amount > 0:
                     req.status = 'Partial'
         # Update dispatch fields
         dispatch.dispatch_number = data.get('dispatch_number') or dispatch.dispatch_number
@@ -3468,22 +3521,34 @@ def handle_distributions():
             )
             db.session.add(ben)
         db.session.flush()
+        # Update ReliefRequestItem.quantity_distributed
+        if dispatch.relief_request_id:
+            req = db_get(ReliefRequest, dispatch.relief_request_id)
+            if req:
+                for ben_data in beneficiaries_payload:
+                    item_name = (ben_data.get('item') or '').strip()
+                    qty = parse_int_field(ben_data, 'quantity', minimum=1)
+                    if item_name and qty:
+                        for rri in req.items:
+                            if rri.item and rri.item.name == item_name:
+                                rri.quantity_distributed = (rri.quantity_distributed or 0) + qty
         # Update linked relief request status if applicable
         if dispatch.relief_request_id:
             req = db_get(ReliefRequest, dispatch.relief_request_id)
             if req:
-                all_dispatched = all(
-                    ri.quantity_dispatched >= ri.quantity_requested for ri in req.items
+                all_distributed = all(
+                    (ri.quantity_distributed or 0) >= (ri.quantity_dispatched or 0)
+                    for ri in req.items
                 ) if req.items else True
                 cash_done = (
                     req.distributed_cash_amount >= req.requested_cash_amount
                     if req.requested_cash_amount > 0 else True
                 )
                 anything_done = (
-                    any(ri.quantity_dispatched > 0 for ri in req.items)
+                    any((ri.quantity_distributed or 0) > 0 for ri in req.items)
                     if req.items else False
                 ) or req.distributed_cash_amount > 0
-                if all_dispatched and cash_done:
+                if all_distributed and cash_done:
                     req.status = 'Completed'
                 elif anything_done:
                     req.status = 'Partial'
@@ -4992,6 +5057,7 @@ def get_item_history(id):
         total_expired = sum(a.adjusted_quantity for a in adjustments if a.adjustment_type == 'Expired')
         total_transferred_out = sum(ti.quantity for ti in transfers_out)
         total_transferred_in = sum(ti.quantity for ti in transfers_in)
+        total_transferred = sum(ti.quantity for ti in all_transfers)
 
         inv_query = Inventory.query.filter_by(item_id=id)
         if warehouse_id:
@@ -5106,6 +5172,7 @@ def get_item_history(id):
                 'total_expired': total_expired,
                 'total_transferred_out': total_transferred_out,
                 'total_transferred_in': total_transferred_in,
+                'total_transferred': total_transferred,
                 'total_distributed_qty': total_distributed_qty,
                 'total_distinct_beneficiaries': total_distinct_beneficiaries,
                 'total_events': len(events),
@@ -6606,15 +6673,12 @@ def print_stock_book():
                     total -= a.adjusted_quantity
             return total
 
-        def sum_transfers_before(trns, cutoff, is_out=False):
+        def sum_transfers_before(trns, cutoff):
             total = 0
             for t in trns:
                 if cutoff is not None and t.transfer and t.transfer.transfer_date and t.transfer.transfer_date >= cutoff:
                     continue
-                if is_out:
-                    total -= t.quantity
-                else:
-                    total += t.quantity
+                total += t.quantity
             return total
 
         def sum_receipts_in_range(rcpts, frm, to):
@@ -6653,7 +6717,7 @@ def print_stock_book():
                         total -= a.adjusted_quantity
             return total
 
-        def sum_transfers_in_range(trns, frm, to, is_out=False):
+        def sum_transfers_in_range(trns, frm, to):
             total = 0
             for t in trns:
                 if t.transfer and t.transfer.transfer_date:
@@ -6661,10 +6725,7 @@ def print_stock_book():
                         continue
                     if to and t.transfer.transfer_date > to:
                         continue
-                    if is_out:
-                        total -= t.quantity
-                    else:
-                        total += t.quantity
+                    total += t.quantity
             return total
 
         # Opening balance: quantity before from_date
@@ -6674,19 +6735,19 @@ def print_stock_book():
             opening += sum_receipts_before(all_receipts, from_date)
             opening -= sum_dispatches_before(all_dispatches, from_date)
             opening += sum_adjustments_before(all_adjustments, from_date)
-            opening += sum_transfers_before(all_transfers_in, from_date, is_out=False)
-            opening += sum_transfers_before(all_transfers_out, from_date, is_out=True)
+            opening += sum_transfers_before(all_transfers_in, from_date)
+            opening -= sum_transfers_before(all_transfers_out, from_date)
             opening = max(opening, 0)
 
         # Period transactions
         received = sum_receipts_in_range(all_receipts, from_date, to_date)
-        received += sum_transfers_in_range(all_transfers_in, from_date, to_date, is_out=False)
+        received += sum_transfers_in_range(all_transfers_in, from_date, to_date)
         adj_in = sum_adjustments_in_range(all_adjustments, from_date, to_date)
         if adj_in > 0:
             received += adj_in
 
         dispatched = sum_dispatches_in_range(all_dispatches, from_date, to_date)
-        dispatched += sum_transfers_in_range(all_transfers_out, from_date, to_date, is_out=True)
+        dispatched += sum_transfers_in_range(all_transfers_out, from_date, to_date)
         if adj_in < 0:
             dispatched += abs(adj_in)
 
@@ -6870,6 +6931,54 @@ def init_db():
                     db.session.execute(db.text("INSERT INTO \"user\" (username, password_hash, role, full_name, is_active) VALUES (:u, :p, :r, :f, 1)"),
                         {'u': 'admin', 'p': generate_password_hash(os.getenv('ADMIN_PASSWORD', 'admin123')), 'r': 'admin', 'f': 'System Administrator'})
                     db.session.commit()
+            if 'category' in inspector.get_table_names():
+                cat_cols = [c['name'] for c in inspector.get_columns('category')]
+                if 'is_predefined' not in cat_cols:
+                    try:
+                        db.session.execute(db.text("ALTER TABLE category ADD COLUMN is_predefined BOOLEAN DEFAULT 0"))
+                        db.session.commit()
+                    except Exception:
+                        pass
+                predefined_names = [
+                    'Food', 'Shelter', 'Relief Supplies', 'WASH (Water/Sanitation)',
+                    'Education Materials', 'Protection Gear', 'Fuel & Lubricants',
+                    'Construction Materials', 'Livestock Supplies', 'Clothing & Textiles',
+                    'Kitchen & Cooking', 'Baby & Child Care', 'Other',
+                    'Rescue - Search & Rescue Tools', 'Rescue - Ropes & Rigging',
+                    'Rescue - Cutting & Breaking', 'Rescue - Lighting & Signal',
+                    'Rescue - Water Rescue', 'Rescue - Confined Space',
+                    'Medical - Consumables', 'Medical - Equipment', 'Medical - First Aid',
+                    'Medical - Diagnostic', 'Medical - Mobility & Transport',
+                    'Vehicles - Light', 'Vehicles - Heavy', 'Vehicles - Water & Air',
+                    'Vehicle Parts & Tools', 'Preparedness - Communication',
+                    'Preparedness - Power & Lighting', 'Preparedness - Shelter & Camp',
+                    'Preparedness - Water & Sanitation', 'Preparedness - Fire Safety',
+                ]
+                for pname in predefined_names:
+                    try:
+                        db.session.execute(
+                            db.text("UPDATE category SET is_predefined = 1 WHERE name = :n AND (is_predefined IS NULL OR is_predefined = 0)"),
+                            {'n': pname}
+                        )
+                    except Exception:
+                        pass
+                db.session.commit()
+            if 'relief_request_item' in inspector.get_table_names():
+                rri_cols = [c['name'] for c in inspector.get_columns('relief_request_item')]
+                if 'quantity_distributed' not in rri_cols:
+                    try:
+                        db.session.execute(db.text("ALTER TABLE relief_request_item ADD COLUMN quantity_distributed INTEGER DEFAULT 0"))
+                        db.session.commit()
+                    except Exception:
+                        pass
+            if 'stock_receipt' in inspector.get_table_names():
+                sr_cols = [c['name'] for c in inspector.get_columns('stock_receipt')]
+                if 'received_by' in sr_cols:
+                    try:
+                        db.session.execute(db.text("UPDATE stock_receipt SET received_by = CAST(received_by AS TEXT) WHERE received_by IS NOT NULL"))
+                        db.session.commit()
+                    except Exception:
+                        pass
             if not AppSettings.get_setting('office_name'):
                 AppSettings.set_setting('office_name', 'थलारा गाउँपालिका')
             if not AppSettings.get_setting('fiscal_years'):
