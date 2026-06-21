@@ -17,6 +17,7 @@ from werkzeug.exceptions import NotFound
 import re
 from functools import wraps
 import time
+from urllib.parse import urlparse, urljoin
 from dotenv import load_dotenv
 from io import BytesIO
 from reportlab.lib import colors
@@ -79,6 +80,13 @@ def cached(timeout=CACHE_TIMEOUT):
 def clear_cache():
     global cache
     cache.clear()
+
+def is_safe_url(target):
+    if not target:
+        return False
+    ref_url = urlparse(request.host_url)
+    test_url = urlparse(urljoin(request.host_url, target))
+    return test_url.scheme in ('http', 'https') and ref_url.netloc == test_url.netloc
 
 def db_get(model, ident):
     return db.session.get(model, ident)
@@ -1607,6 +1615,16 @@ VIEW_ENDPOINTS = {
 LOGGED_VIEWS = {}
 
 @app.after_request
+def add_security_headers(response):
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+    csp = "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'"
+    response.headers['Content-Security-Policy'] = csp
+    return response
+
+@app.after_request
 def log_api_activity(response):
     try:
         if not request.path.startswith('/api/'):
@@ -1693,7 +1711,7 @@ def login():
                 db.session.commit()
                 log_activity('login', 'auth', details=f'User {username} logged in', ip=request.remote_addr)
                 next_page = request.args.get('next')
-                if next_page:
+                if next_page and is_safe_url(next_page):
                     return redirect(next_page)
                 return redirect(url_for('index'))
             else:
@@ -5869,9 +5887,9 @@ def get_map_data():
 def api_get_users():
     try:
         rows = db.session.execute(
-            db.text("SELECT id, username, password_hash, role, full_name, is_active, created_at, last_login FROM \"user\" ORDER BY id")
+            db.text("SELECT id, username, role, full_name, is_active, created_at, last_login FROM \"user\" ORDER BY id")
         ).fetchall()
-        users = [User(r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7]).to_dict() for r in rows]
+        users = [User(r[0], r[1], None, r[2], r[3], r[4], r[5], r[6]).to_dict() for r in rows]
         return jsonify({'success': True, 'users': users})
     except Exception as e:
         return jsonify({'success': False, 'message': friendly_message(e)}), 500
@@ -5962,6 +5980,7 @@ def api_delete_user(user_id):
 
 @app.route('/api/auth/change-password', methods=['POST'])
 @login_required
+@limiter.limit("5 per minute")
 def api_change_password():
     try:
         data = request.get_json()
@@ -7507,21 +7526,32 @@ def init_db():
                         last_login DATETIME
                     )
                 """))
-                admin_password = os.getenv('ADMIN_PASSWORD', 'admin123')
+                import secrets as _sec
+                admin_pw = os.getenv('ADMIN_PASSWORD') or _sec.token_urlsafe(16)
+                if not os.getenv('ADMIN_PASSWORD'): print(f"[!] ADMIN_PASSWORD not set. Generated: {admin_pw}")
                 db.session.execute(db.text("INSERT INTO \"user\" (username, password_hash, role, full_name, is_active) VALUES (:u, :p, :r, :f, 1)"),
-                    {'u': 'admin', 'p': generate_password_hash(admin_password), 'r': 'admin', 'f': 'System Administrator'})
+                    {'u': 'admin', 'p': generate_password_hash(admin_pw), 'r': 'admin', 'f': 'System Administrator'})
+                mgr_pw = os.getenv('MANAGER_PASSWORD') or _sec.token_urlsafe(16)
+                if not os.getenv('MANAGER_PASSWORD'): print(f"[!] MANAGER_PASSWORD not set. Generated: {mgr_pw}")
                 db.session.execute(db.text("INSERT INTO \"user\" (username, password_hash, role, full_name, is_active) VALUES (:u, :p, :r, :f, 1)"),
-                    {'u': 'manager', 'p': generate_password_hash('manager123'), 'r': 'warehouse_manager', 'f': 'Warehouse Manager'})
+                    {'u': 'manager', 'p': generate_password_hash(mgr_pw), 'r': 'warehouse_manager', 'f': 'Warehouse Manager'})
+                de_pw = os.getenv('DATAENTRY_PASSWORD') or _sec.token_urlsafe(16)
+                if not os.getenv('DATAENTRY_PASSWORD'): print(f"[!] DATAENTRY_PASSWORD not set. Generated: {de_pw}")
                 db.session.execute(db.text("INSERT INTO \"user\" (username, password_hash, role, full_name, is_active) VALUES (:u, :p, :r, :f, 1)"),
-                    {'u': 'dataentry', 'p': generate_password_hash('data123'), 'r': 'data_entry', 'f': 'Data Entry Operator'})
+                    {'u': 'dataentry', 'p': generate_password_hash(de_pw), 'r': 'data_entry', 'f': 'Data Entry Operator'})
+                vw_pw = os.getenv('VIEWER_PASSWORD') or _sec.token_urlsafe(16)
+                if not os.getenv('VIEWER_PASSWORD'): print(f"[!] VIEWER_PASSWORD not set. Generated: {vw_pw}")
                 db.session.execute(db.text("INSERT INTO \"user\" (username, password_hash, role, full_name, is_active) VALUES (:u, :p, :r, :f, 1)"),
-                    {'u': 'viewer', 'p': generate_password_hash('viewer123'), 'r': 'viewer', 'f': 'Read Only User'})
+                    {'u': 'viewer', 'p': generate_password_hash(vw_pw), 'r': 'viewer', 'f': 'Read Only User'})
                 db.session.commit()
             else:
                 existing = db.session.execute(db.text("SELECT id FROM \"user\" WHERE username = 'admin'")).fetchone()
                 if not existing:
+                    import secrets as _sec
+                    admin_pw = os.getenv('ADMIN_PASSWORD') or _sec.token_urlsafe(16)
+                    if not os.getenv('ADMIN_PASSWORD'): print(f"[!] ADMIN_PASSWORD not set. Generated: {admin_pw}")
                     db.session.execute(db.text("INSERT INTO \"user\" (username, password_hash, role, full_name, is_active) VALUES (:u, :p, :r, :f, 1)"),
-                        {'u': 'admin', 'p': generate_password_hash(os.getenv('ADMIN_PASSWORD', 'admin123')), 'r': 'admin', 'f': 'System Administrator'})
+                        {'u': 'admin', 'p': generate_password_hash(admin_pw), 'r': 'admin', 'f': 'System Administrator'})
                     db.session.commit()
             if 'category' in inspector.get_table_names():
                 cat_cols = [c['name'] for c in inspector.get_columns('category')]

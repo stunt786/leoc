@@ -48,17 +48,27 @@ def create_user_table():
 def seed_default_users():
     """Seed default users if admin doesn't exist."""
     from werkzeug.security import generate_password_hash
+    import secrets
     existing = db.session.execute(text("SELECT id FROM \"user\" WHERE username = 'admin'")).fetchone()
     if not existing:
         admin_password = os.getenv('ADMIN_PASSWORD')
-        if not admin_password or admin_password == 'admin123':
-            admin_password = 'AdminSec_leoc2026#'
+        if not admin_password:
+            admin_password = secrets.token_urlsafe(16)
+            print(f"[!] ADMIN_PASSWORD not set. Generated: {admin_password}")
+        editor_pw = os.getenv('EDITOR_PASSWORD') or secrets.token_urlsafe(16)
+        viewer_pw = os.getenv('VIEWER_PASSWORD') or secrets.token_urlsafe(16)
+        operator_pw = os.getenv('OPERATOR_PASSWORD') or secrets.token_urlsafe(16)
+        finance_pw = os.getenv('FINANCE_PASSWORD') or secrets.token_urlsafe(16)
+        if not os.getenv('EDITOR_PASSWORD'): print(f"[!] EDITOR_PASSWORD not set. Generated: {editor_pw}")
+        if not os.getenv('VIEWER_PASSWORD'): print(f"[!] VIEWER_PASSWORD not set. Generated: {viewer_pw}")
+        if not os.getenv('OPERATOR_PASSWORD'): print(f"[!] OPERATOR_PASSWORD not set. Generated: {operator_pw}")
+        if not os.getenv('FINANCE_PASSWORD'): print(f"[!] FINANCE_PASSWORD not set. Generated: {finance_pw}")
         users = [
             ('admin', generate_password_hash(admin_password), 'admin', 'System Administrator'),
-            ('editor', generate_password_hash(os.getenv('EDITOR_PASSWORD', 'EditorSec_leoc2026#')), 'editor', 'Data Editor'),
-            ('viewer', generate_password_hash(os.getenv('VIEWER_PASSWORD', 'ViewerSec_leoc2026#')), 'viewer', 'Read Only User'),
-            ('operator', generate_password_hash(os.getenv('OPERATOR_PASSWORD', 'OperatorSec_leoc2026#')), 'operator', 'Operations Officer'),
-            ('finance', generate_password_hash(os.getenv('FINANCE_PASSWORD', 'FinanceSec_leoc2026#')), 'finance', 'Finance Officer'),
+            ('editor', generate_password_hash(editor_pw), 'editor', 'Data Editor'),
+            ('viewer', generate_password_hash(viewer_pw), 'viewer', 'Read Only User'),
+            ('operator', generate_password_hash(operator_pw), 'operator', 'Operations Officer'),
+            ('finance', generate_password_hash(finance_pw), 'finance', 'Finance Officer'),
         ]
         for username, pwhash, role, fullname in users:
             db.session.execute(
