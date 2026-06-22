@@ -926,6 +926,7 @@ class Dispatch(db.Model):
     warehouse_id = db.Column(db.Integer, db.ForeignKey('warehouse.id'), nullable=True, index=True)
     incident_id = db.Column(db.Integer, db.ForeignKey('incident.id'), nullable=False, index=True)
     relief_request_id = db.Column(db.Integer, db.ForeignKey('relief_request.id'), nullable=True, index=True)
+    relief_request_ids = db.Column(db.Text, default='[]')
     destination = db.Column(db.String(300))
     receiver = db.Column(db.String(200))
     phone = db.Column(db.String(50))
@@ -938,12 +939,47 @@ class Dispatch(db.Model):
     items = db.relationship('DispatchItem', backref='dispatch', lazy=True, cascade='all,delete-orphan')
 
     def to_dict(self):
+        rr_ids = []
+        try:
+            rr_ids = json.loads(self.relief_request_ids) if self.relief_request_ids else []
+        except (json.JSONDecodeError, TypeError):
+            rr_ids = []
+        if not rr_ids and self.relief_request_id:
+            rr_ids = [self.relief_request_id]
+        # If only one RR is known, try to find additional linked RRs from dispatch items
+        # (handles dispatches created before relief_request_ids was persisted)
+        if len(rr_ids) <= 1 and self.items:
+            item_ids = list(set(di.item_id for di in self.items if di.item_id))
+            if item_ids:
+                extra_rr_ids = db.session.query(ReliefRequestItem.request_id).join(
+                    ReliefRequest, ReliefRequest.id == ReliefRequestItem.request_id
+                ).filter(
+                    ReliefRequestItem.item_id.in_(item_ids),
+                    ReliefRequestItem.quantity_dispatched > 0,
+                    ReliefRequest.incident_id == self.incident_id
+                ).distinct().all()
+                for (rid,) in extra_rr_ids:
+                    if rid and rid not in rr_ids:
+                        rr_ids.append(rid)
+        rr_list = []
+        for rid in rr_ids:
+            rr = db_get(ReliefRequest, rid)
+            if rr:
+                rr_list.append({
+                    'id': rr.id,
+                    'request_number': rr.request_number,
+                    'requester_name': rr.requester_name,
+                    'organization': rr.organization,
+                    'items': [i.to_dict() for i in rr.items]
+                })
         return {
             'id': self.id, 'dispatch_number': self.dispatch_number,
             'date': ad_to_bs_date(self.date),
             'warehouse_id': self.warehouse_id, 'warehouse_name': self.warehouse.name if self.warehouse else None,
             'incident_id': self.incident_id, 'incident_name': self.incident.incident_name if self.incident else None,
             'relief_request_id': self.relief_request_id,
+            'relief_request_ids': rr_ids,
+            'relief_requests': rr_list,
             'request_number': self.relief_request.request_number if self.relief_request else None,
             'destination': self.destination, 'receiver': self.receiver,
             'phone': self.phone, 'remarks': self.remarks,
@@ -3405,6 +3441,21 @@ def handle_relief_requests():
                 unit=item_data.get('unit')
             )
             db.session.add(ri)
+        # Auto-create a CashRequest when relief request includes cash
+        if requested_cash_amount > 0:
+            cash_req = CashRequest(
+                request_number=generate_cash_request_no(),
+                request_date=req.request_date,
+                incident_id=incident.id,
+                requesting_office=data.get('organization'),
+                requester_name=data.get('requester_name'),
+                phone=data.get('phone'),
+                priority=data.get('priority', 'Medium'),
+                requested_amount=requested_cash_amount,
+                purpose=data.get('cash_purpose'),
+                remarks=f'Auto-created from Relief Request {req.request_number}'
+            )
+            db.session.add(cash_req)
         db.session.commit()
         return jsonify({'success': True, 'message': 'Relief request created', 'data': req.to_dict()}), 201
     except ValueError as e:
@@ -3556,6 +3607,7 @@ def handle_dispatches():
             date=dispatch_date,
             warehouse_id=first_wh_id, incident_id=incident.id,
             relief_request_id=primary_relief_request_id,
+            relief_request_ids=json.dumps(relief_request_ids),
             destination=data.get('destination'), receiver=data.get('receiver'),
             phone=data.get('phone'), remarks=data.get('remarks'), created_by=current_user.id
         )
@@ -3724,6 +3776,7 @@ def handle_dispatch(id):
         dispatch.warehouse_id = first_wh_id
         dispatch.incident_id = incident.id
         dispatch.relief_request_id = relief_request_ids[0] if relief_request_ids else dispatch.relief_request_id
+        dispatch.relief_request_ids = json.dumps(relief_request_ids) if relief_request_ids else dispatch.relief_request_ids
         dispatch.destination = data.get('destination')
         dispatch.receiver = data.get('receiver')
         dispatch.phone = phone
@@ -3845,8 +3898,16 @@ def handle_distributions():
         # Update ReliefRequestItem.quantity_distributed for all linked dispatches' relief requests
         updated_req_ids = set()
         for dp in dispatches:
-            if dp.relief_request_id:
-                req = db_get(ReliefRequest, dp.relief_request_id)
+            # Collect all linked RR IDs from the stored JSON field
+            dp_rr_ids = []
+            try:
+                dp_rr_ids = json.loads(dp.relief_request_ids) if dp.relief_request_ids else []
+            except (json.JSONDecodeError, TypeError):
+                dp_rr_ids = []
+            if not dp_rr_ids and dp.relief_request_id:
+                dp_rr_ids = [dp.relief_request_id]
+            for rr_id in dp_rr_ids:
+                req = db_get(ReliefRequest, rr_id)
                 if req and req.id not in updated_req_ids:
                     updated_req_ids.add(req.id)
                     for ben_data in beneficiaries_payload:
@@ -4403,6 +4464,16 @@ def handle_cash_distributions():
         )
         db.session.add(dist)
         db.session.flush()
+
+        # Auto-link to a CashRequest when distribution comes via relief request
+        if not data.get('cash_request_id') and relief_req:
+            cr_for_incident = CashRequest.query.filter(
+                CashRequest.incident_id == incident.id,
+                CashRequest.status.in_(['Pending', 'Approved', 'Partial'])
+            ).first()
+            if cr_for_incident:
+                dist.cash_request_id = cr_for_incident.id
+
         for ben_data in beneficiaries_payload:
             amount = parse_float_field(ben_data, 'amount', minimum=0.01)
             if amount is None or amount <= 0:
@@ -7848,6 +7919,35 @@ def init_db():
                         except Exception as e:
                             db.session.rollback()
                             print(f"[WARN] Could not alter dispatch.warehouse_id: {e}")
+                if 'relief_request_ids' not in d_cols:
+                    try:
+                        dialect = db.engine.dialect.name
+                        if dialect == 'postgresql':
+                            db.session.execute(db.text("ALTER TABLE dispatch ADD COLUMN relief_request_ids TEXT DEFAULT '[]'"))
+                        else:
+                            db.session.execute(db.text("ALTER TABLE dispatch ADD COLUMN relief_request_ids TEXT DEFAULT '[]'"))
+                        db.session.commit()
+                        print("[MIGRATE] Added 'relief_request_ids' to dispatch")
+                    except Exception as e:
+                        db.session.rollback()
+                        print(f"[WARN] Could not add relief_request_ids to dispatch: {e}")
+                # Populate relief_request_ids for existing dispatches that have it empty
+                try:
+                    rows = db.session.execute(
+                        db.text("SELECT id, relief_request_id FROM dispatch WHERE (relief_request_ids IS NULL OR relief_request_ids = '[]') AND relief_request_id IS NOT NULL")
+                    ).fetchall()
+                    for row in rows:
+                        ids = json.dumps([row[1]])
+                        db.session.execute(
+                            db.text("UPDATE dispatch SET relief_request_ids = :ids WHERE id = :id"),
+                            {'ids': ids, 'id': row[0]}
+                        )
+                    if rows:
+                        db.session.commit()
+                        print(f"[MIGRATE] Populated relief_request_ids for {len(rows)} existing dispatch(es)")
+                except Exception as e:
+                    db.session.rollback()
+                    print(f"[WARN] Could not populate relief_request_ids: {e}")
 
             if 'user' not in inspector.get_table_names():
                 dialect = db.engine.dialect.name

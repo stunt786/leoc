@@ -144,9 +144,28 @@
             </tr>
             <tr>
                 <td class="field-label">Poverty Card:</td><td>{{ 'Yes' if b.social_security.poverty_card_holder else 'No' }}</td>
-                <td class="field-label">Relief Items:</td><td>{% for it in b['items'] %}<span class="badge bg-info me-1">{{ it.item }} × {{ it.quantity }}</span>{% endfor %}</td>
+                <td class="field-label" style="width:15%">Relief Items:</td><td style="width:35%">{{ b['items']|length }} item(s)</td>
             </tr>
         </table>
+
+        <!-- Relief Items per beneficiary -->
+        {% if b['items'] %}
+        <div style="margin:6px 0 4px 0;font-size:10px"><strong>राहत सामग्री (Relief Items)</strong></div>
+        <table class="table table-sm table-bordered" style="font-size:9px">
+            <thead class="table-light">
+                <tr><th style="width:40px">#</th><th>Item Name</th><th style="width:60px" class="text-end">Quantity</th></tr>
+            </thead>
+            <tbody>
+                {% for it in b['items'] %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td>{{ it.item }}</td>
+                    <td class="text-end">{{ it.quantity }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
 
         <!-- Family Members -->
         <table class="table table-sm table-bordered mb-1" style="font-size:9px">

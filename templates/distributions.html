@@ -228,7 +228,7 @@ async function loadFormData() {
         dispatchRRMap = {};
         dispMenu.innerHTML = '';
         dispatches.forEach(dp => {
-            dispatchRRMap[dp.id] = dp.relief_request_id;
+            dispatchRRMap[dp.id] = dp.relief_request_ids || (dp.relief_request_id ? [dp.relief_request_id] : []);
             const li = document.createElement('li');
             li.style.padding = '2px 0';
             const label = document.createElement('label');
@@ -260,11 +260,16 @@ async function loadFormData() {
                 `<option value="${rr.id}">${rr.request_number} - ${rr.requester_name || rr.organization || ''} (${rr.incident_name || ''})</option>`
             ).join('');
 
-        // Load cash distribution data
+        // Load cash distribution data (fund sources from Fund Management)
         const fundSel = document.getElementById('cdFund');
-        fundSel.innerHTML = '<option value="">Select Fund</option>' + (d.cash_funds||[]).filter(f=>f.status==='Active').map(f =>
-            `<option value="${f.id}">${f.name} (Bal: ${Number(f.current_balance).toLocaleString()})</option>`
-        ).join('');
+        const activeFunds = (d.cash_funds||[]).filter(f=>f.status==='Active');
+        if (activeFunds.length > 0) {
+            fundSel.innerHTML = '<option value="">Select Fund</option>' + activeFunds.map(f =>
+                `<option value="${f.id}">${f.name}${f.funding_source ? ' (' + f.funding_source + ')' : ''} — Bal: ${Number(f.current_balance).toLocaleString()}</option>`
+            ).join('');
+        } else {
+            fundSel.innerHTML = '<option value="">Select Fund</option><option value="" disabled>── No funds found ──</option><option value="" disabled class="text-muted">Create a fund in Fund Management first</option>';
+        }
 
         const typeSel = document.getElementById('cdType');
         typeSel.innerHTML = (d.distribution_types||['Individual','Family','Community','Local Government','Organization']).map(t =>
@@ -327,10 +332,13 @@ async function onDispatchChange() {
                     incidentName = dp.incident_name || '';
                     incidentId = dp.incident_id;
                 }
+                console.log('Dispatch API response', dpId, dp.dispatch_number, 'relief_requests:', dp.relief_requests);
                 dispatchItemsCache[dpId] = dp.items || [];
                 dispatchDetailsCache[dpId] = dp;
                 allItems = allItems.concat(dp.items || []);
-                if (dp.relief_request_id) rrIds.push(dp.relief_request_id);
+                // Collect all linked relief request IDs
+                const ids = dp.relief_request_ids || (dp.relief_request_id ? [dp.relief_request_id] : []);
+                ids.forEach(id => { if (id && !rrIds.includes(id)) rrIds.push(id); });
             }
         } catch(e) {
             hasError = true;
@@ -668,58 +676,120 @@ function addBeneficiaryFromDispatch() {
         const dp = dispatchDetailsCache[did];
         if (!dp) return;
 
-        // Find the linked relief request for this dispatch
-        let rr = null;
-        const rrId = parseInt(document.getElementById('dist_import_rr').value);
-        if (rrId && reliefRequestCashMap[rrId] && reliefRequestCashMap[rrId].id === dp.relief_request_id) {
-            rr = reliefRequestCashMap[rrId];
-        } else if (dp.relief_request_id && reliefRequestCashMap[dp.relief_request_id]) {
-            rr = reliefRequestCashMap[dp.relief_request_id];
-        }
-
-        const benName = rr ? (rr.requester_name || rr.organization || '') : (dp.receiver || dp.destination || '');
-        if (!benName) return;
-
-        const match = beneficiaries.find(b => b.name.toLowerCase() === benName.toLowerCase());
-        const benData = match ? match : { name: benName };
-        addBeneficiaryRow(benData);
-
-        // Add only this dispatch's items to this beneficiary row
         const dispatchItems = dispatchItemsCache[did] || [];
-        if (dispatchItems.length > 0) {
-            const rows = document.querySelectorAll('#beneficiaryBody tr');
-            const lastRow = rows[rows.length - 1];
-            const itemsContainer = lastRow.querySelector('.ben-items-container');
+        const linkedRRs = dp.relief_requests || [];
+        console.log('Dispatch:', dp.dispatch_number, 'relief_requests:', linkedRRs);
 
-            // Remove the default empty item row, then create one per dispatch item
-            const defaultRow = itemsContainer.querySelector('.ben-item-row');
-            if (defaultRow) defaultRow.remove();
-
-            dispatchItems.forEach((item) => {
-                const row = document.createElement('div');
-                row.className = 'ben-item-row mb-1';
-                const itemOptions = dispatchItems.map(i => `<option value="${i.item_name}">${i.item_name}</option>`).join('');
-                row.innerHTML = `
-                    <div class="d-flex gap-1 align-items-center">
-                        <select class="form-select form-select-sm ben-item" onchange="updateDistributedQtySummary()">
-                            <option value="">Select Item</option>
-                            ${itemOptions}
-                        </select>
-                        <input type="number" class="form-control form-control-sm ben-qty" style="width:80px" value="${item.quantity || 1}" min="1" oninput="updateDistributedQtySummary()">
-                        <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeBeneficiaryItem(this)"><i class="bi bi-x"></i></button>
-                    </div>
-                `;
-                const select = row.querySelector('.ben-item');
-                if (select) {
-                    const option = Array.from(select.options).find(opt =>
-                        opt.value.toLowerCase() === (item.item_name || '').toLowerCase()
-                    );
-                    if (option) select.value = option.value;
-                }
-                itemsContainer.insertBefore(row, itemsContainer.querySelector('.btn-outline-primary'));
+        if (linkedRRs.length > 0) {
+            // Build a map of item_name -> count of RRs that requested it
+            const itemSharerCount = {};
+            linkedRRs.forEach(rr => {
+                (rr.items || []).forEach(ri => {
+                    itemSharerCount[ri.item_name] = (itemSharerCount[ri.item_name] || 0) + 1;
+                });
             });
+
+            // Create one beneficiary row per linked relief request
+            linkedRRs.forEach((rr) => {
+                const benName = rr.requester_name || rr.organization || '';
+                if (!benName) return;
+
+                const match = beneficiaries.find(b => b.name && b.name.toLowerCase() === benName.toLowerCase());
+                const benData = match ? match : { name: benName };
+                addBeneficiaryRow(benData);
+
+                // Build set of item_names this RR actually requested
+                const rrItemNames = new Set((rr.items || []).map(ri => ri.item_name));
+
+                // Add ONLY dispatch items that this RR requested
+                if (dispatchItems.length > 0) {
+                    const rows = document.querySelectorAll('#beneficiaryBody tr');
+                    const lastRow = rows[rows.length - 1];
+                    const itemsContainer = lastRow.querySelector('.ben-items-container');
+                    const defaultRow = itemsContainer.querySelector('.ben-item-row');
+                    if (defaultRow) defaultRow.remove();
+
+                    const itemOptions = dispatchItems.map(i => `<option value="${i.item_name}">${i.item_name}</option>`).join('');
+
+                    dispatchItems.forEach((item) => {
+                        if (!rrItemNames.has(item.item_name)) return;
+
+                        const numSharers = itemSharerCount[item.item_name] || 1;
+                        const defaultQty = Math.floor((item.quantity || 0) / numSharers);
+                        if (defaultQty < 1) return;
+
+                        const row = document.createElement('div');
+                        row.className = 'ben-item-row mb-1';
+                        row.innerHTML = `
+                            <div class="d-flex gap-1 align-items-center">
+                                <select class="form-select form-select-sm ben-item" onchange="updateDistributedQtySummary()">
+                                    <option value="">Select Item</option>
+                                    ${itemOptions}
+                                </select>
+                                <input type="number" class="form-control form-control-sm ben-qty" style="width:80px" value="${defaultQty}" min="1" oninput="updateDistributedQtySummary()">
+                                <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeBeneficiaryItem(this)"><i class="bi bi-x"></i></button>
+                            </div>
+                        `;
+                        const select = row.querySelector('.ben-item');
+                        const option = Array.from(select.options).find(opt =>
+                            opt.value.toLowerCase() === (item.item_name || '').toLowerCase()
+                        );
+                        if (option) select.value = option.value;
+                        itemsContainer.insertBefore(row, itemsContainer.querySelector('.btn-outline-primary'));
+                    });
+                }
+                addedCount++;
+            });
+        } else {
+            // Fallback: single relief request or use receiver/destination
+            let rr = null;
+            const rrId = parseInt(document.getElementById('dist_import_rr').value);
+            if (rrId && reliefRequestCashMap[rrId] && reliefRequestCashMap[rrId].id === dp.relief_request_id) {
+                rr = reliefRequestCashMap[rrId];
+            } else if (dp.relief_request_id && reliefRequestCashMap[dp.relief_request_id]) {
+                rr = reliefRequestCashMap[dp.relief_request_id];
+            }
+
+            const benName = rr ? (rr.requester_name || rr.organization || '') : (dp.receiver || dp.destination || '');
+            if (!benName) return;
+
+            const match = beneficiaries.find(b => b.name && b.name.toLowerCase() === benName.toLowerCase());
+            const benData = match ? match : { name: benName };
+            addBeneficiaryRow(benData);
+
+            if (dispatchItems.length > 0) {
+                const rows = document.querySelectorAll('#beneficiaryBody tr');
+                const lastRow = rows[rows.length - 1];
+                const itemsContainer = lastRow.querySelector('.ben-items-container');
+                const defaultRow = itemsContainer.querySelector('.ben-item-row');
+                if (defaultRow) defaultRow.remove();
+
+                dispatchItems.forEach((item) => {
+                    const row = document.createElement('div');
+                    row.className = 'ben-item-row mb-1';
+                    const itemOptions = dispatchItems.map(i => `<option value="${i.item_name}">${i.item_name}</option>`).join('');
+                    row.innerHTML = `
+                        <div class="d-flex gap-1 align-items-center">
+                            <select class="form-select form-select-sm ben-item" onchange="updateDistributedQtySummary()">
+                                <option value="">Select Item</option>
+                                ${itemOptions}
+                            </select>
+                            <input type="number" class="form-control form-control-sm ben-qty" style="width:80px" value="${item.quantity || 1}" min="1" oninput="updateDistributedQtySummary()">
+                            <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeBeneficiaryItem(this)"><i class="bi bi-x"></i></button>
+                        </div>
+                    `;
+                    const select = row.querySelector('.ben-item');
+                    if (select) {
+                        const option = Array.from(select.options).find(opt =>
+                            opt.value.toLowerCase() === (item.item_name || '').toLowerCase()
+                        );
+                        if (option) select.value = option.value;
+                    }
+                    itemsContainer.insertBefore(row, itemsContainer.querySelector('.btn-outline-primary'));
+                });
+            }
+            addedCount++;
         }
-        addedCount++;
     });
 
     if (addedCount === 0) {
@@ -752,8 +822,9 @@ async function importFromReliefRequest() {
 
     // Find related dispatches from cached map
     let foundDpIds = [];
-    for (const [dpId, dpRRId] of Object.entries(dispatchRRMap)) {
-        if (dpRRId === rrId) foundDpIds.push(parseInt(dpId));
+    for (const [dpId, dpRRIds] of Object.entries(dispatchRRMap)) {
+        const ids = Array.isArray(dpRRIds) ? dpRRIds : [dpRRIds];
+        if (ids.includes(rrId)) foundDpIds.push(parseInt(dpId));
     }
 
     function addBeneficiaryFromRR() {
@@ -849,7 +920,7 @@ function renderDistributions(data) {
             <td>${dist.officer || '-'}</td>
             <td><span class="badge bg-dark">${benCount} beneficiary${benCount !== 1 ? 'ies' : 'y'}</span></td>
             <td class="text-end">
-                <button class="btn btn-sm btn-outline-primary" onclick="viewDistribution(${dist.id})" title="View"><i class="bi bi-eye"></i></button>
+                <button class="btn btn-sm btn-primary" onclick="viewDistribution(${dist.id})" title="View"><i class="bi bi-eye me-1"></i>View</button>
                 <button class="btn btn-sm btn-outline-secondary" onclick="window.open('/api/distributions/${dist.id}/print','_blank')" title="Print"><i class="bi bi-printer"></i></button>
             </td>
         </tr>`;
@@ -873,173 +944,256 @@ async function viewDistribution(id) {
     if (!d.success) { showToast('danger', d.message); return; }
     const dist = d.distribution;
     const inc = dist.incident || {};
+    const allBens = dist.beneficiaries || [];
 
-    let benCards = '';
-    let families = [];
-    if (dist.beneficiaries && dist.beneficiaries.length > 0) {
-        const grouped = {};
-        dist.beneficiaries.forEach(b => {
-            const key = b.family_name + '|' + (b.id_number || '');
-            if (!grouped[key]) {
-                grouped[key] = { ...b, items: [], photo_url: b.photo_url, document_url: b.document_url };
-            }
-            grouped[key].items.push({ item: b.item || '-', quantity: b.quantity || 0 });
-        });
-        families = Object.values(grouped);
-        families.forEach((b, idx) => {
-            const ben = b.beneficiary || {};
-            const fs = b.family_stats || {};
-            const ss = b.social_security || {};
-            const fm = b.family_members || [];
-
-            const photoHtml = b.photo
-                ? `<a href="${b.photo_url}" target="_blank" class="text-decoration-none" title="View Photo">
-                    <span class="badge bg-light text-dark fw-normal border"><i class="bi bi-eye text-primary me-1"></i>${b.photo}</span></a>`
-                : `<span class="text-muted small">—</span>`;
-            const docHtml = b.document
-                ? `<a href="${b.document_url}" target="_blank" class="text-decoration-none" title="View Document">
-                    <span class="badge bg-light text-dark fw-normal border"><i class="bi bi-eye text-primary me-1"></i>${b.document}</span></a>`
-                : `<span class="text-muted small">—</span>`;
-
-            const fmRows = fm.map(m => `<tr>
-                <td>${m.name || ''}</td>
-                <td>${m.relation || ''}</td>
-                <td>${m.age || ''}</td>
-                <td>${m.gender || ''}</td>
-                <td>${m.is_disabled ? '<span class="badge bg-danger">Yes</span>' : 'No'}</td>
-                <td>${m.is_pregnant ? '<span class="badge bg-warning">Yes</span>' : 'No'}</td>
-                <td>${m.is_old_ssf ? '<span class="badge bg-info">Yes</span>' : 'No'}</td>
-            </tr>`).join('');
-
-            const itemsHtml = b.items.map(it =>
-                `<span class="badge bg-info me-1">${it.item} × ${it.quantity}</span>`
-            ).join('');
-
-            benCards += `<div class="card mb-3 border-success">
-                <div class="card-header bg-success text-white py-2 d-flex justify-content-between align-items-center">
-                    <span><strong>${idx + 1}. ${b.family_name}</strong> (${b.id_number || 'No ID'})</span>
-                    <span class="badge bg-light text-dark">Status: ${b.status}</span>
-                </div>
-                <div class="card-body py-2">
-                    <div class="row g-2">
-                        <div class="col-md-6">
-                            <table class="table table-sm table-borderless mb-0 small">
-                                <tr><td class="fw-medium" style="width:140px">Beneficiary Name:</td><td>${ben.name || b.family_name}</td></tr>
-                                <tr><td class="fw-medium">Father's Name:</td><td>${ben.father_name || '-'}</td></tr>
-                                <tr><td class="fw-medium">National ID:</td><td>${ben.national_id || '-'}</td></tr>
-                                <tr><td class="fw-medium">Phone:</td><td>${ben.phone || '-'}</td></tr>
-                                <tr><td class="fw-medium">Ward:</td><td>${ben.ward_name || ben.ward || '-'}</td></tr>
-                                <tr><td class="fw-medium">Tole:</td><td>${ben.tole || '-'}</td></tr>
-                                <tr><td class="fw-medium">Current Shelter:</td><td>${ben.current_shelter_location || '-'}</td></tr>
-                                <tr><td class="fw-medium">Coordinates:</td><td>${ben.coordinates || '-'}</td></tr>
-                            </table>
-                        </div>
-                        <div class="col-md-6">
-                            <table class="table table-sm table-borderless mb-0 small">
-                                <tr><td class="fw-medium" style="width:150px">Social Security:</td><td>${ss.in_social_security_fund ? '<span class="badge bg-success">Yes</span>' : 'No'}</td></tr>
-                                <tr><td class="fw-medium">SSF Type:</td><td>${ss.ssf_type || '-'}</td></tr>
-                                <tr><td class="fw-medium">Poverty Card:</td><td>${ss.poverty_card_holder ? '<span class="badge bg-success">Yes</span>' : 'No'}</td></tr>
-                            </table>
-                            <hr class="my-1">
-                            <table class="table table-sm table-borderless mb-0 small">
-                                <tr><td class="fw-medium" style="width:150px">👨 Male:</td><td>${fs.male_count || 0}</td>
-                                    <td class="fw-medium" style="width:150px">👩 Female:</td><td>${fs.female_count || 0}</td></tr>
-                                <tr><td class="fw-medium">🧒 Children (<13):</td><td>${fs.child_count || 0}</td>
-                                    <td class="fw-medium">🤰 Pregnant:</td><td>${fs.pregnant_count || 0}</td></tr>
-                                <tr><td class="fw-medium">👴 SSF Age (60+):</td><td>${fs.old_ssf_count || 0}</td>
-                                    <td class="fw-medium">Total Members:</td><td>${fs.total_members || 0}</td></tr>
-                            </table>
-                        </div>
-                    </div>
-                    <hr class="my-1">
-                    <strong class="small">Family Members:</strong>
-                    <div class="table-responsive mt-1">
-                        <table class="table table-sm table-bordered mb-0 small">
-                            <thead class="table-light"><tr><th>Name</th><th>Relation</th><th>Age</th><th>Gender</th><th>Disabled</th><th>Pregnant</th><th>SSF(60+)</th></tr></thead>
-                            <tbody>${fm.length > 0 ? fmRows : '<tr><td colspan="7" class="text-center text-muted">No family members listed</td></tr>'}</tbody>
-                        </table>
-                    </div>
-                    <hr class="my-1">
-                    <div class="d-flex gap-3 align-items-center flex-wrap">
-                        <div><strong class="small">Relief Items:</strong> ${itemsHtml}</div>
-                        <div><strong class="small">Photo:</strong> ${photoHtml}</div>
-                        <div><strong class="small">Document:</strong> ${docHtml}</div>
-                    </div>
-                </div>
-            </div>`;
-        });
-    }
-
-    const dispatchItemsHtml = (dist.dispatch_items || []).map(di =>
-        `<tr><td>${di.item_name}</td><td>${di.quantity}</td><td>${di.unit || '-'}</td></tr>`
+    // Aggregate items across all beneficiaries for summary table
+    const itemTotals = {};
+    allBens.forEach(b => {
+        const key = b.item || 'Unknown';
+        if (!itemTotals[key]) itemTotals[key] = { item: key, qty: 0, unit: '' };
+        itemTotals[key].qty += b.quantity || 0;
+        if (b.beneficiary && b.beneficiary.item_unit) itemTotals[key].unit = b.beneficiary.item_unit;
+    });
+    const itemSummaryRows = Object.values(itemTotals).map(it =>
+        `<tr><td>${it.item}</td><td class="text-end fw-semibold">${it.qty}</td></tr>`
     ).join('');
 
-    // Build modal
+    // Group beneficiaries by family for per-family cards
+    const grouped = {};
+    allBens.forEach(b => {
+        const key = b.family_name + '|' + (b.id_number || '');
+        if (!grouped[key]) {
+            grouped[key] = { ...b, items: [] };
+        } else {
+            // Merge photo/document from other records in the same family if missing
+            if (!grouped[key].photo && b.photo) {
+                grouped[key].photo = b.photo;
+                grouped[key].photo_url = b.photo_url;
+            }
+            if (!grouped[key].document && b.document) {
+                grouped[key].document = b.document;
+                grouped[key].document_url = b.document_url;
+            }
+        }
+        grouped[key].items.push({ item: b.item || '-', quantity: b.quantity || 0 });
+    });
+    const families = Object.values(grouped);
+
+    // Per-family items table rows
+    function familyItemsTable(items) {
+        if (!items || items.length === 0) return '<span class="text-muted small">No items</span>';
+        return `<table class="table table-sm table-bordered mb-0 small">
+            <thead class="table-light"><tr><th>Item</th><th class="text-end" style="width:80px">Qty</th></tr></thead>
+            <tbody>${items.map(it => `<tr><td>${it.item}</td><td class="text-end">${it.quantity}</td></tr>`).join('')}</tbody>
+        </table>`;
+    }
+
+    // File attachment HTML
+    function fileLink(b, type) {
+        const urlKey = type + '_url';
+        const nameKey = type;
+        const label = type === 'photo' ? 'Photo' : 'Document';
+        const icon = type === 'photo' ? 'bi-image' : 'bi-file-earmark-pdf';
+        const color = type === 'photo' ? 'primary' : 'secondary';
+        const url = b[urlKey];
+        const name = b[nameKey];
+        if (!url) return '';
+        return `<div class="btn-group btn-group-sm" role="group">
+            <a href="${url}" target="_blank" class="btn btn-${color}" title="Open ${label}">
+                <i class="bi ${icon} me-1"></i>${name || label}
+            </a>
+            <button type="button" class="btn btn-outline-${color} preview-file-btn" data-url="${url}" data-label="${label}" title="Preview ${label}">
+                <i class="bi bi-eye"></i>
+            </button>
+        </div>`;
+    }
     const modal = document.createElement('div');
     modal.className = 'modal fade';
-    modal.innerHTML = `<div class="modal-dialog modal-xl"><div class="modal-content">
-        <div class="modal-header bg-primary text-white py-2">
+    modal.innerHTML = `<div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content">
+        <div class="modal-header bg-primary text-white">
             <h5 class="modal-title"><i class="bi bi-people me-2"></i>${dist.distribution_no}</h5>
             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body">
-            <!-- Distribution Info -->
-            <div class="card bg-light mb-3">
-                <div class="card-header py-1"><strong><i class="bi bi-info-circle me-1"></i>Distribution Information</strong></div>
-                <div class="card-body py-2">
-                    <div class="row g-1 small">
-                        <div class="col-md-3"><strong>Dispatch:</strong> ${dist.dispatch_number || '-'}</div>
-                        <div class="col-md-3"><strong>Date:</strong> ${dist.distribution_date || '-'}</div>
-                        <div class="col-md-3"><strong>Officer:</strong> ${dist.officer || '-'}</div>
-                        <div class="col-md-3"><strong>Status:</strong> <span class="badge bg-${dist.status === 'Completed' ? 'success' : 'warning'}">${dist.status}</span></div>
-                        <div class="col-md-3"><strong>Location:</strong> ${dist.location || '-'}</div>
-                        <div class="col-md-3"><strong>Coordinates:</strong> ${dist.latitude != null && dist.longitude != null ? dist.latitude + ', ' + dist.longitude : '-'}</div>
-                        <div class="col-12"><strong>Remarks:</strong> ${dist.remarks || '-'}</div>
+
+            <!-- Info Cards Row -->
+            <div class="row g-2 mb-3">
+                <div class="col-md-8">
+                    <div class="card border-0 bg-light h-100">
+                        <div class="card-body py-2">
+                            <div class="row g-1 small">
+                                <div class="col-md-4"><strong>Dispatch:</strong> ${dist.dispatch_number || '-'}</div>
+                                <div class="col-md-4"><strong>Date:</strong> ${dist.distribution_date || '-'}</div>
+                                <div class="col-md-4"><strong>Officer:</strong> ${dist.officer || '-'}</div>
+                                <div class="col-md-4"><strong>Location:</strong> ${dist.location || '-'}</div>
+                                <div class="col-md-4"><strong>Coordinates:</strong> ${dist.latitude != null && dist.longitude != null ? dist.latitude + ', ' + dist.longitude : '-'}</div>
+                                <div class="col-md-4"><strong>Status:</strong> <span class="badge bg-${dist.status === 'Completed' ? 'success' : 'warning'}">${dist.status}</span></div>
+                                <div class="col-12"><strong>Remarks:</strong> ${dist.remarks || '-'}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card border-0 bg-light h-100">
+                        <div class="card-body py-2">
+                            <div class="row g-1 small">
+                                <div class="col-6"><strong>Incident:</strong> ${inc.incident_name || '-'}</div>
+                                <div class="col-6"><strong>Type:</strong> ${inc.incident_type || '-'}</div>
+                                <div class="col-6"><strong>Ward:</strong> ${inc.ward_name || inc.ward || '-'}</div>
+                                <div class="col-6"><strong>Tole:</strong> ${inc.tole || '-'}</div>
+                                <div class="col-6"><strong>Fiscal Year:</strong> ${inc.fiscal_year || dist.fiscal_year || '-'}</div>
+                                <div class="col-6"><strong>Severity:</strong> ${inc.severity || '-'}</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Incident / Disaster Info -->
-            <div class="card bg-light mb-3">
-                <div class="card-header py-1"><strong><i class="bi bi-tornado me-1"></i>Disaster / Incident Information</strong></div>
-                <div class="card-body py-2">
-                    <div class="row g-1 small">
-                        <div class="col-md-3"><strong>Incident:</strong> ${inc.incident_name || '-'}</div>
-                        <div class="col-md-3"><strong>Type:</strong> ${inc.incident_type || '-'}</div>
-                        <div class="col-md-3"><strong>Date:</strong> ${inc.start_date || '-'}</div>
-                        <div class="col-md-3"><strong>Fiscal Year:</strong> ${inc.fiscal_year || dist.fiscal_year || '-'}</div>
-                        <div class="col-md-3"><strong>Ward:</strong> ${inc.ward_name || inc.ward || '-'}</div>
-                        <div class="col-md-3"><strong>Tole:</strong> ${inc.tole || '-'}</div>
-                        <div class="col-md-3"><strong>Latitude:</strong> ${inc.coordinates ? inc.coordinates.split(',')[0] || '-' : '-'}</div>
-                        <div class="col-md-3"><strong>Longitude:</strong> ${inc.coordinates ? inc.coordinates.split(',')[1] || '-' : '-'}</div>
-                        <div class="col-md-3"><strong>Severity:</strong> ${inc.severity || '-'}</div>
-                    </div>
+            <!-- Items Distributed Summary Table -->
+            <div class="card border-0 bg-light mb-3">
+                <div class="card-header bg-white py-2 d-flex justify-content-between align-items-center">
+                    <span class="fw-semibold"><i class="bi bi-box-seam me-1 text-primary"></i>Items Distributed Summary</span>
+                    <span class="badge bg-primary">${Object.keys(itemTotals).length} item(s)</span>
                 </div>
-            </div>
-
-            <!-- Dispatch Items Summary -->
-            <div class="card bg-light mb-3">
-                <div class="card-header py-1"><strong><i class="bi bi-box-seam me-1"></i>Relief Items Distribution</strong></div>
-                <div class="card-body py-2">
-                    <table class="table table-sm table-bordered mb-0 small">
-                        <thead class="table-light"><tr><th>Item Name</th><th>Quantity</th><th>Unit</th></tr></thead>
-                        <tbody>${dispatchItemsHtml || '<tr><td colspan="3" class="text-center text-muted">No items</td></tr>'}</tbody>
-                    </table>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered mb-0 small">
+                            <thead class="table-light"><tr><th>Item Name</th><th class="text-end" style="width:100px">Total Qty</th></tr></thead>
+                            <tbody>${itemSummaryRows || '<tr><td colspan="2" class="text-center text-muted py-2">No items distributed</td></tr>'}</tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
 
             <!-- Beneficiaries -->
-            <h6 class="fw-bold"><i class="bi bi-people me-1"></i>Beneficiaries (${families ? families.length : 0})</h6>
-            ${benCards || '<p class="text-muted">No beneficiaries</p>'}
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="fw-semibold mb-0"><i class="bi bi-people me-1 text-primary"></i>Beneficiaries (${families.length})</h6>
+            </div>
+            ${families.length > 0 ? families.map((b, idx) => {
+                const ben = b.beneficiary || {};
+                const fs = b.family_stats || {};
+                const ss = b.social_security || {};
+                const fm = b.family_members || [];
+                const fmRows = fm.map(m => `<tr>
+                    <td>${m.name || ''}</td>
+                    <td>${m.gender || ''}</td>
+                    <td>${m.age || ''}</td>
+                    <td>${m.relation || ''}</td>
+                    <td>${m.is_disabled ? '<span class="badge bg-danger">Yes</span>' : 'No'}</td>
+                    <td>${m.is_pregnant ? '<span class="badge bg-warning">Yes</span>' : 'No'}</td>
+                    <td>${m.is_old_ssf ? '<span class="badge bg-info">Yes</span>' : 'No'}</td>
+                </tr>`).join('');
+                const hasFamilyMembers = fm.length > 0;
+                return `<div class="card mb-3 border-success shadow-sm">
+                    <div class="card-header bg-success bg-opacity-10 py-2 d-flex justify-content-between align-items-center">
+                        <span class="fw-semibold">${idx + 1}. ${b.family_name} ${b.id_number ? '(' + b.id_number + ')' : ''}</span>
+                        <span class="badge bg-${b.status === 'Received' ? 'success' : 'warning'} fs-6">${b.status}</span>
+                    </div>
+                    <div class="card-body py-2">
+                        <!-- Family Details -->
+                        <div class="bg-light bg-opacity-50 rounded p-2 mb-2">
+                            <div class="fw-semibold small text-secondary mb-1"><i class="bi bi-house-door me-1"></i>Family Details</div>
+                            <div class="row g-2">
+                                <div class="col-md-6">
+                                    <table class="table table-sm table-borderless mb-0 small">
+                                        <tr><td class="fw-medium text-secondary" style="width:130px">Family Name</td><td>${b.family_name}</td></tr>
+                                        <tr><td class="fw-medium text-secondary">Father's Name</td><td>${ben.father_name || '-'}</td></tr>
+                                        <tr><td class="fw-medium text-secondary">National ID</td><td>${ben.national_id || b.id_number || '-'}</td></tr>
+                                        <tr><td class="fw-medium text-secondary">Phone</td><td>${ben.phone || '-'}</td></tr>
+                                        <tr><td class="fw-medium text-secondary">Ward</td><td>${ben.ward_name || ben.ward || '-'}</td></tr>
+                                        <tr><td class="fw-medium text-secondary">Tole</td><td>${ben.tole || '-'}</td></tr>
+                                        <tr><td class="fw-medium text-secondary">Total Members</td><td>${b.members || fs.total_members || '-'}</td></tr>
+                                    </table>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="fw-semibold small text-secondary mb-1"><i class="bi bi-bar-chart me-1"></i>Household Demographics</div>
+                                    <table class="table table-sm table-borderless mb-0 small">
+                                        <tr><td class="fw-medium text-secondary" style="width:150px">Social Security</td><td>${ss.in_social_security_fund ? '<span class="badge bg-success">Yes</span>' : 'No'}</td></tr>
+                                        <tr><td class="fw-medium text-secondary">SSF Type</td><td>${ss.ssf_type || '-'}</td></tr>
+                                        <tr><td class="fw-medium text-secondary">Poverty Card</td><td>${ss.poverty_card_holder ? '<span class="badge bg-success">Yes</span>' : 'No'}</td></tr>
+                                    </table>
+                                    <hr class="my-1">
+                                    <table class="table table-sm table-borderless mb-0 small">
+                                        <tr><td class="fw-medium text-secondary">Male</td><td>${fs.male_count || 0}</td>
+                                            <td class="fw-medium text-secondary">Female</td><td>${fs.female_count || 0}</td></tr>
+                                        <tr><td class="fw-medium text-secondary">Children (<13)</td><td>${fs.child_count || 0}</td>
+                                            <td class="fw-medium text-secondary">Pregnant</td><td>${fs.pregnant_count || 0}</td></tr>
+                                        <tr><td class="fw-medium text-secondary">Disabled</td><td>${fs.disabled_count || 0}</td>
+                                            <td class="fw-medium text-secondary">SSF Age (60+)</td><td>${fs.old_ssf_count || 0}</td></tr>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Relief Items Table -->
+                        <div class="bg-light bg-opacity-50 rounded p-2 mb-2">
+                            <div class="fw-semibold small text-secondary mb-1"><i class="bi bi-box-seam me-1"></i>Relief Items</div>
+                            ${familyItemsTable(b.items)}
+                        </div>
+
+                        <!-- Family Members Table -->
+                        ${hasFamilyMembers ? `<div class="bg-light bg-opacity-50 rounded p-2 mb-2">
+                            <div class="fw-semibold small text-secondary mb-1"><i class="bi bi-people me-1"></i>Family Members</div>
+                            <div class="table-responsive">
+                                <table class="table table-sm table-bordered mb-0 small">
+                                    <thead class="table-light"><tr><th>Name</th><th>Gender</th><th>Age</th><th>Relation</th><th>Disabled</th><th>Pregnant</th><th>SSF Beneficiary</th></tr></thead>
+                                    <tbody>${fmRows}</tbody>
+                                </table>
+                            </div>
+                        </div>` : ''}
+
+                        <!-- Photo & Document -->
+                        <div class="bg-light bg-opacity-50 rounded p-2 d-flex gap-3 flex-wrap align-items-center">
+                            <span class="fw-semibold small text-secondary me-1"><i class="bi bi-paperclip me-1"></i>Attachments:</span>
+                            ${fileLink(b, 'photo')}
+                            ${fileLink(b, 'document')}
+                            ${!b.photo_url && !b.document_url ? '<span class="text-muted small">None</span>' : ''}
+                        </div>
+                    </div>
+                </div>`;
+            }).join('') : '<p class="text-muted small">No beneficiaries recorded</p>'}
+
             <div id="distViewCashInfo_${dist.id}"></div>
         </div>
         <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
         </div>
     </div></div>`;
+    // File preview modal (global)
+    if (typeof window.showFilePreview !== 'function') {
+        window.showFilePreview = function(url, label) {
+            const existing = document.getElementById('filePreviewModal');
+            if (existing) existing.remove();
+            const isPdf = url.toLowerCase().endsWith('.pdf');
+            const bodyContent = isPdf
+                ? `<iframe src="${url}" style="width:100%;height:80vh;border:none"></iframe>`
+                : `<img src="${url}" style="max-width:100%;max-height:80vh;display:block;margin:0 auto">`;
+            const wrapper = document.createElement('div');
+            wrapper.id = 'filePreviewModal';
+            wrapper.className = 'modal fade';
+            wrapper.innerHTML = `<div class="modal-dialog modal-lg modal-dialog-centered"><div class="modal-content">
+                <div class="modal-header"><h6 class="modal-title">${label}</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body text-center p-2 bg-dark">${bodyContent}</div>
+            </div></div>`;
+            document.body.appendChild(wrapper);
+            wrapper.addEventListener('hidden.bs.modal', () => wrapper.remove());
+            new bootstrap.Modal(wrapper).show();
+        };
+    }
+
     document.body.appendChild(modal);
     const bsModal = new bootstrap.Modal(modal);
     modal.addEventListener('hidden.bs.modal', () => modal.remove());
+
+    // Attach preview button handlers
+    modal.addEventListener('click', function(e) {
+        const btn = e.target.closest('.preview-file-btn');
+        if (btn) {
+            window.showFilePreview(btn.dataset.url, btn.dataset.label);
+        }
+    });
+
     bsModal.show();
     // Show linked cash distributions
     if (dist.dispatch_id) {
@@ -1056,8 +1210,8 @@ async function viewDistribution(id) {
                             const cd = cdData.distributions[0];
                             const div = document.getElementById('distViewCashInfo_' + dist.id);
                             if (div) {
-                                div.innerHTML = `<hr><h6><i class="bi bi-cash-stack me-1 text-success"></i>Cash Distribution</h6>
-                                    <div class="card bg-light mb-0">
+                                div.innerHTML = `<hr><h6 class="text-success"><i class="bi bi-cash-stack me-1"></i>Cash Distribution</h6>
+                                    <div class="card border-0 bg-light mb-0">
                                         <div class="card-body py-2">
                                             <div class="row g-1 small">
                                                 <div class="col-md-3"><strong>Dist No:</strong> ${cd.distribution_no}</div>
@@ -1315,7 +1469,8 @@ async function saveDistribution() {
                     const dp = dispatchDetailsCache[did];
                     if (dp) {
                         if (!incidentId) incidentId = dp.incident_id;
-                        if (dp.relief_request_id) rrIds.push(dp.relief_request_id);
+                        const ids = dp.relief_request_ids || (dp.relief_request_id ? [dp.relief_request_id] : []);
+                        ids.forEach(id => { if (id && !rrIds.includes(id)) rrIds.push(id); });
                     }
                 }
                 const primaryRRId = rrIds[0] || null;
