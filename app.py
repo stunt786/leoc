@@ -3844,6 +3844,34 @@ def handle_distributions():
             if total > dispatched:
                 return jsonify({'success': False, 'message': f'Distributed quantity for "{item_name}" ({total}) exceeds total dispatched quantity ({dispatched}) across {len(dispatches)} dispatch(es)'}), 400
         fiscal_year = AppSettings.get_setting('active_fiscal_year', '2081/82')
+        seen_beneficiaries = set()
+        for ben_data in beneficiaries_payload:
+            ben_id = ben_data.get('beneficiary_id')
+            family_name = (ben_data.get('family_name') or '').strip()
+            if ben_id and ben_id in seen_beneficiaries:
+                return jsonify({'success': False, 'message': f'Duplicate beneficiary "{family_name}" in the same distribution request'}), 400
+            if ben_id:
+                seen_beneficiaries.add(ben_id)
+            existing_cash = db.session.query(CashDistributionBeneficiary).join(
+                CashDistribution, CashDistributionBeneficiary.distribution_id == CashDistribution.id
+            ).filter(
+                CashDistribution.fiscal_year == fiscal_year,
+                db.or_(
+                    CashDistributionBeneficiary.beneficiary_id == ben_id,
+                    CashDistributionBeneficiary.name.ilike(family_name)
+                ) if ben_id else CashDistributionBeneficiary.name.ilike(family_name)
+            ).first()
+            if existing_cash:
+                return jsonify({'success': False, 'message': f'Beneficiary "{family_name}" already received cash distribution in fiscal year {fiscal_year}. Cannot also receive relief items.'}), 400
+            if ben_id:
+                existing_relief = db.session.query(DistributionBeneficiary).join(
+                    Distribution, DistributionBeneficiary.distribution_id == Distribution.id
+                ).filter(
+                    Distribution.fiscal_year == fiscal_year,
+                    DistributionBeneficiary.beneficiary_id == ben_id
+                ).first()
+                if existing_relief:
+                    return jsonify({'success': False, 'message': f'Beneficiary "{family_name}" already received relief items in fiscal year {fiscal_year}.'}), 400
         lat = None
         lon = None
         try:
@@ -4420,13 +4448,17 @@ def handle_cash_distributions():
         if total > fund.current_balance:
             return jsonify({'success': False, 'message': f'Insufficient fund balance. Available: {fund.current_balance}, Required: {total}'}), 400
         fiscal_year = AppSettings.get_setting('active_fiscal_year', '2081/82')
+        seen_beneficiaries = set()
         for ben_data in beneficiaries_payload:
             ben_name = (ben_data.get('name') or '').strip()
             ben_id = ben_data.get('beneficiary_id')
+            if ben_id and ben_id in seen_beneficiaries:
+                return jsonify({'success': False, 'message': f'Duplicate beneficiary "{ben_name}" in the same distribution request'}), 400
+            if ben_id:
+                seen_beneficiaries.add(ben_id)
             existing = db.session.query(CashDistributionBeneficiary).join(
                 CashDistribution
             ).filter(
-                CashDistribution.incident_id == incident.id,
                 CashDistribution.fiscal_year == fiscal_year,
                 db.or_(
                     CashDistributionBeneficiary.beneficiary_id == ben_id,
@@ -4434,7 +4466,18 @@ def handle_cash_distributions():
                 )
             ).first()
             if existing:
-                return jsonify({'success': False, 'message': f'Beneficiary "{ben_name}" already received a distribution for this incident in fiscal year {fiscal_year}'}), 400
+                return jsonify({'success': False, 'message': f'Beneficiary "{ben_name}" already received cash distribution in fiscal year {fiscal_year}.'}), 400
+            existing_relief = db.session.query(DistributionBeneficiary).join(
+                Distribution, DistributionBeneficiary.distribution_id == Distribution.id
+            ).filter(
+                Distribution.fiscal_year == fiscal_year,
+                db.or_(
+                    DistributionBeneficiary.beneficiary_id == ben_id,
+                    DistributionBeneficiary.family_name.ilike(ben_name)
+                )
+            ).first()
+            if existing_relief:
+                return jsonify({'success': False, 'message': f'Beneficiary "{ben_name}" already received relief items in fiscal year {fiscal_year}. Cannot also receive cash.'}), 400
         dist = CashDistribution(
             distribution_no=data.get('distribution_no') or generate_cash_distribution_no(),
             distribution_date=parse_bs_date_field(data, 'distribution_date', default=date.today()),
