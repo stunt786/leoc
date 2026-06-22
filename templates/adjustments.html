@@ -125,6 +125,34 @@ function generateAdjNo() {
     document.getElementById('adjNo').value = 'ADJ-' + String(Date.now()).slice(-6);
 }
 
+let allItems = [];
+
+function populateItemDropdown(items) {
+    const itemSel = document.getElementById('adjItem');
+    itemSel.innerHTML = '<option value="">Select Item</option>';
+    items.forEach(i => {
+        itemSel.innerHTML += `<option value="${i.id}" data-unit="${i.unit}">${i.name} (${i.item_code || 'No Code'})</option>`;
+    });
+}
+
+async function loadItemsForWarehouse() {
+    const warehouseId = document.getElementById('adjWarehouse').value;
+    if (!warehouseId) {
+        populateItemDropdown(allItems);
+        document.getElementById('adjCurrentQty').value = '0';
+        return;
+    }
+    try {
+        const r = await fetch(`/api/inventory?warehouse_id=${warehouseId}`);
+        const d = await r.json();
+        if (!d.success) { populateItemDropdown(allItems); return; }
+        const inventoryItemIds = new Set(d.inventory.map(inv => inv.item_id));
+        const filtered = allItems.filter(i => inventoryItemIds.has(i.id));
+        populateItemDropdown(filtered.length > 0 ? filtered : allItems);
+        document.getElementById('adjCurrentQty').value = '0';
+    } catch (e) { populateItemDropdown(allItems); }
+}
+
 async function loadFormData() {
     try {
         const r = await fetch('/api/data');
@@ -134,10 +162,8 @@ async function loadFormData() {
         d.warehouses.forEach(w => {
             warehouseSel.innerHTML += `<option value="${w.id}">${w.name}</option>`;
         });
-        const itemSel = document.getElementById('adjItem');
-        d.items.forEach(i => {
-            itemSel.innerHTML += `<option value="${i.id}" data-unit="${i.unit}">${i.name} (${i.item_code || 'No Code'})</option>`;
-        });
+        allItems = d.items;
+        populateItemDropdown(allItems);
         const typeSel = document.getElementById('adjType');
         d.adjustment_types.forEach(t => {
             typeSel.innerHTML += `<option value="${t}">${t}</option>`;
@@ -257,7 +283,10 @@ async function saveAdjustment() {
 }
 
 document.getElementById('adjItem').addEventListener('change', loadCurrentQty);
-document.getElementById('adjWarehouse').addEventListener('change', loadCurrentQty);
+document.getElementById('adjWarehouse').addEventListener('change', () => {
+    loadItemsForWarehouse();
+    loadCurrentQty();
+});
 
 document.addEventListener('DOMContentLoaded', () => {
     setDefaultDate();

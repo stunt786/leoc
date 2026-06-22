@@ -2495,7 +2495,9 @@ def manage_item(id):
             item.is_consumable = parse_bool_field(data, 'is_consumable', default=item.is_consumable)
         if 'is_distributable' in data:
             item.is_distributable = parse_bool_field(data, 'is_distributable', default=item.is_distributable)
-        for field in ['item_code', 'barcode', 'qr_code', 'local_name', 'description',
+        if 'item_code' in data:
+            item.item_code = (data.get('item_code') or '').strip() or None
+        for field in ['barcode', 'qr_code', 'local_name', 'description',
                        'storage_requirement', 'photo', 'status']:
             if field in data:
                 setattr(item, field, data[field])
@@ -2550,6 +2552,9 @@ def manage_supplier(id):
         return jsonify({'success': False, 'message': 'Supplier not found'}), 404
     try:
         if request.method == 'DELETE':
+            linked_receipts = StockReceipt.query.filter_by(supplier_id=sup.id).count()
+            if linked_receipts > 0:
+                return jsonify({'success': False, 'message': f'Cannot delete supplier "{sup.name}" because {linked_receipts} stock receipt(s) are linked to it. Remove or reassign those receipts first.'}), 400
             db.session.delete(sup)
             db.session.commit()
             return jsonify({'success': True, 'message': 'Supplier deleted'})
@@ -2778,8 +2783,12 @@ def handle_stock_receipts():
             supplier_id = int(supplier_id)
         source_name = data.get('source_name')
         source_contact = data.get('source_contact')
-        phone = data.get('phone')
-        email = data.get('email')
+        phone = (data.get('phone') or '').strip() or None
+        email = (data.get('email') or '').strip() or None
+        if phone and not validate_phone(phone):
+            return jsonify({'success': False, 'message': 'Phone number format is invalid'}), 400
+        if email and not re.match(r'^[^\s@]+@[^\s@]+\.[^\s@]+$', email):
+            return jsonify({'success': False, 'message': 'Email format is invalid'}), 400
         address = data.get('address')
         if supplier_id:
             supplier = db_get(Supplier, supplier_id)
@@ -2900,11 +2909,17 @@ def update_stock_receipt(id):
                 receipt.address = receipt.address or supplier.address
             else:
                 receipt.supplier_id = None
+        phone = (data.get('phone') or '').strip() or None
+        email = (data.get('email') or '').strip() or None
+        if phone and not validate_phone(phone):
+            return jsonify({'success': False, 'message': 'Phone number format is invalid'}), 400
+        if email and not re.match(r'^[^\s@]+@[^\s@]+\.[^\s@]+$', email):
+            return jsonify({'success': False, 'message': 'Email format is invalid'}), 400
         receipt.source_type = data.get('source_type', receipt.source_type)
         receipt.source_name = data.get('source_name', receipt.source_name)
         receipt.source_contact = data.get('source_contact', receipt.source_contact)
-        receipt.phone = data.get('phone', receipt.phone)
-        receipt.email = data.get('email', receipt.email)
+        receipt.phone = phone if 'phone' in data else receipt.phone
+        receipt.email = email if 'email' in data else receipt.email
         receipt.address = data.get('address', receipt.address)
         receipt.ref_number = data.get('ref_number', receipt.ref_number)
         receipt.invoice_no = data.get('invoice_no', receipt.invoice_no)

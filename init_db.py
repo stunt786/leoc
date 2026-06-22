@@ -204,20 +204,21 @@ def seed_non_distributable_items():
         return
 
     items_data = [
-        ('Rice', 'Kg', 'Food', True, True, 'Dry Storage', 'चामल'),
-        ('Tarpaulin Sheet', 'Piece', 'Shelter', False, True, 'Dry Storage', 'तिरपाल'),
-        ('Blanket', 'Piece', 'Clothing & Textiles', False, True, 'Normal', 'कम्बल'),
+        ('Rice', 'ITM-0001', 'Kg', 'Food', True, True, 'Dry Storage', 'चामल'),
+        ('Tarpaulin Sheet', 'ITM-0002', 'Piece', 'Shelter', False, True, 'Dry Storage', 'तिरपाल'),
+        ('Blanket', 'ITM-0003', 'Piece', 'Clothing & Textiles', False, True, 'Normal', 'कम्बल'),
     ]
 
     cat_cache = {c.name: c.id for c in Category.query.all()}
     created_count = 0
-    for name, unit, category_name, consumable, distributable, storage, local_name in items_data:
+    for name, code, unit, category_name, consumable, distributable, storage, local_name in items_data:
         cat_id = cat_cache.get(category_name)
         if not cat_id:
             print(f"  [WARN] Category '{category_name}' not found for item '{name}'")
             continue
         item = Item(
             uuid=str(uuid_lib.uuid4()),
+            item_code=code,
             name=name,
             local_name=local_name,
             unit=unit,

@@ -413,6 +413,11 @@ async function saveReceipt() {
 
     if (items.length === 0) { showToast('danger', 'Add at least one item with quantity'); return; }
 
+    const phone = document.getElementById('receipt_phone').value.trim();
+    const email = document.getElementById('receipt_email').value.trim();
+    if (phone && !/^[\d\s\+\-\(\)]{7,20}$/.test(phone)) { showToast('danger', 'Phone number format is invalid'); return; }
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showToast('danger', 'Email format is invalid'); return; }
+
     const body = {
         receipt_no: document.getElementById('receipt_no').value,
         date: document.getElementById('receipt_date').value,
@@ -421,8 +426,8 @@ async function saveReceipt() {
         source_type: document.getElementById('receipt_source_type').value,
         source_name: document.getElementById('receipt_source_name').value,
         source_contact: document.getElementById('receipt_source_contact').value,
-        phone: document.getElementById('receipt_phone').value,
-        email: document.getElementById('receipt_email').value,
+        phone: phone,
+        email: email,
         address: document.getElementById('receipt_address').value,
         ref_number: document.getElementById('receipt_ref_number').value,
         invoice_no: document.getElementById('receipt_invoice_no').value,
