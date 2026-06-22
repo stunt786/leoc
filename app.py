@@ -946,21 +946,6 @@ class Dispatch(db.Model):
             rr_ids = []
         if not rr_ids and self.relief_request_id:
             rr_ids = [self.relief_request_id]
-        # If only one RR is known, try to find additional linked RRs from dispatch items
-        # (handles dispatches created before relief_request_ids was persisted)
-        if len(rr_ids) <= 1 and self.items:
-            item_ids = list(set(di.item_id for di in self.items if di.item_id))
-            if item_ids:
-                extra_rr_ids = db.session.query(ReliefRequestItem.request_id).join(
-                    ReliefRequest, ReliefRequest.id == ReliefRequestItem.request_id
-                ).filter(
-                    ReliefRequestItem.item_id.in_(item_ids),
-                    ReliefRequestItem.quantity_dispatched > 0,
-                    ReliefRequest.incident_id == self.incident_id
-                ).distinct().all()
-                for (rid,) in extra_rr_ids:
-                    if rid and rid not in rr_ids:
-                        rr_ids.append(rid)
         rr_list = []
         for rid in rr_ids:
             rr = db_get(ReliefRequest, rid)

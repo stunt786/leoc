@@ -672,13 +672,13 @@ function addBeneficiaryFromDispatch() {
     if (dispatchIds.length === 0) { showToast('warning', 'Please select at least one dispatch first'); return; }
 
     let addedCount = 0;
+    const seenBenNames = new Set();
     dispatchIds.forEach((did) => {
         const dp = dispatchDetailsCache[did];
         if (!dp) return;
 
         const dispatchItems = dispatchItemsCache[did] || [];
         const linkedRRs = dp.relief_requests || [];
-        console.log('Dispatch:', dp.dispatch_number, 'relief_requests:', linkedRRs);
 
         if (linkedRRs.length > 0) {
             // Build a map of item_name -> count of RRs that requested it
@@ -689,10 +689,13 @@ function addBeneficiaryFromDispatch() {
                 });
             });
 
-            // Create one beneficiary row per linked relief request
+            // Create one beneficiary row per unique relief request requester
             linkedRRs.forEach((rr) => {
                 const benName = rr.requester_name || rr.organization || '';
                 if (!benName) return;
+                // Deduplicate: skip if this beneficiary was already added
+                if (seenBenNames.has(benName.toLowerCase())) return;
+                seenBenNames.add(benName.toLowerCase());
 
                 const match = beneficiaries.find(b => b.name && b.name.toLowerCase() === benName.toLowerCase());
                 const benData = match ? match : { name: benName };
@@ -752,6 +755,8 @@ function addBeneficiaryFromDispatch() {
 
             const benName = rr ? (rr.requester_name || rr.organization || '') : (dp.receiver || dp.destination || '');
             if (!benName) return;
+            if (seenBenNames.has(benName.toLowerCase())) return;
+            seenBenNames.add(benName.toLowerCase());
 
             const match = beneficiaries.find(b => b.name && b.name.toLowerCase() === benName.toLowerCase());
             const benData = match ? match : { name: benName };
