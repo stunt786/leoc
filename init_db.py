@@ -127,19 +127,62 @@ def seed_item_categories():
         'Preparedness - Shelter & Camp',
         'Preparedness - Water & Sanitation',
         'Preparedness - Fire Safety',
+        # Administrative & Operations
+        'Administrative & Office operation',
+        'Telecoms & IT',
     ]
+
+    categories_np = {
+        'Food': 'खाद्यान्न',
+        'Shelter': 'आश्रय',
+        'Relief Supplies': 'राहत सामग्री',
+        'WASH (Water/Sanitation)': 'खानेपानी तथा सरसफाइ',
+        'Education Materials': 'शैक्षिक सामग्री',
+        'Protection Gear': 'सुरक्षा उपकरण',
+        'Fuel & Lubricants': 'इन्धन तथा स्नेहक',
+        'Construction Materials': 'निर्माण सामग्री',
+        'Livestock Supplies': 'पशुपालन सामग्री',
+        'Clothing & Textiles': 'लत्ताकपडा तथा वस्त्र',
+        'Kitchen & Cooking': 'भान्छा तथा पकाउने सामग्री',
+        'Baby & Child Care': 'बालबालिका हेरचाह',
+        'Other': 'अन्य',
+        'Rescue - Search & Rescue Tools': 'उद्धार - खोज तथा उद्धार उपकरण',
+        'Rescue - Ropes & Rigging': 'उद्धार - डोरी तथा उपकरण',
+        'Rescue - Cutting & Breaking': 'उद्धार - काट्ने तथा तोड्ने',
+        'Rescue - Lighting & Signal': 'उद्धार - बत्ती तथा सङ्केत',
+        'Rescue - Water Rescue': 'उद्धार - पानी उद्धार',
+        'Rescue - Confined Space': 'उद्धार - साँघुरो ठाउँ',
+        'Medical - Consumables': 'चिकित्सा - उपभोग्य वस्तु',
+        'Medical - Equipment': 'चिकित्सा - उपकरण',
+        'Medical - First Aid': 'चिकित्सा - प्राथमिक उपचार',
+        'Medical - Diagnostic': 'चिकित्सा - निदान',
+        'Medical - Mobility & Transport': 'चिकित्सा - गतिशीलता तथा यातायात',
+        'Vehicles - Light': 'सवारी - हल्का',
+        'Vehicles - Heavy': 'सवारी - भारी',
+        'Vehicles - Water & Air': 'सवारी - जल तथा हवाई',
+        'Vehicle Parts & Tools': 'सवारी पार्टपुर्जा तथा औजार',
+        'Preparedness - Communication': 'तयारी - सञ्चार',
+        'Preparedness - Power & Lighting': 'तयारी - विद्युत तथा प्रकाश',
+        'Preparedness - Shelter & Camp': 'तयारी - आश्रय तथा शिविर',
+        'Preparedness - Water & Sanitation': 'तयारी - खानेपानी तथा सरसफाइ',
+        'Preparedness - Fire Safety': 'तयारी - आग सुरक्षा',
+        'Administrative & Office operation': 'प्रशासनिक तथा कार्यालय सञ्चालन',
+        'Telecoms & IT': 'दूरसञ्चार तथा सूचना प्रविधि',
+    }
 
     existing_names = {c.name for c in Category.query.all()}
     new_count = 0
     for cat_name in categories:
         if cat_name not in existing_names:
-            cat = Category(name=cat_name, is_predefined=True)
+            cat = Category(name=cat_name, name_np=categories_np.get(cat_name), is_predefined=True)
             db.session.add(cat)
             new_count += 1
         else:
             existing = Category.query.filter_by(name=cat_name).first()
             if existing and not existing.is_predefined:
                 existing.is_predefined = True
+            if cat_name in categories_np and not existing.name_np:
+                existing.name_np = categories_np[cat_name]
 
     db.session.commit()
     if new_count:
@@ -149,169 +192,34 @@ def seed_item_categories():
 
 
 def seed_non_distributable_items():
-    """Seed standard non-distributable items for rescue, medical equipment, vehicles, and preparedness."""
+    """Seed predefined items (kept minimal — 3 sample items)."""
     try:
         from __main__ import Category, Item
     except (ImportError, AttributeError):
         from app import Category, Item
     import uuid as uuid_lib
 
-    if Item.query.filter(Item.is_distributable == False).first():
-        print("[SKIP] Non-distributable items already exist")
+    if Item.query.first():
+        print("[SKIP] Items already exist")
         return
 
     items_data = [
-        # --- RESCUE: Search & Rescue Tools ---
-        ('Cat-1 Rope (Static)', 'Meter', 'Rescue - Ropes & Rigging', False, False, 'Dry Storage'),
-        ('Cat-2 Rope (Dynamic)', 'Meter', 'Rescue - Ropes & Rigging', False, False, 'Dry Storage'),
-        ('Webbing Sling (60cm)', 'Piece', 'Rescue - Ropes & Rigging', False, False, 'Dry Storage'),
-        ('Webbing Sling (120cm)', 'Piece', 'Rescue - Ropes & Rigging', False, False, 'Dry Storage'),
-        ('Carabiner (Screw Lock)', 'Piece', 'Rescue - Ropes & Rigging', False, False, 'Dry Storage'),
-        ('Carabiner (Auto Lock)', 'Piece', 'Rescue - Ropes & Rigging', False, False, 'Dry Storage'),
-        ('Descender (Figure 8)', 'Piece', 'Rescue - Ropes & Rigging', False, False, 'Dry Storage'),
-        ('Pulley (Single)', 'Piece', 'Rescue - Ropes & Rigging', False, False, 'Dry Storage'),
-        ('Pulley (Double)', 'Piece', 'Rescue - Ropes & Rigging', False, False, 'Dry Storage'),
-        ('Harness (Full Body)', 'Piece', 'Rescue - Ropes & Rigging', False, False, 'Dry Storage'),
-        ('Harness (Chest)', 'Piece', 'Rescue - Ropes & Rigging', False, False, 'Dry Storage'),
-        ('Helmet (Rescue)', 'Piece', 'Rescue - Search & Rescue Tools', False, False, 'Dry Storage'),
-        ('Headlamp (Rescue)', 'Piece', 'Rescue - Lighting & Signal', False, False, 'Dry Storage'),
-        ('Rescue Flashlight', 'Piece', 'Rescue - Lighting & Signal', False, False, 'Dry Storage'),
-        ('Signal Whistle', 'Piece', 'Rescue - Lighting & Signal', False, False, 'Dry Storage'),
-        ('Safety Glasses', 'Piece', 'Rescue - Search & Rescue Tools', False, False, 'Normal'),
-        ('Work Gloves (Leather)', 'Pair', 'Rescue - Search & Rescue Tools', False, False, 'Normal'),
-        ('Knee Pads', 'Pair', 'Rescue - Search & Rescue Tools', False, False, 'Normal'),
-        ('Cutting Tool (Bolt Cutter)', 'Piece', 'Rescue - Cutting & Breaking', False, False, 'Dry Storage'),
-        ('Crowbar', 'Piece', 'Rescue - Cutting & Breaking', False, False, 'Dry Storage'),
-        ('Sledge Hammer', 'Piece', 'Rescue - Cutting & Breaking', False, False, 'Dry Storage'),
-        ('Hacksaw', 'Piece', 'Rescue - Cutting & Breaking', False, False, 'Dry Storage'),
-        ('Shovel (Folding)', 'Piece', 'Rescue - Search & Rescue Tools', False, False, 'Dry Storage'),
-        ('Stretcher (Basket)', 'Piece', 'Rescue - Search & Rescue Tools', False, False, 'Dry Storage'),
-        ('Stretcher (Foldable)', 'Piece', 'Rescue - Search & Rescue Tools', False, False, 'Dry Storage'),
-        ('Spine Board', 'Piece', 'Rescue - Search & Rescue Tools', False, False, 'Dry Storage'),
-        ('Cervical Collar (Set)', 'Set', 'Rescue - Search & Rescue Tools', False, False, 'Dry Storage'),
-        ('Life Jacket', 'Piece', 'Rescue - Water Rescue', False, False, 'Dry Storage'),
-        ('Throw Bag (Water Rescue)', 'Piece', 'Rescue - Water Rescue', False, False, 'Dry Storage'),
-        ('Rescue Tube', 'Piece', 'Rescue - Water Rescue', False, False, 'Dry Storage'),
-        ('Gas Detector (Multi)', 'Piece', 'Rescue - Confined Space', False, False, 'Dry Storage'),
-        ('Tripod Rescue System', 'Set', 'Rescue - Confined Space', False, False, 'Dry Storage'),
-        ('Come-Along Winch', 'Piece', 'Rescue - Search & Rescue Tools', False, False, 'Dry Storage'),
-        ('Rope Grab (ASAP)', 'Piece', 'Rescue - Ropes & Rigging', False, False, 'Dry Storage'),
-        ('Edge Roller', 'Piece', 'Rescue - Ropes & Rigging', False, False, 'Dry Storage'),
-        ('Prusik Loop', 'Piece', 'Rescue - Ropes & Rigging', False, False, 'Dry Storage'),
-        ('Daisy Chain', 'Piece', 'Rescue - Ropes & Rigging', False, False, 'Dry Storage'),
-        ('Ratchet Strap (Heavy)', 'Piece', 'Rescue - Search & Rescue Tools', False, False, 'Dry Storage'),
-        ('Tarp (Waterproof)', 'Piece', 'Rescue - Search & Rescue Tools', False, False, 'Dry Storage'),
-
-        # --- MEDICAL: Equipment (non-distributable) ---
-        ('Oxygen Cylinder (Portable)', 'Piece', 'Medical - Equipment', False, False, 'Dry Storage'),
-        ('Oxygen Regulator', 'Piece', 'Medical - Equipment', False, False, 'Dry Storage'),
-        ('Pulse Oximeter', 'Piece', 'Medical - Diagnostic', False, False, 'Normal'),
-        ('BP Monitor (Digital)', 'Piece', 'Medical - Diagnostic', False, False, 'Normal'),
-        ('Thermometer (Infrared)', 'Piece', 'Medical - Diagnostic', False, False, 'Normal'),
-        ('Stethoscope', 'Piece', 'Medical - Diagnostic', False, False, 'Normal'),
-        ('Glucometer', 'Piece', 'Medical - Diagnostic', False, False, 'Normal'),
-        ('Suction Machine', 'Piece', 'Medical - Equipment', False, False, 'Normal'),
-        ('Bag Valve Mask (Adult)', 'Piece', 'Medical - Equipment', False, False, 'Normal'),
-        ('Bag Valve Mask (Pediatric)', 'Piece', 'Medical - Equipment', False, False, 'Normal'),
-        ('Laryngoscope Set', 'Set', 'Medical - Equipment', False, False, 'Normal'),
-        ('Stretcher (Ambulance)', 'Piece', 'Medical - Mobility & Transport', False, False, 'Dry Storage'),
-        ('Wheelchair', 'Piece', 'Medical - Mobility & Transport', False, False, 'Dry Storage'),
-        ('Crutches (Pair)', 'Pair', 'Medical - Mobility & Transport', False, False, 'Dry Storage'),
-        ('Walking Frame', 'Piece', 'Medical - Mobility & Transport', False, False, 'Dry Storage'),
-        ('IV Stand', 'Piece', 'Medical - Equipment', False, False, 'Normal'),
-        ('First Aid Cabinet (Empty)', 'Piece', 'Medical - First Aid', False, False, 'Normal'),
-        ('Splint Set (SAM)', 'Set', 'Medical - First Aid', False, False, 'Normal'),
-        ('Tourniquet (CAT)', 'Piece', 'Medical - First Aid', False, False, 'Normal'),
-        ('Trauma Shears', 'Piece', 'Medical - First Aid', False, False, 'Normal'),
-        ('Medical Backpack (Empty)', 'Piece', 'Medical - First Aid', False, False, 'Normal'),
-        ('CPR Pocket Mask', 'Piece', 'Medical - Equipment', False, False, 'Normal'),
-        ('Portable Ventilator', 'Piece', 'Medical - Equipment', False, False, 'Normal'),
-        ('Defibrillator (AED)', 'Piece', 'Medical - Equipment', False, False, 'Normal'),
-        ('Oxygen Tank (Large)', 'Piece', 'Medical - Equipment', False, False, 'Dry Storage'),
-
-        # --- VEHICLES ---
-        ('4x4 Pickup (Double Cab)', 'Piece', 'Vehicles - Light', False, False, 'Normal'),
-        ('SUV (4x4)', 'Piece', 'Vehicles - Light', False, False, 'Normal'),
-        ('Motorcycle (Dirt)', 'Piece', 'Vehicles - Light', False, False, 'Normal'),
-        ('Ambulance (4x4)', 'Piece', 'Vehicles - Light', False, False, 'Normal'),
-        ('Cargo Truck (6-Ton)', 'Piece', 'Vehicles - Heavy', False, False, 'Normal'),
-        ('Cargo Truck (10-Ton)', 'Piece', 'Vehicles - Heavy', False, False, 'Normal'),
-        ('Dump Truck', 'Piece', 'Vehicles - Heavy', False, False, 'Normal'),
-        ('Water Tanker Truck', 'Piece', 'Vehicles - Heavy', False, False, 'Normal'),
-        ('Fuel Tanker', 'Piece', 'Vehicles - Heavy', False, False, 'Normal'),
-        ('Bulldozer', 'Piece', 'Vehicles - Heavy', False, False, 'Normal'),
-        ('Excavator', 'Piece', 'Vehicles - Heavy', False, False, 'Normal'),
-        ('Forklift', 'Piece', 'Vehicles - Heavy', False, False, 'Normal'),
-        ('Backhoe Loader', 'Piece', 'Vehicles - Heavy', False, False, 'Normal'),
-        ('Outboard Motor (Boat)', 'Piece', 'Vehicles - Water & Air', False, False, 'Dry Storage'),
-        ('Rescue Boat (Inflatable)', 'Piece', 'Vehicles - Water & Air', False, False, 'Dry Storage'),
-        ('Drone (Search)', 'Piece', 'Vehicles - Water & Air', False, False, 'Dry Storage'),
-        ('Tire (Vehicle)', 'Piece', 'Vehicle Parts & Tools', False, False, 'Dry Storage'),
-        ('Jump Starter Pack', 'Piece', 'Vehicle Parts & Tools', False, False, 'Dry Storage'),
-        ('Tow Cable', 'Piece', 'Vehicle Parts & Tools', False, False, 'Dry Storage'),
-        ('Hydraulic Jack', 'Piece', 'Vehicle Parts & Tools', False, False, 'Dry Storage'),
-        ('Tool Kit (Vehicle)', 'Set', 'Vehicle Parts & Tools', False, False, 'Dry Storage'),
-        ('Fire Extinguisher (Vehicle)', 'Piece', 'Vehicle Parts & Tools', False, False, 'Dry Storage'),
-        ('Fuel Can (20L)', 'Piece', 'Vehicles - Light', False, False, 'Hazardous'),
-        ('Warning Triangle', 'Piece', 'Vehicle Parts & Tools', False, False, 'Dry Storage'),
-        ('Safety Vest (Reflective)', 'Piece', 'Vehicle Parts & Tools', False, False, 'Normal'),
-
-        # --- PREPAREDNESS ---
-        ('Satellite Phone', 'Piece', 'Preparedness - Communication', False, False, 'Dry Storage'),
-        ('Handheld Radio (VHF)', 'Piece', 'Preparedness - Communication', False, False, 'Dry Storage'),
-        ('Handheld Radio (UHF)', 'Piece', 'Preparedness - Communication', False, False, 'Dry Storage'),
-        ('Base Station Radio', 'Piece', 'Preparedness - Communication', False, False, 'Dry Storage'),
-        ('Megaphone (Battery)', 'Piece', 'Preparedness - Communication', False, False, 'Dry Storage'),
-        ('Generator (2kW)', 'Piece', 'Preparedness - Power & Lighting', False, False, 'Dry Storage'),
-        ('Generator (5kW)', 'Piece', 'Preparedness - Power & Lighting', False, False, 'Dry Storage'),
-        ('Generator (10kW)', 'Piece', 'Preparedness - Power & Lighting', False, False, 'Dry Storage'),
-        ('Solar Panel (Portable 100W)', 'Piece', 'Preparedness - Power & Lighting', False, False, 'Dry Storage'),
-        ('Solar Panel (Portable 300W)', 'Piece', 'Preparedness - Power & Lighting', False, False, 'Dry Storage'),
-        ('Power Station (Portable)', 'Piece', 'Preparedness - Power & Lighting', False, False, 'Dry Storage'),
-        ('LED Flood Light', 'Piece', 'Preparedness - Power & Lighting', False, False, 'Dry Storage'),
-        ('Extension Cable (50m)', 'Piece', 'Preparedness - Power & Lighting', False, False, 'Dry Storage'),
-        ('Power Distribution Box', 'Piece', 'Preparedness - Power & Lighting', False, False, 'Dry Storage'),
-        ('Camp Tent (10 Person)', 'Piece', 'Preparedness - Shelter & Camp', False, False, 'Dry Storage'),
-        ('Camp Tent (20 Person)', 'Piece', 'Preparedness - Shelter & Camp', False, False, 'Dry Storage'),
-        ('Cot (Folding)', 'Piece', 'Preparedness - Shelter & Camp', False, False, 'Dry Storage'),
-        ('Sleeping Bag', 'Piece', 'Preparedness - Shelter & Camp', False, False, 'Dry Storage'),
-        ('Camp Table', 'Piece', 'Preparedness - Shelter & Camp', False, False, 'Dry Storage'),
-        ('Camp Chair', 'Piece', 'Preparedness - Shelter & Camp', False, False, 'Dry Storage'),
-        ('Water Bladder (1000L)', 'Piece', 'Preparedness - Water & Sanitation', False, False, 'Dry Storage'),
-        ('Water Bladder (2000L)', 'Piece', 'Preparedness - Water & Sanitation', False, False, 'Dry Storage'),
-        ('Water Treatment Unit (Portable)', 'Piece', 'Preparedness - Water & Sanitation', False, False, 'Dry Storage'),
-        ('Water Pump (Submersible)', 'Piece', 'Preparedness - Water & Sanitation', False, False, 'Dry Storage'),
-        ('Water Tank (Plastic 500L)', 'Piece', 'Preparedness - Water & Sanitation', False, False, 'Dry Storage'),
-        ('Water Tank (Plastic 1000L)', 'Piece', 'Preparedness - Water & Sanitation', False, False, 'Dry Storage'),
-        ('Collapsible Jerry Can (10L)', 'Piece', 'Preparedness - Water & Sanitation', False, False, 'Dry Storage'),
-        ('Portable Toilet', 'Piece', 'Preparedness - Water & Sanitation', False, False, 'Dry Storage'),
-        ('Shower Unit (Portable)', 'Piece', 'Preparedness - Water & Sanitation', False, False, 'Dry Storage'),
-        ('Fire Extinguisher (ABC 6kg)', 'Piece', 'Preparedness - Fire Safety', False, False, 'Dry Storage'),
-        ('Fire Extinguisher (CO2)', 'Piece', 'Preparedness - Fire Safety', False, False, 'Dry Storage'),
-        ('Fire Hose (15m)', 'Piece', 'Preparedness - Fire Safety', False, False, 'Dry Storage'),
-        ('Fire Nozzle', 'Piece', 'Preparedness - Fire Safety', False, False, 'Dry Storage'),
-        ('Fire Blanket', 'Piece', 'Preparedness - Fire Safety', False, False, 'Dry Storage'),
-        ('Smoke Detector', 'Piece', 'Preparedness - Fire Safety', False, False, 'Normal'),
-        ('First Aid Kit (Workplace)', 'Set', 'Preparedness - Shelter & Camp', False, False, 'Normal'),
-        ('Emergency Whistle', 'Piece', 'Preparedness - Shelter & Camp', False, False, 'Normal'),
-        ('Dust Mask (N95)', 'Piece', 'Preparedness - Shelter & Camp', False, False, 'Normal'),
-        ('Safety Goggles', 'Piece', 'Preparedness - Shelter & Camp', False, False, 'Normal'),
-        ('Rain Poncho', 'Piece', 'Preparedness - Shelter & Camp', False, False, 'Normal'),
+        ('Rice', 'Kg', 'Food', True, True, 'Dry Storage', 'चामल'),
+        ('Tarpaulin Sheet', 'Piece', 'Shelter', False, True, 'Dry Storage', 'तिरपाल'),
+        ('Blanket', 'Piece', 'Clothing & Textiles', False, True, 'Normal', 'कम्बल'),
     ]
 
     cat_cache = {c.name: c.id for c in Category.query.all()}
-    existing_item_names = {i.name for i in Item.query.all()}
     created_count = 0
-    for name, unit, category_name, consumable, distributable, storage in items_data:
+    for name, unit, category_name, consumable, distributable, storage, local_name in items_data:
         cat_id = cat_cache.get(category_name)
         if not cat_id:
             print(f"  [WARN] Category '{category_name}' not found for item '{name}'")
             continue
-        if name in existing_item_names:
-            continue
         item = Item(
             uuid=str(uuid_lib.uuid4()),
             name=name,
+            local_name=local_name,
             unit=unit,
             category_id=cat_id,
             is_consumable=consumable,
@@ -324,9 +232,9 @@ def seed_non_distributable_items():
 
     db.session.commit()
     if created_count:
-        print(f"[OK] Seeded {created_count} non-distributable items")
+        print(f"[OK] Seeded {created_count} items")
     else:
-        print("[SKIP] Non-distributable items already seeded")
+        print("[SKIP] Items already seeded")
 
 def seed_default_settings():
     """Seed default application settings."""
@@ -468,7 +376,7 @@ def run_migrations():
             ('missing_female', 'INTEGER DEFAULT 0'),
         ],
         'event_log': [('is_locked', 'BOOLEAN DEFAULT 0')],
-        'category': [('is_predefined', 'BOOLEAN DEFAULT 0')],
+        'category': [('is_predefined', 'BOOLEAN DEFAULT 0'), ('name_np', 'VARCHAR(100)')],
         'user': [
             ('failed_login_attempts', 'INTEGER DEFAULT 0'),
             ('locked_until', 'DATETIME'),

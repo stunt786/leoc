@@ -192,6 +192,13 @@ def parse_float_field(data, field_name, minimum=None, default=None):
         raise ValueError(f"{field_name} must be at least {minimum}")
     return value
 
+
+def validate_phone(phone):
+    if not phone:
+        return True
+    return bool(re.match(r'^[\d\s\+\-\(\)]{7,20}$', phone))
+
+
 def parse_bool_field(data, field_name, default=False):
     value = data.get(field_name, default)
     if isinstance(value, bool):
@@ -395,7 +402,7 @@ class AppSettings(db.Model):
 # ============ WAREHOUSE MODEL (Module 3) ============
 class Warehouse(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(200), nullable=False)
+    name = db.Column(db.String(200), nullable=False, unique=True)
     code = db.Column(db.String(50), unique=True, nullable=False, index=True)
     address = db.Column(db.String(300))
     contact_person = db.Column(db.String(200))
@@ -418,8 +425,8 @@ class Supplier(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(200), nullable=False, index=True)
     contact_person = db.Column(db.String(200))
-    phone = db.Column(db.String(50))
-    email = db.Column(db.String(100))
+    phone = db.Column(db.String(50), unique=True)
+    email = db.Column(db.String(100), unique=True)
     address = db.Column(db.String(300))
     supplier_type = db.Column(db.String(50), default='Other')
     status = db.Column(db.String(20), default='Active')
@@ -458,12 +465,13 @@ class WarehouseZone(db.Model):
 class Category(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), unique=True, nullable=False, index=True)
+    name_np = db.Column(db.String(100))
     description = db.Column(db.Text)
     is_predefined = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=utc_now)
 
     def to_dict(self):
-        return {'id': self.id, 'name': self.name, 'description': self.description, 'is_predefined': self.is_predefined}
+        return {'id': self.id, 'name': self.name, 'name_np': self.name_np, 'description': self.description, 'is_predefined': self.is_predefined}
 
 # ============ ITEM MASTER MODEL (Module 5) ============
 class Item(db.Model):
@@ -473,7 +481,7 @@ class Item(db.Model):
     barcode = db.Column(db.String(100))
     qr_code = db.Column(db.Text)
     category_id = db.Column(db.Integer, db.ForeignKey('category.id'), nullable=False, index=True)
-    name = db.Column(db.String(200), nullable=False, index=True)
+    name = db.Column(db.String(200), nullable=False, unique=True, index=True)
     local_name = db.Column(db.String(200))
     description = db.Column(db.Text)
     unit = db.Column(db.String(50), nullable=False)
@@ -2230,8 +2238,13 @@ def handle_warehouses():
         name = (data.get('name') or '').strip()
         if not name:
             return jsonify({'success': False, 'message': 'Warehouse name is required'}), 400
+        if Warehouse.query.filter_by(name=name).first():
+            return jsonify({'success': False, 'message': 'A warehouse with this name already exists'}), 400
+        phone = data.get('phone')
+        if not validate_phone(phone):
+            return jsonify({'success': False, 'message': 'Phone number format is invalid'}), 400
         wh = Warehouse(name=name, code=(data.get('code') or '').strip(), address=data.get('address'),
-                       contact_person=data.get('contact_person'), phone=data.get('phone'),
+                       contact_person=data.get('contact_person'), phone=phone,
                        capacity=parse_int_field(data, 'capacity', minimum=0, default=0), remarks=data.get('remarks'))
         if not wh.code:
             wh.code = f"WH-{Warehouse.query.count() + 1}"
@@ -2275,10 +2288,17 @@ def manage_warehouse(id):
             name = (data.get('name') or '').strip()
             if not name:
                 return jsonify({'success': False, 'message': 'Warehouse name is required'}), 400
+            existing = Warehouse.query.filter_by(name=name).first()
+            if existing and existing.id != wh.id:
+                return jsonify({'success': False, 'message': 'A warehouse with this name already exists'}), 400
             wh.name = name
         if 'code' in data:
             wh.code = (data.get('code') or '').strip()
-        for field in ['address', 'contact_person', 'phone', 'remarks']:
+        if 'phone' in data:
+            if not validate_phone(data['phone']):
+                return jsonify({'success': False, 'message': 'Phone number format is invalid'}), 400
+            wh.phone = data['phone']
+        for field in ['address', 'contact_person', 'remarks']:
             if field in data:
                 setattr(wh, field, data[field])
         if 'capacity' in data:
@@ -2306,7 +2326,7 @@ def handle_categories():
         name = (data.get('name') or '').strip()
         if not name:
             return jsonify({'success': False, 'message': 'Category name is required'}), 400
-        cat = Category(name=name, description=data.get('description'))
+        cat = Category(name=name, name_np=data.get('name_np'), description=data.get('description'))
         db.session.add(cat)
         db.session.commit()
         return jsonify({'success': True, 'message': 'Category created', 'data': cat.to_dict()}), 201
@@ -2339,6 +2359,8 @@ def manage_category(id):
             if not name:
                 return jsonify({'success': False, 'message': 'Category name is required'}), 400
             cat.name = name
+        if 'name_np' in data:
+            cat.name_np = data['name_np']
         if 'description' in data:
             cat.description = data['description']
         db.session.commit()
@@ -2385,6 +2407,9 @@ def handle_items():
         data = request.get_json()
         if not data.get('name') or not data.get('unit') or not data.get('category_id'):
             return jsonify({'success': False, 'message': 'Name, unit, and category are required'}), 400
+        name = (data.get('name') or '').strip()
+        if Item.query.filter_by(name=name).first():
+            return jsonify({'success': False, 'message': 'An item with this name already exists'}), 400
         category = db_get(Category, data['category_id'])
         if not category:
             return jsonify({'success': False, 'message': 'Category not found'}), 404
@@ -2397,7 +2422,7 @@ def handle_items():
             uuid=str(uuid_lib.uuid4()),
             item_code=data.get('item_code') or generate_item_code(),
             barcode=data.get('barcode'), qr_code=data.get('qr_code'),
-            category_id=data['category_id'], name=data['name'],
+            category_id=data['category_id'], name=name,
             local_name=data.get('local_name'), description=data.get('description'),
             unit=data['unit'],
             minimum_stock=minimum_stock,
@@ -2438,6 +2463,9 @@ def manage_item(id):
             name = (data.get('name') or '').strip()
             if not name:
                 return jsonify({'success': False, 'message': 'Item name is required'}), 400
+            existing = Item.query.filter_by(name=name).first()
+            if existing and existing.id != item.id:
+                return jsonify({'success': False, 'message': 'An item with this name already exists'}), 400
             item.name = name
         if 'unit' in data:
             unit = (data.get('unit') or '').strip()
@@ -2490,10 +2518,21 @@ def handle_suppliers():
         return jsonify({'success': True, 'suppliers': [s.to_dict() for s in suppliers]})
     try:
         data = request.get_json()
-        if not data.get('name'):
+        name = (data.get('name') or '').strip()
+        if not name:
             return jsonify({'success': False, 'message': 'Supplier name is required'}), 400
-        sup = Supplier(name=data['name'], contact_person=data.get('contact_person'),
-                       phone=data.get('phone'), email=data.get('email'),
+        phone = (data.get('phone') or '').strip() or None
+        if phone and not validate_phone(phone):
+            return jsonify({'success': False, 'message': 'Phone number format is invalid'}), 400
+        if phone and Supplier.query.filter_by(phone=phone).first():
+            return jsonify({'success': False, 'message': 'A supplier with this phone number already exists'}), 400
+        email = (data.get('email') or '').strip() or None
+        if email and not re.match(r'^[^\s@]+@[^\s@]+\.[^\s@]+$', email):
+            return jsonify({'success': False, 'message': 'Email format is invalid'}), 400
+        if email and Supplier.query.filter_by(email=email).first():
+            return jsonify({'success': False, 'message': 'A supplier with this email already exists'}), 400
+        sup = Supplier(name=name, contact_person=data.get('contact_person'),
+                       phone=phone, email=email,
                        address=data.get('address'), supplier_type=data.get('supplier_type', 'Other'),
                        status=data.get('status', 'Active'), remarks=data.get('remarks'))
         db.session.add(sup)
@@ -2515,7 +2554,30 @@ def manage_supplier(id):
             db.session.commit()
             return jsonify({'success': True, 'message': 'Supplier deleted'})
         data = request.get_json()
-        for field in ['name', 'contact_person', 'phone', 'email', 'address', 'supplier_type', 'status', 'remarks']:
+        if 'name' in data:
+            name = (data.get('name') or '').strip()
+            if not name:
+                return jsonify({'success': False, 'message': 'Supplier name is required'}), 400
+            sup.name = name
+        if 'phone' in data:
+            phone = (data.get('phone') or '').strip() or None
+            if phone and not validate_phone(phone):
+                return jsonify({'success': False, 'message': 'Phone number format is invalid'}), 400
+            if phone:
+                existing = Supplier.query.filter_by(phone=phone).first()
+                if existing and existing.id != sup.id:
+                    return jsonify({'success': False, 'message': 'A supplier with this phone number already exists'}), 400
+            sup.phone = phone
+        if 'email' in data:
+            email = (data.get('email') or '').strip() or None
+            if email and not re.match(r'^[^\s@]+@[^\s@]+\.[^\s@]+$', email):
+                return jsonify({'success': False, 'message': 'Email format is invalid'}), 400
+            if email:
+                existing = Supplier.query.filter_by(email=email).first()
+                if existing and existing.id != sup.id:
+                    return jsonify({'success': False, 'message': 'A supplier with this email already exists'}), 400
+            sup.email = email
+        for field in ['contact_person', 'address', 'supplier_type', 'status', 'remarks']:
             if field in data:
                 setattr(sup, field, data[field])
         db.session.commit()
@@ -3413,12 +3475,8 @@ def handle_dispatches():
         data = request.get_json()
         if not isinstance(data, dict):
             return jsonify({'success': False, 'message': 'Invalid JSON payload'}), 400
-        warehouse_id = data.get('warehouse_id')
         incident_id = data.get('incident_id')
-        warehouse = db_get(Warehouse, warehouse_id)
         incident = db_get(Incident, incident_id)
-        if not warehouse:
-            return jsonify({'success': False, 'message': 'Warehouse not found'}), 404
         if not incident:
             return jsonify({'success': False, 'message': 'Incident not found'}), 404
         dispatch_date = parse_bs_date_field(data, 'date', default=date.today())
@@ -3430,39 +3488,64 @@ def handle_dispatches():
         items_payload = data.get('items', [])
         if not items_payload:
             return jsonify({'success': False, 'message': 'At least one dispatch item is required'}), 400
-        dispatch = Dispatch(
-            dispatch_number=data.get('dispatch_number') or generate_dispatch_no(),
-            date=dispatch_date,
-            warehouse_id=warehouse.id, incident_id=incident.id,
-            relief_request_id=data.get('relief_request_id'),
-            destination=data.get('destination'), receiver=data.get('receiver'),
-            phone=data.get('phone'), remarks=data.get('remarks'), created_by=current_user.id
-        )
-        db.session.add(dispatch)
-        db.session.flush()
+
+        # Group items by warehouse
+        warehouse_groups = {}
         for item_data in items_payload:
-            item_id = item_data.get('item_id')
-            if item_id is None:
-                return jsonify({'success': False, 'message': 'Each dispatch item requires an item_id'}), 400
-            qty = parse_int_field(item_data, 'quantity', minimum=1)
-            item = db_get(Item, item_id)
-            if not item:
-                return jsonify({'success': False, 'message': 'One or more items were not found'}), 404
-            if item.is_distributable is False:
+            wh_id = item_data.get('warehouse_id') or data.get('warehouse_id')
+            if not wh_id:
+                return jsonify({'success': False, 'message': 'Each item must have a warehouse assigned'}), 400
+            warehouse_groups.setdefault(wh_id, []).append(item_data)
+
+        relief_request_ids = data.get('relief_request_ids') or (data.get('relief_request_id') and [data.get('relief_request_id')]) or []
+        primary_relief_request_id = relief_request_ids[0] if relief_request_ids else None
+
+        dispatches_created = []
+        for wh_id, wh_items in warehouse_groups.items():
+            warehouse = db_get(Warehouse, wh_id)
+            if not warehouse:
                 db.session.rollback()
-                return jsonify({'success': False, 'message': f'{item.name} is non-distributable equipment and cannot be dispatched. Use stock transfer instead.'}), 400
-            if data.get('relief_request_id'):
-                rr_item = ReliefRequestItem.query.filter_by(request_id=data['relief_request_id'], item_id=item_id).first()
-                if rr_item:
-                    total_dispatched = (rr_item.quantity_dispatched or 0) + qty
-                    if total_dispatched > rr_item.quantity_requested:
+                return jsonify({'success': False, 'message': f'Warehouse {wh_id} not found'}), 404
+
+            dispatch = Dispatch(
+                dispatch_number=data.get('dispatch_number') or generate_dispatch_no(),
+                date=dispatch_date,
+                warehouse_id=warehouse.id, incident_id=incident.id,
+                relief_request_id=primary_relief_request_id,
+                destination=data.get('destination'), receiver=data.get('receiver'),
+                phone=data.get('phone'), remarks=data.get('remarks'), created_by=current_user.id
+            )
+            db.session.add(dispatch)
+            db.session.flush()
+
+            for item_data in wh_items:
+                item_id = item_data.get('item_id')
+                if item_id is None:
+                    db.session.rollback()
+                    return jsonify({'success': False, 'message': 'Each dispatch item requires an item_id'}), 400
+                qty = parse_int_field(item_data, 'quantity', minimum=1)
+                item = db_get(Item, item_id)
+                if not item:
+                    db.session.rollback()
+                    return jsonify({'success': False, 'message': 'One or more items were not found'}), 404
+                if item.is_distributable is False:
+                    db.session.rollback()
+                    return jsonify({'success': False, 'message': f'{item.name} is non-distributable equipment and cannot be dispatched. Use stock transfer instead.'}), 400
+
+                # Validate against each linked relief request
+                for rr_id in relief_request_ids:
+                    rr_item = ReliefRequestItem.query.filter_by(request_id=rr_id, item_id=item_id).first()
+                    if rr_item:
+                        total_dispatched = (rr_item.quantity_dispatched or 0) + qty
+                        if total_dispatched > rr_item.quantity_requested:
                             db.session.rollback()
-                            return jsonify({'success': False, 'message': f'Cannot dispatch {qty} of "{item.name}". Only {max(0, rr_item.quantity_requested - (rr_item.quantity_dispatched or 0))} remaining of requested {rr_item.quantity_requested}.'}), 400
+                            return jsonify({'success': False, 'message': f'Cannot dispatch {qty} of "{item.name}". Only {max(0, rr_item.quantity_requested - (rr_item.quantity_dispatched or 0))} remaining of requested {rr_item.quantity_requested} for request #{rr_id}.'}), 400
+
                 inv = Inventory.query.filter_by(item_id=item_id, warehouse_id=warehouse.id).first()
                 if not inv or inv.available_quantity < qty:
                     db.session.rollback()
-                    item_name = item.name if item else 'Unknown'
-                    return jsonify({'success': False, 'message': f'Insufficient stock for {item_name}. Available: {inv.available_quantity if inv else 0}, Required: {qty}'}), 400
+                    return jsonify({'success': False, 'message': f'Insufficient stock for {item.name} in {warehouse.name}. Available: {inv.available_quantity if inv else 0}, Required: {qty}'}), 400
+
                 batch = item_data.get('batch_no') or ''
                 expiry = None
                 if item_data.get('expiry_date'):
@@ -3471,18 +3554,25 @@ def handle_dispatches():
                                   unit=item_data.get('unit'), batch_no=batch, expiry_date=expiry)
                 db.session.add(di)
                 inv.quantity -= qty
-                if data.get('relief_request_id'):
-                    rr_items = ReliefRequestItem.query.filter_by(request_id=data['relief_request_id'], item_id=item_id).all()
+
+                # Update quantity_dispatched for all linked relief requests
+                for rr_id in relief_request_ids:
+                    rr_items = ReliefRequestItem.query.filter_by(request_id=rr_id, item_id=item_id).all()
                     for rri in rr_items:
                         rri.quantity_dispatched = (rri.quantity_dispatched or 0) + qty
-            if data.get('relief_request_id'):
-                req = db_get(ReliefRequest, data['relief_request_id'])
+
+            # Update status for all linked relief requests
+            for rr_id in relief_request_ids:
+                req = db_get(ReliefRequest, rr_id)
                 if req:
                     anything_done = any(ri.quantity_dispatched > 0 for ri in req.items) if req.items else False
                     if anything_done or req.distributed_cash_amount > 0:
                         req.status = 'Partial'
+
+            dispatches_created.append(dispatch)
+
         db.session.commit()
-        return jsonify({'success': True, 'message': 'Dispatch created', 'data': dispatch.to_dict()}), 201
+        return jsonify({'success': True, 'message': f'{len(dispatches_created)} dispatch(es) created', 'data': [d.to_dict() for d in dispatches_created]}), 201
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': friendly_message(e)}), 500
@@ -3518,22 +3608,31 @@ def handle_dispatch(id):
         items_payload = data.get('items', [])
         if not items_payload:
             return jsonify({'success': False, 'message': 'At least one dispatch item is required'}), 400
-        # Reverse old inventory and relief request quantities
+
+        relief_request_ids = data.get('relief_request_ids') or (data.get('relief_request_id') and [data.get('relief_request_id')]) or []
+
+        # Reverse old inventory and relief request quantities from all linked requests
         for old_item in dispatch.items:
-            inv = Inventory.query.filter_by(item_id=old_item.item_id, warehouse_id=dispatch.warehouse_id).first()
+            old_wh_id = old_item.dispatch.warehouse_id if old_item.dispatch else dispatch.warehouse_id
+            inv = Inventory.query.filter_by(item_id=old_item.item_id, warehouse_id=old_wh_id).first()
             if inv:
                 inv.quantity += old_item.quantity
-            if dispatch.relief_request_id:
-                rr_item = ReliefRequestItem.query.filter_by(request_id=dispatch.relief_request_id, item_id=old_item.item_id).first()
+            old_rr_ids = relief_request_ids or (dispatch.relief_request_id and [dispatch.relief_request_id]) or []
+            for rr_id in old_rr_ids:
+                rr_item = ReliefRequestItem.query.filter_by(request_id=rr_id, item_id=old_item.item_id).first()
                 if rr_item:
                     rr_item.quantity_dispatched = max(0, (rr_item.quantity_dispatched or 0) - old_item.quantity)
-        # Reset relief request status if old dispatch was linked
-        if dispatch.relief_request_id:
-            old_req = db_get(ReliefRequest, dispatch.relief_request_id)
+
+        # Reset relief request status for all linked requests
+        old_rr_ids = relief_request_ids or (dispatch.relief_request_id and [dispatch.relief_request_id]) or []
+        for rr_id in old_rr_ids:
+            old_req = db_get(ReliefRequest, rr_id)
             if old_req:
                 old_req.status = 'Pending'
+
         # Delete old items
         DispatchItem.query.filter_by(dispatch_id=dispatch.id).delete()
+
         # Create new items and deduct inventory
         for item_data in items_payload:
             item_id = item_data.get('item_id')
@@ -3546,18 +3645,27 @@ def handle_dispatch(id):
             if item.is_distributable is False:
                 db.session.rollback()
                 return jsonify({'success': False, 'message': f'{item.name} is non-distributable equipment and cannot be dispatched. Use stock transfer instead.'}), 400
-            if data.get('relief_request_id'):
-                rr_item = ReliefRequestItem.query.filter_by(request_id=data['relief_request_id'], item_id=item_id).first()
+
+            # Determine warehouse for this item (per-item or dispatch default)
+            item_wh_id = item_data.get('warehouse_id') or warehouse.id
+            item_warehouse = db_get(Warehouse, item_wh_id)
+            if not item_warehouse:
+                db.session.rollback()
+                return jsonify({'success': False, 'message': f'Warehouse {item_wh_id} not found'}), 404
+
+            for rr_id in relief_request_ids:
+                rr_item = ReliefRequestItem.query.filter_by(request_id=rr_id, item_id=item_id).first()
                 if rr_item:
                     total_disp = (rr_item.quantity_dispatched or 0) + qty
                     if total_disp > rr_item.quantity_requested:
                         db.session.rollback()
                         return jsonify({'success': False, 'message': f'Cannot dispatch {qty} of "{item.name}". Only {max(0, rr_item.quantity_requested - (rr_item.quantity_dispatched or 0))} remaining of requested {rr_item.quantity_requested}.'}), 400
-            inv = Inventory.query.filter_by(item_id=item_id, warehouse_id=warehouse.id).first()
+
+            inv = Inventory.query.filter_by(item_id=item_id, warehouse_id=item_warehouse.id).first()
             if not inv or inv.quantity < qty:
                 db.session.rollback()
-                item_name = item.name if item else 'Unknown'
-                return jsonify({'success': False, 'message': f'Insufficient stock for {item_name}. Available: {inv.quantity if inv else 0}, Required: {qty}'}), 400
+                return jsonify({'success': False, 'message': f'Insufficient stock for {item.name} in {item_warehouse.name}. Available: {inv.quantity if inv else 0}, Required: {qty}'}), 400
+
             batch = item_data.get('batch_no') or ''
             expiry = None
             if item_data.get('expiry_date'):
@@ -3566,22 +3674,25 @@ def handle_dispatch(id):
                               unit=item_data.get('unit'), batch_no=batch, expiry_date=expiry)
             db.session.add(di)
             inv.quantity -= qty
-            if data.get('relief_request_id'):
-                rr_item_new = ReliefRequestItem.query.filter_by(request_id=data['relief_request_id'], item_id=item_id).first()
+
+            for rr_id in relief_request_ids:
+                rr_item_new = ReliefRequestItem.query.filter_by(request_id=rr_id, item_id=item_id).first()
                 if rr_item_new:
                     rr_item_new.quantity_dispatched = (rr_item_new.quantity_dispatched or 0) + qty
-        if data.get('relief_request_id'):
-            req = db_get(ReliefRequest, data['relief_request_id'])
+
+        for rr_id in relief_request_ids:
+            req = db_get(ReliefRequest, rr_id)
             if req and req.items:
                 anything_done = any(ri.quantity_dispatched > 0 for ri in req.items)
                 if anything_done or req.distributed_cash_amount > 0:
                     req.status = 'Partial'
+
         # Update dispatch fields
         dispatch.dispatch_number = data.get('dispatch_number') or dispatch.dispatch_number
         dispatch.date = dispatch_date
         dispatch.warehouse_id = warehouse.id
         dispatch.incident_id = incident.id
-        dispatch.relief_request_id = data.get('relief_request_id')
+        dispatch.relief_request_id = relief_request_ids[0] if relief_request_ids else dispatch.relief_request_id
         dispatch.destination = data.get('destination')
         dispatch.receiver = data.get('receiver')
         dispatch.phone = phone
@@ -3621,24 +3732,38 @@ def handle_distributions():
         data = request.get_json()
         if not isinstance(data, dict):
             return jsonify({'success': False, 'message': 'Invalid JSON payload'}), 400
-        dispatch_id = data.get('dispatch_id')
-        if dispatch_id is None:
-            return jsonify({'success': False, 'message': 'Dispatch is required'}), 400
-        dispatch = db_get(Dispatch, dispatch_id)
-        if not dispatch:
-            return jsonify({'success': False, 'message': 'Dispatch not found'}), 404
-        incident_id = data.get('incident_id')
-        if incident_id and int(incident_id) != dispatch.incident_id:
-            return jsonify({'success': False, 'message': 'Incident does not match selected dispatch'}), 400
-        allowed_items = {di.item.name for di in dispatch.items if di.item}
-        dispatch_qty_map = {di.item.name: di.quantity for di in dispatch.items if di.item}
+        dispatch_ids = data.get('dispatch_ids') or (data.get('dispatch_id') and [data.get('dispatch_id')]) or []
+        if not dispatch_ids:
+            return jsonify({'success': False, 'message': 'At least one dispatch is required'}), 400
+        dispatches = [db_get(Dispatch, did) for did in dispatch_ids]
+        dispatches = [d for d in dispatches if d is not None]
+        if not dispatches:
+            return jsonify({'success': False, 'message': 'No valid dispatches found'}), 404
+        primary_dispatch = dispatches[0]
+        incident = dispatches[0].incident
+        if not incident:
+            return jsonify({'success': False, 'message': 'Incident not found on dispatch'}), 404
+        # Collect all allowed items and qty maps from all dispatches
+        allowed_items = set()
+        dispatch_qty_maps = {}
+        for dp in dispatches:
+            for di in dp.items:
+                if di.item:
+                    allowed_items.add(di.item.name)
+                    dispatch_qty_maps[(dp.id, di.item.name)] = di.quantity
+        # Aggregate dispatched qty per item across all dispatches
+        total_dispatch_qty_map = {}
+        for dp in dispatches:
+            for di in dp.items:
+                if di.item:
+                    total_dispatch_qty_map[di.item.name] = total_dispatch_qty_map.get(di.item.name, 0) + di.quantity
         beneficiaries_payload = data.get('beneficiaries', [])
         if not beneficiaries_payload:
             return jsonify({'success': False, 'message': 'At least one beneficiary is required'}), 400
         dist_date = parse_bs_date_field(data, 'distribution_date', default=date.today())
         if dist_date > date.today():
             return jsonify({'success': False, 'message': 'Distribution date cannot be in the future'}), 400
-        # Validate total distributed qty per item does not exceed dispatched qty
+        # Validate total distributed qty per item against aggregate dispatched qty
         dist_totals = {}
         for ben_data in beneficiaries_payload:
             item_name = (ben_data.get('item') or '').strip()
@@ -3646,9 +3771,9 @@ def handle_distributions():
             if item_name:
                 dist_totals[item_name] = dist_totals.get(item_name, 0) + qty
         for item_name, total in dist_totals.items():
-            dispatched = dispatch_qty_map.get(item_name, 0)
+            dispatched = total_dispatch_qty_map.get(item_name, 0)
             if total > dispatched:
-                return jsonify({'success': False, 'message': f'Distributed quantity for "{item_name}" ({total}) exceeds dispatched quantity ({dispatched})'}), 400
+                return jsonify({'success': False, 'message': f'Distributed quantity for "{item_name}" ({total}) exceeds total dispatched quantity ({dispatched}) across {len(dispatches)} dispatch(es)'}), 400
         fiscal_year = AppSettings.get_setting('active_fiscal_year', '2081/82')
         lat = None
         lon = None
@@ -3659,7 +3784,7 @@ def handle_distributions():
             pass
         dist = Distribution(
             distribution_no=data.get('distribution_no') or generate_distribution_no(),
-            dispatch_id=dispatch_id, incident_id=dispatch.incident_id,
+            dispatch_id=primary_dispatch.id, incident_id=incident.id,
             location=data.get('location'),
             latitude=lat, longitude=lon,
             fiscal_year=fiscal_year,
@@ -3676,7 +3801,7 @@ def handle_distributions():
             qty = parse_int_field(ben_data, 'quantity', minimum=1)
             item_name = (ben_data.get('item') or '').strip()
             if item_name and item_name not in allowed_items:
-                return jsonify({'success': False, 'message': f'Item "{item_name}" is not part of the selected dispatch'}), 400
+                return jsonify({'success': False, 'message': f'Item "{item_name}" is not part of the selected dispatches'}), 400
             ben = DistributionBeneficiary(
                 distribution_id=dist.id, family_name=family_name,
                 beneficiary_id=ben_data.get('beneficiary_id'),
@@ -3686,37 +3811,37 @@ def handle_distributions():
             )
             db.session.add(ben)
         db.session.flush()
-        # Update ReliefRequestItem.quantity_distributed
-        if dispatch.relief_request_id:
-            req = db_get(ReliefRequest, dispatch.relief_request_id)
-            if req:
-                for ben_data in beneficiaries_payload:
-                    item_name = (ben_data.get('item') or '').strip()
-                    qty = parse_int_field(ben_data, 'quantity', minimum=1)
-                    if item_name and qty:
-                        for rri in req.items:
-                            if rri.item and rri.item.name == item_name:
-                                rri.quantity_distributed = (rri.quantity_distributed or 0) + qty
-        # Update linked relief request status if applicable
-        if dispatch.relief_request_id:
-            req = db_get(ReliefRequest, dispatch.relief_request_id)
-            if req:
-                all_distributed = all(
-                    (ri.quantity_distributed or 0) >= (ri.quantity_dispatched or 0)
-                    for ri in req.items
-                ) if req.items else True
-                cash_done = (
-                    req.distributed_cash_amount >= req.requested_cash_amount
-                    if req.requested_cash_amount > 0 else True
-                )
-                anything_done = (
-                    any((ri.quantity_distributed or 0) > 0 for ri in req.items)
-                    if req.items else False
-                ) or req.distributed_cash_amount > 0
-                if all_distributed and cash_done:
-                    req.status = 'Completed'
-                elif anything_done:
-                    req.status = 'Partial'
+        # Update ReliefRequestItem.quantity_distributed for all linked dispatches' relief requests
+        updated_req_ids = set()
+        for dp in dispatches:
+            if dp.relief_request_id:
+                req = db_get(ReliefRequest, dp.relief_request_id)
+                if req and req.id not in updated_req_ids:
+                    updated_req_ids.add(req.id)
+                    for ben_data in beneficiaries_payload:
+                        item_name = (ben_data.get('item') or '').strip()
+                        qty_item = parse_int_field(ben_data, 'quantity', minimum=1)
+                        if item_name and qty_item:
+                            for rri in req.items:
+                                if rri.item and rri.item.name == item_name:
+                                    rri.quantity_distributed = (rri.quantity_distributed or 0) + qty_item
+                    # Update linked relief request status
+                    all_distributed = all(
+                        (ri.quantity_distributed or 0) >= (ri.quantity_dispatched or 0)
+                        for ri in req.items
+                    ) if req.items else True
+                    cash_done = (
+                        req.distributed_cash_amount >= req.requested_cash_amount
+                        if req.requested_cash_amount > 0 else True
+                    )
+                    anything_done = (
+                        any((ri.quantity_distributed or 0) > 0 for ri in req.items)
+                        if req.items else False
+                    ) or req.distributed_cash_amount > 0
+                    if all_distributed and cash_done:
+                        req.status = 'Completed'
+                    elif anything_done:
+                        req.status = 'Partial'
         db.session.commit()
         return jsonify({'success': True, 'message': 'Distribution recorded', 'data': dist.to_dict()}), 201
     except Exception as e:
@@ -4444,12 +4569,15 @@ def manage_beneficiary(id):
         if request.method == 'DELETE':
             related_dists = DistributionBeneficiary.query.filter_by(beneficiary_id=ben.id).count()
             related_cash_dists = CashDistributionBeneficiary.query.filter_by(beneficiary_id=ben.id).count()
-            if related_dists or related_cash_dists:
+            related_cash_requests = CashRequest.query.filter_by(beneficiary_id=ben.id).count()
+            if related_dists or related_cash_dists or related_cash_requests:
                 parts = []
                 if related_dists:
-                    parts.append(f'{related_dists} distribution link(s)')
+                    parts.append(f'{related_dists} material distribution link(s)')
                 if related_cash_dists:
                     parts.append(f'{related_cash_dists} cash distribution link(s)')
+                if related_cash_requests:
+                    parts.append(f'{related_cash_requests} cash request(s)')
                 return jsonify({'success': False, 'message': f'Cannot delete: Beneficiary has {" and ".join(parts)}. Remove all related records first.'}), 400
             db.session.delete(ben)
             db.session.commit()
@@ -6045,8 +6173,8 @@ def api_create_user():
             return jsonify({'success': False, 'message': 'Username already exists'}), 409
         password_hash = generate_password_hash(password)
         db.session.execute(
-            db.text("INSERT INTO \"user\" (username, password_hash, role, full_name, is_active, created_at) VALUES (:username, :password_hash, :role, :full_name, 1, :created_at)"),
-            {'username': username, 'password_hash': password_hash, 'role': role, 'full_name': full_name, 'created_at': datetime.now(timezone.utc)}
+            db.text("INSERT INTO \"user\" (username, password_hash, role, full_name, is_active, created_at) VALUES (:username, :password_hash, :role, :full_name, :is_active, :created_at)"),
+            {'username': username, 'password_hash': password_hash, 'role': role, 'full_name': full_name, 'is_active': True, 'created_at': datetime.now(timezone.utc)}
         )
         db.session.commit()
         return jsonify({'success': True, 'message': 'User created successfully'}), 201
@@ -6077,7 +6205,7 @@ def api_update_user(user_id):
             params['full_name'] = (data.get('full_name') or '').strip()
         if 'is_active' in data:
             updates.append("is_active = :is_active")
-            params['is_active'] = 1 if parse_bool_field(data, 'is_active', default=True) else 0
+            params['is_active'] = parse_bool_field(data, 'is_active', default=True)
         if 'password' in data and data['password']:
             if len(data['password']) < 6:
                 return jsonify({'success': False, 'message': 'Password must be at least 6 characters'}), 400
@@ -6217,7 +6345,7 @@ def get_form_data():
             'success': True,
             'warehouses': [w.to_dict() for w in Warehouse.query.all()],
             'categories': [c.to_dict() for c in Category.query.all()],
-            'items': [i.to_dict() for i in Item.query.all()],
+            'items': [i.to_dict() for i in Item.query.filter(Item.status == 'Active').all()],
             'inventory_available': inventory_available,
             'total_fund_balance': total_fund_balance,
             'incidents': [i.to_dict() for i in Incident.query.all()],
@@ -6240,7 +6368,7 @@ def get_form_data():
             'cash_funds': [f.to_dict() for f in CashFund.query.all()],
             'cash_requests': [r.to_dict() for r in CashRequest.query.all()],
             'beneficiaries': [b.to_dict() for b in Beneficiary.query.all()],
-            'suppliers': [s.to_dict() for s in Supplier.query.all()],
+            'suppliers': [s.to_dict() for s in Supplier.query.filter(Supplier.status == 'Active').all()],
             'supplier_types': ['Government Supply', 'Donation', 'NGO', 'Local Government', 'Purchase', 'Supplier', 'Transfer', 'Other'],
             'warehouse_zones': [z.to_dict() for z in WarehouseZone.query.all()],
             'funding_sources': ['Federal Government', 'Provincial Government', 'Municipality', 'Disaster Relief Fund', 'Donor Agency', 'NGO', 'Other'],
@@ -7722,6 +7850,17 @@ def init_db():
                         db.session.commit()
                     except Exception:
                         pass
+                if 'name_np' not in cat_cols:
+                    try:
+                        db.session.execute(db.text("ALTER TABLE category ADD COLUMN name_np VARCHAR(100)"))
+                        db.session.commit()
+                    except Exception:
+                        pass
+                dialect = db.engine.dialect.name
+                insert_sql = "INSERT OR IGNORE INTO category (name, name_np, is_predefined) VALUES (:n, :np, 1)" if dialect == 'sqlite' else \
+                    "INSERT INTO category (name, name_np, is_predefined) VALUES (:n, :np, TRUE) ON CONFLICT (name) DO NOTHING"
+                update_sql = "UPDATE category SET is_predefined = 1 WHERE name = :n AND (is_predefined IS NULL OR is_predefined = 0)"
+                update_np_sql = "UPDATE category SET name_np = :np WHERE name = :n AND (name_np IS NULL OR name_np = '')"
                 predefined_names = [
                     'Food', 'Shelter', 'Relief Supplies', 'WASH (Water/Sanitation)',
                     'Education Materials', 'Protection Gear', 'Fuel & Lubricants',
@@ -7736,13 +7875,55 @@ def init_db():
                     'Vehicle Parts & Tools', 'Preparedness - Communication',
                     'Preparedness - Power & Lighting', 'Preparedness - Shelter & Camp',
                     'Preparedness - Water & Sanitation', 'Preparedness - Fire Safety',
+                    'Administrative & Office operation',
+                    'Telecoms & IT',
                 ]
+                predefined_names_np = {
+                    'Food': 'खाद्यान्न',
+                    'Shelter': 'आश्रय',
+                    'Relief Supplies': 'राहत सामग्री',
+                    'WASH (Water/Sanitation)': 'खानेपानी तथा सरसफाइ',
+                    'Education Materials': 'शैक्षिक सामग्री',
+                    'Protection Gear': 'सुरक्षा उपकरण',
+                    'Fuel & Lubricants': 'इन्धन तथा स्नेहक',
+                    'Construction Materials': 'निर्माण सामग्री',
+                    'Livestock Supplies': 'पशुपालन सामग्री',
+                    'Clothing & Textiles': 'लत्ताकपडा तथा वस्त्र',
+                    'Kitchen & Cooking': 'भान्छा तथा पकाउने सामग्री',
+                    'Baby & Child Care': 'बालबालिका हेरचाह',
+                    'Other': 'अन्य',
+                    'Rescue - Search & Rescue Tools': 'उद्धार - खोज तथा उद्धार उपकरण',
+                    'Rescue - Ropes & Rigging': 'उद्धार - डोरी तथा उपकरण',
+                    'Rescue - Cutting & Breaking': 'उद्धार - काट्ने तथा तोड्ने',
+                    'Rescue - Lighting & Signal': 'उद्धार - बत्ती तथा सङ्केत',
+                    'Rescue - Water Rescue': 'उद्धार - पानी उद्धार',
+                    'Rescue - Confined Space': 'उद्धार - साँघुरो ठाउँ',
+                    'Medical - Consumables': 'चिकित्सा - उपभोग्य वस्तु',
+                    'Medical - Equipment': 'चिकित्सा - उपकरण',
+                    'Medical - First Aid': 'चिकित्सा - प्राथमिक उपचार',
+                    'Medical - Diagnostic': 'चिकित्सा - निदान',
+                    'Medical - Mobility & Transport': 'चिकित्सा - गतिशीलता तथा यातायात',
+                    'Vehicles - Light': 'सवारी - हल्का',
+                    'Vehicles - Heavy': 'सवारी - भारी',
+                    'Vehicles - Water & Air': 'सवारी - जल तथा हवाई',
+                    'Vehicle Parts & Tools': 'सवारी पार्टपुर्जा तथा औजार',
+                    'Preparedness - Communication': 'तयारी - सञ्चार',
+                    'Preparedness - Power & Lighting': 'तयारी - विद्युत तथा प्रकाश',
+                    'Preparedness - Shelter & Camp': 'तयारी - आश्रय तथा शिविर',
+                    'Preparedness - Water & Sanitation': 'तयारी - खानेपानी तथा सरसफाइ',
+                    'Preparedness - Fire Safety': 'तयारी - आग सुरक्षा',
+                    'Administrative & Office operation': 'प्रशासनिक तथा कार्यालय सञ्चालन',
+                    'Telecoms & IT': 'दूरसञ्चार तथा सूचना प्रविधि',
+                }
                 for pname in predefined_names:
                     try:
-                        db.session.execute(
-                            db.text("UPDATE category SET is_predefined = 1 WHERE name = :n AND (is_predefined IS NULL OR is_predefined = 0)"),
-                            {'n': pname}
-                        )
+                        db.session.execute(db.text(insert_sql), {'n': pname, 'np': predefined_names_np.get(pname, '')})
+                        db.session.execute(db.text(update_sql), {'n': pname})
+                    except Exception:
+                        pass
+                for pname, np_name in predefined_names_np.items():
+                    try:
+                        db.session.execute(db.text(update_np_sql), {'n': pname, 'np': np_name})
                     except Exception:
                         pass
                 db.session.commit()
@@ -7762,6 +7943,27 @@ def init_db():
                         db.session.commit()
                     except Exception:
                         pass
+            if 'item' in inspector.get_table_names():
+                try:
+                    db.session.execute(db.text("ALTER TABLE item ADD CONSTRAINT item_name_unique UNIQUE (name)"))
+                    db.session.commit()
+                except Exception:
+                    try:
+                        db.session.execute(db.text("CREATE UNIQUE INDEX IF NOT EXISTS ix_item_name ON item (name)"))
+                        db.session.commit()
+                    except Exception:
+                        pass
+            if 'supplier' in inspector.get_table_names():
+                try:
+                    db.session.execute(db.text("ALTER TABLE supplier ADD CONSTRAINT supplier_phone_unique UNIQUE (phone)"))
+                    db.session.commit()
+                except Exception:
+                    pass
+                try:
+                    db.session.execute(db.text("ALTER TABLE supplier ADD CONSTRAINT supplier_email_unique UNIQUE (email)"))
+                    db.session.commit()
+                except Exception:
+                    pass
             if not AppSettings.get_setting('office_name'):
                 AppSettings.set_setting('office_name', 'थलारा गाउँपालिका')
             if not AppSettings.get_setting('fiscal_years'):

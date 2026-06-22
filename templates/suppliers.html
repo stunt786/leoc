@@ -217,13 +217,25 @@ async function editSupplier(id) {
     new bootstrap.Modal(document.getElementById('supplierModal')).show();
 }
 
+function validatePhone(phone) {
+    return !phone || /^[\d\s\+\-\(\)]{7,20}$/.test(phone);
+}
+
+function validateEmail(email) {
+    return !email || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
 async function saveSupplier() {
     const id = document.getElementById('supplier_id').value;
+    const phone = document.getElementById('sup_phone').value.trim();
+    const email = document.getElementById('sup_email').value.trim();
+    if (phone && !validatePhone(phone)) { showToast('danger', 'Phone number format is invalid'); return; }
+    if (email && !validateEmail(email)) { showToast('danger', 'Email format is invalid'); return; }
     const body = {
         name: document.getElementById('sup_name').value,
         contact_person: document.getElementById('sup_contact_person').value,
-        phone: document.getElementById('sup_phone').value,
-        email: document.getElementById('sup_email').value,
+        phone: phone,
+        email: email,
         supplier_type: document.getElementById('sup_type').value,
         status: document.getElementById('sup_status').value,
         address: document.getElementById('sup_address').value,

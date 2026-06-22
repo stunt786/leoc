@@ -24,39 +24,41 @@
 
 <!-- Modal -->
 <div class="modal fade" id="warehouseModal" tabindex="-1">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header"><h5 class="modal-title" id="modalTitle">Add Warehouse</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
             <div class="modal-body">
                 <form id="warehouseForm">
                     <input type="hidden" id="edit_id">
-                    <div class="mb-3">
-                        <label class="form-label">Warehouse Code</label>
-                        <input type="text" class="form-control" id="code" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Warehouse Name</label>
-                        <input type="text" class="form-control" id="name" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Address</label>
-                        <input type="text" class="form-control" id="address">
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Contact Person</label>
-                        <input type="text" class="form-control" id="contact_person">
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Phone</label>
-                        <input type="text" class="form-control" id="phone">
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Capacity</label>
-                        <input type="number" class="form-control" id="capacity" step="0.01">
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Remarks</label>
-                        <textarea class="form-control" id="remarks" rows="2"></textarea>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Warehouse Code</label>
+                            <input type="text" class="form-control" id="code" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Warehouse Name</label>
+                            <input type="text" class="form-control" id="name" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Address</label>
+                            <input type="text" class="form-control" id="address">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Contact Person</label>
+                            <input type="text" class="form-control" id="contact_person">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Phone</label>
+                            <input type="text" class="form-control" id="phone">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Capacity</label>
+                            <input type="number" class="form-control" id="capacity" step="0.01">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Remarks</label>
+                            <textarea class="form-control" id="remarks" rows="2"></textarea>
+                        </div>
                     </div>
                 </form>
             </div>
@@ -110,13 +112,19 @@ function editWarehouse(id) {
     }).catch(e => showToast('danger', 'Error: ' + e.message));
 }
 
+function validatePhone(phone) {
+    return !phone || /^[\d\s\+\-\(\)]{7,20}$/.test(phone);
+}
+
 function saveWarehouse() {
+    const phone = document.getElementById('phone').value;
+    if (phone && !validatePhone(phone)) { showToast('danger', 'Phone number format is invalid'); return; }
     const data = {
         code: document.getElementById('code').value,
         name: document.getElementById('name').value,
         address: document.getElementById('address').value,
         contact_person: document.getElementById('contact_person').value,
-        phone: document.getElementById('phone').value,
+        phone: phone,
         capacity: parseFloat(document.getElementById('capacity').value) || 0,
         remarks: document.getElementById('remarks').value
     };

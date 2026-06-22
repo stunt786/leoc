@@ -27,12 +27,13 @@
                 <thead>
                     <tr>
                         <th>Name</th>
+                        <th>नेपाली नाम</th>
                         <th>Description</th>
                         <th class="text-end">Actions</th>
                     </tr>
                 </thead>
                 <tbody id="categoryTableBody">
-                    <tr><td colspan="3" class="text-center py-4"><div class="spinner-border text-primary"></div></td></tr>
+                    <tr><td colspan="4" class="text-center py-4"><div class="spinner-border text-primary"></div></td></tr>
                 </tbody>
             </table>
         </div>
@@ -53,6 +54,10 @@
                     <div class="mb-3">
                         <label class="form-label">Name *</label>
                         <input type="text" class="form-control" id="cat_name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">नेपाली नाम</label>
+                        <input type="text" class="form-control" id="cat_name_np">
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Description</label>
@@ -85,11 +90,12 @@ async function loadCategories() {
 function renderCategories(data) {
     const tbody = document.getElementById('categoryTableBody');
     if (data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-muted">No categories found</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-muted">No categories found</td></tr>';
         return;
     }
     tbody.innerHTML = data.map(c => `<tr>
         <td><strong>${c.name}</strong></td>
+        <td>${c.name_np || '-'}</td>
         <td>${c.description || '-'}</td>
         <td class="text-end">
             <button class="btn btn-sm btn-outline-primary" onclick="editCategory(${c.id})"><i class="bi bi-pencil"></i></button>
@@ -102,7 +108,8 @@ function filterCategories() {
     const q = document.getElementById('categorySearch').value.toLowerCase();
     const filtered = categories.filter(c =>
         c.name.toLowerCase().includes(q) ||
-        (c.description && c.description.toLowerCase().includes(q))
+        (c.description && c.description.toLowerCase().includes(q)) ||
+        (c.name_np && c.name_np.includes(q))
     );
     renderCategories(filtered);
 }
@@ -119,6 +126,7 @@ async function editCategory(id) {
     document.getElementById('categoryModalTitle').textContent = 'Edit Category';
     document.getElementById('cat_id').value = c.id;
     document.getElementById('cat_name').value = c.name;
+    document.getElementById('cat_name_np').value = c.name_np || '';
     document.getElementById('cat_description').value = c.description || '';
     new bootstrap.Modal(document.getElementById('categoryModal')).show();
 }
@@ -127,6 +135,7 @@ async function saveCategory() {
     const id = document.getElementById('cat_id').value;
     const body = {
         name: document.getElementById('cat_name').value,
+        name_np: document.getElementById('cat_name_np').value,
         description: document.getElementById('cat_description').value
     };
     if (!body.name) { showToast('danger', 'Category name is required'); return; }

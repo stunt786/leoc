@@ -7,6 +7,8 @@ services:
       POSTGRES_DB: leoc
       POSTGRES_USER: leoc
       POSTGRES_PASSWORD: ${DB_PASSWORD:-leoc_prod_pass}
+    ports:
+      - "5432:5432"
     volumes:
       - leoc_db_data:/var/lib/postgresql/data
     healthcheck:
@@ -25,6 +27,7 @@ services:
     volumes:
       - ./static/uploads:/app/static/uploads
       - ./backups:/app/backups
+      - .:/app
     environment:
       - FLASK_ENV=production
       - FLASK_DEBUG=False

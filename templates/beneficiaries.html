@@ -206,6 +206,26 @@
     </div>
 </div>
 
+<div class="modal fade" id="deleteWarningModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-warning">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title"><i class="bi bi-exclamation-triangle-fill me-2"></i>Cannot Delete Beneficiary</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-3" id="deleteWarningMessage"></p>
+                <div class="alert alert-light border mb-0">
+                    <small class="text-muted"><i class="bi bi-info-circle me-1"></i>Please remove all linked records before deleting this beneficiary.</small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="modal fade" id="historyModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
@@ -517,11 +537,16 @@ async function editBen(id) {
 }
 
 async function deleteBen(id) {
-    if (!confirm('Delete this beneficiary?')) return;
+    if (!confirm('Are you sure you want to delete this beneficiary?')) return;
     const r = await fetch(`/api/beneficiaries/${id}`, {method:'DELETE', headers:{'X-CSRFToken':csrf}});
     const d = await r.json();
-    if (d.success) { showToast('success', d.message); loadBeneficiaries(); }
-    else showToast('danger', d.message);
+    if (d.success) {
+        showToast('success', d.message);
+        loadBeneficiaries();
+    } else {
+        document.getElementById('deleteWarningMessage').textContent = d.message;
+        new bootstrap.Modal(document.getElementById('deleteWarningModal')).show();
+    }
 }
 
 async function showHistory(id) {

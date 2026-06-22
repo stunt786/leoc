@@ -21,8 +21,8 @@ ENV FLASK_ENV=production
 ENV PYTHONUNBUFFERED=1
 
 RUN mkdir -p instance static/uploads backups && \
-    addgroup --system --gid 1001 appuser && \
-    adduser --system --uid 1001 --gid 1001 --no-create-home appuser && \
+    addgroup --system --gid 1000 appuser && \
+    adduser --system --uid 1000 --gid 1000 --no-create-home appuser && \
     chown -R appuser:appuser /app
 
 USER appuser
