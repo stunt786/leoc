@@ -85,15 +85,17 @@
                             <input type="text" class="form-control" id="rr_organization">
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label">Requester Name</label>
+                            <label class="form-label">Requester Name <span class="text-danger">*</span></label>
                             <div class="input-group">
-                                <input type="text" class="form-control" id="rr_requester_name">
-                                <button type="button" class="btn btn-outline-info btn-sm" onclick="openRequesterPicker()" title="Select from Registry"><i class="bi bi-person-lines-fill"></i></button>
+                                <input type="text" class="form-control" id="rr_requester_name" readonly placeholder="Select from registry">
+                                <button type="button" class="btn btn-outline-info" onclick="openRequesterPicker()" title="Select from Registry"><i class="bi bi-person-lines-fill"></i></button>
                             </div>
+                            <div class="form-text small text-muted">Must select from beneficiary registry</div>
                         </div>
                         <div class="col-md-4">
                             <label class="form-label">Phone</label>
-                            <input type="text" class="form-control" id="rr_phone">
+                            <input type="text" class="form-control" id="rr_phone" placeholder="e.g. 9841234567" oninput="this.classList.remove('is-invalid')">
+                            <div class="invalid-feedback">Invalid phone number format</div>
                         </div>
                         <div class="col-md-4">
                             <label class="form-label">Priority</label>
@@ -440,8 +442,22 @@ function editRRFromData(r) {
     new bootstrap.Modal(document.getElementById('reliefRequestModal')).show();
 }
 
+function validatePhone(phone) {
+    return !phone || /^[\d\s\+\-\(\)]{7,20}$/.test(phone);
+}
+
 async function saveRR() {
     const id = document.getElementById('rr_id').value;
+    const requesterName = document.getElementById('rr_requester_name').value.trim();
+    if (!requesterName) { showToast('danger', 'Please select a requester from the beneficiary registry'); return; }
+    const phone = document.getElementById('rr_phone').value;
+    const phoneEl = document.getElementById('rr_phone');
+    if (phone && !validatePhone(phone)) {
+        phoneEl.classList.add('is-invalid');
+        showToast('danger', 'Phone number format is invalid');
+        return;
+    }
+    phoneEl.classList.remove('is-invalid');
     const items = Array.from(document.querySelectorAll('#rrItemsBody tr')).map(tr => ({
         item_id: parseInt(tr.querySelector('.item-select').value),
         unit: tr.querySelector('.item-unit').value,
@@ -453,8 +469,8 @@ async function saveRR() {
         request_date: document.getElementById('rr_request_date').value || null,
         incident_id: parseInt(document.getElementById('rr_incident_id').value) || null,
         organization: document.getElementById('rr_organization').value,
-        requester_name: document.getElementById('rr_requester_name').value,
-        phone: document.getElementById('rr_phone').value,
+        requester_name: requesterName,
+        phone: phone,
         priority: document.getElementById('rr_priority').value,
         status: document.getElementById('rr_status').value,
         requested_cash_amount: cashAmt,

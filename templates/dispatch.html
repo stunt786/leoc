@@ -30,9 +30,9 @@
                     <input type="text" class="form-control nepali-date" placeholder="YYYY-MM-DD" id="dp_date">
                 </div>
                 <div class="col-md-3">
-                    <label class="form-label">Warehouse *</label>
-                    <select class="form-select" id="dp_warehouse_id" required>
-                        <option value="">Select Warehouse</option>
+                    <label class="form-label">Warehouse <span class="text-muted small">(optional — per-item below)</span></label>
+                    <select class="form-select" id="dp_warehouse_id">
+                        <option value="">All Warehouses — pick per item</option>
                     </select>
                 </div>
                 <div class="col-md-3">
@@ -213,7 +213,7 @@ function updateRRLabel() {
 
 document.getElementById('dp_warehouse_id').addEventListener('change', function() {
     const whId = parseInt(this.value);
-    if (!whId) { inventoryMap = {}; return; }
+    if (!whId) { inventoryMap = {}; populateItems(); return; }
     fetch('/api/inventory?warehouse_id=' + whId)
         .then(r => r.json())
         .then(d => {
@@ -230,7 +230,7 @@ async function addItemRow(item, availQty) {
     const tr = document.createElement('tr');
     const tracking = window.itemTrackingMap && window.itemTrackingMap[item.item_id];
 
-    let whOptions = '<option value="">Select</option>';
+    let whOptions = '<option value="">-- Select Warehouse --</option>';
     warehouseList.forEach(w => {
         whOptions += `<option value="${w.id}">${w.name}</option>`;
     });
@@ -300,10 +300,6 @@ async function populateItems() {
         return;
     }
     const whId = parseInt(document.getElementById('dp_warehouse_id').value);
-    if (!whId) {
-        showToast('warning', 'Please select a warehouse first');
-        return;
-    }
 
     // Aggregate items from all selected requests
     const itemMap = {};
@@ -329,14 +325,16 @@ async function populateItems() {
         if (!distributableItems.has(parseInt(itemId))) continue;
         hasItems = true;
         const item = itemMap[itemId];
-        const avail = inventoryMap[item.item_id] || 0;
+        const avail = whId ? (inventoryMap[item.item_id] || 0) : 0;
         await addItemRow(item, avail);
 
-        // Set warehouse default on new rows
-        const rows = tbody.querySelectorAll('tr');
-        const lastRow = rows[rows.length - 1];
-        const whSelect = lastRow.querySelector('.dp-warehouse-id');
-        if (whSelect) whSelect.value = whId;
+        // Set warehouse default on new rows if primary warehouse is selected
+        if (whId) {
+            const rows = tbody.querySelectorAll('tr');
+            const lastRow = rows[rows.length - 1];
+            const whSelect = lastRow.querySelector('.dp-warehouse-id');
+            if (whSelect) whSelect.value = whId;
+        }
     }
     if (!hasItems) {
         tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">No distributable items in selected requests</td></tr>';
@@ -413,11 +411,11 @@ async function viewDispatch(id) {
     const d = await r.json();
     if (!d.success) { showToast('danger', d.message); return; }
     const dp = d.dispatch;
-    let itemsHtml = '<table class="table table-sm mb-0"><thead><tr><th>Item</th><th>Qty</th><th>Unit</th><th>Batch No</th><th>Expiry Date</th></tr></thead><tbody>';
+    let itemsHtml = '<table class="table table-sm mb-0"><thead><tr><th>Item</th><th>Qty</th><th>Unit</th><th>Warehouse</th><th>Batch No</th><th>Expiry Date</th></tr></thead><tbody>';
     if (dp.items && dp.items.length > 0) {
         dp.items.forEach(item => {
             const expiry = item.expiry_date ? new Date(item.expiry_date).toLocaleDateString() : '-';
-            itemsHtml += `<tr><td>${item.item_name}</td><td>${item.quantity}</td><td>${item.unit || '-'}</td><td>${item.batch_no || '-'}</td><td>${expiry}</td></tr>`;
+            itemsHtml += `<tr><td>${item.item_name}</td><td>${item.quantity}</td><td>${item.unit || '-'}</td><td>${item.warehouse_name || dp.warehouse_name || '-'}</td><td>${item.batch_no || '-'}</td><td>${expiry}</td></tr>`;
         });
     }
     itemsHtml += '</tbody></table>';
@@ -488,6 +486,16 @@ async function editDispatch(id) {
             updateRRLabel();
         }
 
+        // Fetch inventory for the dispatch's warehouse
+        try {
+            const invR = await fetch('/api/inventory?warehouse_id=' + dp.warehouse_id);
+            const invD = await invR.json();
+            if (invD.success) {
+                inventoryMap = {};
+                invD.inventory.forEach(inv => { inventoryMap[inv.item_id] = inv.available_quantity; });
+            }
+        } catch(e) {}
+
         document.getElementById('dp_destination').value = dp.destination || '';
         document.getElementById('dp_receiver').value = dp.receiver || '';
         document.getElementById('dp_phone').value = dp.phone || '';
@@ -499,7 +507,7 @@ async function editDispatch(id) {
             const distItemIds = window.distributableItemIds || new Set();
             let editHasItems = false;
 
-            let whOptions = '<option value="">Select</option>';
+            let whOptions = '<option value="">-- Select Warehouse --</option>';
             warehouseList.forEach(w => {
                 whOptions += `<option value="${w.id}">${w.name}</option>`;
             });
@@ -525,9 +533,9 @@ async function editDispatch(id) {
                     <td><input type="text" class="form-control form-control-sm dp-expiry-date${tracking ? ' nepali-date' : ''}" placeholder="${tracking ? 'YYYY-MM-DD' : 'N/A'}" value="${tracking ? (item.expiry_date || '') : ''}" ${tracking ? '' : 'disabled'}></td>`;
                 tbody.appendChild(tr);
 
-                // Set warehouse dropdown to dispatch's warehouse
+                // Set warehouse dropdown to the item's warehouse (with fallback to dispatch's primary)
                 const whSelect = tr.querySelector('.dp-warehouse-id');
-                if (whSelect) whSelect.value = dp.warehouse_id || '';
+                if (whSelect) whSelect.value = item.warehouse_id || dp.warehouse_id || '';
             }
             if (!editHasItems) {
                 tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">No distributable items in this request</td></tr>';
@@ -599,10 +607,11 @@ async function saveDispatch() {
     if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving...'; }
 
     try {
+        const primaryWhId = parseInt(document.getElementById('dp_warehouse_id').value) || items[0].warehouse_id;
         const body = {
             dispatch_number: document.getElementById('dp_dispatch_number').value,
             date: dateVal,
-            warehouse_id: items[0].warehouse_id,
+            warehouse_id: primaryWhId,
             incident_id: incident_id,
             relief_request_ids: relief_request_ids,
             destination: document.getElementById('dp_destination').value,

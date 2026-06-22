@@ -923,7 +923,7 @@ class Dispatch(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     dispatch_number = db.Column(db.String(50), unique=True, nullable=False, index=True)
     date = db.Column(db.Date, nullable=False, default=date.today)
-    warehouse_id = db.Column(db.Integer, db.ForeignKey('warehouse.id'), nullable=False, index=True)
+    warehouse_id = db.Column(db.Integer, db.ForeignKey('warehouse.id'), nullable=True, index=True)
     incident_id = db.Column(db.Integer, db.ForeignKey('incident.id'), nullable=False, index=True)
     relief_request_id = db.Column(db.Integer, db.ForeignKey('relief_request.id'), nullable=True, index=True)
     destination = db.Column(db.String(300))
@@ -955,23 +955,29 @@ class DispatchItem(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     dispatch_id = db.Column(db.Integer, db.ForeignKey('dispatch.id'), nullable=False, index=True)
     item_id = db.Column(db.Integer, db.ForeignKey('item.id'), nullable=False)
+    warehouse_id = db.Column(db.Integer, db.ForeignKey('warehouse.id'), nullable=True, index=True)
     quantity = db.Column(db.Integer, nullable=False)
     unit = db.Column(db.String(50))
     batch_no = db.Column(db.String(100))
     expiry_date = db.Column(db.Date)
     item = db.relationship('Item', backref=db.backref('dispatch_items', lazy=True))
+    warehouse = db.relationship('Warehouse', backref=db.backref('dispatch_items', lazy=True))
 
     @property
     def available_qty(self):
-        inv = Inventory.query.filter_by(item_id=self.item_id, warehouse_id=self.dispatch.warehouse_id if self.dispatch else None).first()
+        wh_id = self.warehouse_id or (self.dispatch.warehouse_id if self.dispatch else None)
+        inv = Inventory.query.filter_by(item_id=self.item_id, warehouse_id=wh_id).first()
         return inv.quantity if inv else 0
 
     def to_dict(self):
-        inv = Inventory.query.filter_by(item_id=self.item_id).first()
+        wh_id = self.warehouse_id or (self.dispatch.warehouse_id if self.dispatch else None)
+        inv = Inventory.query.filter_by(item_id=self.item_id, warehouse_id=wh_id).first() if wh_id else None
         return {
             'id': self.id, 'item_id': self.item_id,
             'item_name': self.item.name if self.item else None,
             'quantity': self.quantity,
+            'warehouse_id': self.warehouse_id,
+            'warehouse_name': self.warehouse.name if self.warehouse else None,
             'available_qty': inv.quantity if inv else 0,
             'unit': self.unit or (self.item.unit if self.item else None),
             'batch_no': self.batch_no,
@@ -2880,9 +2886,7 @@ def update_stock_receipt(id):
             transfer_count = StockTransferItem.query.filter_by(item_id=ri.item_id).join(
                 StockTransfer, StockTransferItem.transfer_id == StockTransfer.id
             ).filter(StockTransfer.from_warehouse_id == receipt.warehouse_id).count()
-            dispatch_count = DispatchItem.query.filter_by(item_id=ri.item_id).join(
-                Dispatch, DispatchItem.dispatch_id == Dispatch.id
-            ).filter(Dispatch.warehouse_id == receipt.warehouse_id).count()
+            dispatch_count = DispatchItem.query.filter_by(item_id=ri.item_id, warehouse_id=receipt.warehouse_id).count()
             if transfer_count > 0 or dispatch_count > 0:
                 return jsonify({'success': False, 'message': f'Cannot edit stock receipt: item "{ri.item.name}" has been transferred or dispatched from this warehouse. Reverse those transactions first.'}), 400
         for ri in receipt.items[:]:
@@ -3369,6 +3373,9 @@ def handle_relief_requests():
         incident = db_get(Incident, incident_id)
         if not incident:
             return jsonify({'success': False, 'message': 'Incident not found'}), 404
+        phone = data.get('phone')
+        if phone and not validate_phone(phone):
+            return jsonify({'success': False, 'message': 'Invalid phone number format'}), 400
         items_payload = data.get('items', [])
         requested_cash_amount = parse_float_field(data, 'requested_cash_amount', minimum=0, default=0)
         if not items_payload and requested_cash_amount <= 0:
@@ -3430,6 +3437,8 @@ def manage_relief_request(id):
         if req.status == 'Completed':
             return jsonify({'success': False, 'message': 'Cannot edit a completed relief request'}), 400
         data = request.get_json()
+        if data.get('phone') and not validate_phone(data.get('phone')):
+            return jsonify({'success': False, 'message': 'Invalid phone number format'}), 400
         if 'incident_id' in data:
             incident = db_get(Incident, data.get('incident_id'))
             if not incident:
@@ -3504,90 +3513,90 @@ def handle_dispatches():
         if not items_payload:
             return jsonify({'success': False, 'message': 'At least one dispatch item is required'}), 400
 
-        # Group items by warehouse
-        warehouse_groups = {}
-        for item_data in items_payload:
-            wh_id = item_data.get('warehouse_id') or data.get('warehouse_id')
-            if not wh_id:
-                return jsonify({'success': False, 'message': 'Each item must have a warehouse assigned'}), 400
-            warehouse_groups.setdefault(wh_id, []).append(item_data)
-
         relief_request_ids = data.get('relief_request_ids') or (data.get('relief_request_id') and [data.get('relief_request_id')]) or []
         primary_relief_request_id = relief_request_ids[0] if relief_request_ids else None
 
-        dispatches_created = []
-        for wh_id, wh_items in warehouse_groups.items():
-            warehouse = db_get(Warehouse, wh_id)
-            if not warehouse:
-                db.session.rollback()
+        # Pre-validate items, per-warehouse inventory, and combined relief request limits
+        validated_items = {}
+        total_qty_by_item = {}
+        for item_data in items_payload:
+            item_id = item_data.get('item_id')
+            qty = parse_int_field(item_data, 'quantity', minimum=1)
+            wh_id = item_data.get('warehouse_id') or data.get('warehouse_id')
+            if not wh_id:
+                return jsonify({'success': False, 'message': 'Each item must have a warehouse assigned'}), 400
+            item = db_get(Item, item_id)
+            if not item:
+                return jsonify({'success': False, 'message': 'One or more items were not found'}), 400
+            if item.is_distributable is False:
+                return jsonify({'success': False, 'message': f'{item.name} is non-distributable equipment and cannot be dispatched. Use stock transfer instead.'}), 400
+            validated_items[item_id] = item
+            total_qty_by_item[item_id] = total_qty_by_item.get(item_id, 0) + qty
+            wh = db_get(Warehouse, wh_id)
+            if not wh:
                 return jsonify({'success': False, 'message': f'Warehouse {wh_id} not found'}), 404
+            inv = Inventory.query.filter_by(item_id=item_id, warehouse_id=wh_id).first()
+            if not inv or inv.available_quantity < qty:
+                return jsonify({'success': False, 'message': f'Insufficient stock for {item.name} in {wh.name}. Available: {inv.available_quantity if inv else 0}, Required: {qty}'}), 400
 
-            dispatch = Dispatch(
-                dispatch_number=data.get('dispatch_number') or generate_dispatch_no(),
-                date=dispatch_date,
-                warehouse_id=warehouse.id, incident_id=incident.id,
-                relief_request_id=primary_relief_request_id,
-                destination=data.get('destination'), receiver=data.get('receiver'),
-                phone=data.get('phone'), remarks=data.get('remarks'), created_by=current_user.id
-            )
-            db.session.add(dispatch)
-            db.session.flush()
-
-            for item_data in wh_items:
-                item_id = item_data.get('item_id')
-                if item_id is None:
-                    db.session.rollback()
-                    return jsonify({'success': False, 'message': 'Each dispatch item requires an item_id'}), 400
-                qty = parse_int_field(item_data, 'quantity', minimum=1)
-                item = db_get(Item, item_id)
-                if not item:
-                    db.session.rollback()
-                    return jsonify({'success': False, 'message': 'One or more items were not found'}), 404
-                if item.is_distributable is False:
-                    db.session.rollback()
-                    return jsonify({'success': False, 'message': f'{item.name} is non-distributable equipment and cannot be dispatched. Use stock transfer instead.'}), 400
-
-                # Validate against each linked relief request
-                for rr_id in relief_request_ids:
-                    rr_item = ReliefRequestItem.query.filter_by(request_id=rr_id, item_id=item_id).first()
-                    if rr_item:
-                        total_dispatched = (rr_item.quantity_dispatched or 0) + qty
-                        if total_dispatched > rr_item.quantity_requested:
-                            db.session.rollback()
-                            return jsonify({'success': False, 'message': f'Cannot dispatch {qty} of "{item.name}". Only {max(0, rr_item.quantity_requested - (rr_item.quantity_dispatched or 0))} remaining of requested {rr_item.quantity_requested} for request #{rr_id}.'}), 400
-
-                inv = Inventory.query.filter_by(item_id=item_id, warehouse_id=warehouse.id).first()
-                if not inv or inv.available_quantity < qty:
-                    db.session.rollback()
-                    return jsonify({'success': False, 'message': f'Insufficient stock for {item.name} in {warehouse.name}. Available: {inv.available_quantity if inv else 0}, Required: {qty}'}), 400
-
-                batch = item_data.get('batch_no') or ''
-                expiry = None
-                if item_data.get('expiry_date'):
-                    expiry = parse_bs_date_field(item_data, 'expiry_date')
-                di = DispatchItem(dispatch_id=dispatch.id, item_id=item_id, quantity=qty,
-                                  unit=item_data.get('unit'), batch_no=batch, expiry_date=expiry)
-                db.session.add(di)
-                inv.quantity -= qty
-
-                # Update quantity_dispatched for all linked relief requests
-                for rr_id in relief_request_ids:
-                    rr_items = ReliefRequestItem.query.filter_by(request_id=rr_id, item_id=item_id).all()
-                    for rri in rr_items:
-                        rri.quantity_dispatched = (rri.quantity_dispatched or 0) + qty
-
-            # Update status for all linked relief requests
+        for item_id, total_qty in total_qty_by_item.items():
+            item = validated_items[item_id]
+            total_remaining = 0
             for rr_id in relief_request_ids:
-                req = db_get(ReliefRequest, rr_id)
-                if req:
-                    anything_done = any(ri.quantity_dispatched > 0 for ri in req.items) if req.items else False
-                    if anything_done or req.distributed_cash_amount > 0:
-                        req.status = 'Partial'
+                rr_item = ReliefRequestItem.query.filter_by(request_id=rr_id, item_id=item_id).first()
+                if rr_item:
+                    total_remaining += rr_item.quantity_requested - (rr_item.quantity_dispatched or 0)
+            if total_qty > total_remaining:
+                return jsonify({'success': False, 'message': f'Cannot dispatch {total_qty} of "{item.name}". Only {total_remaining} remaining across the selected relief requests.'}), 400
 
-            dispatches_created.append(dispatch)
+        # Create a single dispatch (warehouse_id is nullable — set to first item's warehouse for display)
+        first_wh_id = items_payload[0].get('warehouse_id') or data.get('warehouse_id')
+        dispatch = Dispatch(
+            dispatch_number=data.get('dispatch_number') or generate_dispatch_no(),
+            date=dispatch_date,
+            warehouse_id=first_wh_id, incident_id=incident.id,
+            relief_request_id=primary_relief_request_id,
+            destination=data.get('destination'), receiver=data.get('receiver'),
+            phone=data.get('phone'), remarks=data.get('remarks'), created_by=current_user.id
+        )
+        db.session.add(dispatch)
+        db.session.flush()
+
+        for item_data in items_payload:
+            item_id = item_data.get('item_id')
+            qty = parse_int_field(item_data, 'quantity', minimum=1)
+            wh_id = item_data.get('warehouse_id') or data.get('warehouse_id')
+            item = validated_items[item_id]
+
+            inv = Inventory.query.filter_by(item_id=item_id, warehouse_id=wh_id).first()
+            di = DispatchItem(dispatch_id=dispatch.id, item_id=item_id, warehouse_id=wh_id,
+                              quantity=qty, unit=item_data.get('unit'),
+                              batch_no=item_data.get('batch_no') or '',
+                              expiry_date=parse_bs_date_field(item_data, 'expiry_date') if item_data.get('expiry_date') else None)
+            db.session.add(di)
+            inv.quantity -= qty
+
+            # Distribute quantity_dispatched across relief requests
+            remaining_qty = qty
+            for rr_id in relief_request_ids:
+                rr_item = ReliefRequestItem.query.filter_by(request_id=rr_id, item_id=item_id).first()
+                if rr_item and remaining_qty > 0:
+                    available = rr_item.quantity_requested - (rr_item.quantity_dispatched or 0)
+                    to_add = min(remaining_qty, available)
+                    if to_add > 0:
+                        rr_item.quantity_dispatched = (rr_item.quantity_dispatched or 0) + to_add
+                        remaining_qty -= to_add
+
+        # Update status for all linked relief requests
+        for rr_id in relief_request_ids:
+            req = db_get(ReliefRequest, rr_id)
+            if req:
+                anything_done = any(ri.quantity_dispatched > 0 for ri in req.items) if req.items else False
+                if anything_done or req.distributed_cash_amount > 0:
+                    req.status = 'Partial'
 
         db.session.commit()
-        return jsonify({'success': True, 'message': f'{len(dispatches_created)} dispatch(es) created', 'data': [d.to_dict() for d in dispatches_created]}), 201
+        return jsonify({'success': True, 'message': 'Dispatch created successfully', 'data': dispatch.to_dict()}), 201
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': friendly_message(e)}), 500
@@ -3628,10 +3637,11 @@ def handle_dispatch(id):
 
         # Reverse old inventory and relief request quantities from all linked requests
         for old_item in dispatch.items:
-            old_wh_id = old_item.dispatch.warehouse_id if old_item.dispatch else dispatch.warehouse_id
-            inv = Inventory.query.filter_by(item_id=old_item.item_id, warehouse_id=old_wh_id).first()
-            if inv:
-                inv.quantity += old_item.quantity
+            old_wh_id = old_item.warehouse_id or (old_item.dispatch.warehouse_id if old_item.dispatch else None)
+            if old_wh_id:
+                inv = Inventory.query.filter_by(item_id=old_item.item_id, warehouse_id=old_wh_id).first()
+                if inv:
+                    inv.quantity += old_item.quantity
             old_rr_ids = relief_request_ids or (dispatch.relief_request_id and [dispatch.relief_request_id]) or []
             for rr_id in old_rr_ids:
                 rr_item = ReliefRequestItem.query.filter_by(request_id=rr_id, item_id=old_item.item_id).first()
@@ -3661,39 +3671,44 @@ def handle_dispatch(id):
                 db.session.rollback()
                 return jsonify({'success': False, 'message': f'{item.name} is non-distributable equipment and cannot be dispatched. Use stock transfer instead.'}), 400
 
-            # Determine warehouse for this item (per-item or dispatch default)
             item_wh_id = item_data.get('warehouse_id') or warehouse.id
             item_warehouse = db_get(Warehouse, item_wh_id)
             if not item_warehouse:
                 db.session.rollback()
                 return jsonify({'success': False, 'message': f'Warehouse {item_wh_id} not found'}), 404
 
+            # Validate against combined remaining across all selected relief requests
+            total_remaining = 0
             for rr_id in relief_request_ids:
                 rr_item = ReliefRequestItem.query.filter_by(request_id=rr_id, item_id=item_id).first()
                 if rr_item:
-                    total_disp = (rr_item.quantity_dispatched or 0) + qty
-                    if total_disp > rr_item.quantity_requested:
-                        db.session.rollback()
-                        return jsonify({'success': False, 'message': f'Cannot dispatch {qty} of "{item.name}". Only {max(0, rr_item.quantity_requested - (rr_item.quantity_dispatched or 0))} remaining of requested {rr_item.quantity_requested}.'}), 400
+                    total_remaining += rr_item.quantity_requested - (rr_item.quantity_dispatched or 0)
+            if qty > total_remaining:
+                db.session.rollback()
+                return jsonify({'success': False, 'message': f'Cannot dispatch {qty} of "{item.name}". Only {total_remaining} remaining across the selected relief requests.'}), 400
 
             inv = Inventory.query.filter_by(item_id=item_id, warehouse_id=item_warehouse.id).first()
             if not inv or inv.quantity < qty:
                 db.session.rollback()
                 return jsonify({'success': False, 'message': f'Insufficient stock for {item.name} in {item_warehouse.name}. Available: {inv.quantity if inv else 0}, Required: {qty}'}), 400
 
-            batch = item_data.get('batch_no') or ''
-            expiry = None
-            if item_data.get('expiry_date'):
-                expiry = parse_bs_date_field(item_data, 'expiry_date')
-            di = DispatchItem(dispatch_id=dispatch.id, item_id=item_id, quantity=qty,
-                              unit=item_data.get('unit'), batch_no=batch, expiry_date=expiry)
+            di = DispatchItem(dispatch_id=dispatch.id, item_id=item_id, warehouse_id=item_warehouse.id,
+                              quantity=qty, unit=item_data.get('unit'),
+                              batch_no=item_data.get('batch_no') or '',
+                              expiry_date=parse_bs_date_field(item_data, 'expiry_date') if item_data.get('expiry_date') else None)
             db.session.add(di)
             inv.quantity -= qty
 
+            # Distribute quantity_dispatched across relief requests
+            remaining_qty = qty
             for rr_id in relief_request_ids:
                 rr_item_new = ReliefRequestItem.query.filter_by(request_id=rr_id, item_id=item_id).first()
-                if rr_item_new:
-                    rr_item_new.quantity_dispatched = (rr_item_new.quantity_dispatched or 0) + qty
+                if rr_item_new and remaining_qty > 0:
+                    available = rr_item_new.quantity_requested - (rr_item_new.quantity_dispatched or 0)
+                    to_add = min(remaining_qty, available)
+                    if to_add > 0:
+                        rr_item_new.quantity_dispatched = (rr_item_new.quantity_dispatched or 0) + to_add
+                        remaining_qty -= to_add
 
         for rr_id in relief_request_ids:
             req = db_get(ReliefRequest, rr_id)
@@ -3703,9 +3718,10 @@ def handle_dispatch(id):
                     req.status = 'Partial'
 
         # Update dispatch fields
+        first_wh_id = items_payload[0].get('warehouse_id') or warehouse.id
         dispatch.dispatch_number = data.get('dispatch_number') or dispatch.dispatch_number
         dispatch.date = dispatch_date
-        dispatch.warehouse_id = warehouse.id
+        dispatch.warehouse_id = first_wh_id
         dispatch.incident_id = incident.id
         dispatch.relief_request_id = relief_request_ids[0] if relief_request_ids else dispatch.relief_request_id
         dispatch.destination = data.get('destination')
@@ -5533,7 +5549,7 @@ def get_item_history(id):
 
         dispatches = DispatchItem.query.filter_by(item_id=id).all()
         if warehouse_id:
-            dispatches = [d for d in dispatches if d.dispatch and d.dispatch.warehouse_id == warehouse_id]
+            dispatches = [d for d in dispatches if d.warehouse_id == warehouse_id]
 
         transfers_out = []
         transfers_in = []
@@ -5598,7 +5614,7 @@ def get_item_history(id):
                 'type': 'Dispatch', 'ref': d.dispatch.dispatch_number if d.dispatch else '',
                 'detail': f"Qty: {d.quantity} {d.unit or ''}" + (f" → {d.dispatch.destination}" if d.dispatch and d.dispatch.destination else ''),
                 'qty_change': f"-{d.quantity}",
-                'warehouse': d.dispatch.warehouse.name if d.dispatch and d.dispatch.warehouse else '',
+                'warehouse': d.warehouse.name if d.warehouse else (d.dispatch.warehouse.name if d.dispatch and d.dispatch.warehouse else ''),
                 'source': d.dispatch.incident.incident_name if d.dispatch and d.dispatch.incident else '',
                 'sub_type': 'Relief Dispatch',
                 'icon': 'bi-truck',
@@ -5651,7 +5667,7 @@ def get_item_history(id):
                         'ref': dist.distribution_no or '',
                         'detail': f"{dbene.quantity} × {dbene.item}" + (f" at {location_info}" if location_info else ''),
                         'qty_change': f"-{dbene.quantity}",
-                        'warehouse': d.dispatch.warehouse.name if d.dispatch.warehouse else '',
+                        'warehouse': d.warehouse.name if d.warehouse else (d.dispatch.warehouse.name if d.dispatch and d.dispatch.warehouse else ''),
                         'source': f"Beneficiary: {ben_name}" + (f" ({ben_id_no})" if ben_id_no else "") + (f" | Family: {dbene.members}" if dbene.members else ''),
                         'sub_type': 'Beneficiary Distribution',
                         'icon': 'bi-people',
@@ -6894,7 +6910,7 @@ def get_report_data(report_type, args):
                 receipts = [r for r in StockReceiptItem.query.filter_by(item_id=item_id).all()
                             if r.receipt and r.receipt.warehouse_id == warehouse_id]
                 dispatches = [d for d in DispatchItem.query.filter_by(item_id=item_id).all()
-                              if d.dispatch and d.dispatch.warehouse_id == warehouse_id]
+                              if d.warehouse_id == warehouse_id]
                 adjustments = ManualAdjustment.query.filter_by(item_id=item_id, warehouse_id=warehouse_id).all()
                 transfers_out = [t for t in StockTransferItem.query.filter_by(item_id=item_id).all()
                                  if t.transfer and t.transfer.from_warehouse_id == warehouse_id]
@@ -6988,11 +7004,11 @@ def get_report_data(report_type, args):
                              r.receipt.warehouse.name if r.receipt.warehouse else ''])
         for d in DispatchItem.query.all():
             if d.dispatch:
-                if warehouse_id and d.dispatch.warehouse_id != warehouse_id: continue
+                if warehouse_id and d.warehouse_id != warehouse_id: continue
                 if item_id and d.item_id != item_id: continue
                 rows.append([ad_to_bs_date(d.dispatch.date) or '', d.dispatch.dispatch_number,
                              d.item.name if d.item else '', 'Dispatch', '-', d.quantity,
-                             d.dispatch.warehouse.name if d.dispatch.warehouse else ''])
+                             d.warehouse.name if d.warehouse else (d.dispatch.warehouse.name if d.dispatch.warehouse else '')])
         rows.sort(key=lambda x: x[0], reverse=True)
         if not rows:
             rows = [['-', '-', '-', '-', '-', '-', 'No movements found']]
@@ -7433,7 +7449,7 @@ def print_bin_card():
     receipts = [r for r in receipts if r.receipt and r.receipt.warehouse_id == warehouse_id]
     adjustments = ManualAdjustment.query.filter_by(item_id=item_id, warehouse_id=warehouse_id).all()
     dispatches = DispatchItem.query.filter_by(item_id=item_id).all()
-    dispatches = [d for d in dispatches if d.dispatch and d.dispatch.warehouse_id == warehouse_id]
+    dispatches = [d for d in dispatches if d.warehouse_id == warehouse_id]
     transfers_out = StockTransferItem.query.filter_by(item_id=item_id).all()
     transfers_out = [t for t in transfers_out if t.transfer and t.transfer.from_warehouse_id == warehouse_id]
     transfers_in = StockTransferItem.query.filter_by(item_id=item_id).all()
@@ -7539,7 +7555,7 @@ def print_stock_book():
         all_receipts = [r for r in all_receipts if r.receipt and r.receipt.warehouse_id == warehouse_id]
 
         all_dispatches = DispatchItem.query.filter_by(item_id=item.id).all()
-        all_dispatches = [d for d in all_dispatches if d.dispatch and d.dispatch.warehouse_id == warehouse_id]
+        all_dispatches = [d for d in all_dispatches if d.warehouse_id == warehouse_id]
 
         all_adjustments = ManualAdjustment.query.filter_by(item_id=item.id, warehouse_id=warehouse_id).all()
 
@@ -7807,6 +7823,31 @@ def init_db():
                     except Exception as e:
                         db.session.rollback()
                         print(f"[WARN] Could not cleanup old date column in weekly_forecast: {e}")
+
+            if 'dispatch_item' in inspector.get_table_names():
+                di_cols = [c['name'] for c in inspector.get_columns('dispatch_item')]
+                if 'warehouse_id' not in di_cols:
+                    try:
+                        db.session.execute(db.text("ALTER TABLE dispatch_item ADD COLUMN warehouse_id INTEGER REFERENCES warehouse(id)"))
+                        db.session.commit()
+                        print("[MIGRATE] Added 'warehouse_id' to dispatch_item")
+                    except Exception as e:
+                        db.session.rollback()
+                        print(f"[WARN] Could not add warehouse_id to dispatch_item: {e}")
+            if 'dispatch' in inspector.get_table_names():
+                d_cols = [c['name'] for c in inspector.get_columns('dispatch')]
+                if 'warehouse_id' in d_cols:
+                    col_info = next((c for c in inspector.get_columns('dispatch') if c['name'] == 'warehouse_id'), None)
+                    if col_info and not col_info.get('nullable', True):
+                        try:
+                            dialect = db.engine.dialect.name
+                            if dialect == 'postgresql':
+                                db.session.execute(db.text("ALTER TABLE dispatch ALTER COLUMN warehouse_id DROP NOT NULL"))
+                                db.session.commit()
+                                print("[MIGRATE] Made dispatch.warehouse_id nullable")
+                        except Exception as e:
+                            db.session.rollback()
+                            print(f"[WARN] Could not alter dispatch.warehouse_id: {e}")
 
             if 'user' not in inspector.get_table_names():
                 dialect = db.engine.dialect.name

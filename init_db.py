@@ -408,6 +408,36 @@ def run_migrations():
                     db.session.rollback()
                     print(f"  [WARN] Could not add '{col_name}' to {table_name}: {e}")
     
+    # Migrate dispatch.warehouse_id to nullable
+    if 'dispatch' in inspector.get_table_names():
+        existing_cols = [c['name'] for c in inspector.get_columns('dispatch')]
+        if 'warehouse_id' in existing_cols:
+            col_info = next(c for c in inspector.get_columns('dispatch') if c['name'] == 'warehouse_id')
+            if not col_info.get('nullable', True):
+                try:
+                    dialect = db.engine.dialect.name
+                    if dialect == 'postgresql':
+                        db.session.execute(text("ALTER TABLE dispatch ALTER COLUMN warehouse_id DROP NOT NULL"))
+                        db.session.commit()
+                        migrated += 1
+                        print(f"  [MIGRATE] Made 'dispatch.warehouse_id' nullable")
+                except Exception as e:
+                    db.session.rollback()
+                    print(f"  [WARN] Could not alter dispatch.warehouse_id: {e}")
+
+    # Add warehouse_id to dispatch_item
+    if 'dispatch_item' in inspector.get_table_names():
+        existing_cols = [c['name'] for c in inspector.get_columns('dispatch_item')]
+        if 'warehouse_id' not in existing_cols:
+            try:
+                db.session.execute(text("ALTER TABLE dispatch_item ADD COLUMN warehouse_id INTEGER REFERENCES warehouse(id)"))
+                db.session.commit()
+                migrated += 1
+                print(f"  [MIGRATE] Added 'warehouse_id' to dispatch_item")
+            except Exception as e:
+                db.session.rollback()
+                print(f"  [WARN] Could not add 'warehouse_id' to dispatch_item: {e}")
+
     if migrated:
         print(f"[OK] Applied {migrated} column migrations")
     else:
