@@ -102,6 +102,27 @@
         </div>
     </div>
 </div>
+<div class="modal fade" id="cancelModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title"><i class="bi bi-exclamation-triangle me-2"></i>Cancel Cash Distribution</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-3">Are you sure you want to cancel this cash distribution? The fund balance will be restored and the distribution record will be removed.</p>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Reason for Cancellation <span class="text-danger">*</span></label>
+                    <textarea class="form-control" id="cancelReason" rows="3" placeholder="Enter the reason for cancelling this distribution..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Keep</button>
+                <button type="button" class="btn btn-danger" id="confirmCancelBtn"><i class="bi bi-x-circle"></i> Cancel Distribution</button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 {% block extra_js %}
 <script>
@@ -128,7 +149,8 @@ async function loadDistributions() {
         <td>${cd.officer || '-'}</td>
         <td>${filesHtml}</td>
         <td>${srcHtml}</td>
-        <td><button class="btn btn-sm btn-outline-primary" onclick="viewCd(${cd.id})"><i class="bi bi-eye"></i></button></td>
+        <td><button class="btn btn-sm btn-outline-primary" onclick="viewCd(${cd.id})" title="View"><i class="bi bi-eye"></i></button>
+            <button class="btn btn-sm btn-outline-danger ms-1" onclick="cancelCd(${cd.id})" title="Cancel"><i class="bi bi-x-circle"></i></button></td>
     </tr>`}).join('');
 }
 
@@ -314,6 +336,40 @@ function openCdModal() {
     document.getElementById('cdPhotoPreview').innerHTML = '';
     document.getElementById('cdDocPreview').innerHTML = '';
 }
+
+let cancelDistId = null;
+
+async function cancelCd(id) {
+    cancelDistId = id;
+    document.getElementById('cancelReason').value = '';
+    new bootstrap.Modal(document.getElementById('cancelModal')).show();
+}
+
+document.getElementById('confirmCancelBtn').addEventListener('click', async function() {
+    const reason = document.getElementById('cancelReason').value.trim();
+    if (!reason) { showToast('danger', 'Cancellation reason is required'); return; }
+    this.disabled = true;
+    try {
+        const r = await fetch(`/api/cash-distributions/${cancelDistId}/cancel`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrf},
+            body: JSON.stringify({ cancel_reason: reason })
+        });
+        const d = await r.json();
+        if (d.success) {
+            showToast('success', d.message);
+            bootstrap.Modal.getInstance(document.getElementById('cancelModal')).hide();
+            loadDistributions();
+        } else {
+            showToast('danger', d.message);
+        }
+    } catch(e) {
+        showToast('danger', e.message);
+    } finally {
+        this.disabled = false;
+        cancelDistId = null;
+    }
+});
 
 loadDistributions();
 loadData();
