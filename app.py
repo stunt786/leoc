@@ -1725,6 +1725,7 @@ def log_api_activity(response):
 
 # ============ AUTH ROUTES ============
 @app.route('/login', methods=['GET', 'POST'])
+@limiter.limit("20 per minute")
 def login():
     if current_user.is_authenticated:
         return redirect(url_for('index'))
@@ -1793,6 +1794,7 @@ def login():
         else:
             flash('Invalid username or password', 'danger')
             log_activity('login_failed', 'auth', details=f'Failed login attempt for unknown user {username}', ip=request.remote_addr)
+            time.sleep(1)
             return render_template('login.html')
 
     return render_template('login.html', locked=False)
@@ -1813,12 +1815,12 @@ def index():
     return render_template('index.html')
 
 @app.route('/settings')
-@login_required
+@permission_required('edit')
 def settings():
     return render_template('settings.html')
 
 @app.route('/logs')
-@login_required
+@permission_required('manage_users')
 def logs_page():
     return render_template('logs.html')
 
@@ -1843,7 +1845,7 @@ def stock_receipts_page():
     return render_template('stock_receipts.html')
 
 @app.route('/users')
-@login_required
+@permission_required('manage_users')
 def users_page():
     return render_template('users.html')
 
@@ -1986,7 +1988,7 @@ def handle_setting(key):
 
 # ============ ACTIVITY LOG API ============
 @app.route('/api/logs', methods=['GET'])
-@login_required
+@permission_required('manage_users')
 def get_activity_logs():
     try:
         page = request.args.get('page', 1, type=int)
@@ -3909,10 +3911,19 @@ def handle_distributions():
             qty = parse_int_field(ben_data, 'quantity', minimum=1)
             if item_name:
                 dist_totals[item_name] = dist_totals.get(item_name, 0) + qty
+        # Subtract already-distributed quantities for the same dispatches
+        already_distributed_map = {}
+        existing_dists = Distribution.query.filter(Distribution.dispatch_id.in_([d.id for d in dispatches])).all()
+        for ed in existing_dists:
+            for edb in ed.beneficiaries:
+                if edb.item:
+                    already_distributed_map[edb.item] = already_distributed_map.get(edb.item, 0) + edb.quantity
         for item_name, total in dist_totals.items():
             dispatched = total_dispatch_qty_map.get(item_name, 0)
-            if total > dispatched:
-                return jsonify({'success': False, 'message': f'Distributed quantity for "{item_name}" ({total}) exceeds total dispatched quantity ({dispatched}) across {len(dispatches)} dispatch(es)'}), 400
+            already = already_distributed_map.get(item_name, 0)
+            remaining = dispatched - already
+            if total > remaining:
+                return jsonify({'success': False, 'message': f'Distributed quantity for "{item_name}" ({total}) exceeds remaining dispatched quantity ({remaining}) across {len(dispatches)} dispatch(es) (already distributed: {already})'}), 400
         fiscal_year = AppSettings.get_setting('active_fiscal_year', '2081/82')
         seen_beneficiaries = set()
         for ben_data in beneficiaries_payload:
@@ -4499,6 +4510,13 @@ def handle_cash_distributions():
                 return jsonify({'success': False, 'message': 'Cash request not found'}), 404
             if cash_req.incident_id != incident.id:
                 return jsonify({'success': False, 'message': 'Cash request does not match selected incident'}), 400
+            already_distributed = db.session.query(
+                db.func.coalesce(db.func.sum(CashDistributionBeneficiary.amount), 0)
+            ).join(
+                CashDistribution, CashDistributionBeneficiary.distribution_id == CashDistribution.id
+            ).filter(CashDistribution.cash_request_id == cash_req.id).scalar()
+            remaining = cash_req.requested_amount - already_distributed
+            max_amount = min(max_amount, remaining)
         
         if data.get('relief_request_id'):
             relief_req = db_get(ReliefRequest, data['relief_request_id'])
@@ -4851,6 +4869,7 @@ def manage_beneficiary(id):
         return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 @app.route('/api/beneficiaries/<int:id>/history', methods=['GET'])
+@permission_required('view')
 def get_beneficiary_history(id):
     try:
         ben = db_get(Beneficiary, id)
