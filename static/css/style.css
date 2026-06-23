@@ -1,3 +1,51 @@
+@font-face {
+    font-family: 'Kokila';
+    src: url('/static/fonts/Kokila-Regular.ttf') format('truetype');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Kokila';
+    src: url('/static/fonts/Kokila-Regular.ttf') format('truetype');
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Noto Sans';
+    src: url('/static/fonts/NotoSans-Regular.ttf') format('truetype');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Noto Sans';
+    src: url('/static/fonts/NotoSans-Bold.ttf') format('truetype');
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Noto Sans Devanagari';
+    src: url('/static/fonts/NotoSansDevanagari-Regular.ttf') format('truetype');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Noto Sans Devanagari';
+    src: url('/static/fonts/NotoSansDevanagari-Bold.ttf') format('truetype');
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;
+}
+
 :root {
     --sidebar-width: 260px;
     --sidebar-collapsed-width: 70px;
@@ -26,7 +74,7 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 body {
-    font-family: 'Inter', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif, 'Noto Sans Devanagari', 'Arial Unicode MS';
+    font-family: 'Inter', 'Noto Sans', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif, 'Kokila', 'Noto Sans Devanagari', 'Arial Unicode MS';
     background: #f1f5f9;
     min-height: 100vh;
     color: #334155;
@@ -34,11 +82,11 @@ body {
 }
 
 .devanagari-text {
-    font-family: 'Noto Sans Devanagari', 'Arial Unicode MS', 'Segoe UI', sans-serif;
+    font-family: 'Kokila', 'Noto Sans Devanagari', 'Arial Unicode MS', 'Segoe UI', sans-serif;
 }
 
 h1,h2,h3,h4,h5,h6,p,span,div,td,th,label,.card-title,.stat-label {
-    font-family: 'Inter', 'Segoe UI', sans-serif, 'Noto Sans Devanagari', 'Arial Unicode MS';
+    font-family: 'Inter', 'Noto Sans', 'Segoe UI', sans-serif, 'Kokila', 'Noto Sans Devanagari', 'Arial Unicode MS';
 }
 
 .wrapper {

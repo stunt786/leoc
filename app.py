@@ -14,6 +14,7 @@ from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash
 from werkzeug.exceptions import NotFound
 import re
+from html import escape
 from functools import wraps
 import time
 from urllib.parse import urlparse, urljoin
@@ -31,30 +32,62 @@ from auth_helpers import login_manager, User, login_required, role_required, per
 
 def register_unicode_fonts():
     try:
+        app_root = os.path.dirname(os.path.abspath(__file__))
         font_paths = {
-            'NotoSansDevanagari': '/usr/share/fonts/truetype/noto/NotoSansDevanagari-Regular.ttf',
-            'NotoSansDevanagariBold': '/usr/share/fonts/truetype/noto/NotoSansDevanagari-Bold.ttf'
+            'NotoSans': [
+                os.path.join(app_root, 'static', 'fonts', 'NotoSans-Regular.ttf'),
+                '/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf',
+            ],
+            'NotoSansBold': [
+                os.path.join(app_root, 'static', 'fonts', 'NotoSans-Bold.ttf'),
+                '/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf',
+            ],
+            'Kokila': [
+                os.path.join(app_root, 'static', 'fonts', 'Kokila-Regular.ttf'),
+            ],
+            'NotoSansDevanagari': [
+                os.path.join(app_root, 'static', 'fonts', 'NotoSansDevanagari-Regular.ttf'),
+                '/usr/share/fonts/truetype/noto/NotoSansDevanagari-Regular.ttf',
+            ],
+            'NotoSansDevanagariBold': [
+                os.path.join(app_root, 'static', 'fonts', 'NotoSansDevanagari-Bold.ttf'),
+                '/usr/share/fonts/truetype/noto/NotoSansDevanagari-Bold.ttf',
+            ],
         }
         registered_fonts = {}
-        for name, path in font_paths.items():
-            if os.path.exists(path):
-                try:
-                    pdfmetrics.registerFont(TTFont(name, path))
-                    registered_fonts[name] = name
-                except Exception as e:
-                    print(f"Failed to register font {path}: {e}")
+        for name, candidates in font_paths.items():
+            for path in candidates:
+                if os.path.exists(path):
+                    try:
+                        pdfmetrics.registerFont(TTFont(name, path))
+                        registered_fonts[name] = name
+                        break
+                    except Exception as e:
+                        print(f"Failed to register font {path}: {e}")
+        if 'NotoSans' in registered_fonts and 'NotoSansBold' in registered_fonts:
+            pdfmetrics.registerFontFamily('NotoSans', normal='NotoSans', bold='NotoSansBold')
+        elif 'NotoSans' in registered_fonts:
+            pdfmetrics.registerFontFamily('NotoSans', normal='NotoSans', bold='NotoSans')
+        if 'Kokila' in registered_fonts:
+            pdfmetrics.registerFontFamily('Kokila', normal='Kokila', bold='Kokila')
+            return 'Kokila'
         if 'NotoSansDevanagari' in registered_fonts and 'NotoSansDevanagariBold' in registered_fonts:
             pdfmetrics.registerFontFamily('NotoSansDevanagari', normal='NotoSansDevanagari', bold='NotoSansDevanagariBold')
             return 'NotoSansDevanagari'
         elif 'NotoSansDevanagari' in registered_fonts:
+            pdfmetrics.registerFontFamily('NotoSansDevanagari', normal='NotoSansDevanagari', bold='NotoSansDevanagari')
             return 'NotoSansDevanagari'
-        return None
+        return 'NotoSans' if 'NotoSans' in registered_fonts else None
     except Exception as e:
         print(f"Error registering fonts: {e}")
         return None
 
 UNICODE_FONT = register_unicode_fonts()
-UNICODE_FONT_BOLD = 'NotoSansDevanagariBold' if UNICODE_FONT else None
+LATIN_FONT = 'NotoSans' if 'NotoSans' in pdfmetrics.getRegisteredFontNames() else 'Helvetica'
+LATIN_FONT_BOLD = 'NotoSansBold' if 'NotoSansBold' in pdfmetrics.getRegisteredFontNames() else 'Helvetica-Bold'
+DEVANAGARI_FONT = 'Kokila' if 'Kokila' in pdfmetrics.getRegisteredFontNames() else ('NotoSansDevanagari' if 'NotoSansDevanagari' in pdfmetrics.getRegisteredFontNames() else LATIN_FONT)
+DEVANAGARI_FONT_BOLD = 'Kokila' if 'Kokila' in pdfmetrics.getRegisteredFontNames() else ('NotoSansDevanagariBold' if 'NotoSansDevanagariBold' in pdfmetrics.getRegisteredFontNames() else (LATIN_FONT_BOLD if LATIN_FONT_BOLD else DEVANAGARI_FONT))
+UNICODE_FONT_BOLD = DEVANAGARI_FONT_BOLD if UNICODE_FONT else None
 
 load_dotenv()
 
@@ -5205,11 +5238,17 @@ def get_disaster_statistics():
 @login_required
 def generate_daily_report():
     try:
+        bulletin_id = request.args.get('bulletin_id', type=int)
+        bulletin = DailyBulletin.query.get(bulletin_id) if bulletin_id else None
         from_bs = request.args.get('from_bs_date')
         to_bs = request.args.get('to_bs_date')
         bs_date = request.args.get('bs_date')
         start_date, end_date = date.today(), date.today()
         start_bs, end_bs = None, None
+
+        if bulletin and not from_bs and not to_bs and not bs_date:
+            from_bs = bulletin.valid_from
+            to_bs = bulletin.valid_to or bulletin.valid_from
 
         if from_bs and to_bs:
             if not is_valid_nepali_date(from_bs) or not is_valid_nepali_date(to_bs):
@@ -5343,28 +5382,28 @@ def generate_disaster_pdf(incidents, total, ward_stats, type_stats, start_bs, en
     normal = ParagraphStyle('Normal', parent=styles['Normal'], fontSize=8, fontName=font_name)
     small = ParagraphStyle('Small', parent=styles['Normal'], fontSize=7, fontName=font_name)
 
-    elements.append(Paragraph(office_name, title_style))
-    elements.append(Paragraph("स्थानीय आपतकालीन कार्य केन्द्र (LEOC)", subtitle_style))
-    elements.append(Paragraph("दैनिक घटना प्रतिवेदन", subtitle_style))
+    elements.append(pdf_text(office_name, title_style, latin_font=font_name, devanagari_font=font_bold))
+    elements.append(pdf_text("स्थानीय आपतकालीन कार्य केन्द्र (LEOC)", subtitle_style))
+    elements.append(pdf_text("दैनिक घटना प्रतिवेदन", subtitle_style))
     if sit_rep_no:
-        elements.append(Paragraph(f"Sit Rep No: {nepali_num_str(sit_rep_no)}", normal))
+        elements.append(pdf_text(f"Sit Rep No: {nepali_num_str(sit_rep_no)}", normal))
     elements.append(Spacer(1, 6))
 
     date_str = f"{start_bs}" if start_bs == end_bs else f"{start_bs} देखि {end_bs}"
-    elements.append(Paragraph(f"<b>मिति:</b> {date_str}", normal))
+    elements.append(pdf_text(f"मिति: {date_str}", normal))
     elements.append(Spacer(1, 6))
 
-    header_data = [['वडा', 'घटना', 'मृतक', 'बेपत्ता', 'घाइते', 'घर नष्ट', 'अ.क्षति']]
+    header_data = [[pdf_text('वडा', normal), pdf_text('घटना', normal), pdf_text('मृतक', normal), pdf_text('बेपत्ता', normal), pdf_text('घाइते', normal), pdf_text('घर नष्ट', normal), pdf_text('अ.क्षति', normal)]]
     for w in get_ward_list():
         ws = ward_stats.get(str(w.id), {})
         header_data.append([
-            w.name, nepali_num_str(ws.get('incidents', 0)), nepali_num_str(ws.get('deaths', 0)),
-            nepali_num_str(ws.get('missing', 0)), nepali_num_str(ws.get('injured', 0)),
-            nepali_num_str(ws.get('house_destroyed', 0)), nepali_num_str(ws.get('estimated_loss', 0))
+            pdf_text(w.name, normal), pdf_text(nepali_num_str(ws.get('incidents', 0)), normal), pdf_text(nepali_num_str(ws.get('deaths', 0)), normal),
+            pdf_text(nepali_num_str(ws.get('missing', 0)), normal), pdf_text(nepali_num_str(ws.get('injured', 0)), normal),
+            pdf_text(nepali_num_str(ws.get('house_destroyed', 0)), normal), pdf_text(nepali_num_str(ws.get('estimated_loss', 0)), normal)
         ])
-    header_data.append(['जम्मा', nepali_num_str(total['incidents']), nepali_num_str(total['deaths']), nepali_num_str(total['missing']),
-                        nepali_num_str(total['injured']), nepali_num_str(total['house_destroyed']),
-                        nepali_num_str(total['estimated_loss'])])
+    header_data.append([pdf_text('जम्मा', normal), pdf_text(nepali_num_str(total['incidents']), normal), pdf_text(nepali_num_str(total['deaths']), normal), pdf_text(nepali_num_str(total['missing']), normal),
+                        pdf_text(nepali_num_str(total['injured']), normal), pdf_text(nepali_num_str(total['house_destroyed']), normal),
+                        pdf_text(nepali_num_str(total['estimated_loss']), normal)])
     tbl = Table(header_data, colWidths=[18*mm, 14*mm, 14*mm, 14*mm, 14*mm, 18*mm, 28*mm])
     tbl.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2c5282')),
@@ -5379,17 +5418,17 @@ def generate_disaster_pdf(incidents, total, ward_stats, type_stats, start_bs, en
     elements.append(Spacer(1, 8))
 
     if type_stats:
-        elements.append(Paragraph("<b>विपद् प्रकार अनुसार</b>", normal))
+        elements.append(pdf_text("विपद् प्रकार अनुसार", normal))
         elements.append(Spacer(1, 3))
-        td = [['प्रकार', 'जम्मा', 'मृत्यु\nपुरुष', 'मृत्यु\nमहिला', 'बेपत्ता',
-               'घाइते\nपुरुष', 'घाइते\nमहिला', 'प्रभावित\nपरिवार',
-               'घर\nआं.क्षति', 'घर\nपूर्ण.क्षति', 'पशु', 'अ.क्षति']]
+        td = [[pdf_text('प्रकार', normal), pdf_text('जम्मा', normal), pdf_text('मृत्यु\nपुरुष', normal), pdf_text('मृत्यु\nमहिला', normal), pdf_text('बेपत्ता', normal),
+               pdf_text('घाइते\nपुरुष', normal), pdf_text('घाइते\nमहिला', normal), pdf_text('प्रभावित\nपरिवार', normal),
+               pdf_text('घर\nआं.क्षति', normal), pdf_text('घर\nपूर्ण.क्षति', normal), pdf_text('पशु', normal), pdf_text('अ.क्षति', normal)]]
         for t, s in type_stats.items():
-            td.append([t, nepali_num_str(s['count']), nepali_num_str(s.get('male_death', 0)), nepali_num_str(s.get('female_death', 0)),
-                       nepali_num_str(s.get('missing', 0)), nepali_num_str(s.get('male_injured', 0)), nepali_num_str(s.get('female_injured', 0)),
-                       nepali_num_str(s.get('affected_households', 0)), nepali_num_str(s.get('house_damaged', 0)),
-                       nepali_num_str(s.get('house_destroyed', 0)), nepali_num_str(s.get('livestock_loss', 0)),
-                       nepali_num_str(s.get('estimated_loss', 0))])
+            td.append([pdf_text(t, normal), pdf_text(nepali_num_str(s['count']), normal), pdf_text(nepali_num_str(s.get('male_death', 0)), normal), pdf_text(nepali_num_str(s.get('female_death', 0)), normal),
+                       pdf_text(nepali_num_str(s.get('missing', 0)), normal), pdf_text(nepali_num_str(s.get('male_injured', 0)), normal), pdf_text(nepali_num_str(s.get('female_injured', 0)), normal),
+                       pdf_text(nepali_num_str(s.get('affected_households', 0)), normal), pdf_text(nepali_num_str(s.get('house_damaged', 0)), normal),
+                       pdf_text(nepali_num_str(s.get('house_destroyed', 0)), normal), pdf_text(nepali_num_str(s.get('livestock_loss', 0)), normal),
+                       pdf_text(nepali_num_str(s.get('estimated_loss', 0)), normal)])
         tbl2 = Table(td, colWidths=[22*mm, 12*mm, 14*mm, 14*mm, 12*mm, 14*mm, 14*mm, 16*mm, 14*mm, 14*mm, 14*mm, 20*mm])
         tbl2.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#744210')),
@@ -5402,7 +5441,7 @@ def generate_disaster_pdf(incidents, total, ward_stats, type_stats, start_bs, en
         elements.append(tbl2)
 
     elements.append(Spacer(1, 10))
-    elements.append(Paragraph(f"Generated: {today_bs()} {datetime.now().strftime('%H:%M')}", small))
+    elements.append(pdf_text(f"Generated: {today_bs()} {datetime.now().strftime('%H:%M')}", small))
     doc.build(elements)
     buffer.seek(0)
     return buffer
@@ -6893,6 +6932,24 @@ def handle_429(e):
     return render_template('login.html', locked=False), 429
 
 # ============ REPORTS (PDF) ============
+DEVANAGARI_RE = re.compile(r'[\u0900-\u097F]')
+
+def text_font_for(value, latin_font=LATIN_FONT, devanagari_font=DEVANAGARI_FONT):
+    text = '' if value is None else str(value)
+    return devanagari_font if DEVANAGARI_RE.search(text) else latin_font
+
+def pdf_text(value, style, latin_font=LATIN_FONT, devanagari_font=DEVANAGARI_FONT):
+    text = '' if value is None else str(value)
+    safe_lines = []
+    for line in text.split('\n'):
+        parts = []
+        for chunk in re.finditer(r'[\u0900-\u097F]+|[^\u0900-\u097F]+', line):
+            segment = escape(chunk.group(0))
+            chosen_font = devanagari_font if DEVANAGARI_RE.search(chunk.group(0)) else latin_font
+            parts.append(f'<font name="{chosen_font}">{segment}</font>')
+        safe_lines.append(''.join(parts) if parts else '')
+    return Paragraph('<br/>'.join(safe_lines), style)
+
 def make_pdf_report(title, headers, rows, col_widths, filter_summary=''):
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=15*mm, leftMargin=15*mm, topMargin=15*mm, bottomMargin=15*mm)
@@ -6914,23 +6971,23 @@ def make_pdf_report(title, headers, rows, col_widths, filter_summary=''):
         for line in report_header_setting.split('\n'):
             line = line.strip()
             if line:
-                elements.append(Paragraph(line, header_style))
+                elements.append(pdf_text(line, header_style))
         elements.append(Spacer(1, 2))
     else:
-        elements.append(Paragraph(office_name, ParagraphStyle('Off', parent=styles['Heading1'], fontSize=16, alignment=TA_CENTER, fontName=font_bold, textColor=colors.HexColor('#1a365d'))))
-        elements.append(Paragraph('Local Emergency Operation Centre (LEOC)', sub_style))
+        elements.append(pdf_text(office_name, ParagraphStyle('Off', parent=styles['Heading1'], fontSize=16, alignment=TA_CENTER, fontName=font_bold, textColor=colors.HexColor('#1a365d'))))
+        elements.append(pdf_text('Local Emergency Operation Centre (LEOC)', sub_style))
         if address:
-            elements.append(Paragraph(address, sub_style))
+            elements.append(pdf_text(address, sub_style))
         elements.append(Spacer(1, 2))
 
-    elements.append(Paragraph(title, title_style))
+    elements.append(pdf_text(title, title_style, latin_font=font_name, devanagari_font=font_bold))
     if filter_summary:
-        elements.append(Paragraph(filter_summary, ParagraphStyle('FS', parent=styles['Normal'], fontSize=7, alignment=TA_CENTER, fontName=font_name, textColor=colors.HexColor('#718096'))))
+        elements.append(pdf_text(filter_summary, ParagraphStyle('FS', parent=styles['Normal'], fontSize=7, alignment=TA_CENTER, fontName=font_name, textColor=colors.HexColor('#718096'))))
     elements.append(Spacer(1, 6))
 
-    data = [headers]
+    data = [[pdf_text(h, header_style) for h in headers]]
     for row in rows:
-        data.append([str(c) if c is not None else '' for c in row])
+        data.append([pdf_text(c, normal) for c in row])
     tbl = Table(data, colWidths=col_widths, repeatRows=1)
     tbl.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2c5282')),
@@ -6948,9 +7005,9 @@ def make_pdf_report(title, headers, rows, col_widths, filter_summary=''):
     elements.append(Spacer(1, 12))
 
     sig_data = [
-        [Paragraph('&nbsp;', normal), Paragraph('&nbsp;', normal), Paragraph('&nbsp;', normal), Paragraph('&nbsp;', normal)],
-        [Paragraph('<u>Prepared By</u>', normal), Paragraph('<u>Checked By</u>', normal), Paragraph('<u>Approved By</u>', normal), Paragraph('<u>Section Head</u>', normal)],
-        [Paragraph('(Name &amp; Signature)', small), Paragraph('(Name &amp; Signature)', small), Paragraph('(Name &amp; Signature)', small), Paragraph('(Name &amp; Signature)', small)],
+        [pdf_text('', normal), pdf_text('', normal), pdf_text('', normal), pdf_text('', normal)],
+        [pdf_text('Prepared By', normal), pdf_text('Checked By', normal), pdf_text('Approved By', normal), pdf_text('Section Head', normal)],
+        [pdf_text('(Name & Signature)', small), pdf_text('(Name & Signature)', small), pdf_text('(Name & Signature)', small), pdf_text('(Name & Signature)', small)],
     ]
     sig_tbl = Table(sig_data, colWidths=[45*mm, 45*mm, 45*mm, 45*mm])
     sig_tbl.setStyle(TableStyle([
@@ -6964,7 +7021,7 @@ def make_pdf_report(title, headers, rows, col_widths, filter_summary=''):
     elements.append(Spacer(1, 8))
 
     now_val = datetime.now()
-    elements.append(Paragraph(f"Generated on: {today_bs()} {now_val.strftime('%H:%M')} | {office_name} - LEOC", small))
+    elements.append(pdf_text(f"Generated on: {today_bs()} {now_val.strftime('%H:%M')} | {office_name} - LEOC", small))
 
     report_footer_setting = AppSettings.get_setting('report_footer', '')
     if report_footer_setting:
@@ -6972,7 +7029,7 @@ def make_pdf_report(title, headers, rows, col_widths, filter_summary=''):
         for line in report_footer_setting.split('\n'):
             line = line.strip()
             if line:
-                elements.append(Paragraph(line, sub_style))
+                elements.append(pdf_text(line, sub_style))
 
     doc.build(elements)
     buffer.seek(0)
