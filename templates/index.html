@@ -229,6 +229,32 @@
 </div>
 
 <div id="reliefDashboard" style="display:none">
+    <div class="relief-filters mb-4">
+        <div class="row g-2 align-items-end">
+            <div class="col-md-3 col-6">
+                <label class="form-label mb-1 small text-muted">Fiscal Year</label>
+                <select class="form-select form-select-sm" id="reliefFiscalYear" onchange="loadReliefDashboard()">
+                    <option value="">All Fiscal Years</option>
+                </select>
+            </div>
+            <div class="col-md-3 col-6">
+                <label class="form-label mb-1 small text-muted">Ward</label>
+                <select class="form-select form-select-sm" id="reliefWard" onchange="loadReliefDashboard()">
+                    <option value="">All Wards</option>
+                </select>
+            </div>
+            <div class="col-md-3 col-6">
+                <label class="form-label mb-1 small text-muted">Incident Type</label>
+                <select class="form-select form-select-sm" id="reliefIncidentType" onchange="loadReliefDashboard()">
+                    <option value="">All Types</option>
+                </select>
+            </div>
+            <div class="col-md-3 col-6 d-flex align-items-end gap-2">
+                <button class="btn btn-outline-primary btn-sm flex-grow-1" onclick="loadReliefDashboard()"><i class="bi bi-funnel me-1"></i>Apply Filters</button>
+                <button class="btn btn-outline-secondary btn-sm" onclick="resetReliefFilters()"><i class="bi bi-arrow-counterclockwise"></i></button>
+            </div>
+        </div>
+    </div>
     <div class="row g-3 mb-4" id="reliefStatCards">
         <div class="col-md-3 col-6">
             <div class="stat-card stat-card-primary">
@@ -316,10 +342,13 @@
     </div>
 
     <div class="card mb-4">
-        <div class="card-header">
+        <div class="card-header d-flex justify-content-between align-items-center">
             <span><i class="bi bi-map me-2 text-danger"></i>GIS Map - Incidents & Relief Distribution</span>
+            <button class="btn btn-sm btn-outline-secondary" onclick="toggleMapFullscreen()" id="fullscreenBtn" title="Full Screen">
+                <i class="bi bi-arrows-fullscreen"></i>
+            </button>
         </div>
-        <div class="card-body p-0">
+        <div class="card-body p-0" id="mapContainer">
             <div id="reliefMap" style="height:500px;width:100%;border-radius:0 0 var(--bs-card-border-radius) var(--bs-card-border-radius)"></div>
         </div>
     </div>
@@ -759,6 +788,53 @@
     color: #1e293b;
     padding: 4px 10px;
 }
+
+#mapContainer:-webkit-full-screen { width:100vw !important; height:100vh !important; background:#fff; padding:0; }
+#mapContainer:-moz-full-screen { width:100vw !important; height:100vh !important; background:#fff; padding:0; }
+#mapContainer:-ms-fullscreen { width:100vw !important; height:100vh !important; background:#fff; padding:0; }
+#mapContainer:fullscreen { width:100vw !important; height:100vh !important; background:#fff; padding:0; }
+#mapContainer:fullscreen #reliefMap { height:100vh !important; border-radius:0 !important; }
+
+.incident-tip {
+    font-size: 12px; line-height: 1.5; min-width: 260px;
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+.incident-tip-header {
+    color: #fff; font-weight: 700; font-size: 13px;
+    padding: 6px 10px; white-space: nowrap;
+}
+.incident-tip-body {
+    background: #1e293b; color: #f1f5f9;
+    padding: 8px 10px; display: flex; flex-direction: column; gap: 3px;
+}
+.incident-tip-body strong { color: #94a3b8; }
+
+.relief-tip { font-size:12px; line-height:1.5; min-width:260px; border-radius:6px; box-shadow:0 4px 12px rgba(0,0,0,0.3); }
+.relief-tip-header { color:#fff; font-weight:700; font-size:13px; padding:6px 10px; white-space:nowrap; background:#15803d; }
+.relief-tip-body { background:#1e293b; color:#f1f5f9; padding:8px 10px; display:flex; flex-direction:column; gap:3px; }
+.incident-tip-row { display: flex; gap: 12px; font-size: 11px; }
+.incident-tip-row span { white-space: nowrap; flex-shrink: 0; }
+.incident-tip-desc { font-size: 11px; color: #cbd5e1; padding: 2px 0; line-height: 1.4; }
+.incident-tip-divider { border-top: 1px solid #334155; margin: 3px 0; }
+.leaflet-tooltip.incident-tip-container {
+    background: none !important; border: none !important;
+    box-shadow: none !important; padding: 0 !important;
+    max-width: none !important;
+}
+
+.leaflet-control-layers {
+    background: rgba(30,41,59,0.92) !important;
+    color: #f1f5f9 !important;
+    border: 1px solid #475569 !important;
+    border-radius: 8px !important;
+    padding: 6px 10px !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3) !important;
+}
+.leaflet-control-layers label { font-size:13px; color:#f1f5f9 !important; }
+.leaflet-control-layers-selector { margin-top:2px; accent-color:#3b82f6; }
+.leaflet-control-layers-base label, .leaflet-control-layers-overlays label { color:#f1f5f9 !important; }
+.leaflet-control-layers-separator { border-color:#475569 !important; }
 </style>
 {% endblock %}
 {% block extra_js %}
@@ -907,7 +983,15 @@ async function loadDashboard() {
 
 async function loadReliefDashboard() {
     try {
-        const resp = await fetch('/api/dashboard/relief');
+        const fy = document.getElementById('reliefFiscalYear').value;
+        const ward = document.getElementById('reliefWard').value;
+        const it = document.getElementById('reliefIncidentType').value;
+        const params = new URLSearchParams();
+        if (fy) params.set('fiscal_year', fy);
+        if (ward) params.set('ward', ward);
+        if (it) params.set('incident_type', it);
+        const qs = params.toString();
+        const resp = await fetch('/api/dashboard/relief' + (qs ? '?' + qs : ''));
         const data = await resp.json();
         if (!data || !data.success) return;
 
@@ -1005,9 +1089,50 @@ async function loadReliefDashboard() {
         });
 
         loadMapData();
+        populateReliefFilters(data);
     } catch (e) {
         console.error('Relief dashboard load error:', e);
     }
+}
+
+function populateReliefFilters(data) {
+    const fySel = document.getElementById('reliefFiscalYear');
+    const wardSel = document.getElementById('reliefWard');
+    const typeSel = document.getElementById('reliefIncidentType');
+    if (!fySel || !wardSel || !typeSel) return;
+    if (data.filter_options && fySel.options.length <= 1) {
+        if (data.filter_options.fiscal_years && data.filter_options.fiscal_years.length) {
+            data.filter_options.fiscal_years.forEach(fy => {
+                const opt = document.createElement('option');
+                opt.value = fy;
+                opt.textContent = fy;
+                fySel.appendChild(opt);
+            });
+        }
+        if (data.filter_options.wards && data.filter_options.wards.length) {
+            data.filter_options.wards.forEach(w => {
+                const opt = document.createElement('option');
+                opt.value = w.id;
+                opt.textContent = w.name;
+                wardSel.appendChild(opt);
+            });
+        }
+        if (data.filter_options.incident_types && data.filter_options.incident_types.length) {
+            data.filter_options.incident_types.forEach(t => {
+                const opt = document.createElement('option');
+                opt.value = t;
+                opt.textContent = t;
+                typeSel.appendChild(opt);
+            });
+        }
+    }
+}
+
+function resetReliefFilters() {
+    document.getElementById('reliefFiscalYear').value = '';
+    document.getElementById('reliefWard').value = '';
+    document.getElementById('reliefIncidentType').value = '';
+    loadReliefDashboard();
 }
 
 async function loadMapData() {
@@ -1024,18 +1149,10 @@ async function loadMapData() {
             reliefMapInstance = null;
         }
 
-        let boundaryLayer = null;
         let boundaryBounds = null;
         if (data.boundary && data.boundary.features) {
-            boundaryLayer = L.geoJSON(data.boundary, {
-                style: {
-                    color: '#b91c1c',
-                    weight: 3,
-                    fillColor: '#fef2f2',
-                    fillOpacity: 0.15
-                }
-            });
-            boundaryLayer.eachLayer(function(layer) {
+            const tmpLayer = L.geoJSON(data.boundary);
+            tmpLayer.eachLayer(function(layer) {
                 if (layer.getBounds) {
                     boundaryBounds = layer.getBounds();
                 }
@@ -1043,6 +1160,9 @@ async function loadMapData() {
         }
 
         if (!boundaryBounds) return;
+
+        function fmt(v) { return (v ?? 0).toLocaleString(); }
+        function trunc(v, n) { return v && v.length > n ? v.slice(0, n) + '...' : v || ''; }
 
         reliefMapInstance = L.map('reliefMap', {
             zoomControl: true,
@@ -1054,13 +1174,28 @@ async function loadMapData() {
             zoomDelta: 0.5
         });
 
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 18,
-            minZoom: 11,
+        var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 18, minZoom: 11,
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-        }).addTo(reliefMapInstance);
+        });
 
-        boundaryLayer.addTo(reliefMapInstance);
+        var satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            maxZoom: 18, minZoom: 11,
+            attribution: '&copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+        });
+
+        osm.addTo(reliefMapInstance);
+
+        var boundaryGroup = L.layerGroup();
+        var wardsGroup = L.layerGroup();
+        var incidentsGroup = L.layerGroup();
+        var reliefGroup = L.layerGroup();
+
+        if (data.boundary && data.boundary.features) {
+            L.geoJSON(data.boundary, {
+                style: { color: '#b91c1c', weight: 3, fillColor: '#fef2f2', fillOpacity: 0.15 }
+            }).addTo(boundaryGroup);
+        }
 
         if (data.wards && data.wards.features) {
             const wardColors = [
@@ -1070,17 +1205,12 @@ async function loadMapData() {
             L.geoJSON(data.wards, {
                 style: function(feature) {
                     const idx = data.wards.features.indexOf(feature) % wardColors.length;
-                    return {
-                        color: '#1e293b',
-                        weight: 2,
-                        fillColor: wardColors[idx],
-                        fillOpacity: 0.08
-                    };
+                    return { color: '#ca8a04', weight: 2, fillColor: wardColors[idx], fillOpacity: 0.08 };
                 },
                 onEachFeature: function(feature, layer) {
                     if (feature.properties && feature.properties.name) {
                         layer.bindTooltip(feature.properties.name, {
-                            permanent: true,
+                            sticky: true,
                             direction: 'center',
                             className: 'ward-label'
                         });
@@ -1092,16 +1222,16 @@ async function loadMapData() {
                                 iconSize: [0, 0]
                             }),
                             interactive: false
-                        }).addTo(reliefMapInstance);
+                        }).addTo(wardsGroup);
                     }
                 }
-            }).addTo(reliefMapInstance);
+            }).addTo(wardsGroup);
         }
+        wardsGroup.addTo(reliefMapInstance);
 
         if (data.incident_markers && data.incident_markers.length) {
             data.incident_markers.forEach(function(m) {
                 const color = m.severity === 'high' ? '#dc3545' : m.severity === 'medium' ? '#ffc107' : '#0d6efd';
-                const bgColor = m.severity === 'high' ? '#b91c1c' : m.severity === 'medium' ? '#b38600' : '#0369a1';
                 const marker = L.marker([m.lat, m.lng], {
                     icon: L.divIcon({
                         className: 'incident-marker',
@@ -1110,7 +1240,25 @@ async function loadMapData() {
                         iconAnchor: [16, 16],
                         popupAnchor: [0, -18]
                     })
-                }).addTo(reliefMapInstance);
+                }).addTo(incidentsGroup);
+                const sevColor = m.severity === 'high' ? '#dc3545' : m.severity === 'medium' ? '#f59e0b' : '#0d6efd';
+                marker.bindTooltip(`
+                    <div class="incident-tip">
+                        <div class="incident-tip-header" style="background:${sevColor}">${m.name}</div>
+                        <div class="incident-tip-body">
+                            <div class="incident-tip-row"><span><strong>Type:</strong> ${m.type}</span><span><strong>Ward:</strong> ${m.ward_name || m.ward || 'N/A'}</span></div>
+                            <div class="incident-tip-row"><span><strong>Status:</strong> ${m.status}</span><span><strong>Severity:</strong> ${m.severity}</span></div>
+                            <div class="incident-tip-desc">${trunc(m.description, 54)}</div>
+                            <div class="incident-tip-divider"></div>
+                            <div class="incident-tip-row"><span><strong>Deaths:</strong> ${fmt(m.deaths)}</span><span><strong>Injured:</strong> ${fmt(m.injured)}</span></div>
+                            <div class="incident-tip-row"><span><strong>Missing:</strong> ${fmt(m.missing)}</span><span><strong>Affected:</strong> ${fmt(m.affected_people)}</span></div>
+                            <div class="incident-tip-row"><span><strong>House Destroyed:</strong> ${fmt(m.house_destroyed)}</span><span><strong>House Damaged:</strong> ${fmt(m.house_damaged)}</span></div>
+                            <div class="incident-tip-divider"></div>
+                            <div class="incident-tip-row"><span><strong>Cattle Lost:</strong> ${fmt(m.cattle_lost)}</span><span><strong>Poultry Lost:</strong> ${fmt(m.poultry_lost)}</span></div>
+                            <div class="incident-tip-row"><span><strong>Est. Loss:</strong> NPR ${fmt(m.estimated_loss)}</span></div>
+                        </div>
+                    </div>
+                `, { sticky: true, offset: [0, -8], className: 'incident-tip-container' });
                 marker.bindPopup(`
                     <div style="min-width:200px">
                         <h6 style="margin:0 0 6px 0;color:${color};font-weight:700"><i class="bi bi-lightning-charge-fill me-1"></i>${m.name}</h6>
@@ -1124,6 +1272,7 @@ async function loadMapData() {
                 `);
             });
         }
+        incidentsGroup.addTo(reliefMapInstance);
 
         if (data.relief_markers && data.relief_markers.length) {
             data.relief_markers.forEach(function(m) {
@@ -1135,19 +1284,45 @@ async function loadMapData() {
                         iconAnchor: [16, 16],
                         popupAnchor: [0, -18]
                     })
-                }).addTo(reliefMapInstance);
+                }).addTo(reliefGroup);
+                var names = m.sample_names && m.sample_names.length ? m.sample_names.join(', ') : 'N/A';
+                marker.bindTooltip(`
+                    <div class="relief-tip">
+                        <div class="relief-tip-header">${m.distribution_no}</div>
+                        <div class="relief-tip-body">
+                            <div class="incident-tip-row"><span><strong>Location:</strong> ${m.location || 'N/A'}</span><span><strong>Date:</strong> ${m.date || 'N/A'}</span></div>
+                            <div class="incident-tip-row"><span><strong>Beneficiaries:</strong> ${fmt(m.beneficiary_count)}</span><span><strong>Total Items:</strong> ${fmt(m.total_quantity)}</span></div>
+                            <div class="incident-tip-desc"><strong>Items:</strong> ${m.top_items || 'N/A'}</div>
+                            <div class="incident-tip-desc"><strong>Families:</strong> ${names}</div>
+                        </div>
+                    </div>
+                `, { sticky: true, offset: [0, -8], className: 'incident-tip-container' });
                 marker.bindPopup(`
-                    <div style="min-width:200px">
+                    <div style="min-width:220px">
                         <h6 style="margin:0 0 6px 0;color:#15803d;font-weight:700"><i class="bi bi-box-seam-fill me-1"></i>${m.distribution_no}</h6>
                         <table style="font-size:12px;width:100%;border-collapse:collapse">
                             <tr><td style="padding:3px 6px;color:#6c757d;border-bottom:1px solid #f0f0f0">Location</td><td style="padding:3px 6px;font-weight:600;border-bottom:1px solid #f0f0f0">${m.location || 'N/A'}</td></tr>
                             <tr><td style="padding:3px 6px;color:#6c757d;border-bottom:1px solid #f0f0f0">Date</td><td style="padding:3px 6px;font-weight:600;border-bottom:1px solid #f0f0f0">${m.date || 'N/A'}</td></tr>
-                            <tr><td style="padding:3px 6px;color:#6c757d">Incident</td><td style="padding:3px 6px;font-weight:600">${m.incident_name || 'N/A'}</td></tr>
+                            <tr><td style="padding:3px 6px;color:#6c757d;border-bottom:1px solid #f0f0f0">Incident</td><td style="padding:3px 6px;font-weight:600;border-bottom:1px solid #f0f0f0">${m.incident_name || 'N/A'}</td></tr>
+                            <tr><td style="padding:3px 6px;color:#6c757d;border-bottom:1px solid #f0f0f0">Beneficiaries</td><td style="padding:3px 6px;font-weight:600;border-bottom:1px solid #f0f0f0">${fmt(m.beneficiary_count)}</td></tr>
+                            <tr><td style="padding:3px 6px;color:#6c757d;border-bottom:1px solid #f0f0f0">Items Distributed</td><td style="padding:3px 6px;font-weight:600;border-bottom:1px solid #f0f0f0">${fmt(m.total_quantity)}</td></tr>
+                            <tr><td style="padding:3px 6px;color:#6c757d;border-bottom:1px solid #f0f0f0">Top Items</td><td style="padding:3px 6px;font-weight:600;border-bottom:1px solid #f0f0f0">${m.top_items || 'N/A'}</td></tr>
                         </table>
                     </div>
                 `);
             });
         }
+        reliefGroup.addTo(reliefMapInstance);
+
+        L.control.layers({
+            'OpenStreetMap': osm,
+            'Satellite': satellite
+        }, {
+            'Thalara Boundary': boundaryGroup,
+            'Ward Boundaries': wardsGroup,
+            'Incident Markers': incidentsGroup,
+            'Relief Distribution': reliefGroup
+        }, { position: 'topright' }).addTo(reliefMapInstance);
 
         reliefMapInstance.fitBounds(boundaryBounds, { padding: [15, 15] });
         const currentZoom = reliefMapInstance.getZoom();
@@ -1166,6 +1341,55 @@ async function loadMapData() {
         console.error('Map load error:', e);
     }
 }
+
+function toggleMapFullscreen() {
+    var container = document.getElementById('mapContainer');
+    var btn = document.getElementById('fullscreenBtn');
+    if (!document.fullscreenElement && !document.webkitFullscreenElement && !document.msFullscreenElement) {
+        if (container.requestFullscreen) {
+            container.requestFullscreen();
+        } else if (container.webkitRequestFullscreen) {
+            container.webkitRequestFullscreen();
+        } else if (container.msRequestFullscreen) {
+            container.msRequestFullscreen();
+        }
+        btn.innerHTML = '<i class="bi bi-fullscreen-exit"></i>';
+        btn.title = 'Exit Full Screen';
+    } else {
+        if (document.exitFullscreen) {
+            document.exitFullscreen();
+        } else if (document.webkitExitFullscreen) {
+            document.webkitExitFullscreen();
+        } else if (document.msExitFullscreen) {
+            document.msExitFullscreen();
+        }
+        btn.innerHTML = '<i class="bi bi-arrows-fullscreen"></i>';
+        btn.title = 'Full Screen';
+    }
+}
+
+document.addEventListener('fullscreenchange', function() {
+    var btn = document.getElementById('fullscreenBtn');
+    if (!btn) return;
+    if (document.fullscreenElement) {
+        btn.innerHTML = '<i class="bi bi-fullscreen-exit"></i>';
+        btn.title = 'Exit Full Screen';
+    } else {
+        btn.innerHTML = '<i class="bi bi-arrows-fullscreen"></i>';
+        btn.title = 'Full Screen';
+    }
+});
+document.addEventListener('webkitfullscreenchange', function() {
+    var btn = document.getElementById('fullscreenBtn');
+    if (!btn) return;
+    if (document.webkitFullscreenElement) {
+        btn.innerHTML = '<i class="bi bi-fullscreen-exit"></i>';
+        btn.title = 'Exit Full Screen';
+    } else {
+        btn.innerHTML = '<i class="bi bi-arrows-fullscreen"></i>';
+        btn.title = 'Full Screen';
+    }
+});
 
 async function loadIncidentDashboard() {
     try {

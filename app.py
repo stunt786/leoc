@@ -1663,7 +1663,7 @@ def add_security_headers(response):
     response.headers['X-Frame-Options'] = 'DENY'
     response.headers['X-XSS-Protection'] = '1; mode=block'
     response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
-    csp = "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com https://unpkg.com; font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net; img-src 'self' data: https://*.tile.openstreetmap.org; connect-src 'self' https://cdn.jsdelivr.net https://unpkg.com"
+    csp = "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com https://unpkg.com; font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net; img-src 'self' data: https://*.tile.openstreetmap.org https://server.arcgisonline.com; connect-src 'self' https://cdn.jsdelivr.net https://unpkg.com"
     response.headers['Content-Security-Policy'] = csp
     return response
 
@@ -5896,57 +5896,108 @@ def get_dashboard():
 def get_relief_dashboard():
     try:
         active_fy = AppSettings.get_setting('active_fiscal_year', '2081/82')
+        req_fy = request.args.get('fiscal_year') or active_fy
+        req_ward = request.args.get('ward', type=int)
+        req_incident_type = request.args.get('incident_type')
 
-        # 1. Total distributions: material + cash
-        total_mat_dist = Distribution.query.filter(Distribution.fiscal_year == active_fy).count()
-        total_cash_dist = CashDistribution.query.filter(CashDistribution.fiscal_year == active_fy).count()
+        def mat_base():
+            q = Distribution.query
+            if req_fy:
+                q = q.filter(Distribution.fiscal_year == req_fy)
+            if req_ward is not None or req_incident_type:
+                q = q.join(Incident, Distribution.incident_id == Incident.id)
+                if req_ward is not None:
+                    q = q.filter(Incident.ward == req_ward)
+                if req_incident_type:
+                    q = q.filter(Incident.incident_type == req_incident_type)
+            return q
+
+        def cash_base():
+            q = CashDistribution.query
+            if req_fy:
+                q = q.filter(CashDistribution.fiscal_year == req_fy)
+            if req_ward is not None or req_incident_type:
+                q = q.join(Incident, CashDistribution.incident_id == Incident.id)
+                if req_ward is not None:
+                    q = q.filter(Incident.ward == req_ward)
+                if req_incident_type:
+                    q = q.filter(Incident.incident_type == req_incident_type)
+            return q
+
+        def mat_items_base():
+            q = Distribution.query.join(DistributionBeneficiary, DistributionBeneficiary.distribution_id == Distribution.id)
+            if req_fy:
+                q = q.filter(Distribution.fiscal_year == req_fy)
+            if req_ward is not None or req_incident_type:
+                q = q.join(Incident, Distribution.incident_id == Incident.id)
+                if req_ward is not None:
+                    q = q.filter(Incident.ward == req_ward)
+                if req_incident_type:
+                    q = q.filter(Incident.incident_type == req_incident_type)
+            return q
+
+        # 1. Total distributions
+        total_mat_dist = mat_base().count()
+        total_cash_dist = cash_base().count()
         total_distributions = total_mat_dist + total_cash_dist
 
-        # 2. Total items distributed (material items only)
+        # 2. Total items distributed
         total_items_distributed = db.session.query(db.func.coalesce(db.func.sum(DistributionBeneficiary.quantity), 0)).join(
             Distribution, DistributionBeneficiary.distribution_id == Distribution.id
-        ).filter(Distribution.fiscal_year == active_fy).scalar()
+        ).filter(Distribution.id.in_(
+            mat_base().with_entities(Distribution.id).subquery()
+        )).scalar()
 
-        # 3. Total beneficiaries: distinct material + distinct cash
+        # 3. Total beneficiaries
         mat_bens = db.session.query(db.func.count(db.distinct(DistributionBeneficiary.family_name))).join(
             Distribution, DistributionBeneficiary.distribution_id == Distribution.id
-        ).filter(Distribution.fiscal_year == active_fy).scalar() or 0
+        ).filter(Distribution.id.in_(
+            mat_base().with_entities(Distribution.id).subquery()
+        )).scalar() or 0
         cash_bens = db.session.query(db.func.count(db.distinct(CashDistributionBeneficiary.name))).join(
             CashDistribution, CashDistributionBeneficiary.distribution_id == CashDistribution.id
-        ).filter(CashDistribution.fiscal_year == active_fy).scalar() or 0
+        ).filter(CashDistribution.id.in_(
+            cash_base().with_entities(CashDistribution.id).subquery()
+        )).scalar() or 0
         total_beneficiaries = mat_bens + cash_bens
 
         # 4. Total cash distributed
         total_cash_distributed = db.session.query(db.func.coalesce(db.func.sum(CashDistribution.total_amount), 0)).filter(
-            CashDistribution.fiscal_year == active_fy
+            CashDistribution.id.in_(
+                cash_base().with_entities(CashDistribution.id).subquery()
+            )
         ).scalar()
 
-        # 5. Items distributed chart (material only)
+        # 5. Items distributed chart
         items_distributed = db.session.query(
             DistributionBeneficiary.item,
             db.func.sum(DistributionBeneficiary.quantity)
         ).join(
             Distribution, DistributionBeneficiary.distribution_id == Distribution.id
         ).filter(
-            Distribution.fiscal_year == active_fy,
+            Distribution.id.in_(
+                mat_base().with_entities(Distribution.id).subquery()
+            ),
             DistributionBeneficiary.item.isnot(None),
             DistributionBeneficiary.item != ''
         ).group_by(DistributionBeneficiary.item).order_by(db.func.sum(DistributionBeneficiary.quantity).desc()).limit(10).all()
 
-        # 6. Distributions by ward: UNION of material + cash via incident
+        # 6. Distributions by ward
         mat_by_ward = db.session.query(
             Incident.ward,
             db.func.count(db.distinct(Distribution.id))
         ).join(Distribution, Distribution.incident_id == Incident.id
-        ).filter(Distribution.fiscal_year == active_fy
-        ).group_by(Incident.ward).order_by(Incident.ward).all()
+        ).filter(Distribution.id.in_(
+            mat_base().with_entities(Distribution.id).subquery()
+        )).group_by(Incident.ward).order_by(Incident.ward).all()
 
         cash_by_ward = db.session.query(
             Incident.ward,
             db.func.count(db.distinct(CashDistribution.id))
         ).join(CashDistribution, CashDistribution.incident_id == Incident.id
-        ).filter(CashDistribution.fiscal_year == active_fy
-        ).group_by(Incident.ward).order_by(Incident.ward).all()
+        ).filter(CashDistribution.id.in_(
+            cash_base().with_entities(CashDistribution.id).subquery()
+        )).group_by(Incident.ward).order_by(Incident.ward).all()
 
         ward_map = {}
         for w, c in mat_by_ward:
@@ -5956,7 +6007,7 @@ def get_relief_dashboard():
         ward_labels = [f"Ward {w}" for w in sorted(ward_map.keys())]
         ward_counts = [ward_map[w] for w in sorted(ward_map.keys())]
 
-        # 7. Fiscal year distribution: UNION of material + cash
+        # 7. Fiscal year distribution
         fy_mat = db.session.query(
             Distribution.fiscal_year,
             db.func.count(db.distinct(Distribution.id))
@@ -5984,6 +6035,23 @@ def get_relief_dashboard():
             db.extract('year', CashReceipt.receipt_date) == int(active_fy.split('/')[0])
         ).scalar()
 
+        # 8. Filter options
+        all_fys = sorted(set(
+            r[0] for r in Distribution.query.with_entities(Distribution.fiscal_year).distinct().filter(Distribution.fiscal_year.isnot(None), Distribution.fiscal_year != '').all()
+        ) | set(
+            r[0] for r in CashDistribution.query.with_entities(CashDistribution.fiscal_year).distinct().filter(CashDistribution.fiscal_year.isnot(None), CashDistribution.fiscal_year != '').all()
+        ))
+        all_wards = sorted(set(
+            r[0] for r in db.session.query(Incident.ward).join(Distribution, Distribution.incident_id == Incident.id).distinct().filter(Incident.ward.isnot(None)).all()
+        ) | set(
+            r[0] for r in db.session.query(Incident.ward).join(CashDistribution, CashDistribution.incident_id == Incident.id).distinct().filter(Incident.ward.isnot(None)).all()
+        ))
+        all_types = sorted(set(
+            r[0] for r in db.session.query(Incident.incident_type).join(Distribution, Distribution.incident_id == Incident.id).distinct().filter(Incident.incident_type.isnot(None), Incident.incident_type != '').all()
+        ) | set(
+            r[0] for r in db.session.query(Incident.incident_type).join(CashDistribution, CashDistribution.incident_id == Incident.id).distinct().filter(Incident.incident_type.isnot(None), Incident.incident_type != '').all()
+        ))
+
         return jsonify({
             'success': True,
             'total_distributions': total_distributions,
@@ -5999,7 +6067,12 @@ def get_relief_dashboard():
             'material_beneficiaries': mat_bens,
             'cash_beneficiaries': cash_bens,
             'total_cash_received': total_cash_received,
-            'total_cash_receipts': total_cash_receipts
+            'total_cash_receipts': total_cash_receipts,
+            'filter_options': {
+                'fiscal_years': all_fys,
+                'wards': [{'id': w, 'name': f'Ward {w}'} for w in all_wards],
+                'incident_types': all_types
+            }
         })
     except Exception as e:
         return jsonify({'success': False, 'message': friendly_message(e)}), 500
@@ -6238,7 +6311,19 @@ def get_map_data():
                         'type': inc.incident_type, 'ward': inc.ward,
                         'ward_name': ward_name_filter(inc.ward),
                         'lat': lat, 'lng': lng, 'status': inc.status,
-                        'severity': inc.severity
+                        'severity': inc.severity,
+                        'deaths': inc.deaths or 0,
+                        'injured': inc.injured or 0,
+                        'missing': inc.missing_persons or 0,
+                        'house_destroyed': inc.house_destroyed or 0,
+                        'house_damaged': inc.house_damaged or 0,
+                        'estimated_loss': float(inc.estimated_loss or 0),
+                        'affected_people': inc.affected_people or 0,
+                        'affected_households': inc.affected_households or 0,
+                        'cattle_lost': inc.cattle_lost or 0,
+                        'poultry_lost': inc.poultry_lost or 0,
+                        'goats_lost': inc.goats_sheep_lost or 0,
+                        'description': inc.description or ''
                     })
             except (ValueError, IndexError):
                 pass
@@ -6250,12 +6335,25 @@ def get_map_data():
         ).all()
         relief_markers = []
         for dist in distributions:
+            bens = DistributionBeneficiary.query.filter_by(distribution_id=dist.id).all()
+            ben_count = len(bens)
+            total_qty = sum(b.quantity or 0 for b in bens)
+            items = {}
+            for b in bens:
+                item_key = b.item or 'Unknown'
+                items[item_key] = items.get(item_key, 0) + (b.quantity or 0)
+            top_items = [f'{k} ({v})' for k, v in sorted(items.items(), key=lambda x: -x[1])[:3]]
+            sample_names = list(dict.fromkeys(b.family_name for b in bens if b.family_name))[:5]
             relief_markers.append({
                 'id': dist.id, 'distribution_no': dist.distribution_no,
                 'location': dist.location,
                 'lat': dist.latitude, 'lng': dist.longitude,
                 'date': ad_to_bs_date(dist.distribution_date) or None,
-                'incident_name': dist.incident.incident_name if dist.incident else None
+                'incident_name': dist.incident.incident_name if dist.incident else None,
+                'beneficiary_count': ben_count,
+                'total_quantity': total_qty,
+                'top_items': ', '.join(top_items),
+                'sample_names': sample_names
             })
 
         return jsonify({

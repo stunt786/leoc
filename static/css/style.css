@@ -768,6 +768,11 @@ h1,h2,h3,h4,h5,h6,p,span,div,td,th,label,.card-title,.stat-label {
     font-size: 1rem;
 }
 
+/* ============ RELIEF FILTERS ============ */
+.relief-filters { background: #fff; border-radius: var(--radius); padding: 16px 20px; box-shadow: var(--card-shadow); border: 1px solid var(--border-color); transition: var(--transition); }
+.relief-filters:hover { box-shadow: var(--card-shadow-hover); }
+[data-theme="dark"] .relief-filters { background: #1e293b; border-color: #334155; }
+
 /* ============ INCIDENT FILTERS ============ */
 .incident-filters {
     background: #fff;
