@@ -933,6 +933,10 @@ class Dispatch(db.Model):
     remarks = db.Column(db.Text)
     created_by = db.Column(db.Integer)
     created_at = db.Column(db.DateTime, default=utc_now)
+    status = db.Column(db.String(20), default='Active')
+    cancelled_at = db.Column(db.DateTime, nullable=True)
+    cancelled_by = db.Column(db.Integer, nullable=True)
+    cancel_reason = db.Column(db.Text, nullable=True)
     warehouse = db.relationship('Warehouse', backref=db.backref('dispatches', lazy=True))
     incident = db.relationship('Incident', backref=db.backref('dispatches', lazy=True))
     relief_request = db.relationship('ReliefRequest', backref=db.backref('dispatches', lazy=True))
@@ -969,6 +973,10 @@ class Dispatch(db.Model):
             'destination': self.destination, 'receiver': self.receiver,
             'phone': self.phone, 'remarks': self.remarks,
             'has_distribution': Distribution.query.filter_by(dispatch_id=self.id).first() is not None,
+            'status': self.status or 'Active',
+            'cancelled_at': self.cancelled_at.isoformat() if self.cancelled_at else None,
+            'cancelled_by': self.cancelled_by,
+            'cancel_reason': self.cancel_reason,
             'items': [i.to_dict() for i in self.items]
         }
 
@@ -3768,6 +3776,65 @@ def handle_dispatch(id):
         dispatch.remarks = data.get('remarks')
         db.session.commit()
         return jsonify({'success': True, 'message': 'Dispatch updated', 'data': dispatch.to_dict()}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
+
+@app.route('/api/dispatch/<int:id>/cancel', methods=['POST'])
+@permission_required('edit')
+def cancel_dispatch(id):
+    dispatch = db_get(Dispatch, id)
+    if not dispatch:
+        return jsonify({'success': False, 'message': 'Dispatch not found'}), 404
+    if dispatch.status == 'Cancelled':
+        return jsonify({'success': False, 'message': 'Dispatch is already cancelled'}), 400
+    if Distribution.query.filter_by(dispatch_id=dispatch.id).first():
+        return jsonify({'success': False, 'message': 'Cannot cancel a dispatch that has been distributed'}), 400
+    try:
+        data = request.get_json()
+        reason = (data.get('cancel_reason') or '').strip()
+        if not reason:
+            return jsonify({'success': False, 'message': 'Cancellation reason is required'}), 400
+
+        # Reverse inventory: re-add items to their respective warehouses
+        for item in dispatch.items:
+            wh_id = item.warehouse_id or dispatch.warehouse_id
+            if wh_id:
+                inv = Inventory.query.filter_by(item_id=item.item_id, warehouse_id=wh_id).first()
+                if inv:
+                    inv.quantity += item.quantity
+                else:
+                    inv = Inventory(item_id=item.item_id, warehouse_id=wh_id, quantity=item.quantity)
+                    db.session.add(inv)
+
+        # Reverse relief request quantity_dispatched for all linked requests
+        rr_ids = []
+        try:
+            rr_ids = json.loads(dispatch.relief_request_ids) if dispatch.relief_request_ids else []
+        except (json.JSONDecodeError, TypeError):
+            pass
+        if not rr_ids and dispatch.relief_request_id:
+            rr_ids = [dispatch.relief_request_id]
+        for rr_id in rr_ids:
+            req = db_get(ReliefRequest, rr_id)
+            if req:
+                for item in dispatch.items:
+                    rr_item = ReliefRequestItem.query.filter_by(request_id=rr_id, item_id=item.item_id).first()
+                    if rr_item:
+                        rr_item.quantity_dispatched = max(0, (rr_item.quantity_dispatched or 0) - item.quantity)
+                # Reset RR status to Pending if nothing dispatched remains
+                if req.items:
+                    anything_dispatched = any((ri.quantity_dispatched or 0) > 0 for ri in req.items)
+                    if not anything_dispatched and (req.distributed_cash_amount or 0) <= 0:
+                        req.status = 'Pending'
+
+        # Update dispatch as cancelled
+        dispatch.status = 'Cancelled'
+        dispatch.cancelled_at = utc_now()
+        dispatch.cancelled_by = current_user.id
+        dispatch.cancel_reason = reason
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Dispatch cancelled successfully', 'dispatch': dispatch.to_dict()}), 200
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': friendly_message(e)}), 500
@@ -8246,6 +8313,36 @@ def init_db():
                     db.session.commit()
                 except Exception:
                     pass
+            if 'dispatch' in inspector.get_table_names():
+                db.session.rollback()  # clear any stale transaction state
+                dp_cols = [c['name'] for c in inspector.get_columns('dispatch')]
+                dialect = db.engine.dialect.name
+                ts_type = 'TIMESTAMP' if dialect == 'postgresql' else 'DATETIME'
+                print(f"[MIGRATE] Dispatch columns: {dp_cols}, dialect={dialect}")
+                if 'status' not in dp_cols:
+                    try:
+                        db.session.execute(db.text("ALTER TABLE dispatch ADD COLUMN status VARCHAR(20) DEFAULT 'Active'"))
+                        db.session.commit()
+                    except Exception:
+                        db.session.rollback()
+                if 'cancelled_at' not in dp_cols:
+                    try:
+                        db.session.execute(db.text(f"ALTER TABLE dispatch ADD COLUMN cancelled_at {ts_type}"))
+                        db.session.commit()
+                    except Exception:
+                        db.session.rollback()
+                if 'cancelled_by' not in dp_cols:
+                    try:
+                        db.session.execute(db.text("ALTER TABLE dispatch ADD COLUMN cancelled_by INTEGER"))
+                        db.session.commit()
+                    except Exception:
+                        db.session.rollback()
+                if 'cancel_reason' not in dp_cols:
+                    try:
+                        db.session.execute(db.text("ALTER TABLE dispatch ADD COLUMN cancel_reason TEXT"))
+                        db.session.commit()
+                    except Exception:
+                        db.session.rollback()
             if not AppSettings.get_setting('office_name'):
                 AppSettings.set_setting('office_name', 'थलारा गाउँपालिका')
             if not AppSettings.get_setting('fiscal_years'):

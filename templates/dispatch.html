@@ -119,13 +119,37 @@
                         <th>Request</th>
                         <th>Destination</th>
                         <th>Items</th>
+                        <th>Status</th>
                         <th class="text-end">Actions</th>
                     </tr>
                 </thead>
                 <tbody id="dispatchTableBody">
-                    <tr><td colspan="8" class="text-center py-4"><div class="spinner-border text-primary"></div></td></tr>
+                    <tr><td colspan="9" class="text-center py-4"><div class="spinner-border text-primary"></div></td></tr>
                 </tbody>
             </table>
+        </div>
+    </div>
+</div>
+<!-- Cancel Dispatch Modal -->
+<div class="modal fade" id="cancelDispatchModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title"><i class="bi bi-x-circle-fill me-2"></i>Cancel Dispatch</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted small mb-3">This will reverse inventory quantities for all items and mark this dispatch as cancelled.</p>
+                <input type="hidden" id="cancelDispatchId">
+                <div class="mb-3">
+                    <label class="form-label">Reason for Cancellation <span class="text-danger">*</span></label>
+                    <textarea class="form-control" id="cancelReason" rows="3" placeholder="Enter the reason for cancelling this dispatch..." required></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-danger" onclick="confirmCancelDispatch()"><i class="bi bi-check-lg me-1"></i>Confirm Cancel</button>
+            </div>
         </div>
     </div>
 </div>
@@ -140,6 +164,12 @@ let inventoryMap = {};
 let isSaving = false;
 
 let warehouseList = [];
+
+function statusBadge(status) {
+    if (status === 'Cancelled') return '<span class="badge bg-danger">Cancelled</span>';
+    if (status === 'Active') return '<span class="badge bg-success">Active</span>';
+    return `<span class="badge bg-secondary">${status || 'Active'}</span>`;
+}
 
 async function loadFormData() {
     try {
@@ -372,12 +402,15 @@ async function loadDispatches() {
 function renderDispatches(data) {
     const tbody = document.getElementById('dispatchTableBody');
     if (data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-muted">No dispatches found</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" class="text-center py-4 text-muted">No dispatches found</td></tr>';
         return;
     }
     tbody.innerHTML = data.map(dp => {
         const itemsCount = dp.items ? dp.items.length : 0;
-        return `<tr>
+        const isCancelled = dp.status === 'Cancelled';
+        const canEdit = !dp.has_distribution && !isCancelled;
+        const canCancel = !dp.has_distribution && !isCancelled;
+        return `<tr class="${isCancelled ? 'table-danger' : ''}">
             <td><strong>${dp.dispatch_number}</strong></td>
             <td>${dp.date ? new Date(dp.date).toLocaleDateString() : '-'}</td>
             <td>${dp.warehouse_name || '-'}</td>
@@ -385,11 +418,15 @@ function renderDispatches(data) {
             <td>${dp.request_number || '-'}</td>
             <td>${dp.destination || '-'}</td>
             <td><span class="badge bg-dark">${itemsCount} item${itemsCount !== 1 ? 's' : ''}</span></td>
+            <td>${statusBadge(dp.status)}</td>
             <td class="text-end">
                 <button class="btn btn-sm btn-outline-primary" onclick="viewDispatch(${dp.id})"><i class="bi bi-eye"></i></button>
-                ${dp.has_distribution
-                    ? '<button class="btn btn-sm btn-outline-secondary" disabled title="Already distributed — cannot edit"><i class="bi bi-pencil"></i></button>'
-                    : '<button class="btn btn-sm btn-outline-warning" onclick="editDispatch(' + dp.id + ')" title="Edit"><i class="bi bi-pencil"></i></button>'}
+                ${canEdit
+                    ? '<button class="btn btn-sm btn-outline-warning" onclick="editDispatch(' + dp.id + ')" title="Edit"><i class="bi bi-pencil"></i></button>'
+                    : '<button class="btn btn-sm btn-outline-secondary" disabled title="' + (isCancelled ? 'Cancelled — cannot edit' : 'Already distributed — cannot edit') + '"><i class="bi bi-pencil"></i></button>'}
+                ${canCancel
+                    ? '<button class="btn btn-sm btn-outline-danger" onclick="showCancelModal(' + dp.id + ')" title="Cancel Dispatch"><i class="bi bi-x-circle"></i></button>'
+                    : ''}
                 <button class="btn btn-sm btn-outline-secondary" onclick="window.open('/api/dispatch/${dp.id}/print','_blank')" title="Print"><i class="bi bi-printer"></i></button>
             </td>
         </tr>`;
@@ -404,6 +441,48 @@ function filterDispatches() {
         (d.incident_name && d.incident_name.toLowerCase().includes(q))
     );
     renderDispatches(filtered);
+}
+
+let cancelModal = null;
+
+function showCancelModal(id) {
+    document.getElementById('cancelDispatchId').value = id;
+    document.getElementById('cancelReason').value = '';
+    if (!cancelModal) {
+        cancelModal = new bootstrap.Modal(document.getElementById('cancelDispatchModal'));
+    }
+    cancelModal.show();
+}
+
+async function confirmCancelDispatch() {
+    const id = document.getElementById('cancelDispatchId').value;
+    const reason = document.getElementById('cancelReason').value.trim();
+    if (!reason) { showToast('warning', 'Please enter a reason for cancellation'); return; }
+
+    const btn = document.querySelector('#cancelDispatchModal .btn-danger');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Cancelling...';
+
+    try {
+        const r = await fetch('/api/dispatch/' + id + '/cancel', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrf},
+            body: JSON.stringify({ cancel_reason: reason })
+        });
+        const d = await r.json();
+        if (d.success) {
+            showToast('success', 'Dispatch cancelled successfully');
+            cancelModal.hide();
+            loadDispatches();
+        } else {
+            showToast('danger', d.message);
+        }
+    } catch(e) {
+        showToast('danger', 'Error cancelling dispatch: ' + e.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-check-lg me-1"></i>Confirm Cancel';
+    }
 }
 
 async function viewDispatch(id) {
@@ -422,7 +501,7 @@ async function viewDispatch(id) {
     const modal = document.createElement('div');
     modal.className = 'modal fade';
     modal.innerHTML = `<div class="modal-dialog modal-lg"><div class="modal-content">
-        <div class="modal-header"><h5 class="modal-title"><i class="bi bi-truck me-2"></i>${dp.dispatch_number}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-header"><h5 class="modal-title"><i class="bi bi-truck me-2"></i>${dp.dispatch_number} ${statusBadge(dp.status)}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
         <div class="modal-body">
             <div class="row g-3 mb-3">
                 <div class="col-md-4"><strong>Date:</strong> ${dp.date || '-'}</div>
@@ -434,6 +513,14 @@ async function viewDispatch(id) {
                 <div class="col-md-4"><strong>Receiver:</strong> ${dp.receiver || '-'}</div>
                 <div class="col-md-4"><strong>Phone:</strong> ${dp.phone || '-'}</div>
                 <div class="col-12"><strong>Remarks:</strong> ${dp.remarks || '-'}</div>
+                ${dp.status === 'Cancelled' ? `
+                <div class="col-12">
+                    <div class="alert alert-danger mb-0 py-2">
+                        <strong><i class="bi bi-x-circle-fill me-1"></i>Cancelled</strong>
+                        ${dp.cancel_reason ? '<br><span class="small">Reason: ' + dp.cancel_reason + '</span>' : ''}
+                        ${dp.cancelled_at ? '<br><span class="small">At: ' + new Date(dp.cancelled_at).toLocaleString() + '</span>' : ''}
+                    </div>
+                </div>` : ''}
             </div>
             <hr><h6>Dispatched Items</h6>${itemsHtml}
         </div>
@@ -468,6 +555,10 @@ async function editDispatch(id) {
         const dp = d.dispatch;
         if (dp.has_distribution) {
             showToast('warning', 'Cannot edit dispatch — it has already been distributed to relief beneficiaries');
+            return;
+        }
+        if (dp.status === 'Cancelled') {
+            showToast('warning', 'Cannot edit dispatch — it has been cancelled');
             return;
         }
         document.getElementById('dp_id').value = dp.id;
@@ -614,11 +705,19 @@ async function saveDispatch() {
         if (isEdit) {
             const check = await fetch('/api/dispatch/' + document.getElementById('dp_id').value);
             const checkData = await check.json();
-            if (checkData.success && checkData.dispatch && checkData.dispatch.has_distribution) {
-                showToast('warning', 'Cannot save — this dispatch has already been distributed to relief beneficiaries');
-                isSaving = false;
-                if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-check-lg me-1"></i>Update Dispatch'; }
-                return;
+            if (checkData.success && checkData.dispatch) {
+                if (checkData.dispatch.has_distribution) {
+                    showToast('warning', 'Cannot save — this dispatch has already been distributed');
+                    isSaving = false;
+                    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-check-lg me-1"></i>Update Dispatch'; }
+                    return;
+                }
+                if (checkData.dispatch.status === 'Cancelled') {
+                    showToast('warning', 'Cannot save — this dispatch has been cancelled');
+                    isSaving = false;
+                    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-check-lg me-1"></i>Update Dispatch'; }
+                    return;
+                }
             }
         }
 

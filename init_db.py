@@ -390,6 +390,12 @@ def run_migrations():
         ],
         'situation_report': [('is_locked', 'BOOLEAN DEFAULT 0')],
         'public_information': [('is_locked', 'BOOLEAN DEFAULT 0')],
+        'dispatch': [
+            ('status', "VARCHAR(20) DEFAULT 'Active'"),
+            ('cancelled_at', 'DATETIME'),
+            ('cancelled_by', 'INTEGER'),
+            ('cancel_reason', 'TEXT'),
+        ],
     }
     
     migrated = 0

@@ -59,10 +59,10 @@
                 <div class="col-md-3">
                     <label class="form-label">Import from Relief Request</label>
                     <div class="input-group">
-                        <select class="form-select" id="dist_import_rr">
-                            <option value="">Select Request</option>
+                        <select class="form-select" id="dist_import_rr" disabled>
+                            <option value="">Auto — selects with dispatches</option>
                         </select>
-                        <button type="button" class="btn btn-outline-info" onclick="importFromReliefRequest()" title="Import"><i class="bi bi-download"></i></button>
+                        <button type="button" class="btn btn-outline-info" onclick="importFromReliefRequest()" title="Import from auto-selected RR"><i class="bi bi-download"></i></button>
                     </div>
                 </div>
                 <div class="col-12">
@@ -241,6 +241,8 @@ async function loadFormData() {
         }
         pending.forEach(dp => {
             dispatchRRMap[dp.id] = dp.relief_request_ids || (dp.relief_request_id ? [dp.relief_request_id] : []);
+            dispatchItemsCache[dp.id] = dp.items || [];
+            dispatchDetailsCache[dp.id] = dp;
             const li = document.createElement('li');
             li.style.padding = '2px 0';
             const label = document.createElement('label');
@@ -275,12 +277,8 @@ async function loadFormData() {
             reliefRequestCashMap[rr.id] = rr;
         });
 
-        // Populate relief request import dropdown
-        const rrSel = document.getElementById('dist_import_rr');
-        rrSel.innerHTML = '<option value="">Select Request</option>' +
-            (d.requests || []).map(rr =>
-                `<option value="${rr.id}">${rr.request_number} - ${rr.requester_name || rr.organization || ''} (${rr.incident_name || ''})</option>`
-            ).join('');
+        // Relief request import dropdown — populated dynamically when dispatches are selected
+        document.getElementById('dist_import_rr').innerHTML = '<option value="">Auto — selects with dispatches</option>';
 
         // Load cash distribution data (fund sources from Fund Management)
         const fundSel = document.getElementById('cdFund');
@@ -337,37 +335,23 @@ async function onDispatchChange() {
         return;
     }
 
-    // Load all selected dispatches
+    // Use pre-populated cache from initial data load
     let allItems = [];
     let incidentName = '';
     let incidentId = null;
     let rrIds = [];
-    let hasError = false;
 
     for (const dpId of selectedIds) {
-        try {
-            const r = await fetch('/api/dispatch/' + dpId);
-            const d = await r.json();
-            if (d.success && d.dispatch) {
-                const dp = d.dispatch;
-                if (!incidentName) {
-                    incidentName = dp.incident_name || '';
-                    incidentId = dp.incident_id;
-                }
-                console.log('Dispatch API response', dpId, dp.dispatch_number, 'relief_requests:', dp.relief_requests);
-                dispatchItemsCache[dpId] = dp.items || [];
-                dispatchDetailsCache[dpId] = dp;
-                allItems = allItems.concat(dp.items || []);
-                // Collect all linked relief request IDs
-                const ids = dp.relief_request_ids || (dp.relief_request_id ? [dp.relief_request_id] : []);
-                ids.forEach(id => { if (id && !rrIds.includes(id)) rrIds.push(id); });
-            }
-        } catch(e) {
-            hasError = true;
+        const dp = dispatchDetailsCache[dpId];
+        if (!dp) continue;
+        if (!incidentName) {
+            incidentName = dp.incident_name || '';
+            incidentId = dp.incident_id;
         }
+        allItems = allItems.concat(dp.items || []);
+        const ids = dp.relief_request_ids || (dp.relief_request_id ? [dp.relief_request_id] : []);
+        ids.forEach(id => { if (id && !rrIds.includes(id)) rrIds.push(id); });
     }
-
-    if (hasError) { showToast('danger', 'Failed to load some dispatch details'); return; }
 
     document.getElementById('dist_incident').value = incidentName;
 
@@ -422,6 +406,29 @@ async function onDispatchChange() {
             <div class="progress mt-1" style="height:3px;max-width:300px"><div class="progress-bar bg-success" style="width:${pct}%"></div></div>
         `;
         cashSection.style.display = '';
+    }
+
+    // Auto-populate relief request dropdown from selected dispatches
+    const rrSel = document.getElementById('dist_import_rr');
+    if (rrIds.length === 1) {
+        const rr = reliefRequestCashMap[rrIds[0]];
+        if (rr) {
+            rrSel.innerHTML = `<option value="${rr.id}">${rr.request_number} - ${rr.requester_name || rr.organization || ''}</option>`;
+            rrSel.value = rr.id;
+        }
+    } else if (rrIds.length > 1) {
+        const labels = rrIds.map(id => {
+            const rr = reliefRequestCashMap[id];
+            return rr ? `${rr.request_number} (${rr.requester_name || rr.organization || ''})` : null;
+        }).filter(Boolean);
+        rrSel.innerHTML = `<option value="">${labels.length} relief requests linked — select one via Import button</option>` + rrIds.map(id => {
+            const rr = reliefRequestCashMap[id];
+            return rr ? `<option value="${rr.id}">${rr.request_number} - ${rr.requester_name || rr.organization || ''}</option>` : '';
+        }).join('');
+        rrSel.value = '';
+    } else {
+        rrSel.innerHTML = '<option value="">Auto — selects with dispatches</option>';
+        rrSel.value = '';
     }
 }
 
@@ -693,8 +700,9 @@ function addBeneficiaryFromDispatch() {
     const dispatchIds = getSelectedDispatchIds();
     if (dispatchIds.length === 0) { showToast('warning', 'Please select at least one dispatch first'); return; }
 
-    let addedCount = 0;
-    const seenBenNames = new Set();
+    // Build aggregated beneficiary map: name -> { name, items: { item_name: total_qty } }
+    const benMap = {};
+
     dispatchIds.forEach((did) => {
         const dp = dispatchDetailsCache[did];
         if (!dp) return;
@@ -703,67 +711,19 @@ function addBeneficiaryFromDispatch() {
         const linkedRRs = dp.relief_requests || [];
 
         if (linkedRRs.length > 0) {
-            // Build a map of item_name -> count of RRs that requested it
-            const itemSharerCount = {};
-            linkedRRs.forEach(rr => {
-                (rr.items || []).forEach(ri => {
-                    itemSharerCount[ri.item_name] = (itemSharerCount[ri.item_name] || 0) + 1;
-                });
-            });
-
-            // Create one beneficiary row per unique relief request requester
             linkedRRs.forEach((rr) => {
-                const benName = rr.requester_name || rr.organization || '';
+                const benName = (rr.requester_name || rr.organization || '').trim();
                 if (!benName) return;
-                // Deduplicate: skip if this beneficiary was already added
-                if (seenBenNames.has(benName.toLowerCase())) return;
-                seenBenNames.add(benName.toLowerCase());
-
-                const match = beneficiaries.find(b => b.name && b.name.toLowerCase() === benName.toLowerCase());
-                const benData = match ? match : { name: benName };
-                addBeneficiaryRow(benData);
-
-                // Build set of item_names this RR actually requested
-                const rrItemNames = new Set((rr.items || []).map(ri => ri.item_name));
-
-                // Add ONLY dispatch items that this RR requested
-                if (dispatchItems.length > 0) {
-                    const rows = document.querySelectorAll('#beneficiaryBody tr');
-                    const lastRow = rows[rows.length - 1];
-                    const itemsContainer = lastRow.querySelector('.ben-items-container');
-                    const defaultRow = itemsContainer.querySelector('.ben-item-row');
-                    if (defaultRow) defaultRow.remove();
-
-                    const itemOptions = dispatchItems.map(i => `<option value="${i.item_name}">${i.item_name}</option>`).join('');
-
-                    dispatchItems.forEach((item) => {
-                        if (!rrItemNames.has(item.item_name)) return;
-
-                        const numSharers = itemSharerCount[item.item_name] || 1;
-                        const defaultQty = Math.floor((item.quantity || 0) / numSharers);
-                        if (defaultQty < 1) return;
-
-                        const row = document.createElement('div');
-                        row.className = 'ben-item-row mb-1';
-                        row.innerHTML = `
-                            <div class="d-flex gap-1 align-items-center">
-                                <select class="form-select form-select-sm ben-item" onchange="updateDistributedQtySummary()">
-                                    <option value="">Select Item</option>
-                                    ${itemOptions}
-                                </select>
-                                <input type="number" class="form-control form-control-sm ben-qty" style="width:80px" value="${defaultQty}" min="1" oninput="updateDistributedQtySummary()">
-                                <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeBeneficiaryItem(this)"><i class="bi bi-x"></i></button>
-                            </div>
-                        `;
-                        const select = row.querySelector('.ben-item');
-                        const option = Array.from(select.options).find(opt =>
-                            opt.value.toLowerCase() === (item.item_name || '').toLowerCase()
-                        );
-                        if (option) select.value = option.value;
-                        itemsContainer.insertBefore(row, itemsContainer.querySelector('.btn-outline-primary'));
-                    });
+                const key = benName.toLowerCase();
+                if (!benMap[key]) {
+                    benMap[key] = { name: benName, items: {} };
                 }
-                addedCount++;
+                // Aggregate dispatch items that this RR requested
+                const rrItemNames = new Set((rr.items || []).map(ri => ri.item_name));
+                dispatchItems.forEach((item) => {
+                    if (!rrItemNames.has(item.item_name)) return;
+                    benMap[key].items[item.item_name] = (benMap[key].items[item.item_name] || 0) + (item.quantity || 0);
+                });
             });
         } else {
             // Fallback: single relief request or use receiver/destination
@@ -774,66 +734,99 @@ function addBeneficiaryFromDispatch() {
             } else if (dp.relief_request_id && reliefRequestCashMap[dp.relief_request_id]) {
                 rr = reliefRequestCashMap[dp.relief_request_id];
             }
-
-            const benName = rr ? (rr.requester_name || rr.organization || '') : (dp.receiver || dp.destination || '');
+            const benName = (rr ? (rr.requester_name || rr.organization || '') : (dp.receiver || dp.destination || '')).trim();
             if (!benName) return;
-            if (seenBenNames.has(benName.toLowerCase())) return;
-            seenBenNames.add(benName.toLowerCase());
-
-            const match = beneficiaries.find(b => b.name && b.name.toLowerCase() === benName.toLowerCase());
-            const benData = match ? match : { name: benName };
-            addBeneficiaryRow(benData);
-
-            if (dispatchItems.length > 0) {
-                const rows = document.querySelectorAll('#beneficiaryBody tr');
-                const lastRow = rows[rows.length - 1];
-                const itemsContainer = lastRow.querySelector('.ben-items-container');
-                const defaultRow = itemsContainer.querySelector('.ben-item-row');
-                if (defaultRow) defaultRow.remove();
-
-                dispatchItems.forEach((item) => {
-                    const row = document.createElement('div');
-                    row.className = 'ben-item-row mb-1';
-                    const itemOptions = dispatchItems.map(i => `<option value="${i.item_name}">${i.item_name}</option>`).join('');
-                    row.innerHTML = `
-                        <div class="d-flex gap-1 align-items-center">
-                            <select class="form-select form-select-sm ben-item" onchange="updateDistributedQtySummary()">
-                                <option value="">Select Item</option>
-                                ${itemOptions}
-                            </select>
-                            <input type="number" class="form-control form-control-sm ben-qty" style="width:80px" value="${item.quantity || 1}" min="1" oninput="updateDistributedQtySummary()">
-                            <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeBeneficiaryItem(this)"><i class="bi bi-x"></i></button>
-                        </div>
-                    `;
-                    const select = row.querySelector('.ben-item');
-                    if (select) {
-                        const option = Array.from(select.options).find(opt =>
-                            opt.value.toLowerCase() === (item.item_name || '').toLowerCase()
-                        );
-                        if (option) select.value = option.value;
-                    }
-                    itemsContainer.insertBefore(row, itemsContainer.querySelector('.btn-outline-primary'));
-                });
+            const key = benName.toLowerCase();
+            if (!benMap[key]) {
+                benMap[key] = { name: benName, items: {} };
             }
-            addedCount++;
+            dispatchItems.forEach((item) => {
+                benMap[key].items[item.item_name] = (benMap[key].items[item.item_name] || 0) + (item.quantity || 0);
+            });
         }
     });
 
-    if (addedCount === 0) {
+    const keys = Object.keys(benMap);
+    if (keys.length === 0) {
         showToast('warning', 'No relief request or receiver found for selected dispatches. Add beneficiaries manually.');
-    } else {
-        updateDistributedQtySummary();
-        showToast('success', `Added ${addedCount} beneficiary row(s) from dispatch(es)`);
+        return;
     }
+
+    // Create one row per unique beneficiary with aggregated items
+    keys.forEach(key => {
+        const ben = benMap[key];
+        const match = beneficiaries.find(b => b.name && b.name.toLowerCase() === key);
+        const benData = match ? match : { name: ben.name };
+        addBeneficiaryRow(benData);
+
+        const rows = document.querySelectorAll('#beneficiaryBody tr');
+        const lastRow = rows[rows.length - 1];
+        const itemsContainer = lastRow.querySelector('.ben-items-container');
+        const defaultRow = itemsContainer.querySelector('.ben-item-row');
+        if (defaultRow) defaultRow.remove();
+
+        const itemEntries = Object.entries(ben.items);
+        if (itemEntries.length === 0) return;
+
+        const itemNames = Object.keys(ben.items);
+        const itemOptions = itemNames.map(name => `<option value="${name}">${name}</option>`).join('');
+
+        itemEntries.forEach(([itemName, totalQty]) => {
+            const row = document.createElement('div');
+            row.className = 'ben-item-row mb-1';
+            row.innerHTML = `
+                <div class="d-flex gap-1 align-items-center">
+                    <select class="form-select form-select-sm ben-item" onchange="updateDistributedQtySummary()">
+                        <option value="">Select Item</option>
+                        ${itemOptions}
+                    </select>
+                    <input type="number" class="form-control form-control-sm ben-qty" style="width:80px" value="${totalQty}" min="1" oninput="updateDistributedQtySummary()">
+                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeBeneficiaryItem(this)"><i class="bi bi-x"></i></button>
+                </div>
+            `;
+            const select = row.querySelector('.ben-item');
+            const option = Array.from(select.options).find(opt =>
+                opt.value.toLowerCase() === (itemName || '').toLowerCase()
+            );
+            if (option) select.value = option.value;
+            itemsContainer.insertBefore(row, itemsContainer.querySelector('.btn-outline-primary'));
+        });
+    });
+
+    updateDistributedQtySummary();
+    showToast('success', `Added ${keys.length} beneficiary row(s) from dispatch(es)`);
 }
 
 async function importFromReliefRequest() {
-    const rrId = parseInt(document.getElementById('dist_import_rr').value);
-    if (!rrId) { showToast('warning', 'Please select a relief request'); return; }
-    const rr = reliefRequestCashMap[rrId];
-    if (!rr) { showToast('danger', 'Relief request not found'); return; }
+    const selectedIds = getSelectedDispatchIds();
+    if (selectedIds.length === 0) {
+        showToast('warning', 'Select dispatches first — relief request is auto-populated from them');
+        return;
+    }
+
+    // Collect all unique RR IDs from selected dispatches
+    const rrIds = [];
+    selectedIds.forEach(did => {
+        const dp = dispatchDetailsCache[did];
+        if (!dp) return;
+        const ids = dp.relief_request_ids || (dp.relief_request_id ? [dp.relief_request_id] : []);
+        ids.forEach(id => { if (id && !rrIds.includes(id)) rrIds.push(id); });
+    });
+
+    if (rrIds.length === 0) {
+        showToast('warning', 'Selected dispatches have no linked relief requests. Use "Add from Dispatch" instead.');
+        return;
+    }
+
+    if (rrIds.length > 1) {
+        showToast('info', 'Multiple relief requests linked — use "Add from Dispatch" to import all beneficiaries at once');
+        return;
+    }
 
     await loadBeneficiaries();
+
+    const rr = reliefRequestCashMap[rrIds[0]];
+    if (!rr) { showToast('danger', 'Relief request not found'); return; }
 
     // Auto-fill basic info from relief request
     if (rr.organization && !document.getElementById('dist_location').value) {
@@ -847,71 +840,49 @@ async function importFromReliefRequest() {
         if (!existing) document.getElementById('dist_remarks').value = rr.remarks;
     }
 
-    // Find related dispatches from cached map
-    let foundDpIds = [];
-    for (const [dpId, dpRRIds] of Object.entries(dispatchRRMap)) {
-        const ids = Array.isArray(dpRRIds) ? dpRRIds : [dpRRIds];
-        if (ids.includes(rrId)) foundDpIds.push(parseInt(dpId));
+    const benName = rr.requester_name || rr.organization || '';
+    if (!benName) {
+        showToast('info', 'Relief request has no requester or organization name. Add beneficiaries manually.');
+        return;
     }
 
-    function addBeneficiaryFromRR() {
-        const benName = rr.requester_name || rr.organization || '';
-        if (benName) {
-            const match = beneficiaries.find(b => b.name.toLowerCase() === benName.toLowerCase());
-            const benData = match ? match : { name: benName };
-            addBeneficiaryRow(benData);
+    const match = beneficiaries.find(b => b.name && b.name.toLowerCase() === benName.toLowerCase());
+    const benData = match ? match : { name: benName };
+    addBeneficiaryRow(benData);
 
-            if (foundDpIds.length > 0 && rr.items && rr.items.length > 0) {
-                const rows = document.querySelectorAll('#beneficiaryBody tr');
-                const lastRow = rows[rows.length - 1];
-                const itemsContainer = lastRow.querySelector('.ben-items-container');
-                const addBtn = itemsContainer.querySelector('button');
-                const itemRows = itemsContainer.querySelectorAll('.ben-item-row');
+    if (rr.items && rr.items.length > 0) {
+        const rows = document.querySelectorAll('#beneficiaryBody tr');
+        const lastRow = rows[rows.length - 1];
+        const itemsContainer = lastRow.querySelector('.ben-items-container');
+        const addBtn = itemsContainer.querySelector('button');
+        const itemRows = itemsContainer.querySelectorAll('.ben-item-row');
 
-                rr.items.forEach((item, idx) => {
-                    const itemRow = idx < itemRows.length ? itemRows[idx] : null;
-                    if (itemRow) {
-                        const select = itemRow.querySelector('.ben-item');
-                        const qty = itemRow.querySelector('.ben-qty');
-                        const option = Array.from(select.options).find(opt =>
-                            opt.value.toLowerCase() === (item.item_name || '').toLowerCase()
-                        );
-                        if (option) select.value = option.value;
-                        qty.value = item.quantity_requested || 1;
-                    } else {
-                        addBeneficiaryItem(addBtn);
-                        const newRows = itemsContainer.querySelectorAll('.ben-item-row');
-                        const newRow = newRows[newRows.length - 1];
-                        const select = newRow.querySelector('.ben-item');
-                        const qty = newRow.querySelector('.ben-qty');
-                        const option = Array.from(select.options).find(opt =>
-                            opt.value.toLowerCase() === (item.item_name || '').toLowerCase()
-                        );
-                        if (option) select.value = option.value;
-                        qty.value = item.quantity_requested || 1;
-                    }
-                });
-                updateDistributedQtySummary();
+        rr.items.forEach((item, idx) => {
+            const itemRow = idx < itemRows.length ? itemRows[idx] : null;
+            if (itemRow) {
+                const select = itemRow.querySelector('.ben-item');
+                const qty = itemRow.querySelector('.ben-qty');
+                const option = Array.from(select.options).find(opt =>
+                    opt.value.toLowerCase() === (item.item_name || '').toLowerCase()
+                );
+                if (option) select.value = option.value;
+                qty.value = item.quantity_requested || 1;
+            } else {
+                addBeneficiaryItem(addBtn);
+                const newRows = itemsContainer.querySelectorAll('.ben-item-row');
+                const newRow = newRows[newRows.length - 1];
+                const select = newRow.querySelector('.ben-item');
+                const qty = newRow.querySelector('.ben-qty');
+                const option = Array.from(select.options).find(opt =>
+                    opt.value.toLowerCase() === (item.item_name || '').toLowerCase()
+                );
+                if (option) select.value = option.value;
+                qty.value = item.quantity_requested || 1;
             }
-        } else {
-            showToast('info', 'Relief request has no requester or organization name. Add beneficiaries manually.');
-        }
-        openBeneficiaryPicker();
-    }
-
-    // Auto-select dispatches related to this relief request
-    if (foundDpIds.length > 0) {
-        const checkboxes = document.querySelectorAll('#dist_dispatch_menu .dispatch-checkbox');
-        checkboxes.forEach(cb => {
-            if (foundDpIds.includes(parseInt(cb.value))) cb.checked = true;
         });
-        updateDispatchLabel();
-        // Wait for dispatch change to load items
-        setTimeout(() => addBeneficiaryFromRR(), 500);
-    } else {
-        showToast('info', 'No dispatch found for this relief request. Items will not be auto-populated.');
-        addBeneficiaryFromRR();
+        updateDistributedQtySummary();
     }
+    openBeneficiaryPicker();
 }
 
 async function loadDistributions() {
@@ -1298,6 +1269,7 @@ function resetDistributionForm() {
     document.getElementById('cdTotal').value = '0';
     document.getElementById('dist_dispatch_label').textContent = 'Select Dispatches';
     document.querySelectorAll('#dist_dispatch_menu .dispatch-checkbox').forEach(cb => cb.checked = false);
+    document.getElementById('dist_import_rr').innerHTML = '<option value="">Auto — selects with dispatches</option>';
     dispatchItemsCache = {};
     dispatchDetailsCache = {};
     isSaving = false;
