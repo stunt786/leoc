@@ -225,9 +225,21 @@ async function loadFormData() {
 
         const dispMenu = document.getElementById('dist_dispatch_menu');
         const dispatches = d.dispatches || [];
+        const pending = dispatches.filter(dp => !dp.has_distribution);
+        const completed = dispatches.filter(dp => dp.has_distribution);
         dispatchRRMap = {};
         dispMenu.innerHTML = '';
-        dispatches.forEach(dp => {
+        if (pending.length === 0) {
+            const li = document.createElement('li');
+            li.style.padding = '2px 0';
+            const label = document.createElement('label');
+            label.className = 'dropdown-item text-muted py-1';
+            label.style.cursor = 'default';
+            label.textContent = 'No pending dispatches available';
+            li.appendChild(label);
+            dispMenu.appendChild(li);
+        }
+        pending.forEach(dp => {
             dispatchRRMap[dp.id] = dp.relief_request_ids || (dp.relief_request_id ? [dp.relief_request_id] : []);
             const li = document.createElement('li');
             li.style.padding = '2px 0';
@@ -244,6 +256,16 @@ async function loadFormData() {
             li.appendChild(label);
             dispMenu.appendChild(li);
         });
+        if (completed.length > 0) {
+            const sep = document.createElement('li');
+            sep.style.padding = '2px 0';
+            const sepLabel = document.createElement('label');
+            sepLabel.className = 'dropdown-item text-muted small py-1';
+            sepLabel.style.cursor = 'default';
+            sepLabel.innerHTML = `<hr class="my-1">${completed.length} dispatch(es) already distributed — not shown`;
+            sep.appendChild(sepLabel);
+            dispMenu.appendChild(sep);
+        }
 
         document.getElementById('dist_distribution_date').value = today_bs;
         document.getElementById('dist_distribution_no').value = 'DIST-' + String(Date.now()).slice(-4);

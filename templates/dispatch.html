@@ -466,6 +466,10 @@ async function editDispatch(id) {
         const d = await r.json();
         if (!d.success) { showToast('danger', d.message); return; }
         const dp = d.dispatch;
+        if (dp.has_distribution) {
+            showToast('warning', 'Cannot edit dispatch — it has already been distributed to relief beneficiaries');
+            return;
+        }
         document.getElementById('dp_id').value = dp.id;
         document.getElementById('dp_dispatch_number').value = dp.dispatch_number;
         document.getElementById('dp_date').value = dp.date || '';
@@ -607,6 +611,17 @@ async function saveDispatch() {
     if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving...'; }
 
     try {
+        if (isEdit) {
+            const check = await fetch('/api/dispatch/' + document.getElementById('dp_id').value);
+            const checkData = await check.json();
+            if (checkData.success && checkData.dispatch && checkData.dispatch.has_distribution) {
+                showToast('warning', 'Cannot save — this dispatch has already been distributed to relief beneficiaries');
+                isSaving = false;
+                if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-check-lg me-1"></i>Update Dispatch'; }
+                return;
+            }
+        }
+
         const primaryWhId = parseInt(document.getElementById('dp_warehouse_id').value) || items[0].warehouse_id;
         const body = {
             dispatch_number: document.getElementById('dp_dispatch_number').value,
