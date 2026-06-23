@@ -1535,6 +1535,7 @@ class Beneficiary(db.Model):
     created_by = db.Column(db.Integer)
     created_at = db.Column(db.DateTime, default=utc_now)
     updated_at = db.Column(db.DateTime, default=utc_now, onupdate=utc_now)
+    status = db.Column(db.String(20), default='Active')
 
     def to_dict(self):
         fm_json = []
@@ -1559,7 +1560,8 @@ class Beneficiary(db.Model):
             'bank_account_holder_name': self.bank_account_holder_name,
             'bank_account': self.bank_account, 'bank_name': self.bank_name,
             'mobile_wallet': self.mobile_wallet,
-            'remarks': self.remarks
+            'remarks': self.remarks,
+            'status': self.status
         }
 
 # ============ WARD MODEL ============
@@ -6891,51 +6893,86 @@ def handle_429(e):
     return render_template('login.html', locked=False), 429
 
 # ============ REPORTS (PDF) ============
-def make_pdf_report(title, headers, rows, col_widths):
+def make_pdf_report(title, headers, rows, col_widths, filter_summary=''):
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=15*mm, leftMargin=15*mm, topMargin=15*mm, bottomMargin=15*mm)
     elements = []
     font_name = UNICODE_FONT if UNICODE_FONT else 'Helvetica'
     font_bold = UNICODE_FONT_BOLD if UNICODE_FONT_BOLD else 'Helvetica-Bold'
     styles = getSampleStyleSheet()
-    title_style = ParagraphStyle('T', parent=styles['Heading1'], fontSize=14, alignment=TA_CENTER, fontName=font_bold)
+    sub_style = ParagraphStyle('Sub', parent=styles['Normal'], fontSize=10, alignment=TA_CENTER, fontName=font_name, textColor=colors.HexColor('#4a5568'))
+    title_style = ParagraphStyle('T', parent=styles['Heading1'], fontSize=14, alignment=TA_CENTER, fontName=font_bold, spaceAfter=2)
     header_style = ParagraphStyle('H', parent=styles['Normal'], fontSize=10, alignment=TA_CENTER, fontName=font_name)
     normal = ParagraphStyle('N', parent=styles['Normal'], fontSize=8, fontName=font_name)
+    small = ParagraphStyle('S', parent=styles['Normal'], fontSize=7, alignment=TA_CENTER, fontName=font_name, textColor=colors.gray)
 
-    report_header = AppSettings.get_setting('report_header', '')
-    if report_header:
-        for line in report_header.split('\n'):
+    office_name = AppSettings.get_setting('office_name', 'LEOC')
+    address = AppSettings.get_setting('address', '')
+    report_header_setting = AppSettings.get_setting('report_header', '')
+
+    if report_header_setting:
+        for line in report_header_setting.split('\n'):
             line = line.strip()
             if line:
                 elements.append(Paragraph(line, header_style))
-        elements.append(Spacer(1, 4))
+        elements.append(Spacer(1, 2))
+    else:
+        elements.append(Paragraph(office_name, ParagraphStyle('Off', parent=styles['Heading1'], fontSize=16, alignment=TA_CENTER, fontName=font_bold, textColor=colors.HexColor('#1a365d'))))
+        elements.append(Paragraph('Local Emergency Operation Centre (LEOC)', sub_style))
+        if address:
+            elements.append(Paragraph(address, sub_style))
+        elements.append(Spacer(1, 2))
 
     elements.append(Paragraph(title, title_style))
+    if filter_summary:
+        elements.append(Paragraph(filter_summary, ParagraphStyle('FS', parent=styles['Normal'], fontSize=7, alignment=TA_CENTER, fontName=font_name, textColor=colors.HexColor('#718096'))))
     elements.append(Spacer(1, 6))
+
     data = [headers]
     for row in rows:
         data.append([str(c) if c is not None else '' for c in row])
-    tbl = Table(data, colWidths=col_widths)
+    tbl = Table(data, colWidths=col_widths, repeatRows=1)
     tbl.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2c5282')),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
         ('FONTNAME', (0, 0), (-1, 0), font_bold),
         ('FONTSIZE', (0, 0), (-1, -1), 7),
+        ('FONTSIZE', (0, 0), (-1, 0), 8),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('TOPPADDING', (0, 0), (-1, -1), 3),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
     ]))
     elements.append(tbl)
-    elements.append(Spacer(1, 6))
-    elements.append(Paragraph(f"Generated: {today_bs()} {datetime.now().strftime('%H:%M')}", normal))
+    elements.append(Spacer(1, 12))
 
-    report_footer = AppSettings.get_setting('report_footer', '')
-    if report_footer:
-        elements.append(Spacer(1, 4))
-        for line in report_footer.split('\n'):
+    sig_data = [
+        [Paragraph('&nbsp;', normal), Paragraph('&nbsp;', normal), Paragraph('&nbsp;', normal), Paragraph('&nbsp;', normal)],
+        [Paragraph('<u>Prepared By</u>', normal), Paragraph('<u>Checked By</u>', normal), Paragraph('<u>Approved By</u>', normal), Paragraph('<u>Section Head</u>', normal)],
+        [Paragraph('(Name &amp; Signature)', small), Paragraph('(Name &amp; Signature)', small), Paragraph('(Name &amp; Signature)', small), Paragraph('(Name &amp; Signature)', small)],
+    ]
+    sig_tbl = Table(sig_data, colWidths=[45*mm, 45*mm, 45*mm, 45*mm])
+    sig_tbl.setStyle(TableStyle([
+        ('LINEABOVE', (0, 0), (-1, 0), 0.5, colors.black),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('TOPPADDING', (0, 0), (-1, -1), 2),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+    ]))
+    elements.append(sig_tbl)
+    elements.append(Spacer(1, 8))
+
+    now_val = datetime.now()
+    elements.append(Paragraph(f"Generated on: {today_bs()} {now_val.strftime('%H:%M')} | {office_name} - LEOC", small))
+
+    report_footer_setting = AppSettings.get_setting('report_footer', '')
+    if report_footer_setting:
+        elements.append(Spacer(1, 2))
+        for line in report_footer_setting.split('\n'):
             line = line.strip()
             if line:
-                elements.append(Paragraph(line, header_style))
+                elements.append(Paragraph(line, sub_style))
 
     doc.build(elements)
     buffer.seek(0)
@@ -6952,11 +6989,22 @@ def report_dispatch():
     if warehouse_id:
         q = q.filter(Dispatch.warehouse_id == warehouse_id)
     dispatches = q.all()
-    headers = ['#', 'Dispatch No', 'Date', 'Warehouse', 'Incident', 'Destination', 'Receiver']
-    rows = [[i+1, d.dispatch_number, ad_to_bs_date(d.date) or '',
-             d.warehouse.name if d.warehouse else '', d.incident.incident_name if d.incident else '',
-             d.destination or '', d.receiver or ''] for i, d in enumerate(dispatches)]
-    pdf = make_pdf_report('Dispatch Report', headers, rows, [10*mm, 30*mm, 25*mm, 25*mm, 35*mm, 30*mm, 25*mm])
+    headers = ['#', 'Dispatch No', 'Date', 'Warehouse', 'Incident', 'Destination', 'Receiver', 'Item', 'Qty', 'Unit', 'Status']
+    rows = []
+    for i, d in enumerate(dispatches, 1):
+        items = d.items
+        if items:
+            for di in items:
+                rows.append([i, d.dispatch_number, ad_to_bs_date(d.date) or '',
+                            d.warehouse.name if d.warehouse else '', d.incident.incident_name if d.incident else '',
+                            d.destination or '', d.receiver or '',
+                            di.item.name if di.item else '', di.quantity,
+                            di.unit or (di.item.unit if di.item else ''), d.status or ''])
+        else:
+            rows.append([i, d.dispatch_number, ad_to_bs_date(d.date) or '',
+                        d.warehouse.name if d.warehouse else '', d.incident.incident_name if d.incident else '',
+                        d.destination or '', d.receiver or '', '', '', '', d.status or ''])
+    pdf = make_pdf_report('Dispatch Report', headers, rows, [10*mm, 28*mm, 22*mm, 25*mm, 28*mm, 25*mm, 22*mm, 28*mm, 12*mm, 12*mm, 18*mm])
     return make_response(pdf.getvalue(), 200, {'Content-Type': 'application/pdf', 'Content-Disposition': 'attachment; filename=dispatch_report.pdf'})
 
 @app.route('/api/reports/distribution', methods=['GET'])
@@ -6967,25 +7015,36 @@ def report_distribution():
     if incident_id:
         q = q.filter(Distribution.incident_id == incident_id)
     dists = q.all()
-    headers = ['#', 'Dist No', 'Date', 'Location', 'Incident', 'Officer', 'Beneficiaries']
-    rows = [[i+1, d.distribution_no, ad_to_bs_date(d.distribution_date) or '',
-             d.location or '', d.incident.incident_name if d.incident else '',
-             d.officer or '', len(d.beneficiaries)] for i, d in enumerate(dists)]
-    pdf = make_pdf_report('Distribution Report', headers, rows, [10*mm, 30*mm, 25*mm, 30*mm, 35*mm, 25*mm, 20*mm])
+    headers = ['#', 'Dist No', 'Date', 'Location', 'Incident', 'Officer', 'Beneficiaries', 'Items Distributed', 'Fiscal Year']
+    rows = []
+    for i, d in enumerate(dists, 1):
+        items_list = list(set(b.item for b in d.beneficiaries if b.item))
+        rows.append([i, d.distribution_no, ad_to_bs_date(d.distribution_date) or '',
+                    d.location or '', d.incident.incident_name if d.incident else '',
+                    d.officer or '', len(d.beneficiaries),
+                    ', '.join(items_list) if items_list else '', d.fiscal_year or ''])
+    pdf = make_pdf_report('Distribution Report', headers, rows, [10*mm, 28*mm, 22*mm, 28*mm, 28*mm, 22*mm, 18*mm, 30*mm, 20*mm])
     return make_response(pdf.getvalue(), 200, {'Content-Type': 'application/pdf', 'Content-Disposition': 'attachment; filename=distribution_report.pdf'})
 
 @app.route('/api/reports/incidents', methods=['GET'])
 @login_required
 def report_incidents():
     status = request.args.get('status')
+    severity = request.args.get('severity')
     q = Incident.query.order_by(Incident.start_date.desc())
     if status:
         q = q.filter(Incident.status == status)
+    if severity:
+        q = q.filter(Incident.severity == severity)
     incidents = q.all()
-    headers = ['#', 'Name', 'Type', 'Ward', 'Date', 'Status']
-    rows = [[i+1, inc.incident_name, inc.incident_type, inc.ward or '',
-             ad_to_bs_date(inc.start_date) or '', inc.status] for i, inc in enumerate(incidents)]
-    pdf = make_pdf_report('Incident Report', headers, rows, [10*mm, 35*mm, 25*mm, 12*mm, 25*mm, 20*mm])
+    headers = ['#', 'Name', 'Type', 'Ward', 'Date', 'Severity', 'Status', 'Affected HH', 'Deaths', 'Injured']
+    rows = []
+    for i, inc in enumerate(incidents, 1):
+        ward_name = Ward.query.get(inc.ward).name if inc.ward and Ward.query.get(inc.ward) else str(inc.ward or '')
+        rows.append([i, inc.incident_name, inc.incident_type, ward_name,
+                     ad_to_bs_date(inc.start_date) or '', inc.severity or '', inc.status,
+                     inc.affected_households or 0, inc.deaths or 0, inc.injured or 0])
+    pdf = make_pdf_report('Incident Report', headers, rows, [10*mm, 30*mm, 22*mm, 15*mm, 22*mm, 15*mm, 18*mm, 15*mm, 12*mm, 12*mm])
     return make_response(pdf.getvalue(), 200, {'Content-Type': 'application/pdf', 'Content-Disposition': 'attachment; filename=incidents_report.pdf'})
 
 @app.route('/api/reports/requests', methods=['GET'])
@@ -6993,16 +7052,30 @@ def report_incidents():
 def report_requests():
     status = request.args.get('status')
     incident_id = request.args.get('incident_id', type=int)
+    priority = request.args.get('priority')
     q = ReliefRequest.query.order_by(ReliefRequest.request_date.desc())
     if status:
         q = q.filter(ReliefRequest.status == status)
     if incident_id:
         q = q.filter(ReliefRequest.incident_id == incident_id)
+    if priority:
+        q = q.filter(ReliefRequest.priority == priority)
     reqs = q.all()
-    headers = ['#', 'Req No', 'Date', 'Incident', 'Organization', 'Priority', 'Status']
-    rows = [[i+1, r.request_number, ad_to_bs_date(r.request_date) or '',
-             r.incident.incident_name if r.incident else '', r.organization or '', r.priority, r.status] for i, r in enumerate(reqs)]
-    pdf = make_pdf_report('Relief Request Report', headers, rows, [10*mm, 30*mm, 25*mm, 35*mm, 30*mm, 15*mm, 20*mm])
+    headers = ['#', 'Req No', 'Date', 'Incident', 'Organization', 'Requester', 'Priority', 'Status', 'Item', 'Qty Requested', 'Qty Dispatched']
+    rows = []
+    for i, r in enumerate(reqs, 1):
+        items = r.items
+        if items:
+            for ri in items:
+                rows.append([i, r.request_number, ad_to_bs_date(r.request_date) or '',
+                            r.incident.incident_name if r.incident else '', r.organization or '',
+                            r.requester_name or '', r.priority, r.status,
+                            ri.item.name if ri.item else '', ri.quantity_requested, ri.quantity_dispatched])
+        else:
+            rows.append([i, r.request_number, ad_to_bs_date(r.request_date) or '',
+                        r.incident.incident_name if r.incident else '', r.organization or '',
+                        r.requester_name or '', r.priority, r.status, '', '', ''])
+    pdf = make_pdf_report('Relief Request Report', headers, rows, [10*mm, 28*mm, 20*mm, 28*mm, 25*mm, 22*mm, 12*mm, 15*mm, 25*mm, 15*mm, 15*mm])
     return make_response(pdf.getvalue(), 200, {'Content-Type': 'application/pdf', 'Content-Disposition': 'attachment; filename=requests_report.pdf'})
 
 @app.route('/api/reports/adjustments', methods=['GET'])
@@ -7024,10 +7097,10 @@ def report_low_stock():
     for inv in Inventory.query.all():
         if inv.item and inv.item.minimum_stock > 0 and inv.quantity <= inv.item.minimum_stock:
             items.append(inv.to_dict())
-    headers = ['#', 'Item', 'Code', 'Category', 'Qty', 'Min', 'Warehouse']
+    headers = ['#', 'Item', 'Code', 'Category', 'Unit', 'Qty', 'Min Stock', 'Status', 'Warehouse']
     rows = [[i+1, it['item_name'], it['item_code'] or '', it['category_name'] or '',
-             it['quantity'], it['minimum_stock'], it['warehouse_name'] or ''] for i, it in enumerate(items)]
-    pdf = make_pdf_report('Low Stock Report', headers, rows, [10*mm, 35*mm, 25*mm, 25*mm, 15*mm, 15*mm, 25*mm])
+             it['unit'] or '', it['quantity'], it['minimum_stock'], it['status'], it['warehouse_name'] or ''] for i, it in enumerate(items)]
+    pdf = make_pdf_report('Low Stock Report', headers, rows, [10*mm, 30*mm, 20*mm, 20*mm, 12*mm, 12*mm, 12*mm, 15*mm, 22*mm])
     return make_response(pdf.getvalue(), 200, {'Content-Type': 'application/pdf', 'Content-Disposition': 'attachment; filename=low_stock_report.pdf'})
 
 @app.route('/api/reports/monthly-summary', methods=['GET'])
@@ -7059,37 +7132,42 @@ def report_monthly_summary():
 @app.route('/api/reports/inventory', methods=['GET'])
 @login_required
 def report_inventory():
-    headers = ['#', 'Item Code', 'Item Name', 'Category', 'Unit', 'Quantity', 'Min Stock', 'Status']
+    headers = ['#', 'Item Code', 'Item Name', 'Category', 'Unit', 'Quantity', 'Reserved', 'Available', 'Min Stock', 'Max Stock', 'Status', 'Last Updated']
     rows = []
     for i, inv in enumerate(Inventory.query.order_by(Inventory.updated_at.desc()).all(), 1):
         d = inv.to_dict()
+        unit_val = d['unit'] or (inv.item.unit if inv.item else '')
         rows.append([i, d['item_code'] or '', d['item_name'] or '', d['category_name'] or '',
-                     d['unit'] or '', d['quantity'], d['minimum_stock'], d['status']])
+                     unit_val, d['quantity'], d['reserved_quantity'], d['available_quantity'],
+                     d['minimum_stock'], inv.item.max_stock if inv.item else 0,
+                     d['status'], ad_to_bs_date(inv.updated_at) if inv.updated_at else ''])
     pdf = make_pdf_report(AppSettings.get_setting('office_name', 'LEOC') + ' - Inventory Report',
-                          headers, rows, [12*mm, 25*mm, 35*mm, 25*mm, 15*mm, 18*mm, 18*mm, 22*mm])
+                          headers, rows, [10*mm, 20*mm, 28*mm, 22*mm, 12*mm, 14*mm, 14*mm, 14*mm, 14*mm, 14*mm, 18*mm, 20*mm])
     return make_response(pdf.getvalue(), 200, {'Content-Type': 'application/pdf', 'Content-Disposition': 'attachment; filename=inventory_report.pdf'})
 
 @app.route('/api/reports/stock-receipts', methods=['GET'])
 @login_required
 def report_stock_receipts():
-    headers = ['#', 'Receipt No', 'Date', 'Warehouse', 'Source Type', 'Source Name', 'Item', 'Qty', 'Unit']
+    headers = ['#', 'Receipt No', 'Date', 'Warehouse', 'Source Type', 'Source Name', 'Item', 'Qty', 'Unit', 'Batch No', 'Supplier']
     rows = []
     i = 0
     for r in StockReceipt.query.order_by(StockReceipt.date.desc()).all():
         d = r.to_dict()
         items = d.get('items', [])
+        supplier_name = d.get('supplier_name', '')
         if items:
             for item in items:
                 i += 1
                 rows.append([i, d['receipt_no'], d['date'], d['warehouse_name'],
                              d['source_type'], d['source_name'],
-                             item['item_name'], item['quantity'], item['unit']])
+                             item['item_name'], item['quantity'], item['unit'],
+                             item.get('batch_no', '') or '', supplier_name])
         else:
             i += 1
             rows.append([i, d['receipt_no'], d['date'], d['warehouse_name'],
-                         d['source_type'], d['source_name'], '', '', ''])
+                         d['source_type'], d['source_name'], '', '', '', '', supplier_name])
     pdf = make_pdf_report('Stock Receipt Report', headers, rows,
-                          [10*mm, 30*mm, 22*mm, 25*mm, 22*mm, 25*mm, 30*mm, 15*mm, 12*mm])
+                          [10*mm, 28*mm, 20*mm, 22*mm, 20*mm, 22*mm, 28*mm, 12*mm, 12*mm, 18*mm, 22*mm])
     return make_response(pdf.getvalue(), 200, {'Content-Type': 'application/pdf', 'Content-Disposition': 'attachment; filename=stock_receipts_report.pdf'})
 
 # ============ SHARED REPORT DATA HELPER ============
@@ -7110,12 +7188,23 @@ def get_report_data(report_type, args):
         return q
 
     if report_type == 'inventory':
-        headers = ['Item Code', 'Item Name', 'Category', 'Unit', 'Quantity', 'Min Stock', 'Status']
+        warehouse_id = args.get('warehouse_id', type=int)
+        category_id = args.get('category_id', type=int)
+        is_distributable = args.get('is_distributable')
+        q = Inventory.query.order_by(Inventory.updated_at.desc())
+        if warehouse_id: q = q.filter(Inventory.warehouse_id == warehouse_id)
+        if category_id: q = q.join(Item).filter(Item.category_id == category_id)
+        if is_distributable == 'yes': q = q.join(Item).filter(Item.is_distributable == True)
+        elif is_distributable == 'no': q = q.join(Item).filter(Item.is_distributable == False)
+        headers = ['Item Code', 'Item Name', 'Category', 'Unit', 'Quantity', 'Reserved', 'Available', 'Min Stock', 'Max Stock', 'Status', 'Last Updated']
         rows = []
-        for inv in Inventory.query.order_by(Inventory.updated_at.desc()).all():
+        for inv in q.all():
             d = inv.to_dict()
+            unit_val = d['unit'] or (inv.item.unit if inv.item else '')
             rows.append([d['item_code'] or '', d['item_name'] or '', d['category_name'] or '',
-                         d['unit'] or '', d['quantity'], d['minimum_stock'], d['status']])
+                         unit_val, d['quantity'], d['reserved_quantity'], d['available_quantity'],
+                         d['minimum_stock'], inv.item.max_stock if inv.item else 0,
+                         d['status'], ad_to_bs_date(inv.updated_at) if inv.updated_at else ''])
     elif report_type == 'dispatch':
         incident_id = args.get('incident_id', type=int)
         warehouse_id = args.get('warehouse_id', type=int)
@@ -7123,19 +7212,36 @@ def get_report_data(report_type, args):
         if incident_id: q = q.filter(Dispatch.incident_id == incident_id)
         if warehouse_id: q = q.filter(Dispatch.warehouse_id == warehouse_id)
         q = apply_date_filter(q, Dispatch.date)
-        headers = ['Dispatch No', 'Date', 'Warehouse', 'Incident', 'Destination', 'Receiver']
-        rows = [[d.dispatch_number, ad_to_bs_date(d.date) or '',
-                 d.warehouse.name if d.warehouse else '', d.incident.incident_name if d.incident else '',
-                 d.destination or '', d.receiver or ''] for d in q.all()]
+        headers = ['Dispatch No', 'Date', 'Warehouse', 'Incident', 'Destination', 'Receiver', 'Item', 'Qty', 'Unit', 'Status']
+        rows = []
+        for d in q.all():
+            items = d.items
+            if items:
+                for di in items:
+                    rows.append([d.dispatch_number, ad_to_bs_date(d.date) or '',
+                                d.warehouse.name if d.warehouse else '', d.incident.incident_name if d.incident else '',
+                                d.destination or '', d.receiver or '',
+                                di.item.name if di.item else '', di.quantity,
+                                di.unit or (di.item.unit if di.item else ''), d.status or ''])
+            else:
+                rows.append([d.dispatch_number, ad_to_bs_date(d.date) or '',
+                            d.warehouse.name if d.warehouse else '', d.incident.incident_name if d.incident else '',
+                            d.destination or '', d.receiver or '', '', '', '', d.status or ''])
     elif report_type == 'distribution':
         incident_id = args.get('incident_id', type=int)
+        distribution_type = args.get('distribution_type')
         q = Distribution.query.order_by(Distribution.distribution_date.desc())
         if incident_id: q = q.filter(Distribution.incident_id == incident_id)
         q = apply_date_filter(q, Distribution.distribution_date)
-        headers = ['Dist No', 'Date', 'Location', 'Incident', 'Officer', 'Beneficiaries']
-        rows = [[d.distribution_no, ad_to_bs_date(d.distribution_date) or '',
-                 d.location or '', d.incident.incident_name if d.incident else '',
-                 d.officer or '', len(d.beneficiaries)] for d in q.all()]
+        headers = ['Dist No', 'Date', 'Location', 'Incident', 'Officer', 'Beneficiaries', 'Items Distributed', 'Fiscal Year']
+        rows = []
+        for d in q.all():
+            items_list = list(set(b.item for b in d.beneficiaries if b.item))
+            rows.append([d.distribution_no, ad_to_bs_date(d.distribution_date) or '',
+                        d.location or '', d.incident.incident_name if d.incident else '',
+                        d.officer or '', len(d.beneficiaries),
+                        ', '.join(items_list) if items_list else '',
+                        d.fiscal_year or ''])
     elif report_type == 'incidents':
         status = args.get('status')
         severity = args.get('severity')
@@ -7145,9 +7251,12 @@ def get_report_data(report_type, args):
         if severity: q = q.filter(Incident.severity == severity)
         if ward_id: q = q.filter(Incident.ward == ward_id)
         q = apply_date_filter(q, Incident.start_date)
-        headers = ['Name', 'Type', 'Ward', 'Date', 'Severity', 'Status']
-        rows = [[inc.incident_name, inc.incident_type, inc.ward or '',
-                 ad_to_bs_date(inc.start_date) or '', inc.severity or '', inc.status] for inc in q.all()]
+        headers = ['Name', 'Type', 'Ward', 'Date', 'Severity', 'Status', 'Affected HH', 'Deaths', 'Injured', 'Fiscal Year']
+        rows = [[inc.incident_name, inc.incident_type,
+                 Ward.query.get(inc.ward).name if inc.ward and Ward.query.get(inc.ward) else str(inc.ward or ''),
+                 ad_to_bs_date(inc.start_date) or '', inc.severity or '', inc.status,
+                 inc.affected_households or 0, inc.deaths or 0, inc.injured or 0,
+                 inc.fiscal_year or ''] for inc in q.all()]
     elif report_type == 'requests':
         status = args.get('status')
         incident_id = args.get('incident_id', type=int)
@@ -7157,10 +7266,20 @@ def get_report_data(report_type, args):
         if incident_id: q = q.filter(ReliefRequest.incident_id == incident_id)
         if priority: q = q.filter(ReliefRequest.priority == priority)
         q = apply_date_filter(q, ReliefRequest.request_date)
-        headers = ['Req No', 'Date', 'Incident', 'Organization', 'Priority', 'Status']
-        rows = [[r.request_number, ad_to_bs_date(r.request_date) or '',
-                 r.incident.incident_name if r.incident else '', r.organization or '',
-                 r.priority, r.status] for r in q.all()]
+        headers = ['Req No', 'Date', 'Incident', 'Organization', 'Requester', 'Priority', 'Status', 'Item', 'Qty Requested', 'Qty Dispatched']
+        rows = []
+        for r in q.all():
+            items = r.items
+            if items:
+                for ri in items:
+                    rows.append([r.request_number, ad_to_bs_date(r.request_date) or '',
+                                r.incident.incident_name if r.incident else '', r.organization or '',
+                                r.requester_name or '', r.priority, r.status,
+                                ri.item.name if ri.item else '', ri.quantity_requested, ri.quantity_dispatched])
+            else:
+                rows.append([r.request_number, ad_to_bs_date(r.request_date) or '',
+                            r.incident.incident_name if r.incident else '', r.organization or '',
+                            r.requester_name or '', r.priority, r.status, '', '', ''])
     elif report_type == 'adjustments':
         q = ManualAdjustment.query.order_by(ManualAdjustment.date.desc())
         q = apply_date_filter(q, ManualAdjustment.date)
@@ -7170,15 +7289,18 @@ def get_report_data(report_type, args):
                  a.adjustment_type, a.adjusted_quantity, a.reason or ''] for a in q.all()]
     elif report_type == 'low-stock':
         warehouse_id = args.get('warehouse_id', type=int)
-        headers = ['Item', 'Code', 'Category', 'Qty', 'Min', 'Warehouse']
+        category_id = args.get('category_id', type=int)
+        headers = ['Item', 'Code', 'Category', 'Unit', 'Qty', 'Min Stock', 'Status', 'Warehouse']
         rows = []
         q = Inventory.query
         if warehouse_id: q = q.filter(Inventory.warehouse_id == warehouse_id)
         for inv in q.all():
             if inv.item and inv.item.minimum_stock > 0 and inv.quantity <= inv.item.minimum_stock:
+                if category_id and inv.item.category_id != category_id: continue
                 d = inv.to_dict()
-                rows.append([d['item_name'], d['item_code'] or '', d['category_name'] or '',
-                             d['quantity'], d['minimum_stock'], d['warehouse_name'] or ''])
+                unit_val = d['unit'] or (inv.item.unit if inv.item else '')
+                rows.append([d['item_name'], d['item_code'] or '', d['category_name'] or '', unit_val,
+                             d['quantity'], d['minimum_stock'], d['status'], d['warehouse_name'] or ''])
     elif report_type == 'monthly-summary':
         month = args.get('month', datetime.now().strftime('%Y-%m'))
         try:
@@ -7202,23 +7324,27 @@ def get_report_data(report_type, args):
     elif report_type == 'stock-receipts':
         warehouse_id = args.get('warehouse_id', type=int)
         source_type = args.get('source_type')
+        supplier_id = args.get('supplier_id', type=int)
         q = StockReceipt.query.order_by(StockReceipt.date.desc())
         if warehouse_id: q = q.filter(StockReceipt.warehouse_id == warehouse_id)
         if source_type: q = q.filter(StockReceipt.source_type == source_type)
+        if supplier_id: q = q.filter(StockReceipt.supplier_id == supplier_id)
         q = apply_date_filter(q, StockReceipt.date)
-        headers = ['Receipt No', 'Date', 'Warehouse', 'Source Type', 'Source Name', 'Item', 'Qty', 'Unit']
+        headers = ['Receipt No', 'Date', 'Warehouse', 'Source Type', 'Source Name', 'Item', 'Qty', 'Unit', 'Batch No', 'Supplier']
         rows = []
         for r in q.all():
             d = r.to_dict()
             items = d.get('items', [])
+            supplier_name = d.get('supplier_name', '')
             if items:
                 for item in items:
                     rows.append([d['receipt_no'], d['date'], d['warehouse_name'],
                                  d['source_type'], d['source_name'],
-                                 item['item_name'], item['quantity'], item['unit']])
+                                 item['item_name'], item['quantity'], item['unit'],
+                                 item.get('batch_no', '') or '', supplier_name])
             else:
                 rows.append([d['receipt_no'], d['date'], d['warehouse_name'],
-                             d['source_type'], d['source_name'], '', '', ''])
+                             d['source_type'], d['source_name'], '', '', '', '', supplier_name])
     elif report_type == 'cash-balance':
         fund_id = args.get('fund_id', type=int)
         q = CashFund.query
@@ -7321,34 +7447,65 @@ def get_report_data(report_type, args):
         status = args.get('status')
         q = Supplier.query.order_by(Supplier.name)
         if status: q = q.filter(Supplier.status == status)
-        headers = ['Name', 'Contact Person', 'Phone', 'Email', 'Type', 'Status']
-        rows = [[s.name, s.contact_person or '', s.phone or '', s.email or '',
-                 s.supplier_type or '', s.status or ''] for s in q.all()]
+        headers = ['Name', 'Contact Person', 'Phone', 'Email', 'Type', 'Status', 'Items Supplied']
+        rows = []
+        for s in q.all():
+            items_count = db.session.query(db.func.count(StockReceiptItem.id)).join(
+                StockReceipt, StockReceiptItem.receipt_id == StockReceipt.id
+            ).filter(StockReceipt.supplier_id == s.id).scalar() or 0
+            rows.append([s.name, s.contact_person or '', s.phone or '', s.email or '',
+                         s.supplier_type or '', s.status or '', items_count])
     elif report_type == 'warehouses':
         q = Warehouse.query.order_by(Warehouse.name)
-        headers = ['Name', 'Code', 'Address', 'Contact Person', 'Phone', 'Capacity']
-        rows = [[w.name, w.code or '', w.address or '', w.contact_person or '', w.phone or '', w.capacity or 0] for w in q.all()]
+        headers = ['Name', 'Code', 'Address', 'Contact Person', 'Phone', 'Capacity', 'Available Items', 'Total Stock Qty']
+        rows = []
+        for w in q.all():
+            item_count = Inventory.query.filter_by(warehouse_id=w.id).count()
+            total_qty = db.session.query(db.func.coalesce(db.func.sum(Inventory.quantity), 0)).filter(Inventory.warehouse_id == w.id).scalar()
+            rows.append([w.name, w.code or '', w.address or '', w.contact_person or '', w.phone or '',
+                         w.capacity or 0, item_count, total_qty])
     elif report_type == 'items-master':
         category_id = args.get('category_id', type=int)
+        is_distributable = args.get('is_distributable')
         q = Item.query.order_by(Item.name)
         if category_id: q = q.filter(Item.category_id == category_id)
-        headers = ['Code', 'Name', 'Category', 'Unit', 'Min Stock', 'Max Stock', 'Tracking']
-        rows = [[i.item_code or '', i.name, i.category.name if i.category else '', i.unit or '',
-                 i.minimum_stock or 0, i.max_stock or '', 'Batch' if i.batch_tracking else ''] for i in q.all()]
+        if is_distributable == 'yes': q = q.filter(Item.is_distributable == True)
+        elif is_distributable == 'no': q = q.filter(Item.is_distributable == False)
+        headers = ['Code', 'Name', 'Category', 'Unit', 'Min Stock', 'Max Stock', 'Total Available', 'Distributable', 'Tracking', 'Status']
+        rows = []
+        for i in q.all():
+            total_qty = db.session.query(db.func.coalesce(db.func.sum(Inventory.quantity), 0)).filter(Inventory.item_id == i.id).scalar()
+            rows.append([i.item_code or '', i.name, i.category.name if i.category else '', i.unit or '',
+                         i.minimum_stock or 0, i.max_stock or 0, total_qty,
+                         'Yes' if i.is_distributable else 'No',
+                         'Batch' if i.batch_tracking else 'Serial' if i.serial_tracking else '',
+                         i.status or ''])
     elif report_type == 'stock-transfers':
         status = args.get('status')
         q = StockTransfer.query.order_by(StockTransfer.transfer_date.desc())
         if status: q = q.filter(StockTransfer.status == status)
         q = apply_date_filter(q, StockTransfer.transfer_date)
-        headers = ['Transfer No', 'Date', 'From Warehouse', 'To Warehouse', 'Status', 'Reason']
-        rows = [[t.transfer_no, ad_to_bs_date(t.transfer_date) or '',
-                 t.from_warehouse.name if t.from_warehouse else '',
-                 t.to_warehouse.name if t.to_warehouse else '',
-                 t.status or '', t.reason or ''] for t in q.all()]
+        headers = ['Transfer No', 'Date', 'From', 'To', 'Item', 'Qty', 'Unit', 'Batch No', 'Status', 'Reason']
+        rows = []
+        for t in q.all():
+            items = t.items
+            if items:
+                for ti in items:
+                    rows.append([t.transfer_no, ad_to_bs_date(t.transfer_date) or '',
+                                t.from_warehouse.name if t.from_warehouse else '',
+                                t.to_warehouse.name if t.to_warehouse else '',
+                                ti.item.name if ti.item else '', ti.quantity,
+                                ti.unit or (ti.item.unit if ti.item else ''), ti.batch_no or '',
+                                t.status or '', t.reason or ''])
+            else:
+                rows.append([t.transfer_no, ad_to_bs_date(t.transfer_date) or '',
+                            t.from_warehouse.name if t.from_warehouse else '',
+                            t.to_warehouse.name if t.to_warehouse else '',
+                            '', '', '', '', t.status or '', t.reason or ''])
     elif report_type == 'stock-book':
         warehouse_id = args.get('warehouse_id', type=int)
         item_id = args.get('item_id', type=int)
-        headers = ['Item Code', 'Item Name', 'Unit', 'Opening', 'Received', 'Dispatched', 'Balance']
+        headers = ['Item Code', 'Item Name', 'Category', 'Unit', 'Opening', 'Received', 'Dispatched', 'Balance', 'Warehouse']
         rows = []
         q = Inventory.query
         if warehouse_id: q = q.filter(Inventory.warehouse_id == warehouse_id)
@@ -7356,10 +7513,38 @@ def get_report_data(report_type, args):
         for inv in q.all():
             if not inv.item: continue
             d = inv.to_dict()
-            rows.append([d['item_code'] or '', d['item_name'] or '', d['unit'] or '',
-                         d['quantity'], 0, 0, d['quantity']])
+            received_qty = db.session.query(db.func.coalesce(db.func.sum(StockReceiptItem.quantity), 0)).join(
+                StockReceipt, StockReceiptItem.receipt_id == StockReceipt.id
+            ).filter(
+                StockReceiptItem.item_id == inv.item_id,
+                StockReceipt.warehouse_id == inv.warehouse_id
+            )
+            dispatched_qty = db.session.query(db.func.coalesce(db.func.sum(DispatchItem.quantity), 0)).join(
+                Dispatch, DispatchItem.dispatch_id == Dispatch.id
+            ).filter(
+                DispatchItem.item_id == inv.item_id,
+                Dispatch.warehouse_id == inv.warehouse_id
+            )
+            if date_from:
+                ad_from = bs_to_ad(date_from)
+                if ad_from:
+                    fd = datetime.strptime(ad_from, '%Y-%m-%d').date()
+                    received_qty = received_qty.filter(StockReceipt.date >= fd)
+                    dispatched_qty = dispatched_qty.filter(Dispatch.date >= fd)
+            if date_to:
+                ad_to_v = bs_to_ad(date_to)
+                if ad_to_v:
+                    td = datetime.strptime(ad_to_v, '%Y-%m-%d').date()
+                    received_qty = received_qty.filter(StockReceipt.date <= td)
+                    dispatched_qty = dispatched_qty.filter(Dispatch.date <= td)
+            received = received_qty.scalar() or 0
+            dispatched = dispatched_qty.scalar() or 0
+            opening = max(0, inv.quantity - received + dispatched)
+            unit_val = d['unit'] or (inv.item.unit if inv.item else '')
+            rows.append([d['item_code'] or '', d['item_name'] or '', d['category_name'] or '', unit_val,
+                         opening, received, dispatched, d['quantity'], d['warehouse_name'] or ''])
         if not rows:
-            rows = [['-', 'No stock data found', '-', 0, 0, 0, 0]]
+            rows = [['-', 'No stock data found', '-', '-', 0, 0, 0, 0, '-']]
     elif report_type == 'bin-card':
         item_id = args.get('item_id', type=int)
         warehouse_id = args.get('warehouse_id', type=int)
@@ -7425,8 +7610,7 @@ def get_report_data(report_type, args):
         item_id = args.get('item_id', type=int)
         from datetime import timedelta
         today = date.today()
-        threshold = today + timedelta(days=90)
-        headers = ['Item', 'Code', 'Batch', 'Qty', 'Expiry Date', 'Warehouse', 'Status']
+        headers = ['Item', 'Code', 'Batch', 'Qty', 'Unit', 'Expiry Date', 'Warehouse', 'Status', 'Days Remaining']
         rows = []
         q = StockReceiptItem.query.options(
             db.joinedload(StockReceiptItem.receipt),
@@ -7441,89 +7625,102 @@ def get_report_data(report_type, args):
             expiry = sri.expiry_date
             days = (expiry - today).days
             if days < 0:
-                status = f'Expired ({-days}d ago)'
+                st = 'Expired'
+                detail = f'{-days}d ago'
             elif days <= 30:
-                status = f'{days}d left'
+                st = 'Critical'
+                detail = f'{days}d left'
             elif days <= 90:
-                status = f'{days}d left'
+                st = 'Warning'
+                detail = f'{days}d left'
             else:
-                status = f'{days}d remaining'
+                st = 'OK'
+                detail = f'{days}d remaining'
             wh_name = sri.receipt.warehouse.name if sri.receipt and sri.receipt.warehouse else ''
+            unit_val = sri.unit or (sri.item.unit if sri.item else '')
             rows.append([sri.item.name if sri.item else '', sri.item.item_code if sri.item else '',
-                         sri.batch_no or '', sri.quantity,
-                         ad_to_bs_date(expiry) or '', wh_name, status])
+                         sri.batch_no or '', sri.quantity, unit_val,
+                         ad_to_bs_date(expiry) or '', wh_name, st, detail])
         if not rows:
-            rows = [['-', '-', '-', '-', '-', '-', 'No expiry data']]
+            rows = [['-', '-', '-', '-', '-', '-', '-', '-', 'No expiry data']]
     elif report_type == 'stock-movement':
         warehouse_id = args.get('warehouse_id', type=int)
         category_id = args.get('category_id', type=int)
         item_id = args.get('item_id', type=int)
-        headers = ['Date', 'Ref No', 'Item', 'Type', 'In', 'Out', 'Warehouse']
+        headers = ['Date', 'Ref No', 'Item', 'Type', 'In', 'Out', 'Warehouse', 'Unit']
         rows = []
         for r in StockReceiptItem.query.all():
             if r.receipt:
                 if warehouse_id and r.receipt.warehouse_id != warehouse_id: continue
                 if item_id and r.item_id != item_id: continue
+                if category_id and r.item and r.item.category_id != category_id: continue
+                unit_val = r.unit or (r.item.unit if r.item else '')
                 rows.append([ad_to_bs_date(r.receipt.date) or '', r.receipt.receipt_no,
                              r.item.name if r.item else '', 'Receipt', r.quantity, '-',
-                             r.receipt.warehouse.name if r.receipt.warehouse else ''])
+                             r.receipt.warehouse.name if r.receipt.warehouse else '', unit_val])
         for d in DispatchItem.query.all():
             if d.dispatch:
                 if warehouse_id and d.warehouse_id != warehouse_id: continue
                 if item_id and d.item_id != item_id: continue
+                if category_id and d.item and d.item.category_id != category_id: continue
+                unit_val = d.unit or (d.item.unit if d.item else '')
                 rows.append([ad_to_bs_date(d.dispatch.date) or '', d.dispatch.dispatch_number,
                              d.item.name if d.item else '', 'Dispatch', '-', d.quantity,
-                             d.warehouse.name if d.warehouse else (d.dispatch.warehouse.name if d.dispatch.warehouse else '')])
-        rows.sort(key=lambda x: x[0], reverse=True)
+                             d.warehouse.name if d.warehouse else (d.dispatch.warehouse.name if d.dispatch.warehouse else ''), unit_val])
+        rows.sort(key=lambda x: x[0] or '', reverse=True)
         if not rows:
-            rows = [['-', '-', '-', '-', '-', '-', 'No movements found']]
+            rows = [['-', '-', '-', '-', '-', '-', '-', 'No movements found']]
     elif report_type == 'disaster-assessments':
         incident_id = args.get('incident_id', type=int)
         q = DisasterAssessment.query.order_by(DisasterAssessment.disaster_date_bs.desc())
         if incident_id: q = q.filter(DisasterAssessment.incident_id == incident_id)
-        headers = ['Date (BS)', 'Incident', 'Disaster Type', 'Affected HH', 'Deaths', 'Injured', 'Assessor']
+        headers = ['Date (BS)', 'Incident', 'Disaster Type', 'Affected HH', 'Deaths', 'Injured', 'Missing', 'Est. Loss (NRs)', 'Assessor', 'Fiscal Year']
         rows = [[a.disaster_date_bs or '', a.incident.incident_name if a.incident else '',
                  a.disaster_type or '', a.affected_households or 0, a.deaths or 0,
-                 a.injured or 0, ''] for a in q.all()]
+                 a.injured or 0, a.missing_persons or 0, a.estimated_loss or 0,
+                 '', a.fiscal_year or ''] for a in q.all()]
     elif report_type == 'beneficiaries':
         ward_id = args.get('ward_id', type=int)
         status = args.get('status')
         q = Beneficiary.query.order_by(Beneficiary.name)
         if ward_id: q = q.filter(Beneficiary.ward == ward_id)
         if status: q = q.filter(Beneficiary.status == status)
-        headers = ['Family Name', 'ID Number', 'Ward', 'Phone', 'Members', 'Status']
+        headers = ['Family Name', 'ID Number', 'Ward', 'Phone', 'Members', 'Address', 'Bank Account', 'Status']
         rows = []
         for b in q.all():
             fm = b.family_members_json
             member_count = len(json.loads(fm)) if isinstance(fm, str) and fm else (len(fm) if isinstance(fm, list) else 0)
             ward_name = Ward.query.get(b.ward).name if b.ward else ''
             rows.append([b.name or '', b.national_id or '', ward_name,
-                         b.phone or '', member_count, b.status or ''])
+                         b.phone or '', member_count, b.address or '',
+                         b.bank_account or '', b.status or ''])
     elif report_type == 'beneficiary-history':
         ward_id = args.get('ward_id', type=int)
         q = db.session.query(DistributionBeneficiary).join(Distribution).order_by(Distribution.distribution_date.desc())
         if ward_id:
             q = q.join(Beneficiary, DistributionBeneficiary.beneficiary_id == Beneficiary.id).filter(Beneficiary.ward == ward_id)
-        headers = ['Family Name', 'ID Number', 'Distribution Date', 'Location', 'Items', 'Status']
+        headers = ['Family Name', 'ID Number', 'Distribution Date', 'Location', 'Items', 'Qty', 'Status', 'Incident']
         rows = []
         for db_ben in q.all():
             dist = db_ben.distribution
             ben = db_ben.beneficiary
+            incident_name = dist.incident.incident_name if dist and dist.incident else ''
             rows.append([db_ben.family_name or (ben.family_name if ben else ''),
                          db_ben.id_number or (ben.id_number if ben else ''),
                          ad_to_bs_date(dist.distribution_date) if dist else '',
                          dist.location if dist else '',
-                         db_ben.item or '', db_ben.status or ''])
+                         db_ben.item or '', db_ben.quantity or 0, db_ben.status or '',
+                         incident_name])
         if not rows:
-            rows = [['-', '-', '-', '-', '-', 'No distribution history found']]
+            rows = [['-', '-', '-', '-', '-', '-', '-', 'No distribution history found']]
     elif report_type == 'beneficiary-demographics':
         headers = ['Ward', 'Total Families', 'Total Members', 'Male', 'Female', 'Children', 'Senior Citizens']
         rows = []
         for w in Ward.query.order_by(Ward.sort_order).all():
-            fam_count = Beneficiary.query.filter_by(ward_id=w.id).count()
+            fam_count = Beneficiary.query.filter_by(ward=w.id).count()
             total_members = 0
             male = female = children = senior = 0
-            for b in Beneficiary.query.filter_by(ward_id=w.id).all():
+            for b in Beneficiary.query.filter_by(ward=w.id).all():
                 fm = b.family_members_json
                 members = json.loads(fm) if isinstance(fm, str) and fm else (fm if isinstance(fm, list) else [])
                 total_members += len(members)
@@ -7567,6 +7764,39 @@ def get_report_data(report_type, args):
         for username, uid, total, actions, resources, last_active in q.all():
             rows.append([username or 'System', total, actions, resources,
                          last_active.strftime('%Y-%m-%d %H:%M') if last_active else ''])
+    elif report_type == 'analytics-summary':
+        headers = ['Metric', 'Value']
+        rows = []
+        total_items = Item.query.count()
+        total_inventory = db.session.query(db.func.coalesce(db.func.sum(Inventory.quantity), 0)).scalar()
+        total_suppliers = Supplier.query.count()
+        total_warehouses = Warehouse.query.count()
+        total_incidents = Incident.query.count()
+        total_beneficiaries = Beneficiary.query.count()
+        total_dispatches = Dispatch.query.count()
+        total_distributions = Distribution.query.count()
+        total_receipts = StockReceipt.query.count()
+        total_cash_funds = CashFund.query.count()
+        total_cash_distributed = db.session.query(db.func.coalesce(db.func.sum(CashDistribution.total_amount), 0)).scalar()
+        total_cash_received = db.session.query(db.func.coalesce(db.func.sum(CashReceipt.amount_received), 0)).scalar()
+        low_stock_count = Inventory.query.filter(
+            Inventory.quantity <= db.session.query(db.func.coalesce(db.func.min(Item.minimum_stock), 0)).join(Item, Inventory.item_id == Item.id)
+        ).count()
+        rows.append(['Total Item Types', total_items])
+        rows.append(['Total Stock Quantity', total_inventory])
+        rows.append(['Total Suppliers', total_suppliers])
+        rows.append(['Total Warehouses', total_warehouses])
+        rows.append(['Total Incidents', total_incidents])
+        rows.append(['Total Beneficiaries', total_beneficiaries])
+        rows.append(['Total Dispatches', total_dispatches])
+        rows.append(['Total Distributions', total_distributions])
+        rows.append(['Total Stock Receipts', total_receipts])
+        rows.append(['Total Cash Funds', total_cash_funds])
+        rows.append(['Total Cash Received (NRs)', total_cash_received])
+        rows.append(['Total Cash Distributed (NRs)', total_cash_distributed])
+        rows.append(['Items Below Min Stock', low_stock_count])
+        if not rows:
+            rows = [['No data', '']]
     else:
         raise ValueError(f'Unknown report type: {report_type}')
 
@@ -7613,11 +7843,11 @@ def print_report_preview(report_type):
             'beneficiaries': 'Beneficiary Report', 'beneficiary-history': 'Beneficiary Distribution History',
             'beneficiary-demographics': 'Beneficiary Demographics',
             'activity-logs': 'Activity Log Report', 'user-activity': 'User Activity Summary',
+            'analytics-summary': 'Analytics Summary',
         }
         title = report_titles.get(report_type, report_type.replace('-', ' ').title() + ' Report')
         office = AppSettings.get_setting('office_name', 'LEOC')
         address = AppSettings.get_setting('address', '')
-
         filter_parts = []
         from_ = request.args.get('date_from')
         to_ = request.args.get('date_to')
@@ -7633,6 +7863,21 @@ def print_report_preview(report_type):
             if inc: filter_parts.append(f'Incident: {inc.incident_name}')
         status = request.args.get('status')
         if status: filter_parts.append(f'Status: {status}')
+        is_dist = request.args.get('is_distributable')
+        if is_dist == 'yes': filter_parts.append('Distributable: Yes')
+        elif is_dist == 'no': filter_parts.append('Distributable: No')
+        category_id = request.args.get('category_id', type=int)
+        if category_id:
+            cat = db_get(Category, category_id)
+            if cat: filter_parts.append(f'Category: {cat.name}')
+        ward_id = request.args.get('ward_id', type=int)
+        if ward_id:
+            w = db_get(Ward, ward_id)
+            if w: filter_parts.append(f'Ward: {w.name}')
+        severity = request.args.get('severity')
+        if severity: filter_parts.append(f'Severity: {severity}')
+        priority = request.args.get('priority')
+        if priority: filter_parts.append(f'Priority: {priority}')
         filter_summary = ' | '.join(filter_parts) if filter_parts else ''
 
         now_val = datetime.now()
@@ -7671,12 +7916,46 @@ def report_pdf_generic(report_type):
             'beneficiaries': 'Beneficiary Report', 'beneficiary-history': 'Beneficiary Distribution History',
             'beneficiary-demographics': 'Beneficiary Demographics',
             'activity-logs': 'Activity Log Report', 'user-activity': 'User Activity Summary',
+            'analytics-summary': 'Analytics Summary',
         }
         title = report_titles.get(report_type, report_type.replace('-', ' ').title() + ' Report')
+
+        filter_parts = []
+        from_ = request.args.get('date_from')
+        to_ = request.args.get('date_to')
+        if from_: filter_parts.append(f'From: {from_}')
+        if to_: filter_parts.append(f'To: {to_}')
+        warehouse_id = request.args.get('warehouse_id', type=int)
+        if warehouse_id:
+            w = db_get(Warehouse, warehouse_id)
+            if w: filter_parts.append(f'Warehouse: {w.name}')
+        incident_id = request.args.get('incident_id', type=int)
+        if incident_id:
+            inc = db_get(Incident, incident_id)
+            if inc: filter_parts.append(f'Incident: {inc.incident_name}')
+        status = request.args.get('status')
+        if status: filter_parts.append(f'Status: {status}')
+        is_dist = request.args.get('is_distributable')
+        if is_dist == 'yes': filter_parts.append('Distributable: Yes')
+        elif is_dist == 'no': filter_parts.append('Distributable: No')
+        category_id = request.args.get('category_id', type=int)
+        if category_id:
+            cat = db_get(Category, category_id)
+            if cat: filter_parts.append(f'Category: {cat.name}')
+        ward_id = request.args.get('ward_id', type=int)
+        if ward_id:
+            wd = db_get(Ward, ward_id)
+            if wd: filter_parts.append(f'Ward: {wd.name}')
+        severity = request.args.get('severity')
+        if severity: filter_parts.append(f'Severity: {severity}')
+        priority = request.args.get('priority')
+        if priority: filter_parts.append(f'Priority: {priority}')
+        filter_summary = ' | '.join(filter_parts) if filter_parts else ''
+
         col_count = len(headers) if headers else 6
         col_width = max(15*mm, min(45*mm, 180*mm / max(col_count, 1)))
         col_widths = [col_width] * col_count
-        pdf = make_pdf_report(title, headers, rows, col_widths)
+        pdf = make_pdf_report(title, headers, rows, col_widths, filter_summary=filter_summary)
         filename = f"{report_type}_report.pdf"
         return make_response(pdf.getvalue(), 200, {
             'Content-Type': 'application/pdf',
@@ -7696,17 +7975,17 @@ def report_cash_balance():
     if fund_id:
         q = q.filter(CashFund.id == fund_id)
     funds = q.order_by(CashFund.name).all()
-    headers = ['#', 'Fund Name', 'Fiscal Year', 'Source', 'Allocated', 'Balance', 'Status']
+    headers = ['#', 'Fund Name', 'Fiscal Year', 'Funding Source', 'Allocated (NRs)', 'Balance (NRs)', 'Status']
     rows = [[i+1, f.name, f.fiscal_year or '', f.funding_source or '',
              f.allocated_amount, f.current_balance, f.status] for i, f in enumerate(funds)]
-    pdf = make_pdf_report('Cash Balance Report', headers, rows, [10*mm, 35*mm, 25*mm, 30*mm, 25*mm, 25*mm, 20*mm])
+    pdf = make_pdf_report('Cash Balance Report', headers, rows, [10*mm, 35*mm, 22*mm, 30*mm, 25*mm, 25*mm, 18*mm])
     return make_response(pdf.getvalue(), 200, {'Content-Type': 'application/pdf', 'Content-Disposition': 'attachment; filename=cash_balance_report.pdf'})
 
 @app.route('/api/reports/cash-receipts', methods=['GET'])
 @login_required
 def report_cash_receipts_pdf():
     r = CashReceipt.query.order_by(CashReceipt.receipt_date.desc()).all()
-    headers = ['#', 'Receipt No', 'Date', 'Fund', 'Source', 'Amount', 'Received By']
+    headers = ['#', 'Receipt No', 'Date', 'Fund', 'Source', 'Amount (NRs)', 'Received By']
     rows = [[i+1, cr.receipt_no, ad_to_bs_date(cr.receipt_date) or '',
              cr.fund.name if cr.fund else '', cr.funding_source or '', cr.amount_received, cr.received_by or ''] for i, cr in enumerate(r)]
     pdf = make_pdf_report('Cash Receipt Report', headers, rows, [10*mm, 30*mm, 25*mm, 30*mm, 25*mm, 25*mm, 25*mm])
@@ -7736,7 +8015,7 @@ def report_cash_distributions_pdf():
     if incident_id: q = q.filter(CashDistribution.incident_id == incident_id)
     if fund_id: q = q.filter(CashDistribution.fund_id == fund_id)
     dists = q.all()
-    headers = ['#', 'Dist No', 'Date', 'Fund', 'Incident', 'Type', 'Amount']
+    headers = ['#', 'Dist No', 'Date', 'Fund', 'Incident', 'Type', 'Amount (NRs)']
     rows = [[i+1, d.distribution_no, ad_to_bs_date(d.distribution_date) or '',
              d.fund.name if d.fund else '', d.incident.incident_name if d.incident else '',
              d.distribution_type, d.total_amount] for i, d in enumerate(dists)]
@@ -7751,7 +8030,7 @@ def report_cash_by_incident():
         Incident.incident_name,
         func.coalesce(func.sum(CashDistribution.total_amount), 0)
     ).outerjoin(CashDistribution, CashDistribution.incident_id == Incident.id).group_by(Incident.id).all()
-    headers = ['#', 'Incident', 'Total Cash Distributed']
+    headers = ['#', 'Incident', 'Total Cash Distributed (NRs)']
     rows = [[i+1, name, total] for i, (name, total) in enumerate(data)]
     pdf = make_pdf_report('Cash by Incident Report', headers, rows, [10*mm, 80*mm, 50*mm])
     return make_response(pdf.getvalue(), 200, {'Content-Type': 'application/pdf', 'Content-Disposition': 'attachment; filename=cash_by_incident_report.pdf'})
@@ -7765,7 +8044,7 @@ def report_cash_by_funding_source():
         func.coalesce(func.sum(CashFund.allocated_amount), 0),
         func.coalesce(func.sum(CashFund.current_balance), 0)
     ).group_by(CashFund.funding_source).all()
-    headers = ['#', 'Funding Source', 'Total Allocated', 'Current Balance']
+    headers = ['#', 'Funding Source', 'Total Allocated (NRs)', 'Current Balance (NRs)']
     rows = [[i+1, src or 'Unknown', alloc, bal] for i, (src, alloc, bal) in enumerate(data)]
     pdf = make_pdf_report('Cash by Funding Source Report', headers, rows, [10*mm, 50*mm, 40*mm, 40*mm])
     return make_response(pdf.getvalue(), 200, {'Content-Type': 'application/pdf', 'Content-Disposition': 'attachment; filename=cash_by_funding_source_report.pdf'})
@@ -8364,7 +8643,9 @@ def init_db():
                         full_name VARCHAR(200),
                         is_active BOOLEAN DEFAULT {bool_true},
                         created_at {ts_type} DEFAULT CURRENT_TIMESTAMP,
-                        last_login {ts_type}
+                        last_login {ts_type},
+                        failed_login_attempts INTEGER DEFAULT 0,
+                        locked_until {ts_type}
                     )
                 """))
                 import secrets as _sec
@@ -8386,6 +8667,21 @@ def init_db():
                     {'u': 'viewer', 'p': generate_password_hash(vw_pw), 'r': 'viewer', 'f': 'Read Only User', 'active': True})
                 db.session.commit()
             else:
+                u_cols = [c['name'] for c in inspector.get_columns('user')]
+                u_mig = []
+                if 'failed_login_attempts' not in u_cols:
+                    u_mig.append("failed_login_attempts INTEGER DEFAULT 0")
+                if 'locked_until' not in u_cols:
+                    dialect = db.engine.dialect.name
+                    ts_type = 'TIMESTAMP' if dialect == 'postgresql' else 'DATETIME'
+                    u_mig.append(f"locked_until {ts_type}")
+                for col in u_mig:
+                    try:
+                        db.session.execute(db.text(f"ALTER TABLE \"user\" ADD COLUMN {col}"))
+                    except Exception:
+                        pass
+                if u_mig:
+                    db.session.commit()
                 existing = db.session.execute(db.text("SELECT id FROM \"user\" WHERE username = 'admin'")).fetchone()
                 if not existing:
                     import secrets as _sec
@@ -8558,6 +8854,15 @@ def init_db():
                 AppSettings.set_setting('disaster_types', ['भूकम्प (Earthquake)', 'बाढी (Flood)', 'पहिरो (Landslide)', 'आँधी (Storm)', 'आगलागी (Fire)', 'अन्य (Other)'])
             if not AppSettings.get_setting('ssf_types'):
                 AppSettings.set_setting('ssf_types', ['OAS (बर्षा पेन्सन)', 'विधवा (Widow)', 'अपाङ्गता (Disabled)', 'कोही नभएको (Endangered)', 'बाल भत्ता (Child Grant)', 'अन्य (Other)'])
+            if 'beneficiary' in inspector.get_table_names():
+                ben_cols = [c['name'] for c in inspector.get_columns('beneficiary')]
+                if 'status' not in ben_cols:
+                    try:
+                        db.session.execute(db.text("ALTER TABLE beneficiary ADD COLUMN status VARCHAR(20) DEFAULT 'Active'"))
+                        db.session.commit()
+                        print("[MIGRATE] Added 'status' column to beneficiary")
+                    except Exception:
+                        db.session.rollback()
         except Exception as e:
             print(f"Database init error: {e}")
 

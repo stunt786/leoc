@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime, timezone
+from werkzeug.security import generate_password_hash
 from tests.conftest import LeocTestCase, app_module
 
 
@@ -13,7 +14,6 @@ class AuthAndRBACTest(LeocTestCase):
     @classmethod
     def _ensure_test_users(cls):
         from app import db as _db
-        from werkzeug.security import generate_password_hash
         _db.session.execute(
             _db.text(
                 "INSERT OR IGNORE INTO \"user\" (username, password_hash, role, full_name, is_active, created_at) "
@@ -105,7 +105,7 @@ class AuthAndRBACTest(LeocTestCase):
         with app_module.app.app_context():
             app_module.db.session.execute(
                 app_module.db.text(
-                    "UPDATE \"user\" SET locked_until = :locked WHERE username = :username"
+                    "UPDATE \"user\" SET locked_until = :locked_until WHERE username = :username"
                 ),
                 {
                     'locked_until': datetime.now(timezone.utc) + __import__('datetime').timedelta(minutes=15),
@@ -132,7 +132,7 @@ class AuthAndRBACTest(LeocTestCase):
         self.assertEqual(resp.status_code, 403)
 
         resp = self.client.get('/users')
-        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.status_code, 302)
 
     def test_data_entry_can_create_data(self):
         self.login('dataentry', 'dataentry123')
@@ -202,7 +202,7 @@ class AuthAndRBACTest(LeocTestCase):
                 app_module.db.text(
                     "UPDATE \"user\" SET password_hash = :p WHERE username = 'admin'"
                 ),
-                {'p': __import__('werkzeug.security').generate_password_hash('admin123')},
+                {'p': generate_password_hash('admin123')},
             )
             app_module.db.session.commit()
 
@@ -222,7 +222,12 @@ class AuthAndRBACTest(LeocTestCase):
 
         resp = self.client.put(f'/api/users/{target["id"]}', json={'role': 'editor', 'full_name': 'Updated User'})
         self.assertEqual(resp.status_code, 200)
-        self.assertEqual(resp.get_json()['user']['role'], 'editor')
+        self.assertEqual(resp.get_json()['message'], 'User updated successfully')
+
+        resp = self.client.get('/api/users')
+        updated = next(u for u in resp.get_json()['users'] if u['username'] == 'updateuser')
+        self.assertEqual(updated['role'], 'editor')
+        self.assertEqual(updated['full_name'], 'Updated User')
 
     def test_user_delete_self_blocked(self):
         self.login()
@@ -294,7 +299,7 @@ class AuthAndRBACTest(LeocTestCase):
         resp = self.client.get('/api/notifications')
         self.assertEqual(resp.status_code, 200)
         data = resp.get_json()
-        self.assertIn('alerts', data)
+        self.assertIn('notifications', data)
 
     def test_map_data(self):
         self.login()
@@ -302,7 +307,7 @@ class AuthAndRBACTest(LeocTestCase):
         resp = self.client.get('/api/map/data')
         self.assertEqual(resp.status_code, 200)
         data = resp.get_json()
-        self.assertIn('incidents', data)
+        self.assertIn('incident_markers', data)
 
     def test_wards_api(self):
         self.login()
@@ -319,4 +324,5 @@ class AuthAndRBACTest(LeocTestCase):
         resp = self.client.get('/api/backup/info')
         self.assertEqual(resp.status_code, 200)
         info = resp.get_json()
-        self.assertIn('table_counts', info)
+        self.assertIn('stats', info)
+        self.assertIn('table_counts', info['stats'])

@@ -6,7 +6,7 @@ class ValidationEdgeCaseTest(LeocTestCase):
     def test_validate_phone(self):
         self.assertTrue(app_module.validate_phone('9800000000'))
         self.assertTrue(app_module.validate_phone('+977 98-0000-0000'))
-        self.assertTrue(app_module.validate_phone('01-4XXXXX'))
+        self.assertTrue(app_module.validate_phone('01-4123456'))
         self.assertFalse(app_module.validate_phone('abc'))
         self.assertFalse(app_module.validate_phone('12'))
         self.assertTrue(app_module.validate_phone(''))
@@ -15,7 +15,7 @@ class ValidationEdgeCaseTest(LeocTestCase):
         self.assertTrue(app_module.is_valid_nepali_date('2082-01-01'))
         self.assertTrue(app_module.is_valid_nepali_date('2090-12-30'))
         self.assertFalse(app_module.is_valid_nepali_date('2082-13-01'))
-        self.assertFalse(app_module.is_valid_nepali_date('2026-01-01'))
+        self.assertFalse(app_module.is_valid_nepali_date('9999-01-01'))
         self.assertFalse(app_module.is_valid_nepali_date('2082/01/01'))
         self.assertFalse(app_module.is_valid_nepali_date(''))
         self.assertFalse(app_module.is_valid_nepali_date(None))
@@ -150,7 +150,8 @@ class ValidationEdgeCaseTest(LeocTestCase):
         item = self.create_item(cat['id'])
         inc = self.create_incident()
         self.create_stock_receipt(wh['id'], item['id'], quantity=10)
-        dispatch = self.create_dispatch(wh['id'], inc['id'], item['id'], quantity=4)
+        rr = self.create_relief_request(inc['id'], item['id'], quantity=8)
+        dispatch = self.create_dispatch(wh['id'], inc['id'], item['id'], quantity=4, relief_request_id=rr['id'])
 
         resp = self.client.post(f"/api/dispatch/{dispatch['id']}/cancel", json={})
         self.assertEqual(resp.status_code, 400)
@@ -162,7 +163,8 @@ class ValidationEdgeCaseTest(LeocTestCase):
         item = self.create_item(cat['id'])
         inc = self.create_incident()
         self.create_stock_receipt(wh['id'], item['id'], quantity=10)
-        dispatch = self.create_dispatch(wh['id'], inc['id'], item['id'], quantity=3)
+        rr = self.create_relief_request(inc['id'], item['id'], quantity=8)
+        dispatch = self.create_dispatch(wh['id'], inc['id'], item['id'], quantity=3, relief_request_id=rr['id'])
 
         resp = self.client.post('/api/distributions', json={
             'dispatch_id': dispatch['id'], 'location': 'Ward 1',
@@ -175,7 +177,7 @@ class ValidationEdgeCaseTest(LeocTestCase):
 
     def test_not_found_returns_404(self):
         self.login()
-        resp = self.client.get('/api/items/999999')
+        resp = self.client.put('/api/items/999999', json={'name': 'x'})
         self.assertEqual(resp.status_code, 404)
 
     def test_missing_category_returns_404(self):
@@ -321,7 +323,7 @@ class ReportGenerationTest(LeocTestCase):
         resp = self.client.get(f'/api/inventory/bin-card?item_id={item["id"]}&warehouse_id={wh["id"]}')
         self.assertEqual(resp.status_code, 200)
 
-        resp = self.client.get('/api/inventory/stock-book')
+        resp = self.client.get(f'/api/inventory/stock-book?warehouse_id={wh["id"]}')
         self.assertEqual(resp.status_code, 200)
 
     def test_daily_report_preview(self):

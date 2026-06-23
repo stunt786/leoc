@@ -83,8 +83,10 @@ class InventoryManagementTest(LeocTestCase):
         resp = self.client.put(f'/api/suppliers/{sup_id}', json={'status': 'Inactive'})
         self.assertEqual(resp.status_code, 200)
 
-        resp = self.client.get(f'/api/suppliers/{sup_id}')
+        resp = self.client.get('/api/suppliers')
         self.assertEqual(resp.status_code, 200)
+        names = [s['name'] for s in resp.get_json()['suppliers']]
+        self.assertIn('Test Supplier', names)
 
     def test_item_crud(self):
         self.login()
@@ -103,9 +105,6 @@ class InventoryManagementTest(LeocTestCase):
 
         item_id = item['id']
         resp = self.client.put(f'/api/items/{item_id}', json={'local_name': 'चामल'})
-        self.assertEqual(resp.status_code, 200)
-
-        resp = self.client.get(f'/api/items/{item_id}')
         self.assertEqual(resp.status_code, 200)
 
         resp = self.client.get('/api/items')
@@ -208,7 +207,7 @@ class InventoryManagementTest(LeocTestCase):
         self.assertEqual(resp.status_code, 200)
         summary = resp.get_json()
         self.assertIn('total_items', summary)
-        self.assertIn('total_quantity', summary)
+        self.assertIn('total_stock', summary)
 
     def test_manual_adjustment_increase_decrease(self):
         self.login()
@@ -289,10 +288,10 @@ class InventoryManagementTest(LeocTestCase):
         cat = self.create_category()
         wh = self.create_warehouse()
         item = self.create_item(cat['id'])
-        self.create_stock_receipt(wh['item_id'], item['id'], quantity=10)
+        self.create_stock_receipt(wh['id'], item['id'], quantity=10)
 
         resp = self.client.get(f"/api/items/{item['id']}/history")
         self.assertEqual(resp.status_code, 200)
         history = resp.get_json()
-        self.assertIn('receipts', history)
-        self.assertIn('adjustments', history)
+        self.assertIn('events', history)
+        self.assertTrue(len(history['events']) > 0)

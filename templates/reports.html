@@ -54,6 +54,7 @@
             </optgroup>
             <optgroup label="--- Analytics ---">
                 <option value="monthly-summary">Monthly Summary</option>
+                <option value="analytics-summary">Analytics Summary</option>
             </optgroup>
         </select>
         <button class="btn btn-outline-primary btn-sm" onclick="printPreview()" id="printBtn" disabled title="Print Preview">
@@ -152,6 +153,13 @@
             <div class="col-auto filter-optional" data-types="cash-distributions,cash-requests,cash-balance">
                 <label class="form-label small">Fund</label>
                 <select class="form-select form-select-sm" id="filterFund" onchange="loadReportData()"><option value="">All</option></select>
+            </div>
+            <div class="col-auto filter-optional" data-types="inventory,items-master">
+                <label class="form-label small">Distributable</label>
+                <select class="form-select form-select-sm" id="filterDistributable" onchange="loadReportData()"><option value="">All</option>
+                    <option value="yes">Distributable</option>
+                    <option value="no">Non-Distributable</option>
+                </select>
             </div>
             <div class="col-auto filter-optional" data-types="inventory,dispatch,distribution,incidents,requests,adjustments,low-stock,stock-receipts,stock-transfers,stock-book,expiry-tracking,cash-balance,cash-receipts,cash-requests,cash-distributions,cash-yearly">
                 <label class="form-label small">Fiscal Year</label>
@@ -256,6 +264,7 @@ function getFilterParams() {
     const action = document.getElementById('filterAction').value;
     const user = document.getElementById('filterUser').value;
     const resource = document.getElementById('filterResource').value;
+    const distributable = document.getElementById('filterDistributable').value;
 
     if (dateFrom) params.set('date_from', dateFrom);
     if (dateTo) params.set('date_to', dateTo);
@@ -276,6 +285,7 @@ function getFilterParams() {
     if (action) params.set('action', action);
     if (user) params.set('user_id', user);
     if (resource) params.set('resource', resource);
+    if (distributable) params.set('is_distributable', distributable);
     return params.toString();
 }
 
@@ -308,12 +318,12 @@ async function loadReportData() {
             if (data.rows.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="' + (data.headers.length + 1) + '" class="text-center text-muted py-4">No data found</td></tr>';
             } else {
-                const statusCol = type === 'expiry-tracking' ? 6 : -1;
+                const statusCol = type === 'expiry-tracking' ? 8 : -1;
                 tbody.innerHTML = data.rows.map((row, i) =>
-                    '<tr>' + row.map((c, j) => {
+                    '<tr><td class="text-center">' + (i + 1) + '</td>' + row.map((c, j) => {
                         if (j === statusCol) {
                             const cls = c.startsWith('Expired') ? 'danger' :
-                                parseInt(c) <= 30 ? 'danger' :
+                                c.includes('d left') && parseInt(c) <= 30 ? 'danger' :
                                 c.includes('d left') ? 'warning' : 'success';
                             return `<td><span class="badge bg-${cls}">${c ?? ''}</span></td>`;
                         }

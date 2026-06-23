@@ -2,6 +2,7 @@ import os
 import tempfile
 import unittest
 import uuid
+import atexit
 from datetime import datetime, timezone
 
 
@@ -16,38 +17,39 @@ os.environ.setdefault('OPERATOR_PASSWORD', 'operator123')
 os.environ.setdefault('FINANCE_PASSWORD', 'finance123')
 os.environ.setdefault('FLASK_ENV', 'development')
 os.environ['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{_db_path}'
+os.environ['RATELIMIT_ENABLED'] = 'False'
 
 import app as app_module
+from app import Ward, db as _db
+
+
+def _cleanup():
+    try:
+        os.remove(_db_path)
+    except (FileNotFoundError, OSError):
+        pass
+
+
+atexit.register(_cleanup)
 
 
 def _seed_test_wards():
-    from app import Ward, db
     if Ward.query.first() is None:
         for i in range(1, 10):
-            db.session.add(Ward(name=f'Ward {i}', sort_order=i))
-        db.session.commit()
+            _db.session.add(Ward(name=f'Ward {i}', sort_order=i))
+        _db.session.commit()
+
+
+with app_module.app.app_context():
+    _seed_test_wards()
 
 
 class LeocTestCase(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        with app_module.app.app_context():
-            _seed_test_wards()
-
-    @classmethod
-    def tearDownClass(cls):
-        with app_module.app.app_context():
-            app_module.db.session.remove()
-            app_module.db.engine.dispose()
-        try:
-            os.remove(_db_path)
-        except FileNotFoundError:
-            pass
-
     def setUp(self):
         app_module.app.config['TESTING'] = True
         app_module.app.config['WTF_CSRF_ENABLED'] = False
         app_module.app.config['SERVER_NAME'] = 'localhost'
+        app_module.limiter.enabled = False
         self.client = app_module.app.test_client()
         app_module.clear_cache()
 
@@ -93,7 +95,6 @@ class LeocTestCase(unittest.TestCase):
             )
             app_module.db.session.commit()
 
-    # --- Test data helpers ---
     def create_category(self, name=None, description='Test category'):
         payload = {
             'name': name or f'Cat-{uuid.uuid4().hex[:8]}',
@@ -225,11 +226,11 @@ class LeocTestCase(unittest.TestCase):
         self.assertEqual(response.status_code, 201, response.get_json())
         return response.get_json()['data']
 
-    def create_beneficiary(self, name=None, national_id=None, ward=1, phone='9800000000'):
+    def create_beneficiary(self, name=None, national_id=None, ward=1, phone=None):
         payload = {
             'name': name or f'Ben-{uuid.uuid4().hex[:8]}',
             'national_id': national_id or f'NID-{uuid.uuid4().hex[:8]}',
-            'phone': phone,
+            'phone': phone or f'98{uuid.uuid4().int % 100000000:08d}',
             'ward': ward,
             'tole': 'Test Tole',
             'family_members': 4,
@@ -279,7 +280,17 @@ class LeocTestCase(unittest.TestCase):
         self.assertEqual(response.status_code, 201, response.get_json())
         return response.get_json()['data']
 
-    def create_cash_distribution(self, fund_id, incident_id, cash_request_id, amount=300):
+    def create_cash_distribution(self, fund_id, incident_id, cash_request_id, amount=300, beneficiary_ids=None):
+        if beneficiary_ids is None:
+            b1 = self.create_beneficiary()
+            b2 = self.create_beneficiary()
+            beneficiary_ids = [b1['id'], b2['id']]
+        beneficiaries = [
+            {'name': f'Cash-{uuid.uuid4().hex[:8]}', 'national_id': f'NID-{uuid.uuid4().hex[:8]}',
+             'amount': amount // 3, 'beneficiary_id': beneficiary_ids[0]},
+            {'name': f'Cash-{uuid.uuid4().hex[:8]}', 'national_id': f'NID-{uuid.uuid4().hex[:8]}',
+             'amount': amount - amount // 3, 'beneficiary_id': beneficiary_ids[1]},
+        ]
         payload = {
             'fund_id': fund_id,
             'incident_id': incident_id,
@@ -288,10 +299,7 @@ class LeocTestCase(unittest.TestCase):
             'distribution_date': '2082-03-03',
             'officer': 'Test Officer',
             'remarks': 'Test cash distribution',
-            'beneficiaries': [
-                {'name': 'Cash Fam A', 'national_id': 'CA-1', 'amount': amount // 3},
-                {'name': 'Cash Fam B', 'national_id': 'CA-2', 'amount': amount - amount // 3},
-            ],
+            'beneficiaries': beneficiaries,
         }
         response = self.client.post('/api/cash-distributions', json=payload)
         self.assertEqual(response.status_code, 201, response.get_json())
