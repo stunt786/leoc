@@ -186,6 +186,10 @@
         </tbody>
       </table>
     </div>
+    <div class="d-flex justify-content-between align-items-center mt-2 px-2">
+      <small class="text-muted" id="tableInfo">0 records</small>
+      <nav><ul class="pagination pagination-sm mb-0" id="pagination"></ul></nav>
+    </div>
   </div>
 </div>
 {% endblock %}
@@ -194,6 +198,7 @@
 <script>
 const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 let forecasts = [];
+let paginator = new Paginator({perPage: 25, onPageChange: () => renderForecastsTable(forecasts)});
 let editingForecastId = null;
 
 function toDev(n) {
@@ -224,20 +229,22 @@ async function loadForecasts() {
     const d = await r.json();
     if (!d.success) throw new Error(d.message);
     forecasts = d.forecasts;
-    renderForecastsTable();
+    renderForecastsTable(forecasts);
     renderRecentForecasts();
   } catch(e) {
     document.getElementById('forecastTableBody').innerHTML = `<tr><td colspan="8" class="text-center text-danger py-3">Error: ${esc(e.message)}</td></tr>`;
   }
 }
 
-function renderForecastsTable() {
+function renderForecastsTable(data) {
   const tbody = document.getElementById('forecastTableBody');
-  if (!forecasts.length) {
+  if (!data.length) {
     tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-3"><i class="bi bi-inbox me-1"></i>कुनै पूर्वानुमान छैन</td></tr>';
+    paginator.update(0);
     return;
   }
-  tbody.innerHTML = forecasts.map((f, i) => {
+  const pageData = paginator.getPageData(data);
+  tbody.innerHTML = pageData.map((f, i) => {
     const statusColor = f.forecast_status?.includes('सफा') ? 'success' :
       f.forecast_status?.includes('खतरा') || f.forecast_status?.includes('गम्भीर') ? 'danger' :
       f.forecast_status?.includes('सतर्क') || f.forecast_status?.includes('भारी') ? 'warning' : 'secondary';
@@ -256,6 +263,7 @@ function renderForecastsTable() {
       </td>
     </tr>`;
   }).join('');
+  paginator.update(data.length);
 }
 
 function renderRecentForecasts() {

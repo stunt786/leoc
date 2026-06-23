@@ -36,6 +36,10 @@
                 </tbody>
             </table>
         </div>
+        <div class="d-flex justify-content-between align-items-center mt-2 px-2">
+            <small class="text-muted" id="tableInfo">0 records</small>
+            <nav><ul class="pagination pagination-sm mb-0" id="pagination"></ul></nav>
+        </div>
     </div>
 </div>
 
@@ -156,6 +160,8 @@
 {% block extra_js %}
 <script>
 const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+let _users = [];
+let paginator = new Paginator({perPage: 25, onPageChange: () => renderUsers(_users)});
 const VALID_ROLES = {
     'admin': 'Administrator',
     'warehouse_manager': 'Warehouse Manager',
@@ -196,35 +202,42 @@ function resetUserForm() {
     document.getElementById('isActiveGroup').style.display = 'block';
 }
 
+function renderUsers(data) {
+    const tbody = document.getElementById('usersTableBody');
+    if (data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-muted">No users found</td></tr>';
+        paginator.update(0);
+        return;
+    }
+    const pageData = paginator.getPageData(data);
+    tbody.innerHTML = pageData.map(u => `
+        <tr>
+            <td><strong>${u.username}</strong></td>
+            <td>${u.full_name || '-'}</td>
+            <td>${roleBadge(u.role)}</td>
+            <td>${statusBadge(u.is_active)}</td>
+            <td><small class="text-muted">${u.created_at || '-'}</small></td>
+            <td><small class="text-muted">${u.last_login || 'Never'}</small></td>
+            <td class="text-end">
+                <button class="btn btn-sm btn-outline-primary me-1" onclick="editUser(${u.id})" title="Edit">
+                    <i class="bi bi-pencil"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-danger" onclick="confirmDelete(${u.id}, '${u.username}')" title="Delete">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </td>
+        </tr>
+    `).join('');
+    paginator.update(data.length);
+}
+
 async function loadUsers() {
     try {
         const r = await fetch('/api/users');
         const d = await r.json();
         if (!d.success) { showToast('danger', d.message); return; }
-        const tbody = document.getElementById('usersTableBody');
-        const users = d.users;
-        if (users.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-muted">No users found</td></tr>';
-        } else {
-            tbody.innerHTML = users.map(u => `
-                <tr>
-                    <td><strong>${u.username}</strong></td>
-                    <td>${u.full_name || '-'}</td>
-                    <td>${roleBadge(u.role)}</td>
-                    <td>${statusBadge(u.is_active)}</td>
-                    <td><small class="text-muted">${u.created_at || '-'}</small></td>
-                    <td><small class="text-muted">${u.last_login || 'Never'}</small></td>
-                    <td class="text-end">
-                        <button class="btn btn-sm btn-outline-primary me-1" onclick="editUser(${u.id})" title="Edit">
-                            <i class="bi bi-pencil"></i>
-                        </button>
-                        <button class="btn btn-sm btn-outline-danger" onclick="confirmDelete(${u.id}, '${u.username}')" title="Delete">
-                            <i class="bi bi-trash"></i>
-                        </button>
-                    </td>
-                </tr>
-            `).join('');
-        }
+        _users = d.users;
+        renderUsers(_users);
     } catch (e) { showToast('danger', 'Error loading users: ' + e.message); }
 }
 

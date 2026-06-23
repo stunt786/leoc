@@ -37,6 +37,10 @@
                 </tbody>
             </table>
         </div>
+        <div class="d-flex justify-content-between align-items-center mt-2 px-2">
+            <small class="text-muted" id="tableInfo">0 records</small>
+            <nav><ul class="pagination pagination-sm mb-0" id="pagination"></ul></nav>
+        </div>
     </div>
 </div>
 
@@ -78,6 +82,7 @@
 <script>
 const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 let categories = [];
+let paginator = new Paginator({perPage: 25, onPageChange: () => renderCategories(categories)});
 
 async function loadCategories() {
     const r = await fetch('/api/categories');
@@ -91,9 +96,11 @@ function renderCategories(data) {
     const tbody = document.getElementById('categoryTableBody');
     if (data.length === 0) {
         tbody.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-muted">No categories found</td></tr>';
+        paginator.update(0);
         return;
     }
-    tbody.innerHTML = data.map(c => `<tr>
+    const pageData = paginator.getPageData(data);
+    tbody.innerHTML = pageData.map(c => `<tr>
         <td><strong>${c.name}</strong></td>
         <td>${c.name_np || '-'}</td>
         <td>${c.description || '-'}</td>
@@ -102,6 +109,7 @@ function renderCategories(data) {
             <button class="btn btn-sm btn-outline-danger" onclick="deleteCategory(${c.id})"><i class="bi bi-trash"></i></button>
         </td>
     </tr>`).join('');
+    paginator.update(data.length);
 }
 
 function filterCategories() {
@@ -111,6 +119,7 @@ function filterCategories() {
         (c.description && c.description.toLowerCase().includes(q)) ||
         (c.name_np && c.name_np.includes(q))
     );
+    if (paginator) paginator.currentPage = 1;
     renderCategories(filtered);
 }
 

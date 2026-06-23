@@ -1671,6 +1671,31 @@ def nepali_date_filter(value):
         return ad_to_bs(value.year, value.month, value.day)
     return str(value)
 
+@app.template_filter('format_next_update')
+def format_next_update_filter(value):
+    if not value or not isinstance(value, str):
+        return value
+    parts = value.strip().split()
+    if len(parts) < 2:
+        return value
+    date_part = parts[0]
+    time_part = parts[1]
+    try:
+        hour = int(time_part.split(':')[0])
+        if hour < 12:
+            tod = 'बिहान'
+        elif hour < 17:
+            tod = 'दिउसो'
+        elif hour < 20:
+            tod = 'बेलुका'
+        else:
+            tod = 'बेलुका'
+    except (ValueError, IndexError):
+        tod = ''
+    date_part = nepali_num_str(date_part)
+    time_part = nepali_num_str(time_part)
+    return f"मिति {date_part} {tod} {time_part} बजे"
+
 @app.template_filter('nepali_month_name')
 def nepali_month_name_filter(bs_date_str):
     if not bs_date_str or not isinstance(bs_date_str, str):
@@ -1687,6 +1712,24 @@ def ward_name_filter(ward_id):
         return ''
     ward = db.session.get(Ward, int(ward_id))
     return ward.name if ward else str(ward_id)
+
+# ============ PAGINATION HELPERS ============
+def paginate(query, page=1, per_page=50, max_per_page=200):
+    per_page = min(per_page, max_per_page)
+    page = max(1, page)
+    total = query.count()
+    items = query.offset((page - 1) * per_page).limit(per_page).all()
+    return items, {
+        'page': page,
+        'per_page': per_page,
+        'total': total,
+        'pages': max(1, (total + per_page - 1) // per_page),
+    }
+
+def pagination_args(default_per_page=50):
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', default_per_page, type=int)
+    return page, per_page
 
 VIEW_ENDPOINTS = {
     '/api/incidents': 'incidents',

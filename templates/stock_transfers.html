@@ -114,6 +114,10 @@
                 </tbody>
             </table>
         </div>
+        <div class="d-flex justify-content-between align-items-center mt-2 px-2">
+            <small class="text-muted" id="tableInfo">0 records</small>
+            <nav><ul class="pagination pagination-sm mb-0" id="pagination"></ul></nav>
+        </div>
     </div>
 </div>
 
@@ -142,6 +146,7 @@ const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('con
 let transfers = [];
 let warehouses = [];
 let itemsList = [];
+let paginator = new Paginator({perPage: 25, onPageChange: () => renderTransfers(transfers)});
 
 let inventoryByWarehouse = {};
 
@@ -246,9 +251,11 @@ function renderTransfers(data) {
     const tbody = document.getElementById('transferTableBody');
     if (data.length === 0) {
         tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-muted">No transfers found</td></tr>';
+        paginator.update(0);
         return;
     }
-    tbody.innerHTML = data.map(t => {
+    const pageData = paginator.getPageData(data);
+    tbody.innerHTML = pageData.map(t => {
         const itemCount = t.items ? t.items.length : 0;
         return `<tr>
             <td><strong>${t.transfer_no}</strong></td>
@@ -262,6 +269,7 @@ function renderTransfers(data) {
             </td>
         </tr>`;
     }).join('');
+    paginator.update(data.length);
 }
 
 function statusBadge(status) {
@@ -277,6 +285,7 @@ function statusBadge(status) {
 function filterTransfers() {
     const q = document.getElementById('transferSearch').value.toLowerCase();
     const filtered = transfers.filter(t => t.transfer_no.toLowerCase().includes(q));
+    if (paginator) paginator.currentPage = 1;
     renderTransfers(filtered);
 }
 

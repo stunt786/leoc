@@ -51,6 +51,10 @@
                 </tbody>
             </table>
         </div>
+        <div class="d-flex justify-content-between align-items-center mt-2 px-2">
+            <small class="text-muted" id="tableInfo">0 records</small>
+            <nav><ul class="pagination pagination-sm mb-0" id="pagination"></ul></nav>
+        </div>
     </div>
 </div>
 
@@ -120,6 +124,7 @@
 const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 let suppliers = [];
 let receiptCounts = {};
+let paginator = new Paginator({perPage: 25, onPageChange: () => renderSuppliers(suppliers)});
 
 async function loadSuppliers() {
     try {
@@ -161,9 +166,11 @@ function renderSuppliers(data) {
     const tbody = document.getElementById('supplierTableBody');
     if (data.length === 0) {
         tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-muted">No suppliers found</td></tr>';
+        paginator.update(0);
         return;
     }
-    tbody.innerHTML = data.map(s => `<tr>
+    const pageData = paginator.getPageData(data);
+    tbody.innerHTML = pageData.map(s => `<tr>
         <td><strong>${s.name}</strong></td>
         <td>${s.contact_person || '-'}</td>
         <td>${s.phone || '-'}</td>
@@ -176,6 +183,7 @@ function renderSuppliers(data) {
             <button class="btn btn-sm btn-outline-danger" onclick="deleteSupplier(${s.id})"><i class="bi bi-trash"></i></button>
         </td>
     </tr>`).join('');
+    paginator.update(data.length);
 }
 
 function filterSuppliers() {
@@ -191,6 +199,7 @@ function filterSuppliers() {
         (s.phone && s.phone.includes(q)) ||
         (s.email && s.email.toLowerCase().includes(q))
     );
+    if (paginator) paginator.currentPage = 1;
     renderSuppliers(filtered);
 }
 

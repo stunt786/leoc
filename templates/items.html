@@ -81,6 +81,10 @@
                 </tbody>
             </table>
         </div>
+        <div class="d-flex justify-content-between align-items-center mt-2 px-2">
+            <small class="text-muted" id="tableInfo">0 records</small>
+            <nav><ul class="pagination pagination-sm mb-0" id="pagination"></ul></nav>
+        </div>
     </div>
 </div>
 
@@ -352,6 +356,10 @@
                                 <tbody id="historyBody"></tbody>
                             </table>
                         </div>
+                        <div class="d-flex justify-content-between align-items-center mt-2 px-2">
+                            <small class="text-muted" id="historyInfo">0 records</small>
+                            <nav><ul class="pagination pagination-sm mb-0" id="historyPagination"></ul></nav>
+                        </div>
                         <div id="historyEmpty" class="text-center py-5 text-muted" style="display:none">
                             <i class="bi bi-inbox fs-1 d-block mb-2"></i>
                             <span>No matching history events found</span>
@@ -380,6 +388,8 @@
 const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 let items = [];
 let categories = [];
+let paginator = new Paginator({perPage: 25, onPageChange: () => renderItems(items)});
+let historyPaginator = new Paginator({perPage: 25, onPageChange: () => renderHistoryEvents(_historyAllEvents)});
 
 async function loadData() {
     try {
@@ -439,6 +449,7 @@ function filterItems() {
         i.name.toLowerCase().includes(q) ||
         (i.item_code && i.item_code.toLowerCase().includes(q))
     );
+    if (paginator) paginator.currentPage = 1;
     renderItems(filtered);
 }
 
@@ -446,9 +457,11 @@ function renderItems(data) {
     const tbody = document.getElementById('itemTableBody');
     if (data.length === 0) {
         tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-muted">No items found</td></tr>';
+        paginator.update(0);
         return;
     }
-    tbody.innerHTML = data.map(i => `<tr>
+    const pageData = paginator.getPageData(data);
+    tbody.innerHTML = pageData.map(i => `<tr>
         <td class="text-center">
             ${i.photo ? `<img src="${i.photo}" alt="" style="width:30px;height:30px;object-fit:cover;border-radius:4px">` : `<i class="bi bi-image text-muted" style="font-size:1.1rem"></i>`}
         </td>
@@ -464,6 +477,7 @@ function renderItems(data) {
             <button class="btn btn-sm btn-outline-danger" onclick="deleteItem(${i.id})"><i class="bi bi-trash"></i></button>
         </td>
     </tr>`).join('');
+    paginator.update(data.length);
 }
 
 function resetForm() {
@@ -786,11 +800,13 @@ function renderHistoryEvents(events) {
     if (events.length === 0) {
         tbody.innerHTML = '';
         emptyEl.style.display = 'block';
+        historyPaginator.update(0);
         return;
     }
     emptyEl.style.display = 'none';
 
-    tbody.innerHTML = events.map((e, idx) => {
+    const pageData = historyPaginator.getPageData(events);
+    tbody.innerHTML = pageData.map((e, idx) => {
         const qtyUp = e.qty_change && !e.qty_change.startsWith('-');
         const qtyCls = qtyUp ? 'text-success' : 'text-danger';
         return `<tr class="history-row" style="${idx % 2 === 0 ? '' : 'background:#f8fafc'}">
@@ -808,6 +824,7 @@ function renderHistoryEvents(events) {
             <td class="text-center">${getQtyBadge(e.qty_change)}</td>
         </tr>`;
     }).join('');
+    historyPaginator.update(events.length);
 }
 
 function filterHistoryEvents() {
@@ -822,6 +839,7 @@ function filterHistoryEvents() {
     if (fromVal) filtered = filtered.filter(e => e.date >= fromVal);
     if (toVal) filtered = filtered.filter(e => e.date <= toVal);
 
+    if (historyPaginator) historyPaginator.currentPage = 1;
     renderHistoryEvents(filtered);
 }
 

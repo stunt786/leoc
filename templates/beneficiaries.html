@@ -26,6 +26,10 @@
                 <tbody id="benBody"></tbody>
             </table>
         </div>
+        <div class="d-flex justify-content-between align-items-center mt-2 px-2">
+            <small class="text-muted" id="tableInfo">0 records</small>
+            <nav><ul class="pagination pagination-sm mb-0" id="pagination"></ul></nav>
+        </div>
     </div>
 </div>
 
@@ -305,6 +309,8 @@
 {% block extra_js %}
 <script>
 const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+let _beneficiaries = [];
+let paginator = new Paginator({perPage: 25, onPageChange: () => renderBeneficiaries(_beneficiaries)});
 
 function updateFamilyMembersJson() {
     const members = [];
@@ -387,6 +393,26 @@ document.getElementById('familyMembersContainer').addEventListener('input', func
     }
 });
 
+function renderBeneficiaries(data) {
+    const t = document.getElementById('benBody');
+    if (data.length === 0) { t.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">No beneficiaries found</td></tr>'; paginator.update(0); return; }
+    const pageData = paginator.getPageData(data);
+    t.innerHTML = pageData.map(b => `<tr>
+        <td><strong>${b.name}</strong></td>
+        <td>${b.national_id || '-'}</td>
+        <td>${b.phone || '-'}</td>
+        <td>${b.address || ''}${b.ward ? ', '+b.ward_name : ''}</td>
+        <td>${b.ward_name || b.ward || '-'}</td>
+        <td>${b.family_members || 0}</td>
+        <td>
+            <button class="btn btn-sm btn-outline-info" onclick="showHistory(${b.id})" title="Assistance History"><i class="bi bi-clock-history"></i></button>
+            <button class="btn btn-sm btn-outline-primary" onclick="editBen(${b.id})"><i class="bi bi-pencil"></i></button>
+            <button class="btn btn-sm btn-outline-danger" onclick="deleteBen(${b.id})"><i class="bi bi-trash"></i></button>
+        </td>
+    </tr>`).join('');
+    paginator.update(data.length);
+}
+
 async function loadBeneficiaries() {
     try {
         const search = document.getElementById('benSearch').value;
@@ -396,21 +422,9 @@ async function loadBeneficiaries() {
         if (ward) url += `ward=${ward}&`;
         const r = await fetch(url);
         const d = await r.json();
-        const t = document.getElementById('benBody');
-        if (!d.success || d.beneficiaries.length === 0) { t.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">No beneficiaries found</td></tr>'; return; }
-        t.innerHTML = d.beneficiaries.map(b => `<tr>
-            <td><strong>${b.name}</strong></td>
-            <td>${b.national_id || '-'}</td>
-            <td>${b.phone || '-'}</td>
-            <td>${b.address || ''}${b.ward ? ', '+b.ward_name : ''}</td>
-            <td>${b.ward_name || b.ward || '-'}</td>
-            <td>${b.family_members || 0}</td>
-            <td>
-                <button class="btn btn-sm btn-outline-info" onclick="showHistory(${b.id})" title="Assistance History"><i class="bi bi-clock-history"></i></button>
-                <button class="btn btn-sm btn-outline-primary" onclick="editBen(${b.id})"><i class="bi bi-pencil"></i></button>
-                <button class="btn btn-sm btn-outline-danger" onclick="deleteBen(${b.id})"><i class="bi bi-trash"></i></button>
-            </td>
-        </tr>`).join('');
+        if (!d.success) { showToast('danger', d.message); return; }
+        _beneficiaries = d.beneficiaries;
+        renderBeneficiaries(_beneficiaries);
     } catch(e) {
         showToast('danger', 'Error loading beneficiaries: ' + e.message);
     }

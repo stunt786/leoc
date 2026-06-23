@@ -128,6 +128,10 @@
                 </tbody>
             </table>
         </div>
+        <div class="d-flex justify-content-between align-items-center mt-2 px-2">
+            <small class="text-muted" id="tableInfo">0 records</small>
+            <nav><ul class="pagination pagination-sm mb-0" id="pagination"></ul></nav>
+        </div>
     </div>
 </div>
 <!-- Cancel Dispatch Modal -->
@@ -162,6 +166,7 @@ let dispatches = [];
 let allRequests = [];
 let inventoryMap = {};
 let isSaving = false;
+let paginator = new Paginator({perPage: 25, onPageChange: () => renderDispatches(dispatches)});
 
 let warehouseList = [];
 
@@ -403,9 +408,11 @@ function renderDispatches(data) {
     const tbody = document.getElementById('dispatchTableBody');
     if (data.length === 0) {
         tbody.innerHTML = '<tr><td colspan="9" class="text-center py-4 text-muted">No dispatches found</td></tr>';
+        paginator.update(0);
         return;
     }
-    tbody.innerHTML = data.map(dp => {
+    const pageData = paginator.getPageData(data);
+    tbody.innerHTML = pageData.map(dp => {
         const itemsCount = dp.items ? dp.items.length : 0;
         const isCancelled = dp.status === 'Cancelled';
         const canEdit = !dp.has_distribution && !isCancelled;
@@ -431,6 +438,7 @@ function renderDispatches(data) {
             </td>
         </tr>`;
     }).join('');
+    paginator.update(data.length);
 }
 
 function filterDispatches() {
@@ -440,6 +448,7 @@ function filterDispatches() {
         (d.destination && d.destination.toLowerCase().includes(q)) ||
         (d.incident_name && d.incident_name.toLowerCase().includes(q))
     );
+    if (paginator) paginator.currentPage = 1;
     renderDispatches(filtered);
 }
 

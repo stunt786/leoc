@@ -21,6 +21,10 @@
                 <tbody id="crBody"></tbody>
             </table>
         </div>
+        <div class="d-flex justify-content-between align-items-center mt-2 px-2">
+            <small class="text-muted" id="tableInfo">0 records</small>
+            <nav><ul class="pagination pagination-sm mb-0" id="pagination"></ul></nav>
+        </div>
     </div>
 </div>
 
@@ -58,19 +62,29 @@
 {% block extra_js %}
 <script>
 const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+let _receipts = [];
+let paginator = new Paginator({perPage: 25, onPageChange: () => renderReceipts(_receipts)});
 
-async function loadReceipts() {
-    const r = await fetch('/api/cash-receipts');
-    const d = await r.json();
+function renderReceipts(data) {
     const t = document.getElementById('crBody');
-    if (!d.success || d.receipts.length === 0) { t.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">No receipts found</td></tr>'; return; }
-    t.innerHTML = d.receipts.map(cr => `<tr>
+    if (data.length === 0) { t.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">No receipts found</td></tr>'; paginator.update(0); return; }
+    const pageData = paginator.getPageData(data);
+    t.innerHTML = pageData.map(cr => `<tr>
         <td>${cr.receipt_no}</td><td>${cr.receipt_date}</td><td>${cr.fund_name || '-'}</td>
         <td>${cr.funding_source || '-'}</td>
         <td class="fw-bold text-success">${Number(cr.amount_received).toLocaleString()}</td>
         <td>${cr.received_by || '-'}</td>
         <td><button class="btn btn-sm btn-outline-primary" onclick="viewReceipt(${cr.id})"><i class="bi bi-eye"></i></button></td>
     </tr>`).join('');
+    paginator.update(data.length);
+}
+
+async function loadReceipts() {
+    const r = await fetch('/api/cash-receipts');
+    const d = await r.json();
+    if (!d.success) { showToast('danger', d.message); return; }
+    _receipts = d.receipts;
+    renderReceipts(_receipts);
 }
 
 async function loadData() {

@@ -186,6 +186,10 @@
                 </tbody>
             </table>
         </div>
+        <div class="d-flex justify-content-between align-items-center mt-2 px-2">
+            <small class="text-muted" id="tableInfo">0 records</small>
+            <nav><ul class="pagination pagination-sm mb-0" id="pagination"></ul></nav>
+        </div>
     </div>
     <div class="card-footer d-flex justify-content-between align-items-center">
         <small class="text-muted" id="inventoryCount">Loading...</small>
@@ -200,6 +204,8 @@ const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('con
 let refreshInterval;
 let items = [];
 let warehouses = [];
+let _inventory = [];
+let paginator = new Paginator({perPage: 25, onPageChange: () => renderInventory(_inventory)});
 
 function statusBadge(status) {
     const map = {
@@ -246,6 +252,33 @@ async function loadFormData() {
     } catch (e) { showToast('danger', 'Error loading form data: ' + e.message); }
 }
 
+function renderInventory(data) {
+    const tbody = document.getElementById('inventoryTableBody');
+    if (data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="11" class="text-center py-4 text-muted">No inventory records found</td></tr>';
+        paginator.update(0);
+        return;
+    }
+    const pageData = paginator.getPageData(data);
+    tbody.innerHTML = pageData.map(item => {
+        const expiryIcon = item.expiry_tracking ? '<i class="bi bi-calendar-check text-warning ms-1" title="Expiry tracking enabled"></i>' : '';
+        return `<tr>
+            <td><span class="badge bg-light text-dark">${item.item_code || '-'}</span></td>
+            <td><span class="text-muted small">${item.barcode || '-'}</span></td>
+            <td class="fw-medium">${item.item_name}${expiryIcon}</td>
+            <td>${item.category_name || '-'}</td>
+            <td>${item.warehouse_name || '-'}</td>
+            <td class="text-end fw-bold">${item.available_quantity}</td>
+            <td class="text-end text-muted">${item.reserved_quantity || 0}</td>
+            <td class="text-end">${item.quantity}</td>
+            <td>${item.unit || '-'}</td>
+            <td class="text-end">${item.minimum_stock || 0}</td>
+            <td>${statusBadge(item.status)}</td>
+        </tr>`;
+    }).join('');
+    paginator.update(data.length);
+}
+
 async function loadInventory() {
     try {
         const warehouse = document.getElementById('filterWarehouse').value;
@@ -269,29 +302,9 @@ async function loadInventory() {
         const d = await r.json();
         if (!d.success) { showToast('danger', d.message); return; }
 
-        const tbody = document.getElementById('inventoryTableBody');
-        const inv = d.inventory;
-        if (inv.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="11" class="text-center py-4 text-muted">No inventory records found</td></tr>';
-        } else {
-            tbody.innerHTML = inv.map(item => {
-                const expiryIcon = item.expiry_tracking ? '<i class="bi bi-calendar-check text-warning ms-1" title="Expiry tracking enabled"></i>' : '';
-                return `<tr>
-                    <td><span class="badge bg-light text-dark">${item.item_code || '-'}</span></td>
-                    <td><span class="text-muted small">${item.barcode || '-'}</span></td>
-                    <td class="fw-medium">${item.item_name}${expiryIcon}</td>
-                    <td>${item.category_name || '-'}</td>
-                    <td>${item.warehouse_name || '-'}</td>
-                    <td class="text-end fw-bold">${item.available_quantity}</td>
-                    <td class="text-end text-muted">${item.reserved_quantity || 0}</td>
-                    <td class="text-end">${item.quantity}</td>
-                    <td>${item.unit || '-'}</td>
-                    <td class="text-end">${item.minimum_stock || 0}</td>
-                    <td>${statusBadge(item.status)}</td>
-                </tr>`;
-            }).join('');
-        }
-        document.getElementById('inventoryCount').textContent = `Showing ${inv.length} record${inv.length !== 1 ? 's' : ''}`;
+        _inventory = d.inventory;
+        renderInventory(_inventory);
+        document.getElementById('inventoryCount').textContent = `Showing ${_inventory.length} record${_inventory.length !== 1 ? 's' : ''}`;
     } catch (e) { showToast('danger', 'Error loading inventory: ' + e.message); }
 }
 

@@ -107,6 +107,10 @@
                         </tbody>
                     </table>
                 </div>
+                <div class="d-flex justify-content-between align-items-center mt-2 px-2">
+                    <small class="text-muted" id="tableInfo">0 records</small>
+                    <nav><ul class="pagination pagination-sm mb-0" id="pagination"></ul></nav>
+                </div>
             </div>
         </div>
     </div>
@@ -116,6 +120,11 @@
 {% block extra_js %}
 <script>
 const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+let _adjustments = [];
+let paginator = new Paginator({
+    perPage: 25,
+    onPageChange: () => renderAdjustments(_adjustments)
+});
 
 function setDefaultDate() {
     document.getElementById('adjDate').value = today_bs;
@@ -205,30 +214,37 @@ async function loadCurrentQty() {
     }
 }
 
+function renderAdjustments(data) {
+    const tbody = document.getElementById('adjustmentTableBody');
+    if (data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" class="text-center py-4 text-muted">No adjustments recorded yet</td></tr>';
+        paginator.update(0);
+        return;
+    }
+    const pageData = paginator.getPageData(data);
+    tbody.innerHTML = pageData.map(a => {
+        return `<tr>
+            <td><strong>${a.adjustment_no}</strong></td>
+            <td>${a.date}</td>
+            <td>${a.warehouse_name || a.warehouse_id}</td>
+            <td>${a.item_name || a.item_id}</td>
+            <td>${typeBadge(a.adjustment_type)}</td>
+            <td>${a.reason || '-'}</td>
+            <td class="text-end fw-bold">${a.adjusted_quantity}</td>
+            <td><small>${a.remarks || '-'}</small></td>
+            <td>${a.approval_user || '-'}</td>
+        </tr>`;
+    }).join('');
+    paginator.update(data.length);
+}
+
 async function loadAdjustments() {
     try {
         const r = await fetch('/api/adjustments');
         const d = await r.json();
         if (!d.success) { showToast('danger', d.message); return; }
-        const tbody = document.getElementById('adjustmentTableBody');
-        const adj = d.adjustments;
-        if (adj.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="9" class="text-center py-4 text-muted">No adjustments recorded yet</td></tr>';
-            return;
-        }
-        tbody.innerHTML = adj.map(a => {
-            return `<tr>
-                <td><strong>${a.adjustment_no}</strong></td>
-                <td>${a.date}</td>
-                <td>${a.warehouse_name || a.warehouse_id}</td>
-                <td>${a.item_name || a.item_id}</td>
-                <td>${typeBadge(a.adjustment_type)}</td>
-                <td>${a.reason || '-'}</td>
-                <td class="text-end fw-bold">${a.adjusted_quantity}</td>
-                <td><small>${a.remarks || '-'}</small></td>
-                <td>${a.approval_user || '-'}</td>
-            </tr>`;
-        }).join('');
+        _adjustments = d.adjustments;
+        renderAdjustments(_adjustments);
     } catch (e) { showToast('danger', 'Error loading adjustments: ' + e.message); }
 }
 

@@ -173,6 +173,10 @@
                 </tbody>
             </table>
         </div>
+        <div class="d-flex justify-content-between align-items-center mt-2 px-2">
+            <small class="text-muted" id="tableInfo">0 records</small>
+            <nav><ul class="pagination pagination-sm mb-0" id="pagination"></ul></nav>
+        </div>
     </div>
 </div>
 
@@ -210,6 +214,7 @@ let dispatchItemsCache = {};
 let dispatchDetailsCache = {};
 let dispatchRRMap = {};
 let beneficiaries = [];
+let paginator = new Paginator({perPage: 25, onPageChange: () => renderDistributions(distributions)});
 let benPickerModal = null;
 let isSaving = false;
 let reliefRequestCashMap = {};
@@ -902,9 +907,11 @@ function renderDistributions(data) {
     const tbody = document.getElementById('distributionTableBody');
     if (data.length === 0) {
         tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-muted">No distributions found</td></tr>';
+        paginator.update(0);
         return;
     }
-    tbody.innerHTML = data.map(dist => {
+    const pageData = paginator.getPageData(data);
+    tbody.innerHTML = pageData.map(dist => {
         const benCount = dist.beneficiaries ? dist.beneficiaries.length : 0;
         const cashBadge = dist.cash_distribution
             ? `<span class="badge bg-success ms-1" title="Cash: ${Number(dist.cash_distribution.total_amount).toLocaleString()}"><i class="bi bi-cash-stack me-1"></i>Cash</span>`
@@ -923,6 +930,7 @@ function renderDistributions(data) {
             </td>
         </tr>`;
     }).join('');
+    paginator.update(data.length);
 }
 
 function filterDistributions() {
@@ -933,6 +941,7 @@ function filterDistributions() {
         (d.incident_name && d.incident_name.toLowerCase().includes(q)) ||
         (d.location && d.location.toLowerCase().includes(q))
     );
+    if (paginator) paginator.currentPage = 1;
     renderDistributions(filtered);
 }
 

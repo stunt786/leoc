@@ -233,7 +233,7 @@
     </div>
   </div>
   <div class="d-flex justify-content-end mt-3">
-    <button class="btn btn-primary" onclick="saveBulletin()" id="btnSave">
+    <button type="button" class="btn btn-primary" onclick="saveBulletin()" id="btnSave">
       <i class="bi bi-save me-1"></i><span id="btnSaveText">बुलेटिन सुरक्षित गर्नुहोस्</span>
     </button>
   </div>
@@ -265,10 +265,14 @@
         </thead>
         <tbody id="bulletinTableBody">
           <tr><td colspan="9" class="text-center py-3"><div class="spinner-border spinner-border-sm text-primary"></div> लोड हुँदै...</td></tr>
-        </tbody>
-      </table>
+                </tbody>
+            </table>
+        </div>
+        <div class="d-flex justify-content-between align-items-center mt-2 px-2">
+            <small class="text-muted" id="tableInfo">0 records</small>
+            <nav><ul class="pagination pagination-sm mb-0" id="pagination"></ul></nav>
+        </div>
     </div>
-  </div>
 </div>
 {% endblock %}
 
@@ -279,6 +283,7 @@ let allIncidents = [];
 let incidentTypes = [];
 let bulletins = [];
 let editingBulletinId = null;
+let paginator = new Paginator({perPage: 25, onPageChange: () => renderBulletinTable(bulletins)});
 
 function toDev(n) {
   return String(n).replace(/\d/g, d => '०१२३४५६७८९'[d]);
@@ -346,6 +351,7 @@ function filterIncidentsForBulletin() {
     (i.incident_name && i.incident_name.toLowerCase().includes(q)) ||
     (i.incident_type && i.incident_type.toLowerCase().includes(q))
   );
+  if (paginator) paginator.currentPage = 1;
   renderIncidentTable(filtered);
 }
 
@@ -391,7 +397,7 @@ async function loadBulletins() {
     const d = await r.json();
     if (!d.success) { showToast('danger', d.message); return; }
     bulletins = d.bulletins || [];
-    renderBulletinTable();
+    renderBulletinTable(bulletins);
     renderRecentBulletins();
   } catch(e) {
     document.getElementById('bulletinTableBody').innerHTML =
@@ -399,13 +405,15 @@ async function loadBulletins() {
   }
 }
 
-function renderBulletinTable() {
+function renderBulletinTable(data) {
   const tbody = document.getElementById('bulletinTableBody');
-  if (!bulletins.length) {
+  if (!data.length) {
     tbody.innerHTML = '<tr><td colspan="9" class="text-center py-3 text-muted">कुनै बुलेटिन सुरक्षित गरिएको छैन</td></tr>';
+    paginator.update(0);
     return;
   }
-  tbody.innerHTML = bulletins.map(b => {
+  const pageData = paginator.getPageData(data);
+  tbody.innerHTML = pageData.map(b => {
     const priorityColor = b.priority === 'critical' ? 'danger' : b.priority === 'high' ? 'warning text-dark' : b.priority === 'medium' ? 'info' : 'secondary';
     const statusColor = b.report_status === 'published' ? 'success' : 'secondary';
     const incidentCount = (b.incident_ids || []).length;
@@ -424,6 +432,7 @@ function renderBulletinTable() {
       </td>
     </tr>`;
   }).join('');
+  paginator.update(data.length);
 }
 
 function renderRecentBulletins() {

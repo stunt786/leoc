@@ -22,6 +22,10 @@
                 <tbody id="crqBody"></tbody>
             </table>
         </div>
+        <div class="d-flex justify-content-between align-items-center mt-2 px-2">
+            <small class="text-muted" id="tableInfo">0 records</small>
+            <nav><ul class="pagination pagination-sm mb-0" id="pagination"></ul></nav>
+        </div>
     </div>
 </div>
 
@@ -69,6 +73,8 @@
 <script>
 const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 let beneficiaries = [];
+let _cashRequests = [];
+let paginator = new Paginator({perPage: 25, onPageChange: () => renderCashRequests(_cashRequests)});
 
 function onBeneficiaryChange() {
     const id = parseInt(document.getElementById('crqBeneficiary').value);
@@ -79,12 +85,11 @@ function onBeneficiaryChange() {
     }
 }
 
-async function loadRequests() {
-    const r = await fetch('/api/cash-requests');
-    const d = await r.json();
+function renderCashRequests(data) {
     const t = document.getElementById('crqBody');
-    if (!d.success || d.cash_requests.length === 0) { t.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-3">No requests found</td></tr>'; return; }
-    t.innerHTML = d.cash_requests.map(cr => {
+    if (data.length === 0) { t.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-3">No requests found</td></tr>'; paginator.update(0); return; }
+    const pageData = paginator.getPageData(data);
+    t.innerHTML = pageData.map(cr => {
         const distAmt = cr.distributed_amount || 0;
         const progress = cr.requested_amount > 0 ? Math.min(100, (distAmt / cr.requested_amount) * 100) : 0;
         return `<tr>
@@ -104,6 +109,15 @@ async function loadRequests() {
             <button class="btn btn-sm btn-outline-danger" onclick="deleteCrq(${cr.id})"><i class="bi bi-trash"></i></button>
         </td>
     </tr>`}).join('');
+    paginator.update(data.length);
+}
+
+async function loadRequests() {
+    const r = await fetch('/api/cash-requests');
+    const d = await r.json();
+    if (!d.success) { showToast('danger', d.message); return; }
+    _cashRequests = d.cash_requests;
+    renderCashRequests(_cashRequests);
 }
 
 async function loadData() {

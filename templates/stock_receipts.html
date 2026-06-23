@@ -174,6 +174,10 @@
                 </tbody>
             </table>
         </div>
+        <div class="d-flex justify-content-between align-items-center mt-2 px-2">
+            <small class="text-muted" id="tableInfo">0 records</small>
+            <nav><ul class="pagination pagination-sm mb-0" id="pagination"></ul></nav>
+        </div>
     </div>
 </div>
 
@@ -203,6 +207,7 @@ let receipts = [];
 let warehouses = [];
 let itemsList = [];
 let suppliers = [];
+let paginator = new Paginator({perPage: 25, onPageChange: () => renderReceipts(receipts)});
 
 async function loadFormData() {
     try {
@@ -249,9 +254,11 @@ function renderReceipts(data) {
     const tbody = document.getElementById('receiptTableBody');
     if (data.length === 0) {
         tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-muted">No receipts found</td></tr>';
+        paginator.update(0);
         return;
     }
-    tbody.innerHTML = data.map(r => {
+    const pageData = paginator.getPageData(data);
+    tbody.innerHTML = pageData.map(r => {
         const itemCount = r.items ? r.items.length : 0;
         return `<tr>
             <td><strong>${r.receipt_no}</strong></td>
@@ -266,11 +273,13 @@ function renderReceipts(data) {
             </td>
         </tr>`;
     }).join('');
+    paginator.update(data.length);
 }
 
 function filterReceipts() {
     const q = document.getElementById('receiptSearch').value.toLowerCase();
     const filtered = receipts.filter(r => r.receipt_no.toLowerCase().includes(q));
+    if (paginator) paginator.currentPage = 1;
     renderReceipts(filtered);
 }
 

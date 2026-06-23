@@ -38,6 +38,10 @@
                 </tbody>
             </table>
         </div>
+        <div class="d-flex justify-content-between align-items-center mt-2 px-2">
+            <small class="text-muted" id="tableInfo">0 records</small>
+            <nav><ul class="pagination pagination-sm mb-0" id="pagination"></ul></nav>
+        </div>
     </div>
 </div>
 
@@ -80,6 +84,7 @@
 <script>
 const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 let archives = [];
+let paginator = new Paginator({perPage: 25, onPageChange: () => renderArchives(archives)});
 
 async function loadArchives() {
     const r = await fetch('/api/archives');
@@ -93,9 +98,11 @@ function renderArchives(data) {
     const tbody = document.getElementById('archiveTableBody');
     if (data.length === 0) {
         tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-muted">No documents found</td></tr>';
+        paginator.update(0);
         return;
     }
-    tbody.innerHTML = data.map(d => {
+    const pageData = paginator.getPageData(data);
+    tbody.innerHTML = pageData.map(d => {
         const ext = (d.file_type || '').toLowerCase();
         const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'tiff', 'tif'].includes(ext);
         const previewUrl = `/uploads/${d.filename}`;
@@ -113,6 +120,7 @@ function renderArchives(data) {
             </td>
         </tr>`;
     }).join('');
+    paginator.update(data.length);
 }
 
 function viewArchive(url) {
@@ -125,6 +133,7 @@ function filterArchives() {
         d.document_name.toLowerCase().includes(q) ||
         (d.remarks && d.remarks.toLowerCase().includes(q))
     );
+    if (paginator) paginator.currentPage = 1;
     renderArchives(filtered);
 }
 

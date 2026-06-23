@@ -22,6 +22,10 @@
                 <tbody id="fundsBody"></tbody>
             </table>
         </div>
+        <div class="d-flex justify-content-between align-items-center mt-2 px-2">
+            <small class="text-muted" id="tableInfo">0 records</small>
+            <nav><ul class="pagination pagination-sm mb-0" id="pagination"></ul></nav>
+        </div>
     </div>
 </div>
 
@@ -55,13 +59,14 @@
 {% block extra_js %}
 <script>
 const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+let _funds = [];
+let paginator = new Paginator({perPage: 25, onPageChange: () => renderFunds(_funds)});
 
-async function loadFunds() {
-    const r = await fetch('/api/cash-funds');
-    const d = await r.json();
+function renderFunds(data) {
     const t = document.getElementById('fundsBody');
-    if (!d.success || d.funds.length === 0) { t.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">No funds found</td></tr>'; return; }
-    t.innerHTML = d.funds.map(f => `<tr>
+    if (data.length === 0) { t.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">No funds found</td></tr>'; paginator.update(0); return; }
+    const pageData = paginator.getPageData(data);
+    t.innerHTML = pageData.map(f => `<tr>
         <td>${f.fund_no}</td><td><strong>${f.name}</strong></td><td>${f.fiscal_year || '-'}</td>
         <td>${f.funding_source || '-'}</td>
         <td>${Number(f.allocated_amount).toLocaleString()}</td>
@@ -72,6 +77,15 @@ async function loadFunds() {
             <button class="btn btn-sm btn-outline-danger" onclick="deleteFund(${f.id})"><i class="bi bi-trash"></i></button>
         </td>
     </tr>`).join('');
+    paginator.update(data.length);
+}
+
+async function loadFunds() {
+    const r = await fetch('/api/cash-funds');
+    const d = await r.json();
+    if (!d.success) { showToast('danger', d.message); return; }
+    _funds = d.funds;
+    renderFunds(_funds);
 }
 
 async function loadData() {

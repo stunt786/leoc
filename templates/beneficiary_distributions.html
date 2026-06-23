@@ -72,13 +72,18 @@
             </table>
         </div>
     </div>
-    <div class="card-footer text-muted small" id="tableFooter">Loading...</div>
+    <div class="d-flex justify-content-between align-items-center mt-2 px-2">
+        <small class="text-muted" id="tableInfo">0 records</small>
+        <nav><ul class="pagination pagination-sm mb-0" id="pagination"></ul></nav>
+    </div>
 </div>
 {% endblock %}
 {% block extra_js %}
 <script>
 const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 let searchTimeout = null;
+let _distributions = [];
+let paginator = new Paginator({perPage: 25, onPageChange: () => renderDistributions(_distributions)});
 
 function debounceSearch() {
     clearTimeout(searchTimeout);
@@ -108,6 +113,31 @@ async function loadFilters() {
     }
 }
 
+function renderDistributions(data) {
+    const tbody = document.getElementById('distTableBody');
+    if (data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" class="text-center py-4 text-muted">No records found</td></tr>';
+        paginator.update(0);
+        return;
+    }
+    const pageData = paginator.getPageData(data);
+    tbody.innerHTML = pageData.map((row, i) => {
+        const statusBadge = row.status === 'Received' ? 'success' : 'warning';
+        return `<tr>
+            <td>${i+1}</td>
+            <td><strong>${row.family_name}</strong></td>
+            <td>${row.ward_name || row.ward || '-'}</td>
+            <td>${row.phone || '-'}</td>
+            <td>${row.items_received}</td>
+            <td>${row.cash ? Number(row.cash).toLocaleString() : '-'}</td>
+            <td>${row.date || '-'}</td>
+            <td><span class="badge bg-${statusBadge}">${row.status}</span></td>
+            <td><small>${row.incident_name || '-'}</small></td>
+        </tr>`;
+    }).join('');
+    paginator.update(data.length);
+}
+
 async function loadData() {
     const fiscalYear = document.getElementById('filterFiscalYear').value;
     const disasterType = document.getElementById('filterDisasterType').value;
@@ -125,30 +155,9 @@ async function loadData() {
     try {
         const r = await fetch(url);
         const d = await r.json();
-        const tbody = document.getElementById('distTableBody');
-        const footer = document.getElementById('tableFooter');
-
-        if (!d.success || !d.distributions || d.distributions.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="9" class="text-center py-4 text-muted">No records found</td></tr>';
-            footer.textContent = '0 records';
-            return;
-        }
-
-        tbody.innerHTML = d.distributions.map((row, i) => {
-            const statusBadge = row.status === 'Received' ? 'success' : 'warning';
-            return `<tr>
-                <td>${i+1}</td>
-                <td><strong>${row.family_name}</strong></td>
-                <td>${row.ward_name || row.ward || '-'}</td>
-                <td>${row.phone || '-'}</td>
-                <td>${row.items_received}</td>
-                <td>${row.cash ? Number(row.cash).toLocaleString() : '-'}</td>
-                <td>${row.date || '-'}</td>
-                <td><span class="badge bg-${statusBadge}">${row.status}</span></td>
-                <td><small>${row.incident_name || '-'}</small></td>
-            </tr>`;
-        }).join('');
-        footer.textContent = `${d.total} record(s)`;
+        if (!d.success) { showToast('danger', d.message); return; }
+        _distributions = d.distributions || [];
+        renderDistributions(_distributions);
     } catch(e) {
         showToast('danger', 'Error loading data: ' + e.message);
         document.getElementById('distTableBody').innerHTML = '<tr><td colspan="9" class="text-center py-4 text-danger">Error loading data</td></tr>';
