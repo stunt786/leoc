@@ -52,10 +52,10 @@
                                             <label class="form-label fw-medium">Full Name <span class="text-danger">*</span></label>
                                             <input class="form-control" name="name" id="benName" required placeholder="नाम थर लेख्नुहोस्">
                                         </div>
-                                        <div class="col-md-6">
-                                            <label class="form-label fw-medium">National ID (ना.प्र.प्र नं)</label>
-                                            <input class="form-control" name="national_id" id="benNid" placeholder="उदा: BEN-001">
-                                        </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label fw-medium">National ID (ना.प्र.प्र नं) <span class="text-danger">*</span></label>
+                                                <input class="form-control" name="national_id" id="benNid" required placeholder="उदा: BEN-001">
+                                            </div>
                                         <div class="col-md-6">
                                             <label class="form-label fw-medium">Father's Name (बुवाको नाम थर)</label>
                                             <input class="form-control" name="father_name" id="benFatherName" placeholder="बुवाको नाम थर लेख्नुहोस्">
@@ -82,8 +82,8 @@
                                             <input class="form-control" name="address" id="benAddress" placeholder="ठेगाना लेख्नुहोस्">
                                         </div>
                                         <div class="col-md-2">
-                                            <label class="form-label fw-medium">Ward</label>
-                                            <select class="form-select" name="ward" id="benWardSelect">
+                                            <label class="form-label fw-medium">Ward <span class="text-danger">*</span></label>
+                                            <select class="form-select" name="ward" id="benWardSelect" required>
                                                 <option value="">-- Select --</option>
                                                 {% for w in ward_list %}
                                                 <option value="{{ w.id }}">{{ w.name }}</option>
@@ -91,8 +91,8 @@
                                             </select>
                                         </div>
                                         <div class="col-md-4">
-                                            <label class="form-label fw-medium">Tole (टोल)</label>
-                                            <input class="form-control" name="tole" id="benTole" placeholder="टोलको नाम">
+                                            <label class="form-label fw-medium">Tole (टोल) <span class="text-danger">*</span></label>
+                                            <input class="form-control" name="tole" id="benTole" required placeholder="टोलको नाम">
                                         </div>
                                         <div class="col-md-6">
                                             <label class="form-label fw-medium">Current Shelter (हाल बसोबास)</label>
@@ -180,7 +180,7 @@
                                             <input class="form-control" name="bank_name" id="benBankName" placeholder="बैंकको नाम">
                                         </div>
                                         <div class="col-md-4">
-                                            <label class="form-label fw-medium">Mobile Wallet</label>
+                                            <label class="form-label fw-medium">Wallet (esewa/khalti)</label>
                                             <input class="form-control" name="mobile_wallet" id="benWallet" placeholder="वालेट नम्बर">
                                         </div>
                                     </div>

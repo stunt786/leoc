@@ -475,10 +475,7 @@
     <!-- Print Actions -->
     <div class="print-actions no-print">
         <button class="btn-print" onclick="window.print()">
-            <i class="bi bi-printer"></i> प्रिन्ट गर्नुहोस्
-        </button>
-        <button class="btn-pdf btn-download" onclick="downloadPDF()" id="btnPdf">
-            <i class="bi bi-file-earmark-pdf"></i> PDF डाउनलोड
+            <i class="bi bi-printer"></i> प्रिन्ट / PDF
         </button>
         <button class="btn-image btn-download" onclick="downloadImage()" id="btnImg">
             <i class="bi bi-image"></i> तस्वीर डाउनलोड
@@ -509,7 +506,7 @@
         <div class="report-header">
             {% if sit_rep_no is not none %}
             <div class="sit-rep-box">
-                Sit Rep No: {{ sit_rep_no }}
+                Sit Rep No: {{ sit_rep_no | to_nepali_num }}
             </div>
             {% endif %}
             <img src="{{ url_for('static', filename='Emblem_of_Nepal.png') }}" alt="Logo">
@@ -541,7 +538,7 @@
             <div class="stat-card">
                 <i class="bi bi-exclamation-triangle"></i>
                 <div class="stat-info">
-                    <span class="number">{{ total.incidents }}</span>
+                    <span class="number">{{ total.incidents | to_nepali_num }}</span>
                     <span class="label">जम्मा घटनाहरू</span>
                 </div>
             </div>
@@ -550,7 +547,7 @@
             <div class="stat-card danger">
                 <i class="bi bi-person-x-fill"></i>
                 <div class="stat-info">
-                    <span class="number">{{ total.deaths }}</span>
+                    <span class="number">{{ total.deaths | to_nepali_num }}</span>
                     <span class="label">मृतक संख्या</span>
                 </div>
             </div>
@@ -559,7 +556,7 @@
             <div class="stat-card warning">
                 <i class="bi bi-person-dash-fill"></i>
                 <div class="stat-info">
-                    <span class="number">{{ total.missing }}</span>
+                    <span class="number">{{ total.missing | to_nepali_num }}</span>
                     <span class="label">बेपत्ता</span>
                 </div>
             </div>
@@ -568,7 +565,7 @@
             <div class="stat-card info">
                 <i class="bi bi-bandaid-fill"></i>
                 <div class="stat-info">
-                    <span class="number">{{ total.injured }}</span>
+                    <span class="number">{{ total.injured | to_nepali_num }}</span>
                     <span class="label">घाइते</span>
                 </div>
             </div>
@@ -577,7 +574,7 @@
             <div class="stat-card dark">
                 <i class="bi bi-cash-stack"></i>
                 <div class="stat-info">
-                    <span class="number">{{ "%.0f"|format(total.estimated_loss) if total.estimated_loss else '०' }}</span>
+                    <span class="number">{{ "%.0f"|format(total.estimated_loss) | to_nepali_num if total.estimated_loss else '०' }}</span>
                     <span class="label">अनुमानित क्षति रु</span>
                 </div>
             </div>
@@ -586,7 +583,7 @@
             <div class="stat-card" style="background: linear-gradient(135deg, #6b4226 0%, #a0522d 100%);">
                 <i class="bi bi-paw"></i>
                 <div class="stat-info">
-                    <span class="number">{{ livestock_total }}</span>
+                    <span class="number">{{ livestock_total | to_nepali_num }}</span>
                     <span class="label">पशुचौपाया क्षति</span>
                 </div>
             </div>
@@ -616,11 +613,11 @@
                     {% set ws = ward_stats.get(ward.id|string, {}) %}
                     <tr>
                         <td><strong>{{ ward.name }}</strong></td>
-                        <td>{{ ws.get('incidents', 0) }}</td>
-                        <td>{{ ws.get('deaths', 0) }}</td>
-                        <td>{{ ws.get('missing', 0) }}</td>
-                        <td>{{ ws.get('injured', 0) }}</td>
-                        <td>{{ "%.0f"|format(ws.get('estimated_loss', 0)) }}</td>
+                        <td>{{ ws.get('incidents', 0) | to_nepali_num }}</td>
+                        <td>{{ ws.get('deaths', 0) | to_nepali_num }}</td>
+                        <td>{{ ws.get('missing', 0) | to_nepali_num }}</td>
+                        <td>{{ ws.get('injured', 0) | to_nepali_num }}</td>
+                        <td>{{ "%.0f"|format(ws.get('estimated_loss', 0)) | to_nepali_num }}</td>
                         <td>
                             {% if ws.get('road_blocked') %}
                             <span class="badge bg-danger"><i class="bi bi-signpost-split-fill"></i></span>
@@ -646,11 +643,11 @@
                     {% endfor %}
                     <tr class="total-row">
                         <td>जम्मा</td>
-                        <td>{{ total.incidents }}</td>
-                        <td>{{ total.deaths }}</td>
-                        <td>{{ total.missing }}</td>
-                        <td>{{ total.injured }}</td>
-                        <td>{{ "%.0f"|format(total.estimated_loss) if total.estimated_loss else '०' }}</td>
+                        <td>{{ total.incidents | to_nepali_num }}</td>
+                        <td>{{ total.deaths | to_nepali_num }}</td>
+                        <td>{{ total.missing | to_nepali_num }}</td>
+                        <td>{{ total.injured | to_nepali_num }}</td>
+                        <td>{{ "%.0f"|format(total.estimated_loss) | to_nepali_num if total.estimated_loss else '०' }}</td>
                         <td>-</td>
                         <td>-</td>
                         <td>-</td>
@@ -688,19 +685,19 @@
                     {% if stats.get('count', 0) > 0 or stats.get('total', 0) > 0 %}
                     <tr>
                         <td><strong>{{ dtype }}</strong></td>
-                        <td>{{ stats.get('count', 0) }}</td>
-                        <td>{{ stats.get('male_death', 0) }}</td>
-                        <td>{{ stats.get('female_death', 0) }}</td>
-                        <td>{{ stats.get('missing', 0) }}</td>
-                        <td>{{ stats.get('male_injured', 0) }}</td>
-                        <td>{{ stats.get('female_injured', 0) }}</td>
-                        <td>{{ stats.get('affected_households', stats.get('affected_families', 0)) }}</td>
-                        <td>{{ stats.get('house_damaged', 0) }}</td>
-                        <td>{{ stats.get('house_destroyed', 0) }}</td>
-                        <td>{{ stats.get('public_building_damaged', 0) }}</td>
-                        <td>{{ stats.get('public_building_destroyed', 0) }}</td>
-                        <td>{{ stats.get('livestock_loss', 0) }}</td>
-                        <td>{{ "%.0f"|format(stats.get('estimated_loss', 0)) }}</td>
+                        <td>{{ stats.get('count', 0) | to_nepali_num }}</td>
+                        <td>{{ stats.get('male_death', 0) | to_nepali_num }}</td>
+                        <td>{{ stats.get('female_death', 0) | to_nepali_num }}</td>
+                        <td>{{ stats.get('missing', 0) | to_nepali_num }}</td>
+                        <td>{{ stats.get('male_injured', 0) | to_nepali_num }}</td>
+                        <td>{{ stats.get('female_injured', 0) | to_nepali_num }}</td>
+                        <td>{{ stats.get('affected_households', stats.get('affected_families', 0)) | to_nepali_num }}</td>
+                        <td>{{ stats.get('house_damaged', 0) | to_nepali_num }}</td>
+                        <td>{{ stats.get('house_destroyed', 0) | to_nepali_num }}</td>
+                        <td>{{ stats.get('public_building_damaged', 0) | to_nepali_num }}</td>
+                        <td>{{ stats.get('public_building_destroyed', 0) | to_nepali_num }}</td>
+                        <td>{{ stats.get('livestock_loss', 0) | to_nepali_num }}</td>
+                        <td>{{ "%.0f"|format(stats.get('estimated_loss', 0)) | to_nepali_num }}</td>
                     </tr>
                     {% endif %}
                     {% endfor %}
@@ -849,7 +846,7 @@
 
         <!-- Report Footer -->
         <div class="report-footer">
-            <p>प्रतिवेदन तयार गरिएको मिति: {{ generated_at.strftime('%Y-%m-%d %H:%M') if generated_at is not string else generated_at }} | LEOC {{ office_name }}</p>
+            <p>प्रतिवेदन तयार गरिएको मिति: {{ (generated_at.strftime('%Y-%m-%d %H:%M') if generated_at is not string else generated_at) | to_nepali_num }} | LEOC {{ office_name }}</p>
             <p style="font-size: 8pt; margin-top: 5px;">
                 यो स्थानीय आपतकालीन कार्य केन्द्रको आधिकारिक कागजात हो।
                 आपतकालीन अवस्थाका लागि LEOC सञ्चालन कक्षमा सम्पर्क गर्नुहोस्।
@@ -857,9 +854,7 @@
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
     <script>
         const reportEl = document.getElementById('reportContainer');
 
@@ -878,66 +873,51 @@
             }
         }
 
-        function setLoading(btnId, loading) {
-            const btn = document.getElementById(btnId);
+        function setLoading(loading) {
+            const btn = document.getElementById('btnImg');
             if (loading) {
                 btn.disabled = true;
                 btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> तयार हुँदै...';
             } else {
                 btn.disabled = false;
-                btn.innerHTML = btnId === 'btnPdf'
-                    ? '<i class="bi bi-file-earmark-pdf"></i> PDF डाउनलोड'
-                    : '<i class="bi bi-image"></i> तस्वीर डाउनलोड';
+                btn.innerHTML = '<i class="bi bi-image"></i> तस्वीर डाउनलोड';
             }
         }
 
-        function downloadPDF() {
-            setLoading('btnPdf', true);
-            const opt = {
-                margin:       5,
-                filename:     'daily_bulletin_{{ start_bs }}_{{ end_bs }}.pdf',
-                image:        { type: 'jpeg', quality: 0.98 },
-                html2canvas:  { scale: 2, useCORS: true, logging: false },
-                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
-                pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }
-            };
-            html2pdf().set(opt).from(reportEl).save().then(() => {
-                setLoading('btnPdf', false);
-            }).catch(() => {
-                setLoading('btnPdf', false);
-            });
-        }
-
         function downloadImage() {
-            setLoading('btnImg', true);
+            setLoading(true);
+            if (typeof html2canvas === 'undefined') {
+                setLoading(false);
+                alert('html2canvas लाइब्रेरी लोड हुन सकेन। कृपया पृष्ठ रिफ्रेस गरेर पुन: प्रयास गर्नुहोस्।');
+                return;
+            }
             const origStyle = reportEl.getAttribute('style') || '';
             reportEl.style.width = '794px';
             reportEl.style.maxWidth = 'none';
             reportEl.style.margin = '0 auto';
-
-            const timeout = new Promise((_, reject) =>
-                setTimeout(() => reject(new Error('html2canvas timeout')), 30000)
-            );
-            const render = html2canvas(reportEl, {
-                scale: 2,
-                useCORS: true,
-                logging: false,
-                allowTaint: true,
-                width: 794,
-                windowWidth: 794,
+            reportEl.style.paddingTop = '40px';
+            const timeout = setTimeout(function () {
+                reportEl.setAttribute('style', origStyle);
+                setLoading(false);
+                alert('तस्वीर डाउनलोड गर्न समय लाग्यो। कृपया पुन: प्रयास गर्नुहोस्।');
+            }, 45000);
+            html2canvas(reportEl, {
+                scale: 2, useCORS: true, logging: false,
+                allowTaint: true, width: 794, windowWidth: 794,
                 backgroundColor: '#ffffff',
-            });
-            Promise.race([render, timeout]).then(canvas => {
-                reportEl.setAttribute('style', origStyle);
-                const link = document.createElement('a');
-                link.download = 'daily_bulletin_{{ start_bs }}_{{ end_bs }}.png';
-                link.href = canvas.toDataURL('image/png');
-                link.click();
-                setLoading('btnImg', false);
-            }).catch(err => {
-                reportEl.setAttribute('style', origStyle);
-                console.error('Image download failed:', err);
-                setLoading('btnImg', false);
+            }).then(function (canvas) {
+                    clearTimeout(timeout);
+                    reportEl.setAttribute('style', origStyle);
+                    var link = document.createElement('a');
+                    link.download = 'daily_bulletin_{{ start_bs }}_{{ end_bs }}.png';
+                    link.href = canvas.toDataURL('image/png');
+                    link.click();
+                    setLoading(false);
+                }).catch(function (err) {
+                    clearTimeout(timeout);
+                    reportEl.setAttribute('style', origStyle);
+                    console.error('Image download failed:', err);
+                    setLoading(false);
                 alert('तस्वीर डाउनलोड गर्न समस्या भयो। कृपया पुन: प्रयास गर्नुहोस्।');
             });
         }

@@ -32,8 +32,8 @@ from auth_helpers import login_manager, User, login_required, role_required, per
 def register_unicode_fonts():
     try:
         font_paths = {
-            'FreeSans': '/usr/share/fonts/truetype/freefont/FreeSans.ttf',
-            'FreeSansBold': '/usr/share/fonts/truetype/freefont/FreeSansBold.ttf'
+            'NotoSansDevanagari': '/usr/share/fonts/truetype/noto/NotoSansDevanagari-Regular.ttf',
+            'NotoSansDevanagariBold': '/usr/share/fonts/truetype/noto/NotoSansDevanagari-Bold.ttf'
         }
         registered_fonts = {}
         for name, path in font_paths.items():
@@ -43,18 +43,18 @@ def register_unicode_fonts():
                     registered_fonts[name] = name
                 except Exception as e:
                     print(f"Failed to register font {path}: {e}")
-        if 'FreeSans' in registered_fonts and 'FreeSansBold' in registered_fonts:
-            pdfmetrics.registerFontFamily('FreeSans', normal='FreeSans', bold='FreeSansBold')
-            return 'FreeSans'
-        elif 'FreeSans' in registered_fonts:
-            return 'FreeSans'
+        if 'NotoSansDevanagari' in registered_fonts and 'NotoSansDevanagariBold' in registered_fonts:
+            pdfmetrics.registerFontFamily('NotoSansDevanagari', normal='NotoSansDevanagari', bold='NotoSansDevanagariBold')
+            return 'NotoSansDevanagari'
+        elif 'NotoSansDevanagari' in registered_fonts:
+            return 'NotoSansDevanagari'
         return None
     except Exception as e:
         print(f"Error registering fonts: {e}")
         return None
 
 UNICODE_FONT = register_unicode_fonts()
-UNICODE_FONT_BOLD = 'FreeSansBold' if UNICODE_FONT else None
+UNICODE_FONT_BOLD = 'NotoSansDevanagariBold' if UNICODE_FONT else None
 
 load_dotenv()
 
@@ -1598,6 +1598,9 @@ def inject_wards():
 # ============ TEMPLATE FILTERS ============
 @app.template_filter('to_nepali_num')
 def to_nepali_num(value):
+    return nepali_num_str(value)
+
+def nepali_num_str(value):
     if value is None:
         return ""
     if isinstance(value, float) and value.is_integer():
@@ -4719,17 +4722,33 @@ def handle_beneficiaries():
         data = request.get_json()
         if not data.get('name'):
             return jsonify({'success': False, 'message': 'Beneficiary name is required'}), 400
+        if not data.get('national_id'):
+            return jsonify({'success': False, 'message': 'National ID is required'}), 400
         ward = parse_int_field(data, 'ward', minimum=1, default=None)
-        if ward is not None and not is_valid_ward(ward):
+        if ward is None:
+            return jsonify({'success': False, 'message': 'Ward is required'}), 400
+        if not is_valid_ward(ward):
             return jsonify({'success': False, 'message': 'Invalid ward selected'}), 400
+        if not data.get('tole'):
+            return jsonify({'success': False, 'message': 'Tole is required'}), 400
+        phone = data.get('phone', '').strip()
+        national_id = data.get('national_id', '').strip()
+        duplicate = Beneficiary.query.filter(
+            db.or_(
+                Beneficiary.phone == phone,
+                db.and_(Beneficiary.ward == ward, Beneficiary.national_id == national_id)
+            )
+        ).first()
+        if duplicate:
+            return jsonify({'success': False, 'message': 'A beneficiary with the same phone or same ward & national ID already exists'}), 400
         family_members = parse_int_field(data, 'family_members', minimum=0, default=1)
         family_members_json = data.get('family_members_json')
         if family_members_json is not None and not isinstance(family_members_json, str):
             family_members_json = json.dumps(family_members_json, ensure_ascii=False)
         ben = Beneficiary(
-            name=data['name'], national_id=data.get('national_id'),
+            name=data['name'], national_id=national_id,
             father_name=data.get('father_name'),
-            phone=data.get('phone'),
+            phone=phone,
             address=data.get('address'),
             ward=ward, tole=data.get('tole'),
             current_shelter_location=data.get('current_shelter_location'),
@@ -4780,11 +4799,32 @@ def manage_beneficiary(id):
             db.session.commit()
             return jsonify({'success': True, 'message': 'Beneficiary deleted'})
         data = request.get_json()
+        if 'name' in data and not data.get('name'):
+            return jsonify({'success': False, 'message': 'Beneficiary name is required'}), 400
+        if 'national_id' in data and not data.get('national_id'):
+            return jsonify({'success': False, 'message': 'National ID is required'}), 400
+        if 'tole' in data and not data.get('tole'):
+            return jsonify({'success': False, 'message': 'Tole is required'}), 400
         if 'ward' in data:
             ward = parse_int_field(data, 'ward', minimum=1, default=None)
-            if ward is not None and not is_valid_ward(ward):
+            if ward is None:
+                return jsonify({'success': False, 'message': 'Ward is required'}), 400
+            if not is_valid_ward(ward):
                 return jsonify({'success': False, 'message': 'Invalid ward selected'}), 400
             data['ward'] = ward
+        phone = (data.get('phone') or ben.phone or '').strip()
+        national_id = (data.get('national_id') or ben.national_id or '').strip()
+        ward_val = data.get('ward') if 'ward' in data else ben.ward
+        if phone or national_id:
+            dup_query = Beneficiary.query.filter(Beneficiary.id != id).filter(
+                db.or_(
+                    Beneficiary.phone == phone,
+                    db.and_(Beneficiary.ward == ward_val, Beneficiary.national_id == national_id)
+                )
+            )
+            dup = dup_query.first()
+            if dup:
+                return jsonify({'success': False, 'message': 'A beneficiary with the same phone or same ward & national ID already exists'}), 400
         if 'family_members' in data:
             data['family_members'] = parse_int_field(data, 'family_members', minimum=0, default=1)
         for bool_field in ['in_social_security_fund', 'poverty_card_holder']:
@@ -5163,7 +5203,7 @@ def generate_disaster_pdf(incidents, total, ward_stats, type_stats, start_bs, en
     elements.append(Paragraph("स्थानीय आपतकालीन कार्य केन्द्र (LEOC)", subtitle_style))
     elements.append(Paragraph("दैनिक घटना प्रतिवेदन", subtitle_style))
     if sit_rep_no:
-        elements.append(Paragraph(f"Sit Rep No: {sit_rep_no}", normal))
+        elements.append(Paragraph(f"Sit Rep No: {nepali_num_str(sit_rep_no)}", normal))
     elements.append(Spacer(1, 6))
 
     date_str = f"{start_bs}" if start_bs == end_bs else f"{start_bs} देखि {end_bs}"
@@ -5174,13 +5214,13 @@ def generate_disaster_pdf(incidents, total, ward_stats, type_stats, start_bs, en
     for w in get_ward_list():
         ws = ward_stats.get(str(w.id), {})
         header_data.append([
-            w.name, str(ws.get('incidents', 0)), str(ws.get('deaths', 0)),
-            str(ws.get('missing', 0)), str(ws.get('injured', 0)),
-            str(ws.get('house_destroyed', 0)), str(ws.get('estimated_loss', 0))
+            w.name, nepali_num_str(ws.get('incidents', 0)), nepali_num_str(ws.get('deaths', 0)),
+            nepali_num_str(ws.get('missing', 0)), nepali_num_str(ws.get('injured', 0)),
+            nepali_num_str(ws.get('house_destroyed', 0)), nepali_num_str(ws.get('estimated_loss', 0))
         ])
-    header_data.append(['जम्मा', str(total['incidents']), str(total['deaths']), str(total['missing']),
-                        str(total['injured']), str(total['house_destroyed']),
-                        str(total['estimated_loss'])])
+    header_data.append(['जम्मा', nepali_num_str(total['incidents']), nepali_num_str(total['deaths']), nepali_num_str(total['missing']),
+                        nepali_num_str(total['injured']), nepali_num_str(total['house_destroyed']),
+                        nepali_num_str(total['estimated_loss'])])
     tbl = Table(header_data, colWidths=[18*mm, 14*mm, 14*mm, 14*mm, 14*mm, 18*mm, 28*mm])
     tbl.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2c5282')),
@@ -5201,11 +5241,11 @@ def generate_disaster_pdf(incidents, total, ward_stats, type_stats, start_bs, en
                'घाइते\nपुरुष', 'घाइते\nमहिला', 'प्रभावित\nपरिवार',
                'घर\nआं.क्षति', 'घर\nपूर्ण.क्षति', 'पशु', 'अ.क्षति']]
         for t, s in type_stats.items():
-            td.append([t, str(s['count']), str(s.get('male_death', 0)), str(s.get('female_death', 0)),
-                       str(s.get('missing', 0)), str(s.get('male_injured', 0)), str(s.get('female_injured', 0)),
-                       str(s.get('affected_households', 0)), str(s.get('house_damaged', 0)),
-                       str(s.get('house_destroyed', 0)), str(s.get('livestock_loss', 0)),
-                       str(s.get('estimated_loss', 0))])
+            td.append([t, nepali_num_str(s['count']), nepali_num_str(s.get('male_death', 0)), nepali_num_str(s.get('female_death', 0)),
+                       nepali_num_str(s.get('missing', 0)), nepali_num_str(s.get('male_injured', 0)), nepali_num_str(s.get('female_injured', 0)),
+                       nepali_num_str(s.get('affected_households', 0)), nepali_num_str(s.get('house_damaged', 0)),
+                       nepali_num_str(s.get('house_destroyed', 0)), nepali_num_str(s.get('livestock_loss', 0)),
+                       nepali_num_str(s.get('estimated_loss', 0))])
         tbl2 = Table(td, colWidths=[22*mm, 12*mm, 14*mm, 14*mm, 12*mm, 14*mm, 14*mm, 16*mm, 14*mm, 14*mm, 14*mm, 20*mm])
         tbl2.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#744210')),
