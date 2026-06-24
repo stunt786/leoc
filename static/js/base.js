@@ -140,17 +140,74 @@
     });
 
     // ============ NOTIFICATIONS ============
-    async function loadNotifications() {
+    const HIGH_ALERT_PRIORITIES = new Set(['High', 'Urgent']);
+    const NOTIFICATION_ICONS = {
+        stock_receipt: 'bi-clipboard-check-fill text-primary',
+        stock_transfer: 'bi-arrow-left-right text-info',
+        adjustment: 'bi-sliders text-warning',
+        low_stock: 'bi-exclamation-triangle-fill text-warning',
+        expiry: 'bi-calendar-exclamation-fill text-danger',
+        incident: 'bi-lightning-charge-fill text-danger',
+        relief_request: 'bi-send-fill text-primary',
+        dispatch: 'bi-truck-front-fill text-info',
+        distribution: 'bi-people-fill text-success',
+        cash_receipt: 'bi-cash-coin text-success',
+        cash_request: 'bi-send-exclamation-fill text-warning',
+        cash_distribution: 'bi-cash-stack text-danger',
+        default: 'bi-bell-fill text-secondary'
+    };
+
+    function escapeHtml(value) {
+        return String(value || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function formatNotificationTime(dateValue) {
+        const date = new Date(dateValue);
+        if (Number.isNaN(date.getTime())) return '';
         try {
-            const response = await fetch('/api/notifications');
-            if (!response.ok) return;
-            const data = await response.json();
-            if (data.success && data.notifications) {
-                updateNotificationBadge(data.notifications.length);
-                renderNotifications(data.notifications);
-            }
+            return new Intl.DateTimeFormat('en-GB', {
+                timeZone: 'Asia/Kathmandu',
+                dateStyle: 'medium',
+                timeStyle: 'short',
+            }).format(date);
         } catch (e) {
-            console.error('Failed to load notifications:', e);
+            return date.toLocaleString();
+        }
+    }
+
+    function getNotificationIcon(notification) {
+        return NOTIFICATION_ICONS[notification.type] || NOTIFICATION_ICONS.default;
+    }
+
+    function getNotificationGroup(notification) {
+        const type = notification.type || '';
+        if (['low_stock', 'expiry'].includes(type)) return 'Inventory';
+        if (['cash_receipt', 'cash_request', 'cash_distribution'].includes(type)) return 'Finance';
+        if (['incident', 'relief_request'].includes(type)) return 'Incidents';
+        return 'System';
+    }
+
+    function getCsrfToken() {
+        return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+    }
+
+    async function clearNotification(notificationId) {
+        try {
+            const response = await fetch(`/api/notifications/${notificationId}/clear`, {
+                method: 'POST',
+                headers: {'X-CSRFToken': getCsrfToken()},
+            });
+            if (!response.ok) return false;
+            const data = await response.json();
+            return !!(data && data.success);
+        } catch (e) {
+            console.error('Failed to clear notification:', e);
+            return false;
         }
     }
 
@@ -164,42 +221,112 @@
         if (dot) dot.style.display = count > 0 ? 'block' : 'none';
     }
 
+    function renderHighAlerts(notifications) {
+        const container = document.getElementById('highAlertContainer');
+        if (!container) return;
+        const alerts = notifications.filter(function(n) {
+            return !n.cleared && HIGH_ALERT_PRIORITIES.has(n.priority);
+        });
+        if (alerts.length === 0) {
+            container.innerHTML = '';
+            return;
+        }
+        container.innerHTML = alerts.map(function(notification) {
+            const icon = getNotificationIcon(notification);
+            const timeLabel = notification.created_at_formatted || formatNotificationTime(notification.created_at);
+            return `
+                <div class="high-alert-card" data-notification-id="${notification.id}">
+                    <button type="button" class="high-alert-close" aria-label="Dismiss notification" data-notification-id="${notification.id}">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
+                    <div class="high-alert-icon"><i class="bi ${icon}"></i></div>
+                    <div class="high-alert-body">
+                        <div class="high-alert-top">
+                            <div>
+                                <div class="high-alert-title">${escapeHtml(notification.title)}</div>
+                                <div class="high-alert-meta">${escapeHtml(notification.priority)} alert · ${escapeHtml(getNotificationGroup(notification))}</div>
+                            </div>
+                            <span class="high-alert-badge">${escapeHtml(notification.type || 'alert')}</span>
+                        </div>
+                        <div class="high-alert-message">${escapeHtml(notification.message)}</div>
+                        <div class="high-alert-footer">
+                            <small>${escapeHtml(timeLabel)}</small>
+                            ${notification.url ? `<a href="${notification.url}" class="high-alert-link">Open</a>` : ''}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        container.querySelectorAll('.high-alert-close').forEach(function(button) {
+            button.addEventListener('click', async function() {
+                const notificationId = this.getAttribute('data-notification-id');
+                const card = this.closest('.high-alert-card');
+                if (card) {
+                    card.classList.add('is-dismissing');
+                }
+                const cleared = await clearNotification(notificationId);
+                if (cleared && card) {
+                    setTimeout(function() {
+                        card.remove();
+                    }, 220);
+                }
+                if (!cleared && card) {
+                    card.classList.remove('is-dismissing');
+                }
+            });
+        });
+    }
+
     function renderNotifications(notifications) {
         const container = document.getElementById('notificationList');
-        if (!container) return;
-        if (notifications.length === 0) {
+        if (!container) {
+            renderHighAlerts(notifications);
+            return;
+        }
+        const activeNotifications = notifications.filter(function(notification) {
+            return !notification.cleared;
+        });
+        updateNotificationBadge(activeNotifications.length);
+        renderHighAlerts(activeNotifications);
+        if (activeNotifications.length === 0) {
             container.innerHTML = '<div class="p-4 text-center text-muted"><i class="bi bi-bell-slash d-block mb-2" style="font-size:2rem"></i><small>No notifications</small></div>';
             return;
         }
         let html = '';
-        notifications.slice(0, 10).forEach(function(n) {
-            const timeAgo = getTimeAgo(new Date(n.created_at));
-            const icons = {
-                'low_stock': 'bi bi-exclamation-triangle text-warning',
-                'expiry': 'bi bi-calendar-exclamation text-danger',
-                'dispatch': 'bi bi-truck text-info',
-                'incident': 'bi bi-lightning-charge text-danger',
-                'request': 'bi bi-inbox text-primary',
-                'default': 'bi bi-bell text-secondary'
-            };
-            const icon = icons[n.type] || icons.default;
-            html += `<a class="dropdown-item d-flex align-items-start gap-3 py-2 px-3" href="${n.url || '#'}">
-                <i class="${icon} mt-1"></i>
-                <div><strong>${n.title}</strong><br><small class="text-muted">${n.message}</small><br><small class="text-muted">${timeAgo}</small></div>
-            </a>`;
+        activeNotifications.slice(0, 10).forEach(function(notification) {
+            const icon = getNotificationIcon(notification);
+            const timeLabel = notification.created_at_formatted || formatNotificationTime(notification.created_at);
+            html += `
+                <a class="dropdown-item notification-item d-flex align-items-start gap-3 py-3 px-3" href="${notification.url || '#'}">
+                    <div class="notification-item-icon">
+                        <i class="bi ${icon}"></i>
+                    </div>
+                    <div class="flex-grow-1">
+                        <div class="d-flex justify-content-between align-items-start gap-2">
+                            <strong>${escapeHtml(notification.title)}</strong>
+                            <span class="notification-pill">${escapeHtml(notification.priority || 'Medium')}</span>
+                        </div>
+                        <div class="small text-muted mt-1">${escapeHtml(notification.message)}</div>
+                        <div class="small text-muted mt-1">${escapeHtml(timeLabel)}</div>
+                    </div>
+                </a>
+            `;
         });
         container.innerHTML = html;
     }
 
-    function getTimeAgo(date) {
-        const seconds = Math.floor((new Date() - date) / 1000);
-        if (seconds < 60) return 'Just now';
-        const minutes = Math.floor(seconds / 60);
-        if (minutes < 60) return minutes + 'm ago';
-        const hours = Math.floor(minutes / 60);
-        if (hours < 24) return hours + 'h ago';
-        const days = Math.floor(hours / 24);
-        return days + 'd ago';
+    async function loadNotifications() {
+        try {
+            const response = await fetch('/api/notifications?include_cleared=0', { cache: 'no-cache' });
+            if (!response.ok) return;
+            const data = await response.json();
+            if (data.success && data.notifications) {
+                renderNotifications(data.notifications);
+            }
+        } catch (e) {
+            console.error('Failed to load notifications:', e);
+        }
     }
 
     const notifToggle = document.getElementById('notificationToggle');
@@ -210,7 +337,7 @@
     }
 
     // Load notifications on page load
-    if (document.getElementById('notificationList')) {
+    if (document.getElementById('notificationList') || document.getElementById('highAlertContainer')) {
         loadNotifications();
         setInterval(loadNotifications, 60000);
     }

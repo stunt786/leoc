@@ -794,23 +794,40 @@ class Notification(db.Model):
             'resource_id': self.resource_id,
             'url': self.url,
             'cleared': self.cleared,
+            'cleared_at': self.cleared_at.isoformat() if self.cleared_at else None,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'created_at_formatted': ad_to_bs_date(self.created_at) + ' ' + self.created_at.strftime('%H:%M') if self.created_at else '',
+            'cleared_at_formatted': ad_to_bs_date(self.cleared_at) + ' ' + self.cleared_at.strftime('%H:%M') if self.cleared_at else '',
+            'status': 'Cleared' if self.cleared else 'Active',
         }
 
 def create_notification(title, message, type_name, priority='Medium', resource_id=None, url=None):
     try:
-        notif = Notification(
-            title=title,
-            message=message,
-            type=type_name,
-            priority=priority,
-            resource_id=str(resource_id) if resource_id is not None else None,
-            url=url,
-            cleared=False
-        )
-        db.session.add(notif)
-        db.session.commit()
+        resource_key = str(resource_id) if resource_id is not None else None
+        notif = None
+        if resource_key is not None:
+            notif = Notification.query.filter_by(type=type_name, resource_id=resource_key).first()
+        if notif:
+            notif.title = title
+            notif.message = message
+            notif.priority = priority
+            if url:
+                notif.url = url
+            notif.cleared = False
+            notif.cleared_at = None
+            notif.created_at = utc_now()
+        else:
+            notif = Notification(
+                title=title,
+                message=message,
+                type=type_name,
+                priority=priority,
+                resource_id=resource_key,
+                url=url,
+                cleared=False
+            )
+            db.session.add(notif)
+        return notif
     except Exception as e:
         db.session.rollback()
         print(f"Failed to create notification: {e}")
@@ -3204,6 +3221,15 @@ def handle_stock_transfers():
             else:
                 to_inv = Inventory(item_id=item_id, warehouse_id=to_wh, quantity=qty)
                 db.session.add(to_inv)
+        create_notification(
+            title=f'Stock Transfer {transfer.transfer_no}',
+            message=f'{transfer.transfer_no} moved stock from {transfer.from_warehouse.name if transfer.from_warehouse else "source warehouse"} to {transfer.to_warehouse.name if transfer.to_warehouse else "destination warehouse"}',
+            type_name='stock_transfer',
+            priority='Medium',
+            resource_id=transfer.id,
+            url=url_for('stock_transfers_page')
+        )
+        log_activity('create', 'stock_transfer', resource_id=transfer.id, details=f'Stock transfer {transfer.transfer_no} created', user=current_user, ip=request.remote_addr)
         db.session.commit()
         return jsonify({'success': True, 'message': 'Stock transfer completed', 'data': transfer.to_dict()}), 201
     except Exception as e:
@@ -3359,6 +3385,15 @@ def handle_stock_receipts():
             )
             db.session.add(ri)
             update_inventory(item_id, data['warehouse_id'], qty)
+        create_notification(
+            title=f'Stock Receipt {receipt.receipt_no}',
+            message=f'{receipt.receipt_no} received into {receipt.warehouse.name if receipt.warehouse else "warehouse"} from {receipt.source_name or receipt.source_type or "stock source"}',
+            type_name='stock_receipt',
+            priority='Medium',
+            resource_id=receipt.id,
+            url=url_for('stock_receipts_page')
+        )
+        log_activity('create', 'stock_receipt', resource_id=receipt.id, details=f'Stock receipt {receipt.receipt_no} recorded', user=current_user, ip=request.remote_addr)
         db.session.commit()
         return jsonify({'success': True, 'message': 'Stock receipt recorded', 'data': receipt.to_dict()}), 201
     except ValueError as e:
@@ -3753,10 +3788,20 @@ def handle_adjustments():
             created_by=current_user.id
         )
         db.session.add(adjustment)
+        db.session.flush()
         if adj_type in ('Increase', 'Correction_Increase'):
             update_inventory(item.id, warehouse_id, adj_qty)
         elif adj_type in ('Decrease', 'Damage', 'Expired', 'Lost', 'Correction'):
             update_inventory(item.id, warehouse_id, -adj_qty)
+        create_notification(
+            title=f'Adjustment {adjustment.adjustment_no}',
+            message=f'{adjustment.adjustment_no} applied to {item.name} in {warehouse.name} ({adjustment.adjustment_type})',
+            type_name='adjustment',
+            priority='Medium',
+            resource_id=adjustment.id,
+            url=url_for('adjustments_page')
+        )
+        log_activity('create', 'adjustment', resource_id=adjustment.id, details=f'Adjustment {adjustment.adjustment_no} recorded', user=current_user, ip=request.remote_addr)
         db.session.commit()
         return jsonify({'success': True, 'message': 'Adjustment recorded', 'data': adjustment.to_dict()}), 201
     except ValueError as e:
@@ -3844,6 +3889,17 @@ def handle_incidents():
         )
         _apply_incident_fields(incident, data)
         db.session.add(incident)
+        db.session.flush()
+        incident_priority = 'Urgent' if (incident.severity or '').lower() in ('critical', 'urgent') else 'High' if (incident.severity or '').lower() == 'high' else 'Medium'
+        create_notification(
+            title=f'Incident Reported: {incident.incident_name}',
+            message=f'{incident.incident_type} incident reported in Ward {incident.ward or "N/A"} with severity {incident.severity or "Medium"}',
+            type_name='incident',
+            priority=incident_priority,
+            resource_id=incident.id,
+            url=url_for('incidents_page')
+        )
+        log_activity('create', 'incident', resource_id=incident.id, details=f'Incident {incident.incident_name} created', user=current_user, ip=request.remote_addr)
         db.session.commit()
         return jsonify({'success': True, 'message': 'Incident created', 'data': incident.to_dict()}), 201
     except ValueError as e:
@@ -4051,6 +4107,23 @@ def handle_relief_requests():
                 remarks=f'Auto-created from Relief Request {req.request_number}'
             )
             db.session.add(cash_req)
+            create_notification(
+                title=f'Cash Request {cash_req.request_number}',
+                message=f'Cash request for {incident.incident_name} created from relief request {req.request_number}',
+                type_name='cash_request',
+                priority='High' if (data.get('priority') or 'Medium') in ('High', 'Urgent') else 'Medium',
+                resource_id=f'cashreq-{cash_req.request_number}',
+                url=url_for('cash_requests_page')
+            )
+        create_notification(
+            title=f'Relief Request {req.request_number}',
+            message=f'Relief request for {incident.incident_name} created for {req.requester_name or "beneficiary"}',
+            type_name='relief_request',
+            priority='High' if (req.priority or 'Medium') in ('High', 'Urgent') else 'Medium',
+            resource_id=req.id,
+            url=url_for('relief_requests_page')
+        )
+        log_activity('create', 'relief_request', resource_id=req.id, details=f'Relief request {req.request_number} created', user=current_user, ip=request.remote_addr)
         db.session.commit()
         return jsonify({'success': True, 'message': 'Relief request created', 'data': req.to_dict()}), 201
     except ValueError as e:
@@ -4287,6 +4360,15 @@ def handle_dispatches():
                 if anything_done or req.distributed_cash_amount > 0:
                     req.status = 'Partial'
 
+        create_notification(
+            title=f'Dispatch {dispatch.dispatch_number}',
+            message=f'Dispatch to {dispatch.destination or "destination"} created for {incident.incident_name}',
+            type_name='dispatch',
+            priority='Medium',
+            resource_id=dispatch.id,
+            url=url_for('dispatch_page')
+        )
+        log_activity('create', 'dispatch', resource_id=dispatch.id, details=f'Dispatch {dispatch.dispatch_number} created', user=current_user, ip=request.remote_addr)
         db.session.commit()
         return jsonify({'success': True, 'message': 'Dispatch created successfully', 'data': dispatch.to_dict()}), 201
     except Exception as e:
@@ -4683,6 +4765,15 @@ def handle_distributions():
                         req.status = 'Completed'
                     elif anything_done:
                         req.status = 'Partial'
+        create_notification(
+            title=f'Distribution {dist.distribution_no}',
+            message=f'Distribution recorded for {incident.incident_name} at {data.get("location") or "selected location"}',
+            type_name='distribution',
+            priority='Medium',
+            resource_id=dist.id,
+            url=url_for('distributions_page')
+        )
+        log_activity('create', 'distribution', resource_id=dist.id, details=f'Distribution {dist.distribution_no} recorded', user=current_user, ip=request.remote_addr)
         db.session.commit()
         return jsonify({'success': True, 'message': 'Distribution recorded', 'data': dist.to_dict()}), 201
     except Exception as e:
@@ -5074,7 +5165,17 @@ def handle_cash_receipts():
             created_by=current_user.id
         )
         db.session.add(receipt)
+        db.session.flush()
         fund.current_balance += amount_received
+        create_notification(
+            title=f'Cash Receipt {receipt.receipt_no}',
+            message=f'Cash receipt of {amount_received} recorded for {fund.name}',
+            type_name='cash_receipt',
+            priority='Medium',
+            resource_id=receipt.id,
+            url=url_for('cash_receipts_page')
+        )
+        log_activity('create', 'cash_receipt', resource_id=receipt.id, details=f'Cash receipt {receipt.receipt_no} recorded', user=current_user, ip=request.remote_addr)
         db.session.commit()
         return jsonify({'success': True, 'message': 'Cash receipt recorded', 'data': receipt.to_dict()}), 201
     except ValueError as e:
@@ -5158,6 +5259,16 @@ def handle_cash_requests():
             remarks=data.get('remarks')
         )
         db.session.add(req)
+        db.session.flush()
+        create_notification(
+            title=f'Cash Request {req.request_number}',
+            message=f'Cash request created for {beneficiary.name} under {incident.incident_name}',
+            type_name='cash_request',
+            priority='High' if (req.priority or 'Medium') in ('High', 'Urgent') else 'Medium',
+            resource_id=req.id,
+            url=url_for('cash_requests_page')
+        )
+        log_activity('create', 'cash_request', resource_id=req.id, details=f'Cash request {req.request_number} recorded', user=current_user, ip=request.remote_addr)
         db.session.commit()
         return jsonify({'success': True, 'message': 'Cash request created', 'data': req.to_dict()}), 201
     except ValueError as e:
@@ -5438,6 +5549,15 @@ def handle_cash_distributions():
                 elif total_distributed > 0:
                     related_cash_req.status = 'Partial'
 
+        create_notification(
+            title=f'Cash Distribution {dist.distribution_no}',
+            message=f'Cash distribution of {total} recorded for {incident.incident_name}',
+            type_name='cash_distribution',
+            priority='Medium',
+            resource_id=dist.id,
+            url=url_for('cash_distributions_page')
+        )
+        log_activity('create', 'cash_distribution', resource_id=dist.id, details=f'Cash distribution {dist.distribution_no} recorded', user=current_user, ip=request.remote_addr)
         db.session.commit()
         return jsonify({'success': True, 'message': 'Cash distribution recorded', 'data': dist.to_dict()}), 201
     except ValueError as e:
@@ -7575,31 +7695,55 @@ def global_search():
         return jsonify({'success': False, 'message': friendly_message(e), 'results': []}), 500
 
 # ============ NOTIFICATIONS ============
+@app.route('/notifications')
+@login_required
+def notifications_page():
+    return render_template('notifications.html')
+
 @app.route('/api/notifications', methods=['GET'])
 @login_required
 def get_notifications():
     try:
-        notifications = []
-        low_stock = Inventory.query.all()
-        low_count = sum(1 for inv in low_stock if inv.item and inv.item.minimum_stock > 0 and inv.quantity <= inv.item.minimum_stock)
-        if low_count > 0:
-            notifications.append({'type': 'low_stock', 'title': 'Low Stock Alert', 'message': f'{low_count} item(s) are running low', 'url': url_for('inventory_page'), 'created_at': datetime.now(timezone.utc).isoformat()})
-        out_count = sum(1 for inv in low_stock if inv.quantity <= 0)
-        if out_count > 0:
-            notifications.append({'type': 'out_of_stock', 'title': 'Out of Stock', 'message': f'{out_count} item(s) are out of stock', 'url': url_for('inventory_page'), 'created_at': datetime.now(timezone.utc).isoformat()})
-        reorder_count = sum(1 for inv in low_stock if inv.item and inv.item.max_stock > 0 and inv.quantity <= inv.item.max_stock * 0.25)
-        if reorder_count > 0:
-            notifications.append({'type': 'reorder', 'title': 'Reorder Needed', 'message': f'{reorder_count} item(s) at reorder point', 'url': url_for('inventory_page'), 'created_at': datetime.now(timezone.utc).isoformat()})
-        for wh in Warehouse.query.all():
-            total_qty = sum(inv.quantity for inv in Inventory.query.filter_by(warehouse_id=wh.id).all())
-            if wh.capacity > 0 and total_qty > wh.capacity * 0.9:
-                notifications.append({'type': 'capacity', 'title': 'Warehouse Capacity Alert', 'message': f'{wh.name} is at {int(total_qty/wh.capacity*100)}% capacity', 'url': url_for('warehouses_page'), 'created_at': datetime.now(timezone.utc).isoformat()})
-        active = Incident.query.filter(Incident.status == 'Active').count()
-        if active > 0:
-            notifications.append({'type': 'incident', 'title': 'Active Incidents', 'message': f'{active} active incident(s)', 'url': url_for('incidents_page'), 'created_at': datetime.now(timezone.utc).isoformat()})
+        check_and_update_persistent_notifications()
+        include_cleared = request.args.get('include_cleared', '0').lower() in ('1', 'true', 'yes', 'on')
+        query = Notification.query.order_by(Notification.created_at.desc(), Notification.id.desc())
+        if not include_cleared:
+            query = query.filter(Notification.cleared == False)
+        notifications = [n.to_dict() for n in query.all()]
         return jsonify({'success': True, 'notifications': notifications})
     except Exception as e:
         return jsonify({'success': False, 'message': friendly_message(e), 'notifications': []}), 500
+
+@app.route('/api/notifications/<int:id>/clear', methods=['POST'])
+@login_required
+def clear_notification(id):
+    try:
+        notif = db_get(Notification, id)
+        if not notif:
+            return jsonify({'success': False, 'message': 'Notification not found'}), 404
+        notif.cleared = True
+        notif.cleared_at = utc_now()
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Notification cleared', 'notification': notif.to_dict()})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
+
+@app.route('/api/notifications/clear', methods=['POST'])
+@login_required
+def clear_all_notifications():
+    try:
+        now = utc_now()
+        updated = 0
+        for notif in Notification.query.filter(Notification.cleared == False).all():
+            notif.cleared = True
+            notif.cleared_at = now
+            updated += 1
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'All notifications cleared', 'count': updated})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 # ============ DATA FOR DROPDOWNS ============
 @app.route('/api/data', methods=['GET'])
