@@ -770,6 +770,257 @@ def log_activity(action, resource, resource_id=None, details=None, user=None, ip
     except Exception:
         db.session.rollback()
 
+# ============ NOTIFICATION MODEL ============
+class Notification(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(200), nullable=False)
+    message = db.Column(db.Text, nullable=False)
+    type = db.Column(db.String(50), nullable=False)  # 'stock_receipt', 'stock_transfer', 'adjustment', 'low_stock', 'expiry', 'incident', 'relief_request', 'dispatch', 'distribution', 'cash_request', 'cash_distribution'
+    priority = db.Column(db.String(20), default='Medium')  # 'Low', 'Medium', 'High', 'Urgent'
+    resource_id = db.Column(db.String(100), nullable=True)
+    url = db.Column(db.String(500), nullable=True)
+    cleared = db.Column(db.Boolean, default=False, index=True)
+    created_at = db.Column(db.DateTime, default=utc_now, index=True)
+    cleared_at = db.Column(db.DateTime, nullable=True)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'title': self.title,
+            'message': self.message,
+            'type': self.type,
+            'priority': self.priority,
+            'resource_id': self.resource_id,
+            'url': self.url,
+            'cleared': self.cleared,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'created_at_formatted': ad_to_bs_date(self.created_at) + ' ' + self.created_at.strftime('%H:%M') if self.created_at else '',
+        }
+
+def create_notification(title, message, type_name, priority='Medium', resource_id=None, url=None):
+    try:
+        notif = Notification(
+            title=title,
+            message=message,
+            type=type_name,
+            priority=priority,
+            resource_id=str(resource_id) if resource_id is not None else None,
+            url=url,
+            cleared=False
+        )
+        db.session.add(notif)
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        print(f"Failed to create notification: {e}")
+
+def check_time_elapsed(cleared_at):
+    if not cleared_at:
+        return False
+    now = datetime.now(timezone.utc)
+    if cleared_at.tzinfo is None:
+        cleared_at = cleared_at.replace(tzinfo=timezone.utc)
+    return (now - cleared_at) >= timedelta(hours=24)
+
+LAST_STATUS_CHECK_TIME = 0
+
+def check_and_update_persistent_notifications():
+    global LAST_STATUS_CHECK_TIME
+    now_time = time.time()
+    if now_time - LAST_STATUS_CHECK_TIME < 60:
+        return
+    LAST_STATUS_CHECK_TIME = now_time
+
+    try:
+        today = date.today()
+        # 1. Active incidents
+        active_incidents = Incident.query.filter_by(status='Active').all()
+        active_incident_ids = {inc.id for inc in active_incidents}
+
+        for inc in active_incidents:
+            res_id = f"incident_active_{inc.id}"
+            notif = Notification.query.filter_by(resource_id=res_id).first()
+            sev = (inc.severity or 'medium').lower()
+            priority = 'High' if sev in ('high', 'urgent') else 'Medium'
+            if not notif:
+                notif = Notification(
+                    title=f"Active Incident: {inc.incident_name}",
+                    message=f"Incident of type {inc.incident_type} (severity: {inc.severity}) is active at Ward {inc.ward}.",
+                    type='incident',
+                    priority=priority,
+                    resource_id=res_id,
+                    url=url_for('incidents_page'),
+                    cleared=False
+                )
+                db.session.add(notif)
+            else:
+                if notif.cleared:
+                    if check_time_elapsed(notif.cleared_at):
+                        notif.cleared = False
+                        notif.cleared_at = None
+                        notif.created_at = datetime.now(timezone.utc)
+
+        active_inc_res_ids = {f"incident_active_{inc_id}" for inc_id in active_incident_ids}
+        old_inc_notifs = Notification.query.filter(
+            Notification.type == 'incident',
+            Notification.resource_id.like('incident_active_%'),
+            Notification.cleared == False
+        ).all()
+        for old_notif in old_inc_notifs:
+            if old_notif.resource_id not in active_inc_res_ids:
+                old_notif.cleared = True
+                old_notif.cleared_at = datetime.now(timezone.utc)
+
+        # 2. Low Stock Items
+        low_stock_records = []
+        all_inv = Inventory.query.all()
+        for inv in all_inv:
+            if inv.item and inv.item.minimum_stock > 0 and inv.available_quantity <= inv.item.minimum_stock and inv.available_quantity > 0:
+                low_stock_records.append(inv)
+
+        active_low_stock_res_ids = set()
+        for inv in low_stock_records:
+            res_id = f"low_{inv.item_id}_{inv.warehouse_id}"
+            active_low_stock_res_ids.add(res_id)
+            notif = Notification.query.filter_by(resource_id=res_id).first()
+            if not notif:
+                notif = Notification(
+                    title=f"Low Stock: {inv.item.name}",
+                    message=f"{inv.item.name} at {inv.warehouse.name} is low on stock ({inv.available_quantity} {inv.item.unit} remaining, minimum: {inv.item.minimum_stock})",
+                    type='low_stock',
+                    priority='Medium',
+                    resource_id=res_id,
+                    url=url_for('inventory_page'),
+                    cleared=False
+                )
+                db.session.add(notif)
+            else:
+                if notif.cleared:
+                    if check_time_elapsed(notif.cleared_at):
+                        notif.cleared = False
+                        notif.cleared_at = None
+                        notif.created_at = datetime.now(timezone.utc)
+
+        old_low_notifs = Notification.query.filter(
+            Notification.type == 'low_stock',
+            Notification.cleared == False
+        ).all()
+        for old_notif in old_low_notifs:
+            if old_notif.resource_id not in active_low_stock_res_ids and not old_notif.resource_id.startswith('out_'):
+                old_notif.cleared = True
+                old_notif.cleared_at = datetime.now(timezone.utc)
+
+        # 3. Out of Stock Items
+        out_stock_records = []
+        for inv in all_inv:
+            if inv.available_quantity <= 0:
+                out_stock_records.append(inv)
+
+        active_out_stock_res_ids = set()
+        for inv in out_stock_records:
+            res_id = f"out_{inv.item_id}_{inv.warehouse_id}"
+            active_out_stock_res_ids.add(res_id)
+            notif = Notification.query.filter_by(resource_id=res_id).first()
+            if not notif:
+                notif = Notification(
+                    title=f"Out of Stock: {inv.item.name}",
+                    message=f"{inv.item.name} at {inv.warehouse.name} is out of stock",
+                    type='low_stock',
+                    priority='High',
+                    resource_id=res_id,
+                    url=url_for('inventory_page'),
+                    cleared=False
+                )
+                db.session.add(notif)
+            else:
+                if notif.cleared:
+                    if check_time_elapsed(notif.cleared_at):
+                        notif.cleared = False
+                        notif.cleared_at = None
+                        notif.created_at = datetime.now(timezone.utc)
+
+        old_out_notifs = Notification.query.filter(
+            Notification.type == 'low_stock',
+            Notification.resource_id.like('out_%'),
+            Notification.cleared == False
+        ).all()
+        for old_notif in old_out_notifs:
+            if old_notif.resource_id not in active_out_stock_res_ids:
+                old_notif.cleared = True
+                old_notif.cleared_at = datetime.now(timezone.utc)
+
+        # 4. Expired / Expiring Items
+        receipt_batches = db.session.query(
+            StockReceiptItem.item_id, StockReceipt.warehouse_id, StockReceiptItem.expiry_date, StockReceiptItem.batch_no, Item.name
+        ).join(
+            StockReceipt, StockReceiptItem.receipt_id == StockReceipt.id
+        ).join(
+            Item, StockReceiptItem.item_id == Item.id
+        ).filter(
+            StockReceiptItem.expiry_date.isnot(None),
+            Item.expiry_tracking == True
+        ).all()
+
+        active_expiry_res_ids = set()
+        for item_id, wh_id, expiry_date, batch_no, item_name in receipt_batches:
+            inv = Inventory.query.filter_by(item_id=item_id, warehouse_id=wh_id).first()
+            if not inv or inv.quantity <= 0:
+                continue
+
+            status = None
+            priority = 'Medium'
+            msg_status = ''
+            if expiry_date <= today:
+                status = 'expired'
+                priority = 'High'
+                msg_status = 'expired'
+            elif (expiry_date - today).days <= 30:
+                status = 'expiring_30'
+                priority = 'Medium'
+                msg_status = f'expiring in {(expiry_date - today).days} days'
+            elif (expiry_date - today).days <= 90:
+                status = 'expiring_90'
+                priority = 'Low'
+                msg_status = f'expiring in {(expiry_date - today).days} days'
+
+            if status:
+                res_id = f"expiry_{item_id}_{wh_id}_{batch_no or 'nobatch'}"
+                active_expiry_res_ids.add(res_id)
+                notif = Notification.query.filter_by(resource_id=res_id).first()
+                if not notif:
+                    notif = Notification(
+                        title=f"Expiry Alert: {item_name}",
+                        message=f"{item_name} (Batch: {batch_no or 'N/A'}) at {inv.warehouse.name} is {msg_status} ({ad_to_bs_date(expiry_date)})",
+                        type='expiry',
+                        priority=priority,
+                        resource_id=res_id,
+                        url=url_for('inventory_page'),
+                        cleared=False
+                    )
+                    db.session.add(notif)
+                else:
+                    notif.priority = priority
+                    notif.message = f"{item_name} (Batch: {batch_no or 'N/A'}) at {inv.warehouse.name} is {msg_status} ({ad_to_bs_date(expiry_date)})"
+                    if notif.cleared:
+                        if check_time_elapsed(notif.cleared_at):
+                            notif.cleared = False
+                            notif.cleared_at = None
+                            notif.created_at = datetime.now(timezone.utc)
+
+        old_expiry_notifs = Notification.query.filter(
+            Notification.type == 'expiry',
+            Notification.cleared == False
+        ).all()
+        for old_notif in old_expiry_notifs:
+            if old_notif.resource_id not in active_expiry_res_ids:
+                old_notif.cleared = True
+                old_notif.cleared_at = datetime.now(timezone.utc)
+
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error in background status check: {e}")
+
 # ============ MANUAL ADJUSTMENT MODEL (Module 8) ============
 class ManualAdjustment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -2467,8 +2718,18 @@ def reset_database():
 @permission_required('edit')
 def handle_warehouses():
     if request.method == 'GET':
+        from sqlalchemy import func as sql_func
         warehouses = Warehouse.query.order_by(Warehouse.name).all()
-        return jsonify({'success': True, 'warehouses': [w.to_dict() for w in warehouses]})
+        count_data = db.session.query(
+            Inventory.warehouse_id, sql_func.count(Inventory.id)
+        ).group_by(Inventory.warehouse_id).all()
+        count_map = {wh_id: cnt for wh_id, cnt in count_data}
+        result = []
+        for w in warehouses:
+            d = w.to_dict()
+            d['total_items'] = count_map.get(w.id, 0)
+            result.append(d)
+        return jsonify({'success': True, 'warehouses': result})
     try:
         data = request.get_json()
         if not isinstance(data, dict):
@@ -3221,7 +3482,6 @@ def update_stock_receipt(id):
 @login_required
 def get_inventory():
     try:
-        query = Inventory.query
         warehouse_id = request.args.get('warehouse_id', type=int)
         category_id = request.args.get('category_id', type=int)
         supplier_id = request.args.get('supplier_id', type=int)
@@ -3229,12 +3489,14 @@ def get_inventory():
         to_date_str = request.args.get('to_date')
         status = request.args.get('status')
         search = request.args.get('search')
+
+        query = Inventory.query.join(Item)
         if warehouse_id:
             query = query.filter(Inventory.warehouse_id == warehouse_id)
         if category_id:
-            query = query.join(Item).filter(Item.category_id == category_id)
+            query = query.filter(Item.category_id == category_id)
         if search:
-            query = query.join(Item).filter(Item.name.ilike(f'%{search}%'))
+            query = query.filter(Item.name.ilike(f'%{search}%'))
         if supplier_id or from_date_str or to_date_str:
             receipt_item_ids = db.session.query(StockReceiptItem.item_id).join(
                 StockReceipt, StockReceiptItem.receipt_id == StockReceipt.id
@@ -3257,11 +3519,42 @@ def get_inventory():
             else:
                 query = query.filter(Inventory.item_id == -1)
         inventory = query.order_by(Inventory.updated_at.desc()).all()
-        results = [inv.to_dict() for inv in inventory]
 
+        # Group by item_id, summing quantities across warehouses
+        groups = {}
+        for inv in inventory:
+            item_id = inv.item_id
+            if item_id not in groups:
+                item = inv.item
+                groups[item_id] = {
+                    'item_id': item_id,
+                    'item_name': item.name if item else None,
+                    'item_code': item.item_code if item else None,
+                    'item_uuid': item.uuid if item else None,
+                    'barcode': item.barcode if item else None,
+                    'category_name': item.category.name if item and item.category else None,
+                    'quantity': 0,
+                    'reserved_quantity': 0,
+                    'unit': item.unit if item else None,
+                    'minimum_stock': item.minimum_stock if item else 0,
+                    'expiry_tracking': item.expiry_tracking if item else False,
+                    'updated_at': inv.updated_at,
+                    'warehouse_ids': [],
+                    'warehouse_names': [],
+                    'has_expired': False,
+                }
+            rec = groups[item_id]
+            rec['quantity'] += inv.quantity
+            rec['reserved_quantity'] += inv.reserved_quantity
+            if inv.warehouse_id not in rec['warehouse_ids']:
+                rec['warehouse_ids'].append(inv.warehouse_id)
+                rec['warehouse_names'].append(inv.warehouse.name if inv.warehouse else 'Unknown')
+            if inv.updated_at and (not rec['updated_at'] or inv.updated_at > rec['updated_at']):
+                rec['updated_at'] = inv.updated_at
+
+        # Check expiry for tracking items
         today = date.today()
-        expired_item_ids = set()
-        tracking_ids = [r['item_id'] for r in results if r.get('expiry_tracking')]
+        tracking_ids = [g['item_id'] for g in groups.values() if g['expiry_tracking']]
         if tracking_ids:
             expiry_query = db.session.query(StockReceiptItem.item_id).join(
                 StockReceipt, StockReceiptItem.receipt_id == StockReceipt.id
@@ -3272,20 +3565,40 @@ def get_inventory():
             )
             if warehouse_id:
                 expiry_query = expiry_query.filter(StockReceipt.warehouse_id == warehouse_id)
-            expired_item_ids = {r.item_id for r in expiry_query.all()}
+            for eid in {r.item_id for r in expiry_query.all()}:
+                if eid in groups:
+                    groups[eid]['has_expired'] = True
 
-        for r in results:
-            if r.get('expiry_tracking') and r['item_id'] in expired_item_ids:
-                r['status'] = 'expired'
+        results = []
+        for item_id, rec in groups.items():
+            rec['available_quantity'] = rec['quantity'] - rec['reserved_quantity']
 
-        if status == 'expired':
-            results = [r for r in results if r['status'] == 'expired']
-        elif status == 'low_stock':
-            results = [r for r in results if r['status'] == 'low_stock']
-        elif status == 'out_of_stock':
-            results = [r for r in results if r['status'] == 'out_of_stock']
-        elif status == 'available':
-            results = [r for r in results if r['status'] == 'available']
+            if len(rec['warehouse_names']) == 1:
+                rec['warehouse_name'] = rec['warehouse_names'][0]
+                rec['warehouse_id'] = rec['warehouse_ids'][0]
+            else:
+                rec['warehouse_name'] = f"{len(rec['warehouse_names'])} Warehouses"
+                rec['warehouse_id'] = None
+
+            if rec['expiry_tracking'] and rec['has_expired']:
+                rec['status'] = 'expired'
+            elif rec['available_quantity'] <= 0:
+                rec['status'] = 'out_of_stock'
+            elif rec['minimum_stock'] > 0 and rec['available_quantity'] <= rec['minimum_stock'] * 2:
+                rec['status'] = 'low_stock'
+            else:
+                rec['status'] = 'available'
+
+            del rec['warehouse_ids']
+            del rec['warehouse_names']
+            del rec['has_expired']
+            results.append(rec)
+
+        results.sort(key=lambda r: r['updated_at'] or datetime.min, reverse=True)
+
+        if status:
+            results = [r for r in results if r['status'] == status]
+
         return jsonify({'success': True, 'inventory': results})
     except Exception as e:
         return jsonify({'success': False, 'message': friendly_message(e)}), 500

@@ -15,7 +15,7 @@
     <div class="card-body">
         <div class="table-responsive">
             <table class="table table-hover" id="warehouseTable">
-                <thead><tr><th>Code</th><th>Name</th><th>Address</th><th>Contact Person</th><th>Phone</th><th>Capacity</th><th>Remarks</th><th class="text-end">Actions</th></tr></thead>
+                <thead><tr><th>Code</th><th>Name</th><th>Address</th><th>Contact Person</th><th>Phone</th><th>Capacity</th><th>Total Items</th><th class="text-end">Actions</th></tr></thead>
                 <tbody id="tableBody"><tr class="text-center"><td colspan="8"><div class="spinner-border text-primary"></div></td></tr></tbody>
             </table>
         </div>
@@ -91,7 +91,7 @@ function renderWarehouses(data) {
     tbody.innerHTML = pageData.map(w => `<tr>
         <td>${w.code || ''}</td><td>${w.name}</td><td>${w.address || ''}</td>
         <td>${w.contact_person || ''}</td><td>${w.phone || ''}</td>
-        <td>${w.capacity || 0}</td><td>${w.remarks || ''}</td>
+        <td>${w.capacity || 0}</td><td>${w.total_items}</td>
         <td class="text-end">
             <button class="btn btn-sm btn-outline-primary" onclick="editWarehouse(${w.id})"><i class="bi bi-pencil"></i></button>
             <button class="btn btn-sm btn-outline-danger" onclick="deleteWarehouse(${w.id})"><i class="bi bi-trash"></i></button>
