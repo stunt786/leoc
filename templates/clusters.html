@@ -1,0 +1,482 @@
+{% extends "base.html" %}
+{% block title %}Cluster Coordination - LEOC{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('index') }}"><i class="bi bi-house-fill"></i></a></li>
+<li class="breadcrumb-item active">Cluster Coordination</li>
+{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="mb-0"><i class="bi bi-diagram-3-fill me-2"></i>Cluster Coordination Management</h4>
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#clusterModal" onclick="openForm()">
+        <i class="bi bi-plus-lg"></i> Add Cluster
+    </button>
+</div>
+<div class="card shadow-sm">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle" id="clusterTable">
+                <thead class="table-light"><tr>
+                    <th>Cluster Name</th><th>Lead Organization</th><th>Focal Person</th><th>Contact</th><th>Members</th><th>Actions</th>
+                </tr></thead>
+                <tbody id="clusterBody"></tbody>
+            </table>
+        </div>
+        <div class="d-flex justify-content-between align-items-center mt-2 px-2">
+            <small class="text-muted" id="tableInfo">0 records</small>
+            <nav><ul class="pagination pagination-sm mb-0" id="pagination"></ul></nav>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="clusterModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="bi bi-diagram-3 me-2"></i>Cluster</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="clusterForm">
+                <input type="hidden" name="id" id="clusterId">
+                <div class="modal-body">
+                    <ul class="nav nav-tabs mb-3" id="clusterTab" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="basic-tab" data-bs-toggle="tab" data-bs-target="#basic" type="button"><i class="bi bi-info-circle me-1"></i>Basic</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="resources-tab" data-bs-toggle="tab" data-bs-target="#resources" type="button"><i class="bi bi-tools me-1"></i>Resources</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="members-tab" data-bs-toggle="tab" data-bs-target="#members" type="button"><i class="bi bi-people me-1"></i>Members</button>
+                        </li>
+                    </ul>
+                    <div class="tab-content">
+                        <div class="tab-pane fade show active" id="basic">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label fw-medium">Cluster Name <span class="text-danger">*</span></label>
+                                    <select class="form-select" id="clusterName" name="cluster_name" required>
+                                        <option value="">-- Select Cluster --</option>
+                                        <option value="Search and Rescue">Search and Rescue</option>
+                                        <option value="Health">Health</option>
+                                        <option value="Shelter">Shelter</option>
+                                        <option value="WASH">WASH</option>
+                                        <option value="Food Security">Food Security</option>
+                                        <option value="Protection">Protection</option>
+                                        <option value="Logistics">Logistics</option>
+                                        <option value="Education">Education</option>
+                                        <option value="Communication">Communication</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-medium">Lead Organization <span class="text-danger">*</span></label>
+                                    <input class="form-control" id="leadOrganization" name="lead_organization" required placeholder="Lead organization name">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-medium">Focal Person <span class="text-danger">*</span></label>
+                                    <input class="form-control" id="focalPerson" name="focal_person" required placeholder="Focal person name">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-medium">Contact Details <span class="text-danger">*</span></label>
+                                    <input class="form-control" id="contactDetails" name="contact_details" required placeholder="Phone / Email">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="tab-pane fade" id="resources">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label fw-medium">Resource Capacity</label>
+                                    <input class="form-control" id="resourceCapacity" name="resource_capacity" placeholder="e.g. 500 kits, 20 vehicles">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-medium">Coverage Area</label>
+                                    <input class="form-control" id="coverageArea" name="coverage_area" placeholder="Coverage area / jurisdiction">
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label fw-medium">Available Equipment</label>
+                                    <textarea class="form-control" id="availableEquipment" name="available_equipment" rows="3" placeholder="List available equipment..."></textarea>
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label fw-medium">GIS Coverage Boundary</label>
+                                    <textarea class="form-control" id="gisCoverageBoundary" name="gis_coverage_boundary" rows="3" placeholder="GeoJSON or boundary description"></textarea>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="tab-pane fade" id="members">
+                            <div id="membersContainer">
+                                <p class="text-muted text-center py-3 mb-0" id="noMembersMsg"><i class="bi bi-info-circle me-1"></i>No members added. Click "Add Member" below.</p>
+                            </div>
+                            <button type="button" class="btn btn-outline-primary btn-sm mt-2" onclick="addMemberRow()">
+                                <i class="bi bi-plus-circle"></i> Add Member
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary px-4"><i class="bi bi-check-lg me-1"></i> Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="meetingsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title"><i class="bi bi-calendar-event me-2"></i>Meetings - <span id="meetingsClusterName"></span></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <button class="btn btn-primary btn-sm mb-3" onclick="showAddMeeting()"><i class="bi bi-plus-lg"></i> Add Meeting</button>
+                <div id="addMeetingForm" style="display:none;" class="card card-body bg-light mb-3">
+                    <div class="row g-2">
+                        <div class="col-md-3">
+                            <input type="date" class="form-control form-control-sm" id="meetingDate" placeholder="Date">
+                        </div>
+                        <div class="col-md-3">
+                            <input type="text" class="form-control form-control-sm" id="meetingAgenda" placeholder="Agenda">
+                        </div>
+                        <div class="col-md-3">
+                            <input type="text" class="form-control form-control-sm" id="meetingDecisions" placeholder="Decisions">
+                        </div>
+                        <div class="col-md-3">
+                            <input type="text" class="form-control form-control-sm" id="meetingActionItems" placeholder="Action Items">
+                        </div>
+                        <div class="col-12 text-end mt-2">
+                            <button class="btn btn-success btn-sm" onclick="saveMeeting(currentMeetingsClusterId)"><i class="bi bi-check-lg"></i> Save</button>
+                            <button class="btn btn-secondary btn-sm" onclick="document.getElementById('addMeetingForm').style.display='none'">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered">
+                        <thead class="table-light"><tr><th>Date</th><th>Agenda</th><th>Decisions</th><th>Action Items</th></tr></thead>
+                        <tbody id="meetingsBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="deploymentsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title"><i class="bi bi-truck me-2"></i>Deployments - <span id="deploymentsClusterName"></span></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <button class="btn btn-primary btn-sm mb-3" onclick="showAddDeployment()"><i class="bi bi-plus-lg"></i> Add Deployment</button>
+                <div id="addDeploymentForm" style="display:none;" class="card card-body bg-light mb-3">
+                    <div class="row g-2">
+                        <div class="col-md-3">
+                            <input type="date" class="form-control form-control-sm" id="deploymentDate" placeholder="Date">
+                        </div>
+                        <div class="col-md-3">
+                            <input type="text" class="form-control form-control-sm" id="deploymentLocation" placeholder="Location">
+                        </div>
+                        <div class="col-md-3">
+                            <input type="text" class="form-control form-control-sm" id="deploymentDetails" placeholder="Details">
+                        </div>
+                        <div class="col-md-3">
+                            <select class="form-select form-select-sm" id="deploymentStatus">
+                                <option value="Pending">Pending</option>
+                                <option value="In Progress">In Progress</option>
+                                <option value="Completed">Completed</option>
+                                <option value="Cancelled">Cancelled</option>
+                            </select>
+                        </div>
+                        <div class="col-12 text-end mt-2">
+                            <button class="btn btn-success btn-sm" onclick="saveDeployment(currentDeploymentsClusterId)"><i class="bi bi-check-lg"></i> Save</button>
+                            <button class="btn btn-secondary btn-sm" onclick="document.getElementById('addDeploymentForm').style.display='none'">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered">
+                        <thead class="table-light"><tr><th>Date</th><th>Location</th><th>Details</th><th>Status</th></tr></thead>
+                        <tbody id="deploymentsBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<template id="memberRowTemplate">
+    <div class="member-row card bg-light p-3 mb-2">
+        <div class="row g-2 align-items-center">
+            <div class="col-md-3">
+                <label class="form-label small fw-medium">Organization <span class="text-danger">*</span></label>
+                <input type="text" class="form-control form-control-sm member-org" placeholder="Organization name">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small fw-medium">Representative <span class="text-danger">*</span></label>
+                <input type="text" class="form-control form-control-sm member-rep" placeholder="Representative name">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small fw-medium">Contact</label>
+                <input type="text" class="form-control form-control-sm member-contact" placeholder="Contact number">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small fw-medium">Designation</label>
+                <input type="text" class="form-control form-control-sm member-desig" placeholder="Designation">
+            </div>
+            <div class="col-md-1 text-end">
+                <button type="button" class="btn btn-outline-danger btn-sm mt-3" onclick="removeMemberRow(this)" title="Remove"><i class="bi bi-x-lg"></i></button>
+            </div>
+        </div>
+    </div>
+</template>
+{% endblock %}
+{% block extra_js %}
+<script>
+const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+let paginator = new Paginator({perPage: 25, onPageChange: () => renderClusters(_clusters)});
+let _clusters = [];
+let currentMeetingsClusterId = null;
+let currentDeploymentsClusterId = null;
+
+function renderClusters(data) {
+    const t = document.getElementById('clusterBody');
+    if (data.length === 0) { t.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">No clusters found</td></tr>'; paginator.update(0); return; }
+    const pageData = paginator.getPageData(data);
+    t.innerHTML = pageData.map(c => `<tr>
+        <td><strong>${c.cluster_name}</strong></td>
+        <td>${c.lead_organization || '-'}</td>
+        <td>${c.focal_person || '-'}</td>
+        <td>${c.contact_details || '-'}</td>
+        <td>${(c.members && c.members.length) || 0}</td>
+        <td>
+            <button class="btn btn-sm btn-outline-info" onclick="openMeetings(${c.id})" title="Meetings"><i class="bi bi-calendar-event"></i></button>
+            <button class="btn btn-sm btn-outline-success" onclick="openDeployments(${c.id})" title="Deployments"><i class="bi bi-truck"></i></button>
+            <button class="btn btn-sm btn-outline-primary" onclick="editRecord(${c.id})"><i class="bi bi-pencil"></i></button>
+            <button class="btn btn-sm btn-outline-danger" onclick="deleteRecord(${c.id})"><i class="bi bi-trash"></i></button>
+        </td>
+    </tr>`).join('');
+    paginator.update(data.length);
+}
+
+async function loadData() {
+    try {
+        const r = await fetch('/api/clusters');
+        const d = await r.json();
+        if (!d.success) { showToast('danger', d.message); return; }
+        _clusters = d.clusters || [];
+        renderClusters(_clusters);
+    } catch(e) {
+        showToast('danger', 'Error loading clusters: ' + e.message);
+    }
+}
+
+function openForm() {
+    document.getElementById('clusterForm').reset();
+    document.getElementById('clusterId').value = '';
+    document.getElementById('membersContainer').innerHTML = '<p class="text-muted text-center py-3 mb-0" id="noMembersMsg"><i class="bi bi-info-circle me-1"></i>No members added. Click "Add Member" below.</p>';
+    const tabEl = document.querySelector('#clusterTab button[data-bs-target="#basic"]');
+    if (tabEl) new bootstrap.Tab(tabEl).show();
+}
+
+async function editRecord(id) {
+    const r = await fetch(`/api/clusters/${id}`);
+    const d = await r.json();
+    if (!d.success) { showToast('danger', d.message); return; }
+    const c = d.cluster;
+    document.getElementById('clusterId').value = c.id;
+    document.getElementById('clusterName').value = c.cluster_name || '';
+    document.getElementById('leadOrganization').value = c.lead_organization || '';
+    document.getElementById('focalPerson').value = c.focal_person || '';
+    document.getElementById('contactDetails').value = c.contact_details || '';
+    document.getElementById('resourceCapacity').value = c.resource_capacity || '';
+    document.getElementById('availableEquipment').value = c.available_equipment || '';
+    document.getElementById('coverageArea').value = c.coverage_area || '';
+    document.getElementById('gisCoverageBoundary').value = c.gis_coverage_boundary || '';
+    document.getElementById('membersContainer').innerHTML = '';
+    const members = c.members || [];
+    if (members.length === 0) {
+        document.getElementById('membersContainer').innerHTML = '<p class="text-muted text-center py-3 mb-0" id="noMembersMsg"><i class="bi bi-info-circle me-1"></i>No members added. Click "Add Member" below.</p>';
+    } else {
+        members.forEach(m => addMemberRow(m));
+    }
+    new bootstrap.Modal(document.getElementById('clusterModal')).show();
+}
+
+document.getElementById('clusterForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const id = document.getElementById('clusterId').value;
+    const members = [];
+    document.querySelectorAll('#membersContainer .member-row').forEach(row => {
+        const org = row.querySelector('.member-org').value.trim();
+        if (!org) return;
+        members.push({
+            organization_name: org,
+            representative: row.querySelector('.member-rep').value.trim(),
+            contact_number: row.querySelector('.member-contact').value.trim(),
+            designation: row.querySelector('.member-desig').value.trim()
+        });
+    });
+    const body = {
+        cluster_name: document.getElementById('clusterName').value,
+        lead_organization: document.getElementById('leadOrganization').value,
+        focal_person: document.getElementById('focalPerson').value,
+        contact_details: document.getElementById('contactDetails').value,
+        resource_capacity: document.getElementById('resourceCapacity').value,
+        available_equipment: document.getElementById('availableEquipment').value,
+        coverage_area: document.getElementById('coverageArea').value,
+        gis_coverage_boundary: document.getElementById('gisCoverageBoundary').value,
+        members: members
+    };
+    const url = id ? `/api/clusters/${id}` : '/api/clusters';
+    const method = id ? 'PUT' : 'POST';
+    try {
+        const r = await fetch(url, {method, headers:{'Content-Type':'application/json','X-CSRFToken':csrf}, body: JSON.stringify(body)});
+        const d = await r.json();
+        if (d.success) { showToast('success', d.message); bootstrap.Modal.getInstance(document.getElementById('clusterModal')).hide(); loadData(); }
+        else showToast('danger', d.message);
+    } catch(e) { showToast('danger', e.message); }
+});
+
+async function deleteRecord(id) {
+    if (!confirm('Are you sure you want to delete this cluster?')) return;
+    try {
+        const r = await fetch(`/api/clusters/${id}`, {method:'DELETE', headers:{'X-CSRFToken':csrf}});
+        const d = await r.json();
+        if (d.success) { showToast('success', d.message); loadData(); }
+        else showToast('danger', d.message);
+    } catch(e) { showToast('danger', e.message); }
+}
+
+function addMemberRow(data) {
+    data = data || {};
+    const template = document.getElementById('memberRowTemplate');
+    const clone = template.content.cloneNode(true);
+    const row = clone.querySelector('.member-row');
+    if (data.organization_name) row.querySelector('.member-org').value = data.organization_name;
+    if (data.representative) row.querySelector('.member-rep').value = data.representative;
+    if (data.contact_number) row.querySelector('.member-contact').value = data.contact_number;
+    if (data.designation) row.querySelector('.member-desig').value = data.designation;
+    const container = document.getElementById('membersContainer');
+    const noMsg = document.getElementById('noMembersMsg');
+    if (noMsg) noMsg.remove();
+    container.appendChild(row);
+}
+
+function removeMemberRow(btn) {
+    const row = btn.closest('.member-row');
+    row.remove();
+    if (document.querySelectorAll('#membersContainer .member-row').length === 0) {
+        document.getElementById('membersContainer').innerHTML = '<p class="text-muted text-center py-3 mb-0" id="noMembersMsg"><i class="bi bi-info-circle me-1"></i>No members added. Click "Add Member" below.</p>';
+    }
+}
+
+async function openMeetings(clusterId) {
+    currentMeetingsClusterId = clusterId;
+    const cluster = _clusters.find(c => c.id === clusterId);
+    document.getElementById('meetingsClusterName').textContent = cluster ? cluster.cluster_name : '';
+    document.getElementById('addMeetingForm').style.display = 'none';
+    try {
+        const r = await fetch(`/api/clusters/${clusterId}/meetings`);
+        const d = await r.json();
+        if (!d.success) { showToast('danger', d.message); return; }
+        const meetings = d.meetings || [];
+        const tbody = document.getElementById('meetingsBody');
+        if (meetings.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No meetings recorded</td></tr>';
+        } else {
+            tbody.innerHTML = meetings.map(m => `<tr>
+                <td>${m.meeting_date || '-'}</td>
+                <td>${m.agenda || '-'}</td>
+                <td>${m.decisions || '-'}</td>
+                <td>${m.action_items || '-'}</td>
+            </tr>`).join('');
+        }
+        new bootstrap.Modal(document.getElementById('meetingsModal')).show();
+    } catch(e) { showToast('danger', 'Error loading meetings: ' + e.message); }
+}
+
+function showAddMeeting() {
+    document.getElementById('addMeetingForm').style.display = '';
+    document.getElementById('meetingDate').value = '';
+    document.getElementById('meetingAgenda').value = '';
+    document.getElementById('meetingDecisions').value = '';
+    document.getElementById('meetingActionItems').value = '';
+}
+
+async function saveMeeting(clusterId) {
+    const body = {
+        meeting_date: document.getElementById('meetingDate').value,
+        agenda: document.getElementById('meetingAgenda').value,
+        decisions: document.getElementById('meetingDecisions').value,
+        action_items: document.getElementById('meetingActionItems').value
+    };
+    if (!body.meeting_date) { showToast('danger', 'Meeting date is required'); return; }
+    try {
+        const r = await fetch(`/api/clusters/${clusterId}/meetings`, {
+            method: 'POST',
+            headers: {'Content-Type':'application/json','X-CSRFToken':csrf},
+            body: JSON.stringify(body)
+        });
+        const d = await r.json();
+        if (d.success) { showToast('success', d.message); document.getElementById('addMeetingForm').style.display = 'none'; openMeetings(clusterId); }
+        else showToast('danger', d.message);
+    } catch(e) { showToast('danger', e.message); }
+}
+
+async function openDeployments(clusterId) {
+    currentDeploymentsClusterId = clusterId;
+    const cluster = _clusters.find(c => c.id === clusterId);
+    document.getElementById('deploymentsClusterName').textContent = cluster ? cluster.cluster_name : '';
+    document.getElementById('addDeploymentForm').style.display = 'none';
+    try {
+        const r = await fetch(`/api/clusters/${clusterId}/deployments`);
+        const d = await r.json();
+        if (!d.success) { showToast('danger', d.message); return; }
+        const deployments = d.deployments || [];
+        const tbody = document.getElementById('deploymentsBody');
+        if (deployments.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No deployments recorded</td></tr>';
+        } else {
+            tbody.innerHTML = deployments.map(dp => `<tr>
+                <td>${dp.deployment_date || '-'}</td>
+                <td>${dp.location || '-'}</td>
+                <td>${dp.details || '-'}</td>
+                <td><span class="badge bg-${dp.status === 'Completed' ? 'success' : dp.status === 'In Progress' ? 'warning' : dp.status === 'Cancelled' ? 'danger' : 'secondary'}">${dp.status || 'Pending'}</span></td>
+            </tr>`).join('');
+        }
+        new bootstrap.Modal(document.getElementById('deploymentsModal')).show();
+    } catch(e) { showToast('danger', 'Error loading deployments: ' + e.message); }
+}
+
+function showAddDeployment() {
+    document.getElementById('addDeploymentForm').style.display = '';
+    document.getElementById('deploymentDate').value = '';
+    document.getElementById('deploymentLocation').value = '';
+    document.getElementById('deploymentDetails').value = '';
+    document.getElementById('deploymentStatus').value = 'Pending';
+}
+
+async function saveDeployment(clusterId) {
+    const body = {
+        deployment_date: document.getElementById('deploymentDate').value,
+        location: document.getElementById('deploymentLocation').value,
+        details: document.getElementById('deploymentDetails').value,
+        status: document.getElementById('deploymentStatus').value
+    };
+    if (!body.deployment_date) { showToast('danger', 'Deployment date is required'); return; }
+    try {
+        const r = await fetch(`/api/clusters/${clusterId}/deployments`, {
+            method: 'POST',
+            headers: {'Content-Type':'application/json','X-CSRFToken':csrf},
+            body: JSON.stringify(body)
+        });
+        const d = await r.json();
+        if (d.success) { showToast('success', d.message); document.getElementById('addDeploymentForm').style.display = 'none'; openDeployments(clusterId); }
+        else showToast('danger', d.message);
+    } catch(e) { showToast('danger', e.message); }
+}
+
+loadData();
+</script>
+{% endblock %}

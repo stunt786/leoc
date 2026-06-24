@@ -1,0 +1,439 @@
+{% extends "base.html" %}
+{% block title %}Disaster Committees - LEOC{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('index') }}"><i class="bi bi-house-fill"></i></a></li>
+<li class="breadcrumb-item active">Disaster Committees</li>
+{% endblock %}
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center">
+    <div>
+        <h4><i class="bi bi-people-fill me-2"></i>Disaster Management Committees</h4>
+        <p>Manage disaster management committees and their meetings</p>
+    </div>
+    <button class="btn btn-primary" onclick="openForm()">
+        <i class="bi bi-plus-lg me-1"></i>Add Committee
+    </button>
+</div>
+
+<div class="card mt-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-list-check me-2 text-primary"></i>All Committees</span>
+        <input type="text" class="form-control form-control-sm" style="width:200px" id="searchInput" placeholder="Search committees..." oninput="loadData()">
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Committee Name</th>
+                        <th>Type</th>
+                        <th>Formation Date</th>
+                        <th>Tenure</th>
+                        <th>Members</th>
+                        <th>Meetings</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="committeeTableBody">
+                    <tr><td colspan="7" class="text-center py-4"><div class="spinner-border text-primary"></div></td></tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="d-flex justify-content-between align-items-center mt-2 px-2">
+            <small class="text-muted" id="tableInfo">0 records</small>
+            <nav><ul class="pagination pagination-sm mb-0" id="pagination"></ul></nav>
+        </div>
+    </div>
+</div>
+
+<!-- Committee Modal -->
+<div class="modal fade" id="committeeModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="committeeModalTitle"><i class="bi bi-people-fill me-2"></i>Add Committee</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <ul class="nav nav-tabs mb-3" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="basic-tab" data-bs-toggle="tab" data-bs-target="#basic" type="button" role="tab">
+                            <i class="bi bi-info-circle me-1"></i>Basic
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="members-tab" data-bs-toggle="tab" data-bs-target="#members" type="button" role="tab">
+                            <i class="bi bi-person-lines-fill me-1"></i>Members
+                        </button>
+                    </li>
+                </ul>
+                <form id="committeeForm">
+                    <input type="hidden" id="committee_id">
+                    <div class="tab-content">
+                        <div class="tab-pane fade show active" id="basic" role="tabpanel">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label">Committee Name *</label>
+                                    <input type="text" class="form-control" id="committee_name" required>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Committee Type *</label>
+                                    <select class="form-select" id="committee_type" required>
+                                        <option value="">Select Type</option>
+                                        <option value="Municipal Disaster Management Committee">Municipal Disaster Management Committee</option>
+                                        <option value="Ward Disaster Management Committee">Ward Disaster Management Committee</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Formation Date *</label>
+                                    <input type="date" class="form-control" id="formation_date" required>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Tenure (months) *</label>
+                                    <input type="number" class="form-control" id="tenure" min="1" required>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="tab-pane fade" id="members" role="tabpanel">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <label class="form-label mb-0">Committee Members</label>
+                                <button type="button" class="btn btn-sm btn-outline-primary" onclick="addMemberRow()">
+                                    <i class="bi bi-plus-lg me-1"></i>Add Member
+                                </button>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="table table-bordered table-sm mb-0" id="membersTable">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th style="width:25%">Name</th>
+                                            <th style="width:25%">Position</th>
+                                            <th style="width:25%">Organization</th>
+                                            <th style="width:20%">Contact Number</th>
+                                            <th style="width:5%"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="membersBody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveRecord()"><i class="bi bi-check-lg"></i> Save Committee</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Meetings Modal -->
+<div class="modal fade" id="meetingsModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-calendar-event me-2"></i>Meeting History</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h6 class="mb-0" id="meetingsCommitteeName"></h6>
+                    <button type="button" class="btn btn-sm btn-primary" onclick="showAddMeetingForm()">
+                        <i class="bi bi-plus-lg me-1"></i>Add Meeting
+                    </button>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Meeting Date</th>
+                                <th>Agenda</th>
+                                <th>Decisions</th>
+                                <th>Action Items</th>
+                            </tr>
+                        </thead>
+                        <tbody id="meetingsBody">
+                            <tr><td colspan="4" class="text-center py-4"><div class="spinner-border text-primary"></div></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Meeting Modal -->
+<div class="modal fade" id="addMeetingModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-calendar-plus me-2"></i>Add Meeting</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="meetingForm">
+                    <div class="mb-3">
+                        <label class="form-label">Meeting Date *</label>
+                        <input type="date" class="form-control" id="meeting_date" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Agenda *</label>
+                        <textarea class="form-control" id="agenda" rows="3" required></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Decisions</label>
+                        <textarea class="form-control" id="decisions" rows="3"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Action Items</label>
+                        <textarea class="form-control" id="action_items" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveMeeting()"><i class="bi bi-check-lg"></i> Save Meeting</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+let committees = [];
+let currentMeetingCommitteeId = null;
+let paginator = new Paginator({perPage: 25, onPageChange: () => renderData(committees)});
+
+async function loadData() {
+    const q = document.getElementById('searchInput').value;
+    const url = '/api/committees' + (q ? '?search=' + encodeURIComponent(q) : '');
+    try {
+        const r = await fetch(url);
+        const d = await r.json();
+        if (!d.success) { showToast('danger', d.message); return; }
+        committees = d.committees || d.data || [];
+        renderData(committees);
+    } catch(e) {
+        showToast('danger', 'Error: ' + e.message);
+    }
+}
+
+function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+function renderData(data) {
+    const tbody = document.getElementById('committeeTableBody');
+    if (data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-muted">No committees found</td></tr>';
+        paginator.update(0);
+        return;
+    }
+    const pageData = paginator.getPageData(data);
+    tbody.innerHTML = pageData.map(c => `<tr>
+        <td><strong>${esc(c.committee_name)}</strong></td>
+        <td><span class="badge bg-info">${esc(c.committee_type)}</span></td>
+        <td>${esc(c.formation_date) || '-'}</td>
+        <td>${c.tenure ? c.tenure + ' months' : '-'}</td>
+        <td>${c.members_count || c.members ? (c.members_count || (Array.isArray(c.members) ? c.members.length : 0)) : 0}</td>
+        <td>${c.meetings_count || 0}</td>
+        <td class="text-end">
+            <button class="btn btn-sm btn-outline-info" onclick="openMeetings(${c.id})" title="Meetings"><i class="bi bi-calendar-event"></i></button>
+            <button class="btn btn-sm btn-outline-primary" onclick="editRecord(${c.id})" title="Edit"><i class="bi bi-pencil"></i></button>
+            <button class="btn btn-sm btn-outline-danger" onclick="deleteRecord(${c.id})" title="Delete"><i class="bi bi-trash"></i></button>
+        </td>
+    </tr>`).join('');
+    paginator.update(data.length);
+}
+
+let memberCounter = 0;
+
+function addMemberRow(data) {
+    memberCounter++;
+    const id = memberCounter;
+    const tbody = document.getElementById('membersBody');
+    const tr = document.createElement('tr');
+    tr.id = 'member_row_' + id;
+    tr.innerHTML = `<td><input type="text" class="form-control form-control-sm member-name" value="${esc(data ? data.name : '')}"></td>
+        <td><input type="text" class="form-control form-control-sm member-position" value="${esc(data ? data.position : '')}"></td>
+        <td><input type="text" class="form-control form-control-sm member-organization" value="${esc(data ? data.organization : '')}"></td>
+        <td><input type="text" class="form-control form-control-sm member-contact" value="${esc(data ? data.contact_number : '')}"></td>
+        <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="removeMemberRow(${id})"><i class="bi bi-x-lg"></i></button></td>`;
+    tbody.appendChild(tr);
+}
+
+function removeMemberRow(id) {
+    const row = document.getElementById('member_row_' + id);
+    if (row) row.remove();
+}
+
+function getMembers() {
+    const rows = document.querySelectorAll('#membersBody tr');
+    const members = [];
+    rows.forEach(row => {
+        const name = row.querySelector('.member-name').value.trim();
+        if (!name) return;
+        members.push({
+            name: name,
+            position: row.querySelector('.member-position').value.trim(),
+            organization: row.querySelector('.member-organization').value.trim(),
+            contact_number: row.querySelector('.member-contact').value.trim()
+        });
+    });
+    return members;
+}
+
+function populateMembers(members) {
+    document.getElementById('membersBody').innerHTML = '';
+    memberCounter = 0;
+    if (Array.isArray(members)) {
+        members.forEach(m => addMemberRow(m));
+    }
+    if (document.getElementById('membersBody').children.length === 0) {
+        addMemberRow();
+    }
+}
+
+function openForm() {
+    document.getElementById('committeeModalTitle').textContent = 'Add Committee';
+    document.getElementById('committee_id').value = '';
+    document.getElementById('committeeForm').reset();
+    document.getElementById('membersBody').innerHTML = '';
+    addMemberRow();
+    document.querySelector('#basic-tab').click();
+    new bootstrap.Modal(document.getElementById('committeeModal')).show();
+}
+
+function editRecord(id) {
+    const c = committees.find(x => x.id === id);
+    if (!c) return;
+    document.getElementById('committeeModalTitle').textContent = 'Edit Committee';
+    document.getElementById('committee_id').value = c.id;
+    document.getElementById('committee_name').value = c.committee_name || '';
+    document.getElementById('committee_type').value = c.committee_type || '';
+    document.getElementById('formation_date').value = c.formation_date || '';
+    document.getElementById('tenure').value = c.tenure || '';
+    const members = c.members || [];
+    document.getElementById('membersBody').innerHTML = '';
+    memberCounter = 0;
+    if (members.length === 0) {
+        addMemberRow();
+    } else {
+        members.forEach(m => addMemberRow(m));
+    }
+    document.querySelector('#basic-tab').click();
+    new bootstrap.Modal(document.getElementById('committeeModal')).show();
+}
+
+async function saveRecord() {
+    const id = document.getElementById('committee_id').value;
+    const body = {
+        committee_name: document.getElementById('committee_name').value.trim(),
+        committee_type: document.getElementById('committee_type').value,
+        formation_date: document.getElementById('formation_date').value,
+        tenure: parseInt(document.getElementById('tenure').value) || null
+    };
+    if (!body.committee_name) { showToast('danger', 'Committee name is required'); return; }
+    if (!body.committee_type) { showToast('danger', 'Committee type is required'); return; }
+    if (!body.formation_date) { showToast('danger', 'Formation date is required'); return; }
+    if (!body.tenure) { showToast('danger', 'Tenure is required'); return; }
+    body.members = getMembers();
+    const url = id ? '/api/committees/' + id : '/api/committees';
+    const method = id ? 'PUT' : 'POST';
+    try {
+        const r = await fetch(url, {method, headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrf}, body: JSON.stringify(body)});
+        const d = await r.json();
+        if (d.success) {
+            showToast('success', id ? 'Committee updated' : 'Committee created');
+            bootstrap.Modal.getInstance(document.getElementById('committeeModal')).hide();
+            loadData();
+        } else {
+            showToast('danger', d.message);
+        }
+    } catch(e) {
+        showToast('danger', 'Error: ' + e.message);
+    }
+}
+
+async function deleteRecord(id) {
+    if (!confirm('Delete this committee?')) return;
+    try {
+        const r = await fetch('/api/committees/' + id, {method: 'DELETE', headers: {'X-CSRFToken': csrf}});
+        const d = await r.json();
+        if (d.success) { showToast('success', 'Committee deleted'); loadData(); }
+        else showToast('danger', d.message);
+    } catch(e) {
+        showToast('danger', 'Error: ' + e.message);
+    }
+}
+
+async function openMeetings(committeeId) {
+    currentMeetingCommitteeId = committeeId;
+    const c = committees.find(x => x.id === committeeId);
+    document.getElementById('meetingsCommitteeName').textContent = c ? esc(c.committee_name) : '';
+    document.getElementById('meetingsBody').innerHTML = '<tr><td colspan="4" class="text-center py-4"><div class="spinner-border text-primary"></div></td></tr>';
+    new bootstrap.Modal(document.getElementById('meetingsModal')).show();
+    try {
+        const r = await fetch('/api/committees/' + committeeId + '/meetings');
+        const d = await r.json();
+        if (!d.success) {
+            document.getElementById('meetingsBody').innerHTML = '<tr><td colspan="4" class="text-center py-4 text-danger">' + esc(d.message) + '</td></tr>';
+            return;
+        }
+        const meetings = d.meetings || d.data || [];
+        if (meetings.length === 0) {
+            document.getElementById('meetingsBody').innerHTML = '<tr><td colspan="4" class="text-center py-4 text-muted">No meetings recorded</td></tr>';
+            return;
+        }
+        document.getElementById('meetingsBody').innerHTML = meetings.map(m => `<tr>
+            <td>${esc(m.meeting_date) || '-'}</td>
+            <td>${esc(m.agenda) || '-'}</td>
+            <td>${esc(m.decisions) || '-'}</td>
+            <td>${esc(m.action_items) || '-'}</td>
+        </tr>`).join('');
+    } catch(e) {
+        document.getElementById('meetingsBody').innerHTML = '<tr><td colspan="4" class="text-center py-4 text-danger">Error: ' + esc(e.message) + '</td></tr>';
+    }
+}
+
+function showAddMeetingForm() {
+    document.getElementById('meetingForm').reset();
+    new bootstrap.Modal(document.getElementById('addMeetingModal')).show();
+}
+
+async function saveMeeting() {
+    if (!currentMeetingCommitteeId) { showToast('danger', 'No committee selected'); return; }
+    const body = {
+        meeting_date: document.getElementById('meeting_date').value,
+        agenda: document.getElementById('agenda').value.trim(),
+        decisions: document.getElementById('decisions').value.trim(),
+        action_items: document.getElementById('action_items').value.trim()
+    };
+    if (!body.meeting_date) { showToast('danger', 'Meeting date is required'); return; }
+    if (!body.agenda) { showToast('danger', 'Agenda is required'); return; }
+    try {
+        const r = await fetch('/api/committees/' + currentMeetingCommitteeId + '/meetings', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrf},
+            body: JSON.stringify(body)
+        });
+        const d = await r.json();
+        if (d.success) {
+            showToast('success', 'Meeting added');
+            bootstrap.Modal.getInstance(document.getElementById('addMeetingModal')).hide();
+            openMeetings(currentMeetingCommitteeId);
+            loadData();
+        } else {
+            showToast('danger', d.message);
+        }
+    } catch(e) {
+        showToast('danger', 'Error: ' + e.message);
+    }
+}
+
+document.addEventListener('DOMContentLoaded', loadData);
+</script>
+{% endblock %}

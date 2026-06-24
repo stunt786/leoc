@@ -1,0 +1,363 @@
+{% extends "base.html" %}
+{% block title %}RRT - LEOC{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('index') }}"><i class="bi bi-house-fill"></i></a></li>
+<li class="breadcrumb-item active">Rapid Response Team</li>
+{% endblock %}
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center">
+    <div>
+        <h4><i class="bi bi-people-fill me-2"></i>Rapid Response Teams</h4>
+        <p>Manage emergency response teams and their resources</p>
+    </div>
+    <button class="btn btn-primary" onclick="openForm()">
+        <i class="bi bi-plus-lg me-1"></i>Add Team
+    </button>
+</div>
+
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-list-check me-2 text-primary"></i>All Teams</span>
+        <input type="text" class="form-control form-control-sm" style="width:200px" id="searchInput" placeholder="Search teams..." oninput="loadData()">
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Team Name</th>
+                        <th>Team Type</th>
+                        <th>Coverage Area</th>
+                        <th>Team Leader</th>
+                        <th>Contact</th>
+                        <th>Members</th>
+                        <th>Resources</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody">
+                    <tr><td colspan="8" class="text-center py-4"><div class="spinner-border text-primary"></div></td></tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="d-flex justify-content-between align-items-center mt-2 px-2">
+            <small class="text-muted" id="tableInfo">0 records</small>
+            <nav><ul class="pagination pagination-sm mb-0" id="pagination"></ul></nav>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="formModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalTitle"><i class="bi bi-people-fill me-2"></i>Add Team</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <ul class="nav nav-tabs mb-3" id="formTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="basic-tab" data-bs-toggle="tab" data-bs-target="#basic" type="button" role="tab"><i class="bi bi-info-circle me-1"></i>Basic</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="gis-tab" data-bs-toggle="tab" data-bs-target="#gis" type="button" role="tab"><i class="bi bi-geo-alt me-1"></i>GIS</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="members-tab" data-bs-toggle="tab" data-bs-target="#members" type="button" role="tab"><i class="bi bi-people me-1"></i>Members</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="resources-tab" data-bs-toggle="tab" data-bs-target="#resources" type="button" role="tab"><i class="bi bi-tools me-1"></i>Resources</button>
+                    </li>
+                </ul>
+                <form id="recordForm">
+                    <input type="hidden" id="record_id">
+                    <div class="tab-content" id="formTabContent">
+                        <div class="tab-pane fade show active" id="basic" role="tabpanel">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label">Team Name *</label>
+                                    <input type="text" class="form-control" id="team_name" required>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Team Type *</label>
+                                    <select class="form-select" id="team_type" required>
+                                        <option value="">Select Type</option>
+                                        <option value="Search & Rescue">Search & Rescue</option>
+                                        <option value="Medical">Medical</option>
+                                        <option value="Fire Fighting">Fire Fighting</option>
+                                        <option value="Water Rescue">Water Rescue</option>
+                                        <option value="Technical">Technical</option>
+                                        <option value="Logistics">Logistics</option>
+                                        <option value="Communication">Communication</option>
+                                        <option value="Other">Other</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Coverage Area</label>
+                                    <input type="text" class="form-control" id="coverage_area" placeholder="e.g. Ward 1-5">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Team Leader</label>
+                                    <input type="text" class="form-control" id="team_leader" placeholder="Full name">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Contact Number *</label>
+                                    <input type="text" class="form-control" id="contact_number" required>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="tab-pane fade" id="gis" role="tabpanel">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label">Base Coordinates (Lat, Lng)</label>
+                                    <input type="text" class="form-control" id="base_coordinates" placeholder="27.7172, 85.3240">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="tab-pane fade" id="members" role="tabpanel">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <label class="form-label mb-0 fw-bold"><i class="bi bi-people me-1"></i>Team Members</label>
+                                <button type="button" class="btn btn-sm btn-outline-primary" onclick="addMemberRow()"><i class="bi bi-plus-lg"></i> Add Member</button>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="table table-sm table-bordered mb-0" id="membersTable">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Name</th>
+                                            <th>Designation</th>
+                                            <th>Skill</th>
+                                            <th>Contact Number</th>
+                                            <th style="width:50px"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="membersBody"></tbody>
+                                </table>
+                            </div>
+                            <small class="text-muted">At least one member is required</small>
+                        </div>
+                        <div class="tab-pane fade" id="resources" role="tabpanel">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <label class="form-label mb-0 fw-bold"><i class="bi bi-tools me-1"></i>Team Resources</label>
+                                <button type="button" class="btn btn-sm btn-outline-primary" onclick="addResourceRow()"><i class="bi bi-plus-lg"></i> Add Resource</button>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="table table-sm table-bordered mb-0" id="resourcesTable">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Equipment Assigned</th>
+                                            <th>Vehicles Assigned</th>
+                                            <th style="width:50px"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="resourcesBody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveRecord()"><i class="bi bi-check-lg"></i> Save Team</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+let records = [];
+let paginator = new Paginator({perPage: 25, onPageChange: () => renderTable(records)});
+
+function getVal(i, f) { return i[f] !== undefined && i[f] !== null && i[f] !== '' ? i[f] : 0; }
+function getText(i, f) { return i[f] || ''; }
+
+async function loadData() {
+    const q = document.getElementById('searchInput').value.trim();
+    const url = '/api/rrt' + (q ? '?search=' + encodeURIComponent(q) : '');
+    try {
+        const r = await fetch(url);
+        const d = await r.json();
+        if (!d.success) { showToast('danger', d.message); return; }
+        records = d.data || [];
+        renderTable(records);
+    } catch(e) {
+        showToast('danger', 'Error loading data: ' + e.message);
+    }
+}
+
+function renderTable(data) {
+    const tbody = document.getElementById('tableBody');
+    if (data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-muted">No teams found</td></tr>';
+        paginator.update(0);
+        return;
+    }
+    const pageData = paginator.getPageData(data);
+    tbody.innerHTML = pageData.map(r => {
+        const membersCount = r.members ? r.members.length : 0;
+        const resourcesCount = r.resources ? r.resources.length : 0;
+        return `<tr>
+            <td><strong>${getText(r, 'team_name')}</strong></td>
+            <td><span class="badge bg-info">${getText(r, 'team_type')}</span></td>
+            <td>${getText(r, 'coverage_area')}</td>
+            <td>${getText(r, 'team_leader')}</td>
+            <td>${getText(r, 'contact_number')}</td>
+            <td><span class="badge bg-dark">${membersCount}</span></td>
+            <td><span class="badge bg-secondary">${resourcesCount}</span></td>
+            <td class="text-end">
+                <button class="btn btn-sm btn-outline-primary" onclick="editRecord(${r.id})" title="Edit"><i class="bi bi-pencil"></i></button>
+                <button class="btn btn-sm btn-outline-danger" onclick="deleteRecord(${r.id})" title="Delete"><i class="bi bi-trash"></i></button>
+            </td>
+        </tr>`;
+    }).join('');
+    paginator.update(data.length);
+    document.getElementById('tableInfo').textContent = data.length + ' record(s)';
+}
+
+function openForm() {
+    document.getElementById('modalTitle').innerHTML = '<i class="bi bi-people-fill me-2"></i>Add Team';
+    document.getElementById('record_id').value = '';
+    document.getElementById('recordForm').reset();
+    document.getElementById('basic-tab').click();
+    document.getElementById('membersBody').innerHTML = '';
+    document.getElementById('resourcesBody').innerHTML = '';
+    addMemberRow();
+    new bootstrap.Modal(document.getElementById('formModal')).show();
+}
+
+function serializeMembers() {
+    const rows = document.querySelectorAll('#membersBody tr');
+    return Array.from(rows).map(tr => {
+        const inputs = tr.querySelectorAll('input');
+        return {
+            name: inputs[0] ? inputs[0].value : '',
+            designation: inputs[1] ? inputs[1].value : '',
+            skill: inputs[2] ? inputs[2].value : '',
+            contact_number: inputs[3] ? inputs[3].value : '',
+        };
+    }).filter(m => m.name);
+}
+
+function serializeResources() {
+    const rows = document.querySelectorAll('#resourcesBody tr');
+    return Array.from(rows).map(tr => {
+        const inputs = tr.querySelectorAll('input');
+        return {
+            equipment_assigned: inputs[0] ? inputs[0].value : '',
+            vehicles_assigned: inputs[1] ? inputs[1].value : '',
+        };
+    }).filter(r => r.equipment_assigned || r.vehicles_assigned);
+}
+
+async function editRecord(id) {
+    const r = records.find(x => x.id === id);
+    if (!r) return;
+    document.getElementById('modalTitle').innerHTML = '<i class="bi bi-people-fill me-2"></i>Edit Team';
+    document.getElementById('record_id').value = r.id;
+    document.getElementById('team_name').value = getText(r, 'team_name');
+    document.getElementById('team_type').value = getText(r, 'team_type');
+    document.getElementById('coverage_area').value = getText(r, 'coverage_area');
+    document.getElementById('team_leader').value = getText(r, 'team_leader');
+    document.getElementById('contact_number').value = getText(r, 'contact_number');
+    document.getElementById('base_coordinates').value = r.base_coordinates || '';
+    document.getElementById('membersBody').innerHTML = '';
+    document.getElementById('resourcesBody').innerHTML = '';
+    if (r.members && r.members.length > 0) {
+        r.members.forEach(m => addMemberRow(m));
+    } else {
+        addMemberRow();
+    }
+    if (r.resources && r.resources.length > 0) {
+        r.resources.forEach(res => addResourceRow(res));
+    }
+    document.getElementById('basic-tab').click();
+    new bootstrap.Modal(document.getElementById('formModal')).show();
+}
+
+async function saveRecord() {
+    const id = document.getElementById('record_id').value;
+    const team_name = document.getElementById('team_name').value.trim();
+    const team_type = document.getElementById('team_type').value;
+    const contact_number = document.getElementById('contact_number').value.trim();
+    if (!team_name) { showToast('danger', 'Team name is required'); return; }
+    if (!team_type) { showToast('danger', 'Team type is required'); return; }
+    if (!contact_number) { showToast('danger', 'Contact number is required'); return; }
+    const members = serializeMembers();
+    if (members.length === 0) { showToast('danger', 'At least one team member is required'); return; }
+    const body = {
+        team_name,
+        team_type,
+        coverage_area: document.getElementById('coverage_area').value.trim(),
+        team_leader: document.getElementById('team_leader').value.trim(),
+        contact_number,
+        base_coordinates: document.getElementById('base_coordinates').value || null,
+        members,
+        resources: serializeResources(),
+    };
+    const url = id ? '/api/rrt/' + id : '/api/rrt';
+    const method = id ? 'PUT' : 'POST';
+    try {
+        const r = await fetch(url, {method, headers:{'Content-Type':'application/json','X-CSRFToken':csrf}, body: JSON.stringify(body)});
+        const d = await r.json();
+        if (d.success) {
+            showToast('success', id ? 'Team updated' : 'Team created');
+            bootstrap.Modal.getInstance(document.getElementById('formModal')).hide();
+            loadData();
+        } else {
+            showToast('danger', d.message);
+        }
+    } catch(e) {
+        showToast('danger', 'Error saving: ' + e.message);
+    }
+}
+
+async function deleteRecord(id) {
+    if (!confirm('Delete this team and all its members/resources?')) return;
+    try {
+        const r = await fetch('/api/rrt/' + id, {method:'DELETE', headers:{'X-CSRFToken':csrf}});
+        const d = await r.json();
+        if (d.success) { showToast('success', 'Team deleted'); loadData(); }
+        else showToast('danger', d.message);
+    } catch(e) {
+        showToast('danger', 'Error deleting: ' + e.message);
+    }
+}
+
+function addMemberRow(data) {
+    const tbody = document.getElementById('membersBody');
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td><input type="text" class="form-control form-control-sm" placeholder="Name" value="${data ? getText(data, 'name') : ''}"></td>
+        <td><input type="text" class="form-control form-control-sm" placeholder="Designation" value="${data ? getText(data, 'designation') : ''}"></td>
+        <td><input type="text" class="form-control form-control-sm" placeholder="Skill" value="${data ? getText(data, 'skill') : ''}"></td>
+        <td><input type="text" class="form-control form-control-sm" placeholder="Contact" value="${data ? getText(data, 'contact_number') : ''}"></td>
+        <td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger" onclick="removeMemberRow(this)"><i class="bi bi-x"></i></button></td>`;
+    tbody.appendChild(tr);
+}
+
+function removeMemberRow(btn) {
+    const tr = btn.closest('tr');
+    tr.remove();
+}
+
+function addResourceRow(data) {
+    const tbody = document.getElementById('resourcesBody');
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td><input type="text" class="form-control form-control-sm" placeholder="Equipment" value="${data ? getText(data, 'equipment_assigned') : ''}"></td>
+        <td><input type="text" class="form-control form-control-sm" placeholder="Vehicles" value="${data ? getText(data, 'vehicles_assigned') : ''}"></td>
+        <td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger" onclick="removeResourceRow(this)"><i class="bi bi-x"></i></button></td>`;
+    tbody.appendChild(tr);
+}
+
+function removeResourceRow(btn) {
+    const tr = btn.closest('tr');
+    tr.remove();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    loadData();
+});
+</script>
+{% endblock %}

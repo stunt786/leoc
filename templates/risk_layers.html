@@ -1,0 +1,262 @@
+{% extends "base.html" %}
+{% block title %}Risk Zones - {{ office_name }}{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('index') }}"><i class="bi bi-house-fill"></i></a></li>
+<li class="breadcrumb-item active">Risk Zones</li>
+{% endblock %}
+{% block content %}
+<div class="container-fluid">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="mb-0"><i class="bi bi-exclamation-triangle me-2"></i>Risk Layer Management</h4>
+    <button class="btn btn-primary btn-sm" onclick="openForm()"><i class="bi bi-plus-lg"></i> Add Risk Zone</button>
+  </div>
+
+  <div class="row mb-3">
+    <div class="col-md-3">
+      <select class="form-select form-select-sm" id="filterRiskType" onchange="loadData()">
+        <option value="">All Risk Types</option>
+        <option value="Flood Risk Zone">Flood Risk Zone</option>
+        <option value="Landslide Risk Zone">Landslide Risk Zone</option>
+        <option value="Fire Risk Zone">Fire Risk Zone</option>
+        <option value="Earthquake Risk Zone">Earthquake Risk Zone</option>
+        <option value="River Cutting Zone">River Cutting Zone</option>
+        <option value="Forest Fire Risk Zone">Forest Fire Risk Zone</option>
+        <option value="Drought Risk Zone">Drought Risk Zone</option>
+        <option value="Avalanche Risk Zone">Avalanche Risk Zone</option>
+        <option value="Windstorm Risk Zone">Windstorm Risk Zone</option>
+        <option value="Lightning Risk Zone">Lightning Risk Zone</option>
+      </select>
+    </div>
+    <div class="col-md-3">
+      <select class="form-select form-select-sm" id="filterRiskLevel" onchange="loadData()">
+        <option value="">All Risk Levels</option>
+        <option value="Low">Low</option>
+        <option value="Moderate">Moderate</option>
+        <option value="High">High</option>
+        <option value="Very High">Very High</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover mb-0" id="dataTable">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Type</th>
+              <th>Risk Level</th>
+              <th>Area Coverage</th>
+              <th>Households</th>
+              <th>Population</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="formModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-exclamation-triangle me-2"></i><span id="formTitle">Add Risk Zone</span></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form id="dataForm">
+          <input type="hidden" id="recordId">
+          <ul class="nav nav-tabs mb-3">
+            <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#tabBasic">Basic</a></li>
+            <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tabGIS">GIS</a></li>
+            <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tabImpact">Impact</a></li>
+          </ul>
+          <div class="tab-content">
+            <div class="tab-pane fade show active" id="tabBasic">
+              <div class="row">
+                <div class="col-12 mb-2">
+                  <label class="form-label">Name</label>
+                  <input type="text" class="form-control form-control-sm" id="name" required>
+                </div>
+                <div class="col-md-6 mb-2">
+                  <label class="form-label">Risk Type</label>
+                  <select class="form-select form-select-sm" id="risk_type" required>
+                    <option value="">Select Risk Type</option>
+                    <option value="Flood Risk Zone">Flood Risk Zone</option>
+                    <option value="Landslide Risk Zone">Landslide Risk Zone</option>
+                    <option value="Fire Risk Zone">Fire Risk Zone</option>
+                    <option value="Earthquake Risk Zone">Earthquake Risk Zone</option>
+                    <option value="River Cutting Zone">River Cutting Zone</option>
+                    <option value="Forest Fire Risk Zone">Forest Fire Risk Zone</option>
+                    <option value="Drought Risk Zone">Drought Risk Zone</option>
+                    <option value="Avalanche Risk Zone">Avalanche Risk Zone</option>
+                    <option value="Windstorm Risk Zone">Windstorm Risk Zone</option>
+                    <option value="Lightning Risk Zone">Lightning Risk Zone</option>
+                  </select>
+                </div>
+                <div class="col-md-6 mb-2">
+                  <label class="form-label">Risk Level</label>
+                  <select class="form-select form-select-sm" id="risk_level" required>
+                    <option value="">Select Risk Level</option>
+                    <option value="Low">Low</option>
+                    <option value="Moderate">Moderate</option>
+                    <option value="High">High</option>
+                    <option value="Very High">Very High</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div class="tab-pane fade" id="tabGIS">
+              <div class="row">
+                <div class="col-12 mb-2">
+                  <label class="form-label">Polygon Boundary (GeoJSON)</label>
+                  <textarea class="form-control form-control-sm" id="polygon_boundary" rows="4"></textarea>
+                </div>
+                <div class="col-md-6 mb-2">
+                  <label class="form-label">Coordinates (Lat, Lng)</label>
+                  <input type="text" class="form-control form-control-sm" id="coordinates" placeholder="e.g. 27.7172, 85.3240">
+                </div>
+                <div class="col-12 mb-2">
+                  <label class="form-label">Area Coverage</label>
+                  <input type="text" class="form-control form-control-sm" id="area_coverage" placeholder="e.g. 12.5 km²">
+                </div>
+              </div>
+            </div>
+            <div class="tab-pane fade" id="tabImpact">
+              <div class="row">
+                <div class="col-12 mb-2">
+                  <label class="form-label">Affected Settlements</label>
+                  <input type="text" class="form-control form-control-sm" id="affected_settlements" placeholder="Comma separated">
+                </div>
+                <div class="col-md-6 mb-2">
+                  <label class="form-label">Affected Households</label>
+                  <input type="number" class="form-control form-control-sm" id="affected_households">
+                </div>
+                <div class="col-md-6 mb-2">
+                  <label class="form-label">Population at Risk</label>
+                  <input type="number" class="form-control form-control-sm" id="population_at_risk">
+                </div>
+              </div>
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary btn-sm" onclick="saveRecord()"><i class="bi bi-check-lg"></i> Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+async function loadData() {
+  const params = new URLSearchParams();
+  const riskType = document.getElementById('filterRiskType').value;
+  const riskLevel = document.getElementById('filterRiskLevel').value;
+  if (riskType) params.set('risk_type', riskType);
+  if (riskLevel) params.set('risk_level', riskLevel);
+  const resp = await fetch(`/api/risk-layers?${params}`);
+  const d = await resp.json();
+  const tbody = document.querySelector('#dataTable tbody');
+  if (!d.success) { tbody.innerHTML = '<tr><td colspan="7" class="text-center text-danger">' + (d.message || 'Error loading data') + '</td></tr>'; return; }
+  const items = d.data || [];
+  if(items.length === 0) { tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4">No risk zones found</td></tr>'; return; }
+  tbody.innerHTML = items.map(item => `<tr>
+    <td>${item.name}</td>
+    <td>${item.risk_type}</td>
+    <td><span class="badge bg-${item.risk_level === 'Very High' ? 'danger' : item.risk_level === 'High' ? 'warning' : item.risk_level === 'Moderate' ? 'info' : 'success'}">${item.risk_level}</span></td>
+    <td>${item.area_coverage || '-'}</td>
+    <td>${item.affected_households ?? '-'}</td>
+    <td>${item.population_at_risk ?? '-'}</td>
+    <td>
+      <button class="btn btn-sm btn-outline-info" onclick="editRecord(${item.id})"><i class="bi bi-pencil"></i></button>
+      <button class="btn btn-sm btn-outline-danger" onclick="deleteRecord(${item.id})"><i class="bi bi-trash"></i></button>
+    </td>
+  </tr>`).join('');
+}
+
+function openForm() {
+  document.getElementById('formTitle').textContent = 'Add Risk Zone';
+  document.getElementById('recordId').value = '';
+  document.getElementById('dataForm').reset();
+  new bootstrap.Modal(document.getElementById('formModal')).show();
+}
+
+async function editRecord(id) {
+  const resp = await fetch(`/api/risk-layers/${id}`);
+  const d = await resp.json();
+  if (!d.success) return;
+  const item = d.data;
+  document.getElementById('formTitle').textContent = 'Edit Risk Zone';
+  document.getElementById('recordId').value = item.id;
+  document.getElementById('name').value = item.name;
+  document.getElementById('risk_type').value = item.risk_type;
+  document.getElementById('risk_level').value = item.risk_level;
+  document.getElementById('polygon_boundary').value = item.polygon_boundary || '';
+  document.getElementById('coordinates').value = item.coordinates || '';
+  document.getElementById('area_coverage').value = item.area_coverage || '';
+  document.getElementById('affected_settlements').value = item.affected_settlements || '';
+  document.getElementById('affected_households').value = item.affected_households ?? '';
+  document.getElementById('population_at_risk').value = item.population_at_risk ?? '';
+  new bootstrap.Modal(document.getElementById('formModal')).show();
+}
+
+async function saveRecord() {
+  const id = document.getElementById('recordId').value;
+  const data = {
+    name: document.getElementById('name').value,
+    risk_type: document.getElementById('risk_type').value,
+    risk_level: document.getElementById('risk_level').value,
+    polygon_boundary: document.getElementById('polygon_boundary').value || null,
+    coordinates: document.getElementById('coordinates').value || null,
+    area_coverage: document.getElementById('area_coverage').value || null,
+    affected_settlements: document.getElementById('affected_settlements').value || null,
+    affected_households: document.getElementById('affected_households').value || null,
+    population_at_risk: document.getElementById('population_at_risk').value || null,
+  };
+  const url = id ? `/api/risk-layers/${id}` : '/api/risk-layers';
+  const method = id ? 'PUT' : 'POST';
+  const resp = await fetch(url, {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+    },
+    body: JSON.stringify(data)
+  });
+  const result = await resp.json();
+  if (result.success) {
+    bootstrap.Modal.getInstance(document.getElementById('formModal')).hide();
+    loadData();
+    showToast('success', id ? 'Updated successfully' : 'Created successfully');
+  } else {
+    showToast('danger', result.message || 'Error saving');
+  }
+}
+
+async function deleteRecord(id) {
+  if (!confirm('Are you sure?')) return;
+  const resp = await fetch(`/api/risk-layers/${id}`, {
+    method: 'DELETE',
+    headers: {
+      'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+    }
+  });
+  const result = await resp.json();
+  if (result.success) {
+    loadData();
+    showToast('success', 'Deleted successfully');
+  } else {
+    showToast('danger', result.message || 'Error deleting');
+  }
+}
+
+loadData();
+</script>
+{% endblock %}

@@ -174,7 +174,8 @@ app.config['MAX_CONTENT_LENGTH'] = int(os.getenv('MAX_CONTENT_LENGTH', 16 * 1024
 app.config['UPLOAD_FOLDER'] = os.getenv('UPLOAD_FOLDER', 'static/uploads')
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
-db = SQLAlchemy(app)
+from shared import db
+db.init_app(app)
 
 login_manager.init_app(app)
 login_manager.login_view = 'login'
@@ -9683,6 +9684,9 @@ def init_db():
                         db.session.rollback()
         except Exception as e:
             print(f"Database init error: {e}")
+
+from new_routes import new_bp
+app.register_blueprint(new_bp)
 
 init_db()
 
