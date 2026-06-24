@@ -90,17 +90,28 @@
                             <th>Items</th>
                             <th style="width:90px">Receive Cash?</th>
                             <th style="width:160px">Cash Amount</th>
-                            <th style="width:140px">Photo</th>
-                            <th style="width:140px">Document</th>
                             <th style="width:40px"></th>
                         </tr>
                     </thead>
                     <tbody id="beneficiaryBody">
-<tr><td colspan="9" class="text-center text-muted py-3">Add beneficiaries to this distribution</td></tr>
+<tr><td colspan="7" class="text-center text-muted py-3">Add beneficiaries to this distribution</td></tr>
                     </tbody>
                 </table>
             </div>
 
+            <hr>
+            <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                    <label class="form-label fw-bold"><i class="bi bi-images me-1"></i>Upload Photos</label>
+                    <input type="file" class="form-control" id="distPhotoFiles" accept="image/jpeg,image/png,image/gif" multiple onchange="previewDistPhotos(this)">
+                    <div id="distPhotoPreview" class="d-flex flex-wrap gap-2 mt-2"></div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label fw-bold"><i class="bi bi-file-earmark-pdf me-1"></i>Upload Documents (PDF)</label>
+                    <input type="file" class="form-control" id="distDocFiles" accept="application/pdf" multiple onchange="previewDistDocs(this)">
+                    <div id="distDocPreview" class="d-flex flex-wrap gap-2 mt-2"></div>
+                </div>
+            </div>
             <hr>
             <label class="form-label fw-bold"><i class="bi bi-box-seam me-1"></i>Dispatch Items Summary</label>
             <div class="table-responsive mb-2">
@@ -220,6 +231,8 @@ let isSaving = false;
 let reliefRequestCashMap = {};
 
 let warehouseList = [];
+let pendingPhotoFiles = [];
+let pendingDocFiles = [];
 
 async function loadFormData() {
     try {
@@ -334,7 +347,7 @@ async function onDispatchChange() {
     const selectedIds = getSelectedDispatchIds();
     if (selectedIds.length === 0) {
         document.getElementById('dist_incident').value = '';
-        document.getElementById('beneficiaryBody').innerHTML = '<tr><td colspan="9" class="text-center text-muted py-3">Add beneficiaries to this distribution</td></tr>';
+        document.getElementById('beneficiaryBody').innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">Add beneficiaries to this distribution</td></tr>';
         document.getElementById('dispatchItemsSummaryBody').innerHTML = '<tr><td colspan="4" class="text-center text-muted py-2">Select dispatches to view items</td></tr>';
         document.getElementById('cashFundSection').style.display = 'none';
         return;
@@ -550,24 +563,6 @@ function addBeneficiaryRow(data) {
         </td>
         <td style="width:160px">
             <input type="number" step="0.01" class="form-control form-control-sm ben-cash-amount" placeholder="Amount" disabled oninput="updateCashTotal()">
-        </td>
-        <td style="width:140px">
-            <div class="ben-photo-upload">
-                <input type="file" class="form-control form-control-sm ben-photo-input" accept="image/jpeg,image/png,image/gif" onchange="previewBenFile(this, 'photo')">
-                <div class="ben-photo-preview mt-1" style="max-width:80px;max-height:80px;display:none">
-                    <img src="" class="img-thumbnail" style="max-width:80px;max-height:80px;object-fit:cover">
-                    <button type="button" class="btn btn-sm btn-outline-danger p-0 mt-1" style="font-size:0.65rem;line-height:1" onclick="removeBenFile(this, 'photo')"><i class="bi bi-x"></i></button>
-                </div>
-            </div>
-        </td>
-        <td style="width:140px">
-            <div class="ben-doc-upload">
-                <input type="file" class="form-control form-control-sm ben-doc-input" accept="application/pdf" onchange="previewBenFile(this, 'document')">
-                <div class="ben-doc-preview mt-1" style="display:none">
-                    <span class="badge bg-secondary"><i class="bi bi-file-pdf"></i> PDF</span>
-                    <button type="button" class="btn btn-sm btn-outline-danger p-0 ms-1" style="font-size:0.65rem;line-height:1" onclick="removeBenFile(this, 'document')"><i class="bi bi-x"></i></button>
-                </div>
-            </div>
         </td>
         <td style="width:40px"><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove(); updateDistributedQtySummary(); updateCashTotal()"><i class="bi bi-trash"></i></button></td>
     `;
@@ -1149,12 +1144,12 @@ async function viewDistribution(id) {
                             </div>
                         </div>` : ''}
 
-                        <!-- Photo & Document -->
-                        <div class="bg-light bg-opacity-50 rounded p-2 d-flex gap-3 flex-wrap align-items-center">
+                        <!-- Files -->
+                        <div class="bg-light bg-opacity-50 rounded p-2 d-flex gap-2 flex-wrap align-items-center">
                             <span class="fw-semibold small text-secondary me-1"><i class="bi bi-paperclip me-1"></i>Attachments:</span>
-                            ${fileLink(b, 'photo')}
-                            ${fileLink(b, 'document')}
-                            ${!b.photo_url && !b.document_url ? '<span class="text-muted small">None</span>' : ''}
+                            ${!dist.files || (!dist.files.photos.length && !dist.files.documents.length) ? '<span class="text-muted small">None</span>' : ''}
+                            ${dist.files && dist.files.photos.map(f => `<a href="${f.url}" target="_blank" class="btn btn-sm btn-outline-primary" title="View Photo"><i class="bi bi-image me-1"></i>Photo</a>`).join('')}
+                            ${dist.files && dist.files.documents.map(f => `<a href="${f.url}" target="_blank" class="btn btn-sm btn-outline-secondary" title="View Document"><i class="bi bi-file-earmark-pdf me-1"></i>${f.filename.split('_').pop()}</a>`).join('')}
                         </div>
                     </div>
                 </div>`;
@@ -1235,35 +1230,54 @@ async function viewDistribution(id) {
     }
 }
 
-function previewBenFile(input, type) {
-    const tr = input.closest('tr');
-    const previewDiv = tr.querySelector(`.ben-${type}-preview`);
-    const file = input.files[0];
-    if (!file) { previewDiv.style.display = 'none'; return; }
-    if (type === 'photo') {
+function renderDistPhotoPreviews() {
+    const container = document.getElementById('distPhotoPreview');
+    container.innerHTML = '';
+    pendingPhotoFiles.forEach((f, i) => {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'position-relative';
+        wrapper.style.width = '80px';
+        const img = document.createElement('img');
+        img.className = 'img-thumbnail';
+        img.style.width = '80px';
+        img.style.height = '80px';
+        img.style.objectFit = 'cover';
         const reader = new FileReader();
-        reader.onload = function(e) {
-            const img = previewDiv.querySelector('img');
-            if (img) { img.src = e.target.result; previewDiv.style.display = 'block'; }
-        };
-        reader.readAsDataURL(file);
-    } else {
-        previewDiv.style.display = 'block';
-    }
+        reader.onload = e => { img.src = e.target.result; };
+        reader.readAsDataURL(f);
+        wrapper.appendChild(img);
+        const rmBtn = document.createElement('button');
+        rmBtn.className = 'btn btn-sm btn-outline-danger p-0 position-absolute top-0 end-0';
+        rmBtn.style.fontSize = '0.6rem';
+        rmBtn.innerHTML = '<i class="bi bi-x"></i>';
+        rmBtn.onclick = () => { pendingPhotoFiles.splice(i, 1); renderDistPhotoPreviews(); };
+        wrapper.appendChild(rmBtn);
+        container.appendChild(wrapper);
+    });
 }
 
-function removeBenFile(btn, type) {
-    const tr = btn.closest('tr');
-    const input = tr.querySelector(`.ben-${type}-input`);
-    const previewDiv = tr.querySelector(`.ben-${type}-preview`);
-    if (input) input.value = '';
-    if (previewDiv) previewDiv.style.display = 'none';
+function previewDistPhotos(input) {
+    pendingPhotoFiles = Array.from(input.files);
+    renderDistPhotoPreviews();
 }
 
-function getBenFileData(tr, type) {
-    const input = tr.querySelector(`.ben-${type}-input`);
-    if (input && input.files && input.files[0]) return input.files[0];
-    return null;
+function previewDistDocs(input) {
+    pendingDocFiles = Array.from(input.files);
+    const container = document.getElementById('distDocPreview');
+    container.innerHTML = '';
+    pendingDocFiles.forEach((f, i) => {
+        const badge = document.createElement('span');
+        badge.className = 'badge bg-secondary d-inline-flex align-items-center gap-1';
+        badge.innerHTML = `<i class="bi bi-file-pdf"></i> ${f.name} <button class="btn btn-sm btn-outline-light p-0 ms-1" style="font-size:0.6rem;line-height:1" onclick="removeDistDoc(${i})"><i class="bi bi-x"></i></button>`;
+        container.appendChild(badge);
+    });
+}
+
+function removeDistDoc(index) {
+    pendingDocFiles.splice(index, 1);
+    const container = document.getElementById('distDocPreview');
+    const badges = container.querySelectorAll('.badge');
+    if (badges[index]) badges[index].remove();
 }
 
 function resetDistributionForm() {
@@ -1272,7 +1286,7 @@ function resetDistributionForm() {
     document.getElementById('dist_distribution_no').value = 'DIST-' + String(Date.now()).slice(-4);
     document.getElementById('dist_distribution_date').value = today_bs;
     document.getElementById('dist_incident').value = '';
-    document.getElementById('beneficiaryBody').innerHTML = '<tr><td colspan="9" class="text-center text-muted py-3">Add beneficiaries to this distribution</td></tr>';
+    document.getElementById('beneficiaryBody').innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">Add beneficiaries to this distribution</td></tr>';
     document.getElementById('dispatchItemsSummaryBody').innerHTML = '<tr><td colspan="4" class="text-center text-muted py-2">Select dispatches to view items</td></tr>';
     document.getElementById('cashFundSection').style.display = 'none';
     document.getElementById('cdTotal').value = '0';
@@ -1281,6 +1295,12 @@ function resetDistributionForm() {
     document.getElementById('dist_import_rr').innerHTML = '<option value="">Auto — selects with dispatches</option>';
     dispatchItemsCache = {};
     dispatchDetailsCache = {};
+    document.getElementById('distPhotoFiles').value = '';
+    document.getElementById('distDocFiles').value = '';
+    document.getElementById('distPhotoPreview').innerHTML = '';
+    document.getElementById('distDocPreview').innerHTML = '';
+    pendingPhotoFiles = [];
+    pendingDocFiles = [];
     isSaving = false;
 }
 
@@ -1432,40 +1452,36 @@ async function saveDistribution() {
             itemsSaved = d.success;
             if (d.success && d.data) {
                 savedDistNo = d.data.distribution_no;
-                // Upload photo/document files for each beneficiary
-                const savedBens = d.data.beneficiaries || [];
-                const rows = Array.from(document.querySelectorAll('#beneficiaryBody tr'));
-                for (let i = 0; i < rows.length && i < savedBens.length; i++) {
-                    const tr = rows[i];
-                    const benId = savedBens[i].id;
-                    const photoFile = getBenFileData(tr, 'photo');
-                    const docFile = getBenFileData(tr, 'document');
-                    if (photoFile) {
-                        const fd = new FormData();
-                        fd.append('file', photoFile);
-                        try {
-                            const pr = await fetch(`/api/distributions/beneficiary/${benId}/upload-photo`, {
-                                method: 'POST',
-                                headers: {'X-CSRFToken': csrf},
-                                body: fd
-                            });
-                            const pd = await pr.json();
-                            if (!pd.success) showToast('warning', `Photo upload failed for ${tr.querySelector('.ben-family-name').value}: ${pd.message}`);
-                        } catch(e) { showToast('warning', 'Photo upload error: ' + e.message); }
-                    }
-                    if (docFile) {
-                        const fd = new FormData();
-                        fd.append('file', docFile);
-                        try {
-                            const dr = await fetch(`/api/distributions/beneficiary/${benId}/upload-document`, {
-                                method: 'POST',
-                                headers: {'X-CSRFToken': csrf},
-                                body: fd
-                            });
-                            const dd = await dr.json();
-                            if (!dd.success) showToast('warning', `Document upload failed for ${tr.querySelector('.ben-family-name').value}: ${dd.message}`);
-                        } catch(e) { showToast('warning', 'Document upload error: ' + e.message); }
-                    }
+                const distId = d.data.id;
+                // Upload photo files at distribution level
+                if (pendingPhotoFiles.length > 0) {
+                    const fd = new FormData();
+                    fd.append('type', 'photo');
+                    pendingPhotoFiles.forEach(f => fd.append('files', f));
+                    try {
+                        const pr = await fetch(`/api/distributions/${distId}/upload-files`, {
+                            method: 'POST',
+                            headers: {'X-CSRFToken': csrf},
+                            body: fd
+                        });
+                        const pd = await pr.json();
+                        if (!pd.success) showToast('warning', 'Photo upload: ' + pd.message);
+                    } catch(e) { showToast('warning', 'Photo upload error: ' + e.message); }
+                }
+                // Upload document files at distribution level
+                if (pendingDocFiles.length > 0) {
+                    const fd = new FormData();
+                    fd.append('type', 'document');
+                    pendingDocFiles.forEach(f => fd.append('files', f));
+                    try {
+                        const dr = await fetch(`/api/distributions/${distId}/upload-files`, {
+                            method: 'POST',
+                            headers: {'X-CSRFToken': csrf},
+                            body: fd
+                        });
+                        const dd = await dr.json();
+                        if (!dd.success) showToast('warning', 'Document upload: ' + dd.message);
+                    } catch(e) { showToast('warning', 'Document upload error: ' + e.message); }
                 }
             }
             if (!d.success) {

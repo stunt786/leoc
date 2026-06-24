@@ -1265,6 +1265,7 @@ class Distribution(db.Model):
     remarks = db.Column(db.Text)
     created_by = db.Column(db.Integer)
     created_at = db.Column(db.DateTime, default=utc_now)
+    files = db.Column(db.Text)
     dispatch = db.relationship('Dispatch', backref=db.backref('distributions', lazy=True))
     incident = db.relationship('Incident', backref=db.backref('distributions', lazy=True))
     beneficiaries = db.relationship('DistributionBeneficiary', backref='distribution', lazy=True, cascade='all,delete-orphan')
@@ -1288,6 +1289,13 @@ class Distribution(db.Model):
                 'unit': di.unit or (di.item.unit if di.item else None)
             } for di in self.dispatch.items]
 
+        dist_files = {}
+        if self.files:
+            try:
+                dist_files = json.loads(self.files) if isinstance(self.files, str) else self.files
+            except (json.JSONDecodeError, TypeError):
+                dist_files = {}
+
         return {
             'id': self.id, 'distribution_no': self.distribution_no,
             'dispatch_id': self.dispatch_id,
@@ -1302,7 +1310,11 @@ class Distribution(db.Model):
             'officer': self.officer, 'status': self.status, 'remarks': self.remarks,
             'beneficiaries': [b.to_dict() for b in self.beneficiaries],
             'cash_distribution': cash_info,
-            'dispatch_items': dispatch_items
+            'dispatch_items': dispatch_items,
+            'files': {
+                'photos': [{'filename': f, 'url': f'/uploads/{f}'} for f in dist_files.get('photos', [])],
+                'documents': [{'filename': f, 'url': f'/uploads/{f}'} for f in dist_files.get('documents', [])]
+            }
         }
 
 class DistributionBeneficiary(db.Model):
@@ -4294,6 +4306,72 @@ def get_distribution(id):
     if not dist:
         return jsonify({'success': False, 'message': 'Distribution not found'}), 404
     return jsonify({'success': True, 'distribution': dist.to_dict()})
+
+@app.route('/api/distributions/<int:id>/upload-files', methods=['POST'])
+@login_required
+def upload_distribution_files(id):
+    try:
+        dist = db_get(Distribution, id)
+        if not dist:
+            return jsonify({'success': False, 'message': 'Distribution not found'}), 404
+
+        file_type = request.form.get('type', 'document')
+        if file_type not in ('photo', 'document'):
+            return jsonify({'success': False, 'message': 'Invalid file type'}), 400
+
+        if 'files' not in request.files:
+            return jsonify({'success': False, 'message': 'No files provided'}), 400
+
+        files = request.files.getlist('files')
+        if not files or all(f.filename == '' for f in files):
+            return jsonify({'success': False, 'message': 'No files selected'}), 400
+
+        ALLOWED_PHOTO = {'jpg', 'jpeg', 'png', 'gif'}
+        ALLOWED_DOC = {'pdf'}
+        allowed = ALLOWED_PHOTO if file_type == 'photo' else ALLOWED_DOC
+
+        import uuid as uuid_lib
+        saved_files = []
+
+        for file in files:
+            if file.filename == '':
+                continue
+            ext = file.filename.rsplit('.', 1)[-1].lower() if '.' in file.filename else ''
+            if ext not in allowed:
+                continue
+            prefix = 'dist_photo' if file_type == 'photo' else 'dist_doc'
+            safe_name = f"{prefix}_{uuid_lib.uuid4().hex}.{ext}"
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], safe_name)
+            file.save(filepath)
+            saved_files.append(safe_name)
+
+        if not saved_files:
+            return jsonify({'success': False, 'message': f'No valid {file_type} files were uploaded. Allowed: {", ".join(allowed)}'}), 400
+
+        current_files = {}
+        if dist.files:
+            try:
+                current_files = json.loads(dist.files) if isinstance(dist.files, str) else dist.files
+            except (json.JSONDecodeError, TypeError):
+                current_files = {}
+
+        key = 'photos' if file_type == 'photo' else 'documents'
+        existing = current_files.get(key, [])
+        existing.extend(saved_files)
+        current_files[key] = existing
+        dist.files = json.dumps(current_files)
+        db.session.commit()
+
+        return jsonify({
+            'success': True, 'message': f'{len(saved_files)} file(s) uploaded',
+            'data': {
+                'files': [{'filename': f, 'url': f'/uploads/{f}'} for f in saved_files]
+            }
+        }), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
+
 
 @app.route('/api/distributions/beneficiary/<int:id>/upload-photo', methods=['POST'])
 @login_required
@@ -8804,6 +8882,7 @@ def init_db():
                 if 'longitude' not in dist_cols: dist_mig.append("longitude FLOAT")
                 if 'fiscal_year' not in dist_cols: dist_mig.append("fiscal_year VARCHAR(20)")
                 if 'status' not in dist_cols: dist_mig.append("status VARCHAR(20) DEFAULT 'Completed'")
+                if 'files' not in dist_cols: dist_mig.append("files TEXT")
                 for col in dist_mig:
                     try:
                         db.session.execute(db.text(f"ALTER TABLE distribution ADD COLUMN {col}"))

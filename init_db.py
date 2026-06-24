@@ -396,6 +396,9 @@ def run_migrations():
             ('cancelled_by', 'INTEGER'),
             ('cancel_reason', 'TEXT'),
         ],
+        'distribution': [
+            ('files', 'TEXT'),
+        ],
     }
     
     migrated = 0
