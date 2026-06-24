@@ -3641,6 +3641,23 @@ def handle_relief_requests():
         phone = data.get('phone')
         if phone and not validate_phone(phone):
             return jsonify({'success': False, 'message': 'Invalid phone number format'}), 400
+        if incident.affected_households is None or incident.affected_households < 1:
+            return jsonify({'success': False, 'message': 'Selected incident does not have any affected households. Please update the incident first.'}), 400
+        existing_count = ReliefRequest.query.filter(
+            ReliefRequest.incident_id == incident.id,
+            ReliefRequest.status != 'Cancelled'
+        ).count()
+        if existing_count >= incident.affected_households:
+            return jsonify({'success': False, 'message': f'This incident has only {incident.affected_households} affected households. Only {incident.affected_households} relief request(s) can be created.'}), 400
+        requester_name = data.get('requester_name')
+        if requester_name:
+            existing_req = ReliefRequest.query.filter(
+                ReliefRequest.incident_id == incident.id,
+                ReliefRequest.requester_name == requester_name,
+                ReliefRequest.status != 'Cancelled'
+            ).first()
+            if existing_req:
+                return jsonify({'success': False, 'message': f'Beneficiary "{requester_name}" already has a relief request for this incident (Request #{existing_req.request_number}). Each beneficiary can request only once per incident.'}), 400
         items_payload = data.get('items', [])
         requested_cash_amount = parse_float_field(data, 'requested_cash_amount', minimum=0, default=0)
         if not items_payload and requested_cash_amount <= 0:
@@ -3723,7 +3740,26 @@ def manage_relief_request(id):
             incident = db_get(Incident, data.get('incident_id'))
             if not incident:
                 return jsonify({'success': False, 'message': 'Incident not found'}), 404
+            if incident.affected_households is None or incident.affected_households < 1:
+                return jsonify({'success': False, 'message': 'Selected incident does not have any affected households. Please update the incident first.'}), 400
+            existing_count = ReliefRequest.query.filter(
+                ReliefRequest.incident_id == incident.id,
+                ReliefRequest.status != 'Cancelled',
+                ReliefRequest.id != id
+            ).count()
+            if existing_count >= incident.affected_households:
+                return jsonify({'success': False, 'message': f'This incident has only {incident.affected_households} affected households. Only {incident.affected_households} relief request(s) can be created.'}), 400
             req.incident_id = incident.id
+        if 'requester_name' in data:
+            target_incident_id = data.get('incident_id', req.incident_id)
+            existing_req = ReliefRequest.query.filter(
+                ReliefRequest.incident_id == target_incident_id,
+                ReliefRequest.requester_name == data['requester_name'],
+                ReliefRequest.status != 'Cancelled',
+                ReliefRequest.id != id
+            ).first()
+            if existing_req:
+                return jsonify({'success': False, 'message': f'Beneficiary "{data["requester_name"]}" already has a relief request for this incident (Request #{existing_req.request_number}). Each beneficiary can request only once per incident.'}), 400
         for field in ['organization', 'requester_name', 'phone', 'priority', 'remarks', 'status', 'cash_purpose']:
             if field in data:
                 setattr(req, field, data[field])

@@ -948,16 +948,21 @@ async function viewDistribution(id) {
     const inc = dist.incident || {};
     const allBens = dist.beneficiaries || [];
 
+    // Build unit lookup from dispatch items
+    const unitMap = {};
+    (dist.dispatch_items || []).forEach(di => {
+        if (di.item_name) unitMap[di.item_name.toLowerCase()] = di.unit || '';
+    });
+
     // Aggregate items across all beneficiaries for summary table
     const itemTotals = {};
     allBens.forEach(b => {
         const key = b.item || 'Unknown';
-        if (!itemTotals[key]) itemTotals[key] = { item: key, qty: 0, unit: '' };
+        if (!itemTotals[key]) itemTotals[key] = { item: key, qty: 0, unit: unitMap[key.toLowerCase()] || '' };
         itemTotals[key].qty += b.quantity || 0;
-        if (b.beneficiary && b.beneficiary.item_unit) itemTotals[key].unit = b.beneficiary.item_unit;
     });
     const itemSummaryRows = Object.values(itemTotals).map(it =>
-        `<tr><td>${it.item}</td><td class="text-end fw-semibold">${it.qty}</td></tr>`
+        `<tr><td>${it.item}</td><td class="text-end">${it.unit}</td><td class="text-end fw-semibold">${it.qty}</td></tr>`
     ).join('');
 
     // Group beneficiaries by family for per-family cards
@@ -977,7 +982,7 @@ async function viewDistribution(id) {
                 grouped[key].document_url = b.document_url;
             }
         }
-        grouped[key].items.push({ item: b.item || '-', quantity: b.quantity || 0 });
+        grouped[key].items.push({ item: b.item || '-', quantity: b.quantity || 0, unit: unitMap[(b.item || '').toLowerCase()] || '' });
     });
     const families = Object.values(grouped);
 
@@ -985,8 +990,8 @@ async function viewDistribution(id) {
     function familyItemsTable(items) {
         if (!items || items.length === 0) return '<span class="text-muted small">No items</span>';
         return `<table class="table table-sm table-bordered mb-0 small">
-            <thead class="table-light"><tr><th>Item</th><th class="text-end" style="width:80px">Qty</th></tr></thead>
-            <tbody>${items.map(it => `<tr><td>${it.item}</td><td class="text-end">${it.quantity}</td></tr>`).join('')}</tbody>
+            <thead class="table-light"><tr><th>Item</th><th class="text-center" style="width:60px">Unit</th><th class="text-end" style="width:80px">Qty</th></tr></thead>
+            <tbody>${items.map(it => `<tr><td>${it.item}</td><td class="text-center">${it.unit || '-'}</td><td class="text-end">${it.quantity}</td></tr>`).join('')}</tbody>
         </table>`;
     }
 
@@ -1060,8 +1065,8 @@ async function viewDistribution(id) {
                 <div class="card-body p-0">
                     <div class="table-responsive">
                         <table class="table table-sm table-bordered mb-0 small">
-                            <thead class="table-light"><tr><th>Item Name</th><th class="text-end" style="width:100px">Total Qty</th></tr></thead>
-                            <tbody>${itemSummaryRows || '<tr><td colspan="2" class="text-center text-muted py-2">No items distributed</td></tr>'}</tbody>
+                            <thead class="table-light"><tr><th>Item Name</th><th class="text-center" style="width:80px">Unit</th><th class="text-end" style="width:100px">Total Qty</th></tr></thead>
+                            <tbody>${itemSummaryRows || '<tr><td colspan="3" class="text-center text-muted py-2">No items distributed</td></tr>'}</tbody>
                         </table>
                     </div>
                 </div>

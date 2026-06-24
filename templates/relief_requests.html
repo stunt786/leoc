@@ -81,9 +81,10 @@
                         </div>
                         <div class="col-md-4">
                             <label class="form-label">Incident *</label>
-                            <select class="form-select" id="rr_incident_id">
+                            <select class="form-select" id="rr_incident_id" onchange="onRRIncidentChange()">
                                 <option value="">Select Incident</option>
                             </select>
+                            <small class="text-muted" id="rrIncidentInfo"></small>
                         </div>
                         <div class="col-md-4">
                             <label class="form-label">Organization</label>
@@ -390,6 +391,22 @@ function updateFundBalanceDisplay() {
     if (el) el.value = Number(totalFundBalance).toLocaleString();
 }
 
+function onRRIncidentChange() {
+    const incidentId = parseInt(document.getElementById('rr_incident_id').value);
+    const infoEl = document.getElementById('rrIncidentInfo');
+    if (!incidentId) { infoEl.textContent = ''; return; }
+    const inc = incidentsData.find(i => i.id === incidentId);
+    if (!inc) { infoEl.textContent = ''; return; }
+    const existingCount = reliefRequests.filter(r => r.incident_id === incidentId && r.status !== 'Cancelled').length;
+    const limit = inc.affected_households || 0;
+    if (limit < 1) {
+        infoEl.innerHTML = `<span class="text-danger">Affected households: 0 — cannot create relief request</span>`;
+    } else {
+        const remaining = Math.max(0, limit - existingCount - (document.getElementById('rr_id').value ? 0 : 1));
+        infoEl.textContent = `Affected households: ${limit} | Requests: ${existingCount} | Remaining: ${remaining}`;
+    }
+}
+
 async function loadFormData() {
     try {
         const r = await fetch('/api/data');
@@ -421,6 +438,7 @@ function resetRRForm() {
     document.getElementById('rr_cash_remaining').value = '0';
     document.getElementById('rr_cash_purpose').disabled = true;
     document.getElementById('rrItemsBody').innerHTML = '';
+    document.getElementById('rrIncidentInfo').textContent = '';
     updateFundBalanceDisplay();
 }
 
@@ -447,6 +465,7 @@ function editRRFromData(r) {
     document.getElementById('rr_request_number').value = r.request_number;
     document.getElementById('rr_request_date').value = r.request_date || '';
     document.getElementById('rr_incident_id').value = r.incident_id || '';
+    onRRIncidentChange();
     document.getElementById('rr_organization').value = r.organization || '';
     document.getElementById('rr_requester_name').value = r.requester_name || '';
     document.getElementById('rr_phone').value = r.phone || '';
@@ -503,6 +522,22 @@ async function saveRR() {
         items: items
     };
     if (!body.incident_id) { showToast('danger', 'Incident is required'); return; }
+    const incData = incidentsData.find(i => i.id === body.incident_id);
+    const affectedHH = incData ? (incData.affected_households || 0) : 0;
+    if (affectedHH < 1) {
+        showToast('danger', 'Selected incident does not have any affected households. Please update the incident first.');
+        return;
+    }
+    const existingRRCount = reliefRequests.filter(r => r.incident_id === body.incident_id && r.status !== 'Cancelled').length;
+    if (!id && existingRRCount >= affectedHH) {
+        showToast('danger', `This incident has only ${affectedHH} affected households. Only ${affectedHH} relief request(s) can be created.`);
+        return;
+    }
+    const dupe = reliefRequests.find(r => r.incident_id === body.incident_id && r.requester_name === body.requester_name && r.status !== 'Cancelled' && (id ? r.id != parseInt(id) : true));
+    if (dupe) {
+        showToast('danger', `Beneficiary "${body.requester_name}" already has a relief request for this incident (Request #${dupe.request_number}). Each beneficiary can request only once per incident.`);
+        return;
+    }
     if (items.length === 0 && cashAmt <= 0) { showToast('danger', 'At least one item or cash amount is required'); return; }
     const url = id ? '/api/relief-requests/' + id : '/api/relief-requests';
     const method = id ? 'PUT' : 'POST';
