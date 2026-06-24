@@ -260,6 +260,67 @@ def friendly_message(e):
         return "This operation failed because the record is linked to other records. Please remove all related records and try again."
     return str(e)
 
+
+def find_beneficiary_duplicates(name=None, national_id=None, phone=None, family_members=None, exclude_id=None):
+    """Check if a person (name/national_id/phone) or their family members
+    already exist across all beneficiaries and their family member lists.
+    Returns list of dicts with match details."""
+    duplicates = []
+    name = (name or '').strip().lower()
+    national_id = (national_id or '').strip()
+    phone = (phone or '').strip()
+    if not any([name, national_id, phone, family_members]):
+        return duplicates
+    all_bens = Beneficiary.query.all()
+    for ben in all_bens:
+        if exclude_id and ben.id == exclude_id:
+            continue
+        # --- Check main beneficiary fields ---
+        if name and name == (ben.name or '').strip().lower():
+            duplicates.append({'type': 'main', 'beneficiary_id': ben.id, 'beneficiary_name': ben.name, 'match_type': 'name', 'matched_value': name})
+        if national_id and national_id == (ben.national_id or '').strip():
+            duplicates.append({'type': 'main', 'beneficiary_id': ben.id, 'beneficiary_name': ben.name, 'match_type': 'national_id', 'matched_value': national_id})
+        if phone and phone == (ben.phone or '').strip():
+            duplicates.append({'type': 'main', 'beneficiary_id': ben.id, 'beneficiary_name': ben.name, 'match_type': 'phone', 'matched_value': phone})
+        # --- Parse existing beneficiary's family members ---
+        try:
+            ben_family = json.loads(ben.family_members_json) if isinstance(ben.family_members_json, str) else (ben.family_members_json or [])
+        except (json.JSONDecodeError, TypeError):
+            ben_family = []
+        for fm in ben_family:
+            fm_name = (fm.get('name') or '').strip().lower()
+            fm_id = (fm.get('id') or '').strip()
+            fm_age = fm.get('age')
+            # New beneficiary matches existing family member
+            if name and fm_name and name == fm_name:
+                duplicates.append({'type': 'family_member', 'beneficiary_id': ben.id, 'beneficiary_name': ben.name, 'match_type': 'name', 'matched_value': name})
+            if national_id and fm_id and national_id == fm_id:
+                duplicates.append({'type': 'family_member', 'beneficiary_id': ben.id, 'beneficiary_name': ben.name, 'match_type': 'national_id', 'matched_value': national_id})
+            if phone and fm_name and phone == fm_name:  # phone might match a family member name
+                pass  # phone matching against names is too loose
+        # --- Check if any NEW family members match existing records ---
+        if family_members:
+            for new_fm in family_members:
+                new_fm_name = (new_fm.get('name') or '').strip().lower()
+                new_fm_id = (new_fm.get('id') or '').strip()
+                if not new_fm_name and not new_fm_id:
+                    continue
+                # New family member matches existing main beneficiary
+                if new_fm_name and new_fm_name == (ben.name or '').strip().lower():
+                    duplicates.append({'type': 'family_member_match', 'beneficiary_id': ben.id, 'beneficiary_name': ben.name, 'match_type': 'name', 'matched_value': new_fm_name})
+                if new_fm_id and new_fm_id == (ben.national_id or '').strip():
+                    duplicates.append({'type': 'family_member_match', 'beneficiary_id': ben.id, 'beneficiary_name': ben.name, 'match_type': 'national_id', 'matched_value': new_fm_id})
+                # New family member matches existing family member
+                for existing_fm in ben_family:
+                    efm_name = (existing_fm.get('name') or '').strip().lower()
+                    efm_id = (existing_fm.get('id') or '').strip()
+                    if new_fm_name and efm_name and new_fm_name == efm_name:
+                        duplicates.append({'type': 'family_member_match', 'beneficiary_id': ben.id, 'beneficiary_name': ben.name, 'match_type': 'name', 'matched_value': new_fm_name})
+                    if new_fm_id and efm_id and new_fm_id == efm_id:
+                        duplicates.append({'type': 'family_member_match', 'beneficiary_id': ben.id, 'beneficiary_name': ben.name, 'match_type': 'national_id', 'matched_value': new_fm_id})
+    return duplicates
+
+
 # ============ BS DATE CONVERSION HELPERS ============
 # Extensive BS year start date lookup (BS year -> (AD year, AD month, AD day))
 BS_YEAR_START = {
@@ -4972,6 +5033,25 @@ def upload_cash_distribution_file_temp():
     }), 201
 
 # ============ BENEFICIARY API ============
+@app.route('/api/beneficiaries/check-duplicate', methods=['POST'])
+@permission_required('edit')
+def check_beneficiary_duplicate():
+    try:
+        data = request.get_json() or {}
+        name = data.get('name')
+        national_id = data.get('national_id')
+        phone = data.get('phone')
+        family_members = data.get('family_members')
+        exclude_id = data.get('exclude_id')
+        duplicates = find_beneficiary_duplicates(
+            name=name, national_id=national_id, phone=phone,
+            family_members=family_members, exclude_id=exclude_id
+        )
+        return jsonify({'success': True, 'duplicates': duplicates})
+    except Exception as e:
+        return jsonify({'success': False, 'message': friendly_message(e)}), 400
+
+
 @app.route('/api/beneficiaries', methods=['GET', 'POST'])
 @permission_required('edit')
 def handle_beneficiaries():
@@ -5006,14 +5086,26 @@ def handle_beneficiaries():
         if phone and not validate_phone(phone):
             return jsonify({'success': False, 'message': 'Phone number format is invalid'}), 400
         national_id = data.get('national_id', '').strip()
-        duplicate = Beneficiary.query.filter(
-            db.or_(
-                Beneficiary.phone == phone,
-                db.and_(Beneficiary.ward == ward, Beneficiary.national_id == national_id)
-            )
-        ).first()
-        if duplicate:
-            return jsonify({'success': False, 'message': 'A beneficiary with the same phone or same ward & national ID already exists'}), 400
+        family_members_list = data.get('family_members_json')
+        if isinstance(family_members_list, str):
+            try:
+                family_members_list = json.loads(family_members_list)
+            except (json.JSONDecodeError, TypeError):
+                family_members_list = []
+        duplicates = find_beneficiary_duplicates(
+            name=data.get('name'), national_id=national_id, phone=phone,
+            family_members=family_members_list
+        )
+        if duplicates:
+            dup_msgs = set()
+            for d in duplicates:
+                if d['match_type'] == 'name':
+                    dup_msgs.add(f'Name matches existing {d["type"]} "{d["beneficiary_name"]}"')
+                elif d['match_type'] == 'national_id':
+                    dup_msgs.add(f'National ID matches existing {d["type"]} "{d["beneficiary_name"]}"')
+                elif d['match_type'] == 'phone':
+                    dup_msgs.add(f'Phone matches existing {d["type"]} "{d["beneficiary_name"]}"')
+            return jsonify({'success': False, 'message': 'Duplicate found: ' + '; '.join(dup_msgs)}), 400
         family_members = parse_int_field(data, 'family_members', minimum=0, default=1)
         family_members_json = data.get('family_members_json')
         if family_members_json is not None and not isinstance(family_members_json, str):
@@ -5089,17 +5181,31 @@ def manage_beneficiary(id):
         if 'phone' in data and phone and not validate_phone(phone):
             return jsonify({'success': False, 'message': 'Phone number format is invalid'}), 400
         national_id = (data.get('national_id') or ben.national_id or '').strip()
-        ward_val = data.get('ward') if 'ward' in data else ben.ward
-        if phone or national_id:
-            dup_query = Beneficiary.query.filter(Beneficiary.id != id).filter(
-                db.or_(
-                    Beneficiary.phone == phone,
-                    db.and_(Beneficiary.ward == ward_val, Beneficiary.national_id == national_id)
-                )
+        family_members_json = data.get('family_members_json')
+        if isinstance(family_members_json, str):
+            try:
+                family_members_json = json.loads(family_members_json)
+            except (json.JSONDecodeError, TypeError):
+                family_members_json = None
+        dup_name = data.get('name') if 'name' in data else ben.name
+        dup_nid = national_id
+        dup_phone = phone
+        dup_fm = family_members_json
+        if dup_name or dup_nid or dup_phone or dup_fm:
+            duplicates = find_beneficiary_duplicates(
+                name=dup_name, national_id=dup_nid, phone=dup_phone,
+                family_members=dup_fm, exclude_id=id
             )
-            dup = dup_query.first()
-            if dup:
-                return jsonify({'success': False, 'message': 'A beneficiary with the same phone or same ward & national ID already exists'}), 400
+            if duplicates:
+                dup_msgs = set()
+                for d in duplicates:
+                    if d['match_type'] == 'name':
+                        dup_msgs.add(f'Name matches existing {d["type"]} "{d["beneficiary_name"]}"')
+                    elif d['match_type'] == 'national_id':
+                        dup_msgs.add(f'National ID matches existing {d["type"]} "{d["beneficiary_name"]}"')
+                    elif d['match_type'] == 'phone':
+                        dup_msgs.add(f'Phone matches existing {d["type"]} "{d["beneficiary_name"]}"')
+                return jsonify({'success': False, 'message': 'Duplicate found: ' + '; '.join(dup_msgs)}), 400
         if 'family_members' in data:
             data['family_members'] = parse_int_field(data, 'family_members', minimum=0, default=1)
         for bool_field in ['in_social_security_fund', 'poverty_card_holder']:

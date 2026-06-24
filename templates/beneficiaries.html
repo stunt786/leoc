@@ -55,10 +55,12 @@
                                         <div class="col-md-6">
                                             <label class="form-label fw-medium">Full Name <span class="text-danger">*</span></label>
                                             <input class="form-control" name="name" id="benName" required placeholder="नाम थर लेख्नुहोस्">
+                                            <small class="text-danger" id="benNameError"></small>
                                         </div>
                                             <div class="col-md-6">
                                                 <label class="form-label fw-medium">National ID (ना.प्र.प्र नं) <span class="text-danger">*</span></label>
                                                 <input class="form-control" name="national_id" id="benNid" required placeholder="उदा: BEN-001">
+                                                <small class="text-danger" id="benNidError"></small>
                                             </div>
                                         <div class="col-md-6">
                                             <label class="form-label fw-medium">Father's Name (बुवाको नाम थर)</label>
@@ -67,6 +69,7 @@
                                         <div class="col-md-6">
                                             <label class="form-label fw-medium">Phone <span class="text-danger">*</span></label>
                                             <input class="form-control" name="phone" id="benPhone" placeholder="९८४१००००००">
+                                            <small class="text-danger" id="benPhoneError"></small>
                                         </div>
                                     </div>
                                 </div>
@@ -126,6 +129,7 @@
                                     <button type="button" class="btn btn-outline-success btn-sm mt-2" onclick="addFamilyMember()">
                                         <i class="bi bi-plus-circle"></i> Add Family Member
                                     </button>
+                                    <small class="text-danger" id="benFamilyError"></small>
                                     <input type="hidden" id="benFamilyMembersJson" name="family_members_json" value="[]">
                                     <input type="hidden" id="benFamily" name="family_members" value="0">
                                 </div>
@@ -328,6 +332,8 @@ function updateFamilyMembersJson() {
         });
     });
     document.getElementById('benFamilyMembersJson').value = JSON.stringify(members);
+    validateWithinFamily();
+    debouncedCheck();
 }
 
 function updateFamilyCount() {
@@ -373,6 +379,88 @@ function addFamilyMember(data) {
 function removeFamilyMember(btn) {
     btn.closest('.family-member-row').remove();
     updateFamilyCount();
+    validateWithinFamily();
+}
+
+/* ---- Duplicate validation ---- */
+let _benDupState = { name: false, nid: false, phone: false, family: false };
+
+function clearDuplicateErrors() {
+    ['benNameError','benNidError','benPhoneError','benFamilyError'].forEach(id => document.getElementById(id).textContent = '');
+    _benDupState = { name: false, nid: false, phone: false, family: false };
+}
+
+function showFieldError(id, msg) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = msg;
+}
+
+function validateWithinFamily() {
+    const rows = document.querySelectorAll('#familyMembersContainer .family-member-row');
+    const names = {};
+    const ids = {};
+    let errors = [];
+    rows.forEach(row => {
+        const name = row.querySelector('.fm-name').value.trim().toLowerCase();
+        const id = row.querySelector('.fm-id').value.trim();
+        if (name) {
+            if (names[name]) errors.push(`Duplicate family member name: "${row.querySelector('.fm-name').value.trim()}"`);
+            else names[name] = true;
+        }
+        if (id) {
+            if (ids[id]) errors.push(`Duplicate family member ID: "${id}"`);
+            else ids[id] = true;
+        }
+    });
+    const mainName = document.getElementById('benName').value.trim().toLowerCase();
+    const mainNid = document.getElementById('benNid').value.trim();
+    rows.forEach(row => {
+        const fmName = row.querySelector('.fm-name').value.trim().toLowerCase();
+        const fmId = row.querySelector('.fm-id').value.trim();
+        if (mainName && fmName && mainName === fmName)
+            errors.push(`Family member "${row.querySelector('.fm-name').value.trim()}" has the same name as the main beneficiary`);
+        if (mainNid && fmId && mainNid === fmId)
+            errors.push(`Family member ID "${fmId}" matches the main beneficiary's National ID`);
+    });
+    showFieldError('benFamilyError', errors.join(' | '));
+    _benDupState.family = errors.length > 0;
+    return errors.length === 0;
+}
+
+let _checkTimer = null;
+function debouncedCheck() {
+    if (_checkTimer) clearTimeout(_checkTimer);
+    _checkTimer = setTimeout(doCheckDuplicates, 400);
+}
+async function doCheckDuplicates() {
+    const name = document.getElementById('benName').value.trim();
+    const national_id = document.getElementById('benNid').value.trim();
+    const phone = document.getElementById('benPhone').value.trim();
+    let fmJson = [];
+    try { fmJson = JSON.parse(document.getElementById('benFamilyMembersJson').value || '[]'); } catch(e) {}
+    const exclude_id = document.getElementById('benId').value ? parseInt(document.getElementById('benId').value) : null;
+    if (!name && !national_id && !phone && fmJson.length === 0) {
+        clearDuplicateErrors();
+        return;
+    }
+    try {
+        const r = await fetch('/api/beneficiaries/check-duplicate', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json','X-CSRFToken':csrf},
+            body: JSON.stringify({name, national_id, phone, family_members: fmJson, exclude_id})
+        });
+        const d = await r.json();
+        if (!d.success) return;
+        clearDuplicateErrors();
+        const dups = d.duplicates || [];
+        dups.forEach(dup => {
+            const label = dup.match_type === 'name' ? 'Name' : dup.match_type === 'national_id' ? 'National ID' : 'Phone';
+            const msg = `${label} matches existing ${dup.type === 'main' ? 'beneficiary' : 'family member'} "${dup.beneficiary_name}"`;
+            if (dup.match_type === 'name') { showFieldError('benNameError', msg); _benDupState.name = true; }
+            else if (dup.match_type === 'national_id') { showFieldError('benNidError', msg); _benDupState.nid = true; }
+            else if (dup.match_type === 'phone') { showFieldError('benPhoneError', msg); _benDupState.phone = true; }
+        });
+    } catch(e) { console.error('Duplicate check failed:', e); }
 }
 
 document.getElementById('familyMembersContainer').addEventListener('change', function(e) {
@@ -392,6 +480,13 @@ document.getElementById('familyMembersContainer').addEventListener('input', func
         updateFamilyCount();
     }
 });
+
+document.getElementById('benName').addEventListener('blur', doCheckDuplicates);
+document.getElementById('benNid').addEventListener('blur', doCheckDuplicates);
+document.getElementById('benPhone').addEventListener('blur', doCheckDuplicates);
+document.getElementById('benName').addEventListener('input', debouncedCheck);
+document.getElementById('benNid').addEventListener('input', debouncedCheck);
+document.getElementById('benPhone').addEventListener('input', debouncedCheck);
 
 function renderBeneficiaries(data) {
     const t = document.getElementById('benBody');
@@ -463,6 +558,13 @@ document.getElementById('benSocialSecurity').addEventListener('change', function
 document.getElementById('benForm').addEventListener('submit', async function(e) {
     e.preventDefault();
     updateFamilyMembersJson();
+    // Re-check all validations before submit
+    await doCheckDuplicates();
+    validateWithinFamily();
+    if (_benDupState.name || _benDupState.nid || _benDupState.phone || _benDupState.family) {
+        showToast('danger', 'Please fix duplicate errors before saving');
+        return;
+    }
     const id = document.getElementById('benId').value;
     const fmJson = JSON.parse(document.getElementById('benFamilyMembersJson').value || '[]');
     let fmCount = fmJson.length;
@@ -510,12 +612,14 @@ function openBenModal() {
     document.getElementById('benSocialSecurity').checked = false;
     document.getElementById('benSsfTypeDiv').style.display = 'none';
     document.getElementById('benPovertyCard').checked = false;
+    clearDuplicateErrors();
 }
 
 async function editBen(id) {
     const r = await fetch(`/api/beneficiaries/${id}`);
     const d = await r.json();
     if (!d.success) return;
+    clearDuplicateErrors();
     const b = d.beneficiary;
     document.getElementById('benId').value = b.id;
     document.getElementById('benName').value = b.name;
