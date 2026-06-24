@@ -3771,6 +3771,7 @@ def handle_dispatches():
         incident = db_get(Incident, incident_id)
         if not incident:
             return jsonify({'success': False, 'message': 'Incident not found'}), 404
+        force = data.get('force', False)
         dispatch_date = parse_bs_date_field(data, 'date', default=date.today())
         if dispatch_date > date.today():
             return jsonify({'success': False, 'message': 'Dispatch date cannot be in the future'}), 400
@@ -3783,6 +3784,31 @@ def handle_dispatches():
 
         relief_request_ids = data.get('relief_request_ids') or (data.get('relief_request_id') and [data.get('relief_request_id')]) or []
         primary_relief_request_id = relief_request_ids[0] if relief_request_ids else None
+
+        # Check for existing distributions for the same relief requests
+        if not force and relief_request_ids:
+            fiscal_year = incident.fiscal_year or AppSettings.get_setting('active_fiscal_year', '2081/82')
+            prior_dists = Distribution.query.join(
+                Dispatch, Distribution.dispatch_id == Dispatch.id
+            ).filter(
+                Distribution.fiscal_year == fiscal_year,
+                Distribution.dispatch_id.isnot(None),
+                db.or_(*(db.or_(
+                    Dispatch.relief_request_ids.like(f'%[{rid},%'),
+                    Dispatch.relief_request_ids.like(f'%, {rid},%'),
+                    Dispatch.relief_request_ids.like(f'%, {rid}]%'),
+                    Dispatch.relief_request_ids == f'[{rid}]'
+                ) for rid in relief_request_ids))
+            ).all()
+            if prior_dists:
+                dist_list = [{'no': d.distribution_no, 'date': str(d.distribution_date)} for d in prior_dists[:5]]
+                return jsonify({
+                    'success': False,
+                    'requires_confirmation': True,
+                    'message': f'{len(prior_dists)} distribution(s) already exist for these relief requests in fiscal year {fiscal_year}. Some beneficiaries may have already received relief items.',
+                    'distributions': dist_list,
+                    'total': len(prior_dists)
+                }), 409
 
         # Pre-validate items, per-warehouse inventory, and combined relief request limits
         validated_items = {}
