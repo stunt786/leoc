@@ -18445,3 +18445,94 @@ AttributeError: 'EmergencyContact' object has no attribute 'person_name'
 2026-06-24 14:53:58,894 INFO: LEOC Application started [in /app/app.py:166]
 2026-06-24 14:53:58,976 INFO: LEOC Application started [in /app/app.py:166]
 2026-06-24 20:39:34,597 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:166]
+2026-06-24 20:44:59,407 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:166]
+2026-06-24 20:46:15,077 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:166]
+2026-06-24 20:46:17,555 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:166]
+2026-06-24 15:01:35,142 INFO: LEOC Application started [in /app/app.py:166]
+2026-06-24 15:01:35,165 INFO: LEOC Application started [in /app/app.py:166]
+2026-06-24 15:30:23,522 INFO: LEOC Application started [in /app/app.py:166]
+2026-06-24 15:30:23,522 INFO: LEOC Application started [in /app/app.py:166]
+2026-06-24 15:48:30,579 INFO: LEOC Application started [in /app/app.py:166]
+2026-06-24 15:48:30,622 INFO: LEOC Application started [in /app/app.py:166]
+2026-06-24 15:51:00,592 ERROR: Exception on /api/clusters [POST] [in /usr/local/lib/python3.11/site-packages/flask/app.py:825]
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1969, in _exec_single_context
+    self.dialect.do_execute(
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+psycopg2.errors.UniqueViolation: duplicate key value violates unique constraint "cluster_cluster_name_key"
+DETAIL:  Key (cluster_name)=(Health) already exists.
+
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.11/site-packages/flask/app.py", line 1455, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/flask/app.py", line 869, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/flask/app.py", line 867, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/flask/app.py", line 852, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/flask_login/utils.py", line 290, in decorated_view
+    return current_app.ensure_sync(func)(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/app/new_routes.py", line 522, in api_clusters
+    db.session.flush()
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/orm/scoping.py", line 923, in flush
+    return self._proxied.flush(objects=objects)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/orm/session.py", line 4353, in flush
+    self._flush(objects)
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/orm/session.py", line 4488, in _flush
+    with util.safe_reraise():
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/util/langhelpers.py", line 122, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/orm/session.py", line 4449, in _flush
+    flush_context.execute()
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/orm/unitofwork.py", line 465, in execute
+    rec.execute(self)
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/orm/unitofwork.py", line 641, in execute
+    util.preloaded.orm_persistence.save_obj(
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/orm/persistence.py", line 94, in save_obj
+    _emit_insert_statements(
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/orm/persistence.py", line 1234, in _emit_insert_statements
+    result = connection.execute(
+             ^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1421, in execute
+    return meth(
+           ^^^^^
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/sql/elements.py", line 526, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1643, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1848, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1988, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 2365, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1969, in _exec_single_context
+    self.dialect.do_execute(
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+sqlalchemy.exc.IntegrityError: (psycopg2.errors.UniqueViolation) duplicate key value violates unique constraint "cluster_cluster_name_key"
+DETAIL:  Key (cluster_name)=(Health) already exists.
+
+[SQL: INSERT INTO cluster (cluster_name, lead_organization, focal_person, contact_details, resource_capacity, available_equipment, coverage_area, gis_coverage_boundary, created_at, updated_at, created_by) VALUES (%(cluster_name)s, %(lead_organization)s, %(focal_person)s, %(contact_details)s, %(resource_capacity)s, %(available_equipment)s, %(coverage_area)s, %(gis_coverage_boundary)s, %(created_at)s, %(updated_at)s, %(created_by)s) RETURNING cluster.id]
+[parameters: {'cluster_name': 'Health', 'lead_organization': 'nj', 'focal_person': 'vg', 'contact_details': '9865654665', 'resource_capacity': '', 'available_equipment': '', 'coverage_area': '', 'gis_coverage_boundary': '', 'created_at': datetime.datetime(2026, 6, 24, 15, 51, 0, 587611, tzinfo=datetime.timezone.utc), 'updated_at': datetime.datetime(2026, 6, 24, 15, 51, 0, 587622, tzinfo=datetime.timezone.utc), 'created_by': 1}]
+(Background on this error at: https://sqlalche.me/e/20/gkpj)
+2026-06-24 15:53:36,790 INFO: LEOC Application started [in /app/app.py:166]
+2026-06-24 15:53:36,820 INFO: LEOC Application started [in /app/app.py:166]
+2026-06-24 16:01:47,699 INFO: LEOC Application started [in /app/app.py:166]
+2026-06-24 16:01:47,875 INFO: LEOC Application started [in /app/app.py:166]
+2026-06-24 16:03:30,630 INFO: LEOC Application started [in /app/app.py:166]
+2026-06-24 16:03:30,643 INFO: LEOC Application started [in /app/app.py:166]

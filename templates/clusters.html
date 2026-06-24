@@ -57,18 +57,12 @@
                             <div class="row g-3">
                                 <div class="col-md-6">
                                     <label class="form-label fw-medium">Cluster Name <span class="text-danger">*</span></label>
-                                    <select class="form-select" id="clusterName" name="cluster_name" required>
-                                        <option value="">-- Select Cluster --</option>
-                                        <option value="Search and Rescue">Search and Rescue</option>
-                                        <option value="Health">Health</option>
-                                        <option value="Shelter">Shelter</option>
-                                        <option value="WASH">WASH</option>
-                                        <option value="Food Security">Food Security</option>
-                                        <option value="Protection">Protection</option>
-                                        <option value="Logistics">Logistics</option>
-                                        <option value="Education">Education</option>
-                                        <option value="Communication">Communication</option>
-                                    </select>
+                                    <div class="input-group">
+                                        <select class="form-select" id="clusterName" name="cluster_name" required>
+                                            <option value="">-- Select Cluster --</option>
+                                        </select>
+                                        <button class="btn btn-outline-secondary" type="button" title="Manage Cluster Types" onclick="openClusterTypeManager()"><i class="bi bi-gear"></i></button>
+                                    </div>
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label fw-medium">Lead Organization <span class="text-danger">*</span></label>
@@ -135,7 +129,7 @@
                 <div id="addMeetingForm" style="display:none;" class="card card-body bg-light mb-3">
                     <div class="row g-2">
                         <div class="col-md-3">
-                            <input type="date" class="form-control form-control-sm" id="meetingDate" placeholder="Date">
+                            <input type="text" class="form-control form-control-sm nepali-date" id="meetingDate" placeholder="YYYY-MM-DD">
                         </div>
                         <div class="col-md-3">
                             <input type="text" class="form-control form-control-sm" id="meetingAgenda" placeholder="Agenda">
@@ -175,7 +169,7 @@
                 <div id="addDeploymentForm" style="display:none;" class="card card-body bg-light mb-3">
                     <div class="row g-2">
                         <div class="col-md-3">
-                            <input type="date" class="form-control form-control-sm" id="deploymentDate" placeholder="Date">
+                            <input type="text" class="form-control form-control-sm nepali-date" id="deploymentDate" placeholder="YYYY-MM-DD">
                         </div>
                         <div class="col-md-3">
                             <input type="text" class="form-control form-control-sm" id="deploymentLocation" placeholder="Location">
@@ -233,9 +227,32 @@
         </div>
     </div>
 </template>
+
+<div class="modal fade" id="clusterTypeModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-diagram-3 me-2"></i>Manage Cluster Types</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="small text-muted">Add or remove cluster types. Types in use cannot be deleted.</p>
+                <div id="clusterTypeList" class="mb-3"></div>
+                <div class="input-group">
+                    <input type="text" class="form-control" id="newClusterTypeInput" placeholder="New cluster type name">
+                    <button class="btn btn-primary" onclick="addClusterType()"><i class="bi bi-plus-lg"></i></button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 {% block extra_js %}
 <script>
+function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 let paginator = new Paginator({perPage: 25, onPageChange: () => renderClusters(_clusters)});
 let _clusters = [];
@@ -268,7 +285,7 @@ async function loadData() {
         const r = await fetch('/api/clusters');
         const d = await r.json();
         if (!d.success) { showToast('danger', d.message); return; }
-        _clusters = d.clusters || [];
+        _clusters = d.data || [];
         renderClusters(_clusters);
     } catch(e) {
         showToast('danger', 'Error loading clusters: ' + e.message);
@@ -303,7 +320,7 @@ async function editRecord(id) {
     const r = await fetch(`/api/clusters/${id}`);
     const d = await r.json();
     if (!d.success) { showToast('danger', d.message); return; }
-    const c = d.cluster;
+    const c = d.data;
     document.getElementById('clusterId').value = c.id;
     document.getElementById('clusterName').value = c.cluster_name || '';
     document.getElementById('leadOrganization').value = c.lead_organization || '';
@@ -359,7 +376,7 @@ document.getElementById('clusterForm').addEventListener('submit', async function
     try {
         const r = await fetch(url, {method, headers:{'Content-Type':'application/json','X-CSRFToken':csrf}, body: JSON.stringify(body)});
         const d = await r.json();
-        if (d.success) { showToast('success', d.message); bootstrap.Modal.getInstance(document.getElementById('clusterModal')).hide(); loadData(); }
+        if (d.success) { showToast('success', id ? 'Cluster updated' : 'Cluster created'); bootstrap.Modal.getInstance(document.getElementById('clusterModal')).hide(); loadData(); }
         else showToast('danger', d.message);
     } catch(e) { showToast('danger', e.message); }
 });
@@ -406,7 +423,7 @@ async function openMeetings(clusterId) {
         const r = await fetch(`/api/clusters/${clusterId}/meetings`);
         const d = await r.json();
         if (!d.success) { showToast('danger', d.message); return; }
-        const meetings = d.meetings || [];
+        const meetings = d.data || [];
         const tbody = document.getElementById('meetingsBody');
         if (meetings.length === 0) {
             tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No meetings recorded</td></tr>';
@@ -445,7 +462,7 @@ async function saveMeeting(clusterId) {
             body: JSON.stringify(body)
         });
         const d = await r.json();
-        if (d.success) { showToast('success', d.message); document.getElementById('addMeetingForm').style.display = 'none'; openMeetings(clusterId); }
+        if (d.success) { showToast('success', 'Meeting saved'); document.getElementById('addMeetingForm').style.display = 'none'; openMeetings(clusterId); }
         else showToast('danger', d.message);
     } catch(e) { showToast('danger', e.message); }
 }
@@ -459,7 +476,7 @@ async function openDeployments(clusterId) {
         const r = await fetch(`/api/clusters/${clusterId}/deployments`);
         const d = await r.json();
         if (!d.success) { showToast('danger', d.message); return; }
-        const deployments = d.deployments || [];
+        const deployments = d.data || [];
         const tbody = document.getElementById('deploymentsBody');
         if (deployments.length === 0) {
             tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No deployments recorded</td></tr>';
@@ -498,12 +515,79 @@ async function saveDeployment(clusterId) {
             body: JSON.stringify(body)
         });
         const d = await r.json();
-        if (d.success) { showToast('success', d.message); document.getElementById('addDeploymentForm').style.display = 'none'; openDeployments(clusterId); }
+        if (d.success) { showToast('success', 'Deployment saved'); document.getElementById('addDeploymentForm').style.display = 'none'; openDeployments(clusterId); }
         else showToast('danger', d.message);
     } catch(e) { showToast('danger', e.message); }
 }
 
+async function loadClusterTypes() {
+    const r = await fetch('/api/settings/cluster_types');
+    const d = await r.json();
+    const types = Array.isArray(d.value) ? d.value : [];
+    const sel = document.getElementById('clusterName');
+    const current = sel.value;
+    sel.innerHTML = '<option value="">-- Select Cluster --</option>' + types.map(t => `<option value="${t}">${t}</option>`).join('');
+    if (current) sel.value = current;
+}
+
+async function openClusterTypeManager() {
+    await renderClusterTypeList();
+    new bootstrap.Modal(document.getElementById('clusterTypeModal')).show();
+}
+
+async function renderClusterTypeList() {
+    const r = await fetch('/api/settings/cluster_types');
+    const d = await r.json();
+    const types = Array.isArray(d.value) ? d.value : [];
+    document.getElementById('clusterTypeList').innerHTML = types.map((t, i) =>
+        `<div class="d-flex justify-content-between align-items-center mb-1 p-1 border rounded">
+            <span>${t}</span>
+            <button class="btn btn-sm btn-outline-danger" onclick="removeClusterType(${i}, '${esc(t)}')"><i class="bi bi-x"></i></button>
+        </div>`
+    ).join('');
+}
+
+async function addClusterType() {
+    const input = document.getElementById('newClusterTypeInput');
+    const name = input.value.trim();
+    if (!name) return;
+    const r = await fetch('/api/settings/cluster_types');
+    const d = await r.json();
+    const types = Array.isArray(d.value) ? d.value : [];
+    if (types.includes(name)) { showToast('warning', 'Already exists'); return; }
+    types.push(name);
+    const resp = await fetch('/api/settings/cluster_types', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json','X-CSRFToken':csrf},
+        body: JSON.stringify({value: types})
+    });
+    const rd = await resp.json();
+    if (!rd.success) { showToast('danger', rd.message); return; }
+    input.value = '';
+    await renderClusterTypeList();
+    await loadClusterTypes();
+    showToast('success', 'Cluster type added');
+}
+
+async function removeClusterType(index, name) {
+    const r = await fetch('/api/settings/cluster_types');
+    const d = await r.json();
+    const types = Array.isArray(d.value) ? d.value : [];
+    types.splice(index, 1);
+    const resp = await fetch('/api/settings/cluster_types', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json','X-CSRFToken':csrf},
+        body: JSON.stringify({value: types})
+    });
+    const rd = await resp.json();
+    if (!rd.success) { showToast('danger', rd.message); return; }
+    await renderClusterTypeList();
+    await loadClusterTypes();
+    showToast('success', `"${name}" removed`);
+}
+
 loadData();
+loadClusterTypes();
 </script>
 {% include "_module_shared.html" %}
 {% endblock %}

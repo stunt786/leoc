@@ -535,7 +535,7 @@ function addTrainingRow(data) {
     const tr = document.createElement('tr');
     tr.innerHTML =
         '<td><input type="text" class="form-control form-control-sm training-name" value="' + (data.training_name || '') + '" placeholder="Training name"></td>' +
-        '<td><input type="date" class="form-control form-control-sm training-date" value="' + (data.training_date || '') + '"></td>' +
+        '<td><input type="text" class="form-control form-control-sm training-date nepali-date" value="' + (data.training_date || '') + '" placeholder="YYYY-MM-DD"></td>' +
         '<td><select class="form-select form-select-sm training-cert-status">' +
             '<option value="">Select</option>' +
             '<option value="Certified" ' + (data.certification_status === 'Certified' ? 'selected' : '') + '>Certified</option>' +

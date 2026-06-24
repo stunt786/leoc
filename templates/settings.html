@@ -5,12 +5,37 @@
 <li class="breadcrumb-item active">Settings</li>
 {% endblock %}
 {% block content %}
-<div class="page-header d-flex justify-content-between align-items-center">
+<div class="page-header d-flex justify-content-between align-items-center mb-3">
     <h4><i class="bi bi-gear-fill me-2"></i>Organization Settings</h4>
 </div>
 
-<div class="row g-3">
-    <div class="col-md-8">
+<ul class="nav nav-tabs mb-3" id="settingsTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="org-tab" data-bs-toggle="tab" data-bs-target="#org" type="button" role="tab">
+            <i class="bi bi-building me-1"></i>Organization
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="lists-tab" data-bs-toggle="tab" data-bs-target="#lists" type="button" role="tab">
+            <i class="bi bi-list-check me-1"></i>Dropdown Lists
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="fiscal-tab" data-bs-toggle="tab" data-bs-target="#fiscal" type="button" role="tab">
+            <i class="bi bi-calendar me-1"></i>Fiscal Year
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="system-tab" data-bs-toggle="tab" data-bs-target="#system" type="button" role="tab">
+            <i class="bi bi-database me-1"></i>System
+        </button>
+    </li>
+</ul>
+
+<div class="tab-content" id="settingsTabsContent">
+
+    <!-- ============ ORGANIZATION TAB ============ -->
+    <div class="tab-pane fade show active" id="org" role="tabpanel">
         <div class="card">
             <div class="card-header"><span><i class="bi bi-building me-2"></i>Organization Information</span></div>
             <div class="card-body">
@@ -62,84 +87,123 @@
         </div>
     </div>
 
-    <div class="col-md-4">
-        <div class="card mb-3">
-            <div class="card-header"><span><i class="bi bi-calendar me-2"></i>Fiscal Year</span></div>
-            <div class="card-body">
-                <div class="mb-3">
-                    <label class="form-label">Active Fiscal Year</label>
-                    <select class="form-select" id="active_fiscal_year" data-key="active_fiscal_year"></select>
-                </div>
-                <label class="form-label">Fiscal Years</label>
-                <div id="fiscal_years_list" class="mb-2"></div>
-                <div class="input-group">
-                    <input type="text" class="form-control" id="new_fiscal_year" placeholder="e.g. 2085/86">
-                    <button class="btn btn-outline-primary" onclick="addListItem('fiscal_years', 'new_fiscal_year', 'fiscal_years_list')"><i class="bi bi-plus-lg"></i></button>
-                </div>
-            </div>
-        </div>
-
-        <div class="card mb-3">
-            <div class="card-header"><span><i class="bi bi-exclamation-triangle me-2"></i>Disaster Types</span></div>
-            <div class="card-body">
-                <div id="disaster_types_list" class="mb-2"></div>
-                <div class="input-group">
-                    <input type="text" class="form-control" id="new_disaster_type" placeholder="e.g. Drought">
-                    <button class="btn btn-outline-primary" onclick="addListItem('disaster_types', 'new_disaster_type', 'disaster_types_list')"><i class="bi bi-plus-lg"></i></button>
-                </div>
-            </div>
-        </div>
-
-        <div class="card mb-3">
-            <div class="card-header"><span><i class="bi bi-people me-2"></i>SSF Types</span></div>
-            <div class="card-body">
-                <div id="ssf_types_list" class="mb-2"></div>
-                <div class="input-group">
-                    <input type="text" class="form-control" id="new_ssf_type" placeholder="e.g. Old Age">
-                    <button class="btn btn-outline-primary" onclick="addListItem('ssf_types', 'new_ssf_type', 'ssf_types_list')"><i class="bi bi-plus-lg"></i></button>
-                </div>
-            </div>
-        </div>
-
-        <div class="card mb-3">
-            <div class="card-header"><span><i class="bi bi-map me-2"></i>Wards</span></div>
-            <div class="card-body">
-                <label class="form-label">Ward List</label>
-                <div id="wards_list" class="mb-2"></div>
-                <div class="input-group">
-                    <input type="text" class="form-control" id="new_ward_name" placeholder="e.g. Ward 1 or Ward Name">
-                    <button class="btn btn-outline-primary" onclick="addWard()"><i class="bi bi-plus-lg"></i></button>
-                </div>
-                <small class="text-muted">Customize ward names shown in all dropdowns across the system.</small>
-            </div>
-        </div>
-
-        <div class="card mb-3">
-            <div class="card-header"><span><i class="bi bi-database me-2"></i>Backup & Restore</span></div>
-            <div class="card-body">
-                <div id="dbInfo" class="small text-muted mb-2"></div>
-                <div class="d-grid gap-2">
-                    <a href="/api/backup" class="btn btn-outline-primary btn-sm"><i class="bi bi-download me-1"></i>Download Backup</a>
-                    <hr class="my-1">
-                    <label class="form-label small mb-1">Restore from SQL Backup</label>
-                    <div class="input-group">
-                        <input type="file" class="form-control form-control-sm" id="restoreFile" accept=".sql">
-                        <button class="btn btn-outline-warning btn-sm" onclick="restoreBackup()"><i class="bi bi-upload me-1"></i>Restore</button>
+    <!-- ============ DROPDOWN LISTS TAB ============ -->
+    <div class="tab-pane fade" id="lists" role="tabpanel">
+        <div class="row g-3">
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-header"><span><i class="bi bi-exclamation-triangle me-2"></i>Disaster Types</span></div>
+                    <div class="card-body">
+                        <p class="small text-muted">Used in incidents, assessments, and reports.</p>
+                        <div id="disaster_types_list" class="mb-2"></div>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="new_disaster_type" placeholder="e.g. Drought">
+                            <button class="btn btn-outline-primary" onclick="addListItem('disaster_types', 'new_disaster_type', 'disaster_types_list')"><i class="bi bi-plus-lg"></i></button>
+                        </div>
                     </div>
-                    <small class="text-muted">Upload a .sql backup file. Current data will be replaced.</small>
                 </div>
             </div>
-        </div>
-
-        <div class="card mb-3 border-danger">
-            <div class="card-header text-danger"><span><i class="bi bi-exclamation-triangle-fill me-2"></i>Danger Zone</span></div>
-            <div class="card-body">
-                <label class="form-label small">Reset Database</label>
-                <p class="small text-muted">Deletes all data and re-seeds defaults (admin user, wards, settings).</p>
-                <button class="btn btn-outline-danger btn-sm w-100" onclick="resetDatabase()"><i class="bi bi-arrow-counterclockwise me-1"></i>Reset & Re-seed</button>
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-header"><span><i class="bi bi-diagram-3 me-2"></i>Cluster Types</span></div>
+                    <div class="card-body">
+                        <p class="small text-muted">Used in cluster management and coordination.</p>
+                        <div id="cluster_types_list" class="mb-2"></div>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="new_cluster_type" placeholder="e.g. Search and Rescue">
+                            <button class="btn btn-outline-primary" onclick="addListItem('cluster_types', 'new_cluster_type', 'cluster_types_list')"><i class="bi bi-plus-lg"></i></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-header"><span><i class="bi bi-people me-2"></i>SSF Types</span></div>
+                    <div class="card-body">
+                        <p class="small text-muted">Used in beneficiary registration for social security categories.</p>
+                        <div id="ssf_types_list" class="mb-2"></div>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="new_ssf_type" placeholder="e.g. Old Age">
+                            <button class="btn btn-outline-primary" onclick="addListItem('ssf_types', 'new_ssf_type', 'ssf_types_list')"><i class="bi bi-plus-lg"></i></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-header"><span><i class="bi bi-map me-2"></i>Wards</span></div>
+                    <div class="card-body">
+                        <p class="small text-muted">Customize ward names shown in all dropdowns across the system.</p>
+                        <div id="wards_list" class="mb-2"></div>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="new_ward_name" placeholder="e.g. Ward 1 or Ward Name">
+                            <button class="btn btn-outline-primary" onclick="addWard()"><i class="bi bi-plus-lg"></i></button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
+
+    <!-- ============ FISCAL YEAR TAB ============ -->
+    <div class="tab-pane fade" id="fiscal" role="tabpanel">
+        <div class="card">
+            <div class="card-header"><span><i class="bi bi-calendar me-2"></i>Fiscal Year Management</span></div>
+            <div class="card-body">
+                <div class="row g-4">
+                    <div class="col-md-6">
+                        <label class="form-label fw-medium">Active Fiscal Year</label>
+                        <p class="small text-muted">The currently active fiscal year used for filtering and reports.</p>
+                        <select class="form-select" id="active_fiscal_year" data-key="active_fiscal_year"></select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-medium">Fiscal Years</label>
+                        <p class="small text-muted">Add or remove fiscal years available across the system.</p>
+                        <div id="fiscal_years_list" class="mb-2"></div>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="new_fiscal_year" placeholder="e.g. 2085/86">
+                            <button class="btn btn-outline-primary" onclick="addListItem('fiscal_years', 'new_fiscal_year', 'fiscal_years_list')"><i class="bi bi-plus-lg"></i></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============ SYSTEM TAB ============ -->
+    <div class="tab-pane fade" id="system" role="tabpanel">
+        <div class="row g-3">
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-header"><span><i class="bi bi-database me-2"></i>Backup & Restore</span></div>
+                    <div class="card-body">
+                        <div id="dbInfo" class="small text-muted mb-3"></div>
+                        <div class="d-grid gap-2">
+                            <a href="/api/backup" class="btn btn-outline-primary"><i class="bi bi-download me-1"></i>Download Backup</a>
+                            <hr class="my-1">
+                            <label class="form-label small mb-1">Restore from SQL Backup</label>
+                            <div class="input-group">
+                                <input type="file" class="form-control" id="restoreFile" accept=".sql">
+                                <button class="btn btn-outline-warning" onclick="restoreBackup()"><i class="bi bi-upload me-1"></i>Restore</button>
+                            </div>
+                            <small class="text-muted">Upload a .sql backup file. Current data will be replaced.</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card h-100 border-danger">
+                    <div class="card-header text-danger"><span><i class="bi bi-exclamation-triangle-fill me-2"></i>Danger Zone</span></div>
+                    <div class="card-body d-flex flex-column">
+                        <label class="form-label fw-medium">Reset Database</label>
+                        <p class="small text-muted flex-grow-1">Deletes all data and re-seeds defaults (admin user, wards, settings). A backup will be created automatically.</p>
+                        <button class="btn btn-outline-danger" onclick="resetDatabase()"><i class="bi bi-arrow-counterclockwise me-1"></i>Reset & Re-seed</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
 </div>
 {% endblock %}
 {% block extra_js %}
@@ -156,6 +220,7 @@ async function loadSettings() {
             renderList('fiscal_years', 'fiscal_years_list');
             renderList('disaster_types', 'disaster_types_list');
             renderList('ssf_types', 'ssf_types_list');
+            renderList('cluster_types', 'cluster_types_list');
             renderActiveFiscalYear();
         }
     } catch(e) { console.error('Failed to load settings:', e); }

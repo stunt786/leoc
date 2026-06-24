@@ -261,6 +261,11 @@ def seed_default_settings():
             'भूकम्प (Earthquake)', 'बाढी (Flood)', 'पहिरो (Landslide)',
             'आँधी (Storm)', 'आगलागी (Fire)', 'अन्य (Other)'
         ],
+        'cluster_types': [
+            'Search and Rescue', 'Health', 'Shelter', 'WASH',
+            'Food Security', 'Protection', 'Logistics', 'Education',
+            'Communication', 'Others'
+        ],
         'organization_name': 'थलारा गाउँपालिका',
         'organization_address': 'खोली, बझाङ',
         'organization_phone': 'XXX-XXXXXXX',

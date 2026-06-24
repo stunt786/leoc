@@ -2387,7 +2387,7 @@ def handle_setting(key):
         setting = AppSettings.query.filter_by(setting_key=key).first()
         value = data.get('value')
 
-        if key in ('fiscal_years', 'disaster_types', 'ssf_types') and setting:
+        if key in ('fiscal_years', 'disaster_types', 'ssf_types', 'cluster_types') and setting:
             try:
                 old_value = json.loads(setting.setting_value)
             except (TypeError, json.JSONDecodeError):
@@ -2412,6 +2412,9 @@ def handle_setting(key):
                             )
                         elif key == 'ssf_types':
                             total = Beneficiary.query.filter_by(ssf_type=item).count()
+                        elif key == 'cluster_types':
+                            from new_models import Cluster
+                            total = Cluster.query.filter_by(cluster_name=item).count()
                         else:
                             total = 0
                         if total > 0:
@@ -9673,6 +9676,8 @@ def init_db():
                 AppSettings.set_setting('disaster_types', ['भूकम्प (Earthquake)', 'बाढी (Flood)', 'पहिरो (Landslide)', 'आँधी (Storm)', 'आगलागी (Fire)', 'अन्य (Other)'])
             if not AppSettings.get_setting('ssf_types'):
                 AppSettings.set_setting('ssf_types', ['OAS (बर्षा पेन्सन)', 'विधवा (Widow)', 'अपाङ्गता (Disabled)', 'कोही नभएको (Endangered)', 'बाल भत्ता (Child Grant)', 'अन्य (Other)'])
+            if not AppSettings.get_setting('cluster_types'):
+                AppSettings.set_setting('cluster_types', ['Search and Rescue', 'Health', 'Shelter', 'WASH', 'Food Security', 'Protection', 'Logistics', 'Education', 'Communication', 'Others'])
             if 'beneficiary' in inspector.get_table_names():
                 ben_cols = [c['name'] for c in inspector.get_columns('beneficiary')]
                 if 'status' not in ben_cols:

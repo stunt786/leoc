@@ -209,6 +209,7 @@ html, body { height: 100%; }
         <label class="filter-checkbox"><input type="checkbox" class="layer-toggle" data-layer="infrastructure" checked onchange="toggleLayer('infrastructure')"><span class="layer-dot" style="background:#6f42c1"></span> Critical Infrastructure <span class="layer-count" id="count-infrastructure">0</span></label>
         <label class="filter-checkbox"><input type="checkbox" class="layer-toggle" data-layer="facilities" checked onchange="toggleLayer('facilities')"><span class="layer-dot" style="background:#0d6efd"></span> Emergency Facilities <span class="layer-count" id="count-facilities">0</span></label>
         <label class="filter-checkbox"><input type="checkbox" class="layer-toggle" data-layer="shelters" checked onchange="toggleLayer('shelters')"><span class="layer-dot" style="background:#20c997"></span> Shelters <span class="layer-count" id="count-shelters">0</span></label>
+        <label class="filter-checkbox" style="padding-left:24px;font-size:12px"><input type="checkbox" class="layer-toggle" data-layer="shelter_polygons" checked onchange="toggleLayer('shelter_polygons')"><span class="layer-dot" style="background:#312E81;border-radius:3px"></span> Boundary Polygons <span class="layer-count" id="count-shelter_polygons">0</span></label>
       </div>
 
       <div class="filter-group">
@@ -328,7 +329,7 @@ function initMap() {
   osmLayer.addTo(mapInstance);
 
   L.control.scale({ position: 'bottomleft', imperial: false }).addTo(mapInstance);
-  ['incidents','relief','infrastructure','facilities','shelters','risk_layers','contacts','vulnerable','disabled','high_risk','volunteers','rrt','vehicles'].forEach(k => {
+  ['incidents','relief','infrastructure','facilities','shelters','shelter_polygons','risk_layers','contacts','vulnerable','disabled','high_risk','volunteers','rrt','vehicles'].forEach(k => {
     layerGroups[k] = L.layerGroup().addTo(mapInstance);
     markerMap[k] = [];
   });
@@ -397,7 +398,7 @@ function processMapData(d) {
   }, {
     '<span style="color:#b91c1c">●</span> Thalara Boundary': boundaryGroup,
     '<span style="color:#ca8a04">●</span> Ward Boundaries': wardsGroup
-  }, { position: 'topright' }).addTo(mapInstance);
+  }, { position: 'bottomright' }).addTo(mapInstance);
 
   if (d.incident_markers && d.incident_markers.length) {
     d.incident_markers.forEach(function(m) {
@@ -495,6 +496,23 @@ function processModulesData(d) {
     });
     document.getElementById('count-' + cfg.key).textContent = markerMap[cfg.key].length;
   });
+
+  // Render shelter boundary polygons from GeoJSON
+  (d.shelters || []).forEach(function(s) {
+    if (s.boundary_polygon && s.lat != null && s.lng != null) {
+      try {
+        var geojson = (typeof s.boundary_polygon === 'string') ? JSON.parse(s.boundary_polygon) : s.boundary_polygon;
+        var polyLayer = L.geoJSON(geojson, {
+          style: { color: '#312E81', weight: 2, fillColor: '#312E81', fillOpacity: 0.1 }
+        }).addTo(layerGroups.shelter_polygons);
+        polyLayer.bindTooltip(tipHeader('#312E81', s.name + ' Boundary') + tipBody([
+          {l:'Shelter',v:s.name},{l:'Type',v:s.type||'-'}
+        ]), { sticky: true });
+        markerMap.shelter_polygons.push(polyLayer);
+      } catch(e) { console.warn('Invalid boundary polygon for shelter', s.id, e); }
+    }
+  });
+  document.getElementById('count-shelter_polygons').textContent = markerMap.shelter_polygons.length;
 
   Object.keys(d).forEach(function(key) {
     allData[key] = d[key];

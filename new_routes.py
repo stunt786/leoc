@@ -1224,6 +1224,7 @@ def api_new_modules_map_data():
         'lat': float(s.coordinates.split(',')[0]) if s.coordinates else None,
         'lng': float(s.coordinates.split(',')[1]) if s.coordinates else None,
         'capacity': s.total_capacity, 'occupancy': s.current_occupancy,
+        'boundary_polygon': json.loads(s.boundary_polygon) if s.boundary_polygon else None,
     } for s in Shelter.query.all() if s.coordinates]
 
     data['volunteers'] = [{
