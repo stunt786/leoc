@@ -6,6 +6,8 @@
 {% endblock %}
 {% block extra_css %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
 <style>
 html, body { height: 100%; }
 .wrapper { height: 100vh; display: flex; flex-direction: column; }
@@ -18,13 +20,22 @@ html, body { height: 100%; }
 .gis-container { display: flex; flex: 1; overflow: hidden; position: relative; }
 .gis-map-wrap { flex: 1; position: relative; display: flex; flex-direction: column; }
 #gisMap { flex: 1; width: 100%; z-index: 1; min-height: 400px; }
+.gis-map-wrap:-webkit-full-screen { width:100vw !important; height:100vh !important; background:#fff; padding:0; }
+.gis-map-wrap:-moz-full-screen { width:100vw !important; height:100vh !important; background:#fff; padding:0; }
+.gis-map-wrap:-ms-fullscreen { width:100vw !important; height:100vh !important; background:#fff; padding:0; }
+.gis-map-wrap:fullscreen { width:100vw !important; height:100vh !important; background:#fff; padding:0; }
+.gis-map-wrap:fullscreen #gisMap { height:100vh !important; border-radius:0 !important; }
+.gis-map-wrap:fullscreen .gis-filter-panel {
+  position: absolute; left: 0; top: 0; bottom: 0; z-index: 999;
+  box-shadow: 2px 0 12px rgba(0,0,0,0.2); background: #fff;
+}
+.gis-map-wrap:fullscreen .gis-filter-panel.collapsed { margin-left: -320px; }
 .gis-filter-panel {
   width: 320px; min-width: 320px; background: #fff; border-right: 1px solid #dee2e6;
   overflow-y: auto; z-index: 2; display: flex; flex-direction: column;
   transition: margin-left 0.3s ease;
 }
 .gis-filter-panel.collapsed { margin-left: -320px; }
-.gis-map-wrap { flex: 1; position: relative; }
 
 .filter-header {
   padding: 12px 14px; border-bottom: 1px solid #dee2e6;
@@ -85,7 +96,11 @@ html, body { height: 100%; }
   transition: transform 0.15s;
 }
 .gis-marker:hover { transform: scale(1.15); z-index: 10000 !important; }
-.gis-marker i { font-size: 16px; line-height: 1; text-shadow: 0 1px 2px rgba(0,0,0,0.3); }
+.gis-marker i {
+  display: flex; align-items: center; justify-content: center;
+  width: 100%; height: 100%; border-radius: inherit;
+  font-size: 16px; text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+}
 
 /* Circle shape (default) */
 .gis-marker-circle { border-radius: 50%; }
@@ -111,20 +126,13 @@ html, body { height: 100%; }
   border-bottom-width: 5px;
 }
 
-/* Category colors */
-.gis-marker-incidents { background: #dc3545; }
-.gis-marker-relief { background: #15803d; }
-.gis-marker-infrastructure { background: #7c3aed; }
-.gis-marker-facilities { background: #2563eb; }
-.gis-marker-shelters { background: #0d9488; }
-.gis-marker-risk_layers { background: #ea580c; }
-.gis-marker-contacts { background: #0891b2; color: #fff; }
-.gis-marker-vulnerable { background: #9333ea; }
-.gis-marker-disabled { background: #db2777; }
-.gis-marker-high_risk { background: #1e293b; }
-.gis-marker-volunteers { background: #be185d; }
-.gis-marker-rrt { background: #dc2626; }
-.gis-marker-vehicles { background: #d97706; color: #fff; }
+/* MarkerCluster overrides */
+.marker-cluster-small { background-color: rgba(0, 123, 255, 0.3) !important; }
+.marker-cluster-small div { background-color: #007bff !important; color: #fff !important; font-weight: 700; }
+.marker-cluster-medium { background-color: rgba(255, 193, 7, 0.3) !important; }
+.marker-cluster-medium div { background-color: #ffc107 !important; color: #212529 !important; font-weight: 700; }
+.marker-cluster-large { background-color: rgba(220, 53, 69, 0.3) !important; }
+.marker-cluster-large div { background-color: #dc3545 !important; color: #fff !important; font-weight: 700; }
 
 .gis-tip { font-size: 12px; line-height: 1.5; min-width: 200px; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
 .gis-tip-header { color: #fff; font-weight: 700; font-size: 12px; padding: 5px 8px; border-radius: 6px 6px 0 0; }
@@ -235,7 +243,6 @@ html, body { height: 100%; }
     <div class="filter-actions">
       <button class="btn btn-outline-primary btn-sm" onclick="selectAll(true)"><i class="bi bi-check-all"></i> All</button>
       <button class="btn btn-outline-secondary btn-sm" onclick="selectAll(false)"><i class="bi bi-x"></i> None</button>
-      <button class="btn btn-outline-info btn-sm" onclick="fitAllLayers()"><i class="bi bi-arrows-angle-expand"></i> Fit All</button>
     </div>
   </div>
 
@@ -246,6 +253,8 @@ html, body { height: 100%; }
     </div>
     <div class="gis-tools">
       <button class="btn" onclick="toggleFilterPanel()" id="filterToggleBtn" title="Toggle filters"><i class="bi bi-layout-sidebar"></i> Filters</button>
+      <button class="btn btn-outline-info" onclick="toggleFullScreen()" id="fullscreenBtn" title="Full Screen"><i class="bi bi-arrows-fullscreen"></i></button>
+      <button class="btn btn-outline-secondary" onclick="toggleFullScreen()" id="minimizeBtn" title="Exit Full Screen" style="display:none"><i class="bi bi-fullscreen-exit"></i></button>
       <button class="btn" onclick="refreshMapData()" title="Refresh data"><i class="bi bi-arrow-clockwise"></i></button>
       <span class="text-muted small" id="totalCount">0 points</span>
     </div>
@@ -255,6 +264,7 @@ html, body { height: 100%; }
 {% endblock %}
 {% block extra_js %}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <script>
 let mapInstance = null;
 let allData = {};
@@ -266,10 +276,10 @@ let wardsLayer = null;
 let boundaryGroup = null;
 let wardsGroup = null;
 const LAYER_COLORS = {
-  incidents: '#dc3545', relief: '#15803d', infrastructure: '#6f42c1',
-  facilities: '#0d6efd', shelters: '#20c997', risk_layers: '#fd7e14',
-  contacts: '#0dcaf0', vulnerable: '#6610f2', disabled: '#e83e8c',
-  high_risk: '#212529', volunteers: '#d63384', rrt: '#e74c3c', vehicles: '#ffc107'
+  incidents: '#dc3545', relief: '#15803d', infrastructure: '#7c3aed',
+  facilities: '#2563eb', shelters: '#0d9488', risk_layers: '#ea580c',
+  contacts: '#0891b2', vulnerable: '#9333ea', disabled: '#db2777',
+  high_risk: '#1e293b', volunteers: '#be185d', rrt: '#dc2626', vehicles: '#d97706'
 };
 const LAYER_NAMES = {
   incidents: 'Incidents', relief: 'Relief', infrastructure: 'Infrastructure',
@@ -284,7 +294,6 @@ const LAYER_ICONS = {
   high_risk: 'bi-shield-exclamation', volunteers: 'bi-person-check', rrt: 'bi-flag',
   vehicles: 'bi-truck'
 };
-
 const MARKER_SHAPES = {
   incidents: 'gis-marker-circle', relief: 'gis-marker-diamond',
   infrastructure: 'gis-marker-square', facilities: 'gis-marker-square',
@@ -294,11 +303,68 @@ const MARKER_SHAPES = {
   volunteers: 'gis-marker-hex', rrt: 'gis-marker-hex', vehicles: 'gis-marker-square'
 };
 
-function makeMarkerIcon(layerKey, iconClass) {
-  const cls = 'gis-marker gis-marker-' + layerKey + ' ' + (MARKER_SHAPES[layerKey] || 'gis-marker-circle');
+// Sub-type icon maps for richer visualization
+const SUBTYPE_ICONS = {
+  infrastructure: {
+    'Hospital': 'bi-hospital', 'Health Post': 'bi-heart-pulse', 'Primary Health Centre': 'bi-heart-pulse',
+    'School': 'bi-mortarboard', 'Police Office': 'bi-shield-shaded', 'Armed Police Office': 'bi-shield-fill',
+    'Army Barrack': 'bi-shield-fill-check', 'Fire Station': 'bi-fire', 'Communication Tower': 'bi-broadcast',
+    'Power Substation': 'bi-lightning', 'Water Supply Facility': 'bi-droplet', 'Irrigation Facility': 'bi-droplet',
+    'Bridge': 'bi-signpost-2', 'Government Building': 'bi-building', 'Community Building': 'bi-people',
+    'Market Centre': 'bi-shop', 'Fuel Station': 'bi-fuel-pump', 'Bank': 'bi-bank',
+    'Municipality Office': 'bi-building', 'Ward Office': 'bi-building'
+  },
+  facilities: {
+    'Helipad': 'bi-helicopter', 'Safe Shelter': 'bi-house-heart', 'Evacuation Centre': 'bi-people',
+    'Open Space': 'bi-tree', 'Relief Distribution Centre': 'bi-box-seam', 'Emergency Warehouse': 'bi-building',
+    'Emergency Operations Centre': 'bi-diagram-3', 'Temporary Camp Site': 'bi-tent'
+  },
+  shelters: {
+    'Temporary Shelter': 'bi-house-door', 'Permanent Shelter': 'bi-building', 'Community Building': 'bi-people',
+    'School': 'bi-mortarboard', 'Relief Centre': 'bi-box-seam', 'Open Area/Open Space': 'bi-tree'
+  },
+  risk_layers: {
+    'Flood Risk Zone': 'bi-water', 'Landslide Risk Zone': 'bi-mountain', 'Fire Risk Zone': 'bi-fire',
+    'Earthquake Risk Zone': 'bi-globe2', 'River Cutting Zone': 'bi-water', 'Forest Fire Risk Zone': 'bi-tree',
+    'Drought Risk Zone': 'bi-sun', 'Avalanche Risk Zone': 'bi-snow', 'Windstorm Risk Zone': 'bi-wind',
+    'Lightning Risk Zone': 'bi-cloud-lightning-rain'
+  },
+  vehicles: {
+    'Ambulance': 'bi-truck-front', 'Fire Engine': 'bi-fire', 'Excavator': 'bi-tools',
+    'Tractor': 'bi-truck', 'Pickup': 'bi-truck', 'Truck': 'bi-truck', 'Jeep': 'bi-car-front',
+    'Motorcycle': 'bi-scooter', 'Boat': 'bi-water'
+  }
+};
+
+// Sub-property color maps
+const SEVERITY_COLORS = { low: '#2563eb', medium: '#d97706', high: '#dc3545', critical: '#7f1d1d' };
+const RISK_LEVEL_COLORS = { 'Low': '#22c55e', 'Moderate': '#eab308', 'High': '#ef4444', 'Very High': '#7f1d1d' };
+const PRIORITY_COLORS = { 'Normal': '#22c55e', 'High': '#eab308', 'Critical': '#ef4444' };
+
+function pickIcon(layerKey, item) {
+  const map = SUBTYPE_ICONS[layerKey];
+  if (map && map[item.type]) return map[item.type];
+  if (map && map[item.shelter_type]) return map[item.shelter_type];
+  if (map && map[item.vehicle_type]) return map[item.vehicle_type];
+  if (map && item.facility_type && map[item.facility_type]) return map[item.facility_type];
+  if (map && item.infrastructure_type && map[item.infrastructure_type]) return map[item.infrastructure_type];
+  return LAYER_ICONS[layerKey] || 'bi-geo-alt-fill';
+}
+
+function pickColor(layerKey, item) {
+  if (layerKey === 'incidents' && item.severity) return SEVERITY_COLORS[item.severity] || SEVERITY_COLORS['medium'];
+  if (layerKey === 'risk_layers' && item.level) return RISK_LEVEL_COLORS[item.level] || RISK_LEVEL_COLORS['Moderate'];
+  if (layerKey === 'vulnerable' && item.priority) return PRIORITY_COLORS[item.priority] || PRIORITY_COLORS['Normal'];
+  if (layerKey === 'high_risk' && item.category) return SEVERITY_COLORS['high'];
+  return null;
+}
+
+function makeMarkerIcon(layerKey, iconClass, color) {
+  const shape = MARKER_SHAPES[layerKey] || 'gis-marker-circle';
+  const c = color || LAYER_COLORS[layerKey] || '#6c757d';
   return L.divIcon({
-    className: cls,
-    html: '<i class="bi ' + iconClass + '"></i>',
+    className: 'gis-marker ' + shape,
+    html: '<i class="bi ' + iconClass + '" style="background:' + c + ';display:flex;align-items:center;justify-content:center;width:100%;height:100%;border-radius:inherit;color:#fff"></i>',
     iconSize: [34, 34],
     iconAnchor: [17, 17],
     popupAnchor: [0, -17]
@@ -329,10 +395,12 @@ function initMap() {
   osmLayer.addTo(mapInstance);
 
   L.control.scale({ position: 'bottomleft', imperial: false }).addTo(mapInstance);
-  ['incidents','relief','infrastructure','facilities','shelters','shelter_polygons','risk_layers','contacts','vulnerable','disabled','high_risk','volunteers','rrt','vehicles'].forEach(k => {
-    layerGroups[k] = L.layerGroup().addTo(mapInstance);
+  ['incidents','relief','infrastructure','facilities','shelters','risk_layers','contacts','vulnerable','disabled','high_risk','volunteers','rrt','vehicles'].forEach(k => {
+    layerGroups[k] = L.markerClusterGroup({ chunkedLoading: true, maxClusterRadius: 60, spiderfyOnMaxZoom: true, showCoverageOnHover: false, zoomToBoundsOnClick: true }).addTo(mapInstance);
     markerMap[k] = [];
   });
+  layerGroups.shelter_polygons = L.layerGroup().addTo(mapInstance);
+  markerMap.shelter_polygons = [];
   loadAllData();
 }
 
@@ -402,8 +470,9 @@ function processMapData(d) {
 
   if (d.incident_markers && d.incident_markers.length) {
     d.incident_markers.forEach(function(m) {
-      const color = m.severity === 'high' ? '#dc3545' : m.severity === 'medium' ? '#d97706' : '#2563eb';
-      const mk = L.marker([m.lat, m.lng], { icon: makeMarkerIcon('incidents', 'bi-lightning-charge-fill') }).addTo(layerGroups.incidents);
+      const color = pickColor('incidents', m);
+      const icon = pickIcon('incidents', m);
+      const mk = L.marker([m.lat, m.lng], { icon: makeMarkerIcon('incidents', icon, color) }).addTo(layerGroups.incidents);
       mk.bindTooltip(tipHeader(color, m.name) + tipBody([
         {l:'Type',v:m.type},{l:'Ward',v:m.ward_name || m.ward || 'N/A'},{l:'Severity',v:m.severity},
         {l:'Deaths',v:(m.deaths||0).toLocaleString()},{l:'Injured',v:(m.injured||0).toLocaleString()},
@@ -484,8 +553,10 @@ function processModulesData(d) {
     const items = d[cfg.key] || [];
     items.forEach(function(r) {
       if (r.lat == null || r.lng == null) return;
+      const icon = pickIcon(cfg.key, r);
+      const color = pickColor(cfg.key, r);
       const mk = L.marker([r.lat, r.lng], {
-        icon: makeMarkerIcon(cfg.key, cfg.icon)
+        icon: makeMarkerIcon(cfg.key, icon, color)
       }).addTo(layerGroups[cfg.key]);
       const rows = cfg.fields.map(f => ({l: f.l, v: f.v(r)}));
       mk.bindTooltip(tipHeader(LAYER_COLORS[cfg.key], cfg.label) + tipBody(rows), { sticky: true, offset: [0, -8] });
@@ -562,9 +633,72 @@ function filterBySearch(query) {
   });
 }
 
-function fitAllLayers() {
-  if (boundaryBounds) mapInstance.fitBounds(boundaryBounds, { padding: [15, 15] });
+function toggleFullScreen() {
+  var container = document.querySelector('.gis-map-wrap');
+  var btn = document.getElementById('fullscreenBtn');
+  var minimizeBtn = document.getElementById('minimizeBtn');
+  var filterPanel = document.getElementById('filterPanel');
+  if (!document.fullscreenElement && !document.webkitFullscreenElement && !document.msFullscreenElement) {
+    if (!filterPanel.dataset.originalParent) {
+      filterPanel.dataset.originalParent = 'gisContainer';
+    }
+    container.insertBefore(filterPanel, container.firstChild);
+    filterPanel.classList.remove('collapsed');
+    if (container.requestFullscreen) {
+      container.requestFullscreen();
+    } else if (container.webkitRequestFullscreen) {
+      container.webkitRequestFullscreen();
+    } else if (container.msRequestFullscreen) {
+      container.msRequestFullscreen();
+    }
+    btn.style.display = 'none';
+    minimizeBtn.style.display = '';
+  } else {
+    if (document.exitFullscreen) {
+      document.exitFullscreen();
+    } else if (document.webkitExitFullscreen) {
+      document.webkitExitFullscreen();
+    } else if (document.msExitFullscreen) {
+      document.msExitFullscreen();
+    }
+  }
 }
+
+function restoreFilterPanel() {
+  var filterPanel = document.getElementById('filterPanel');
+  var container = document.querySelector('.gis-container');
+  var mapWrap = document.querySelector('.gis-map-wrap');
+  if (filterPanel.parentNode === mapWrap) {
+    container.insertBefore(filterPanel, mapWrap);
+  }
+}
+
+document.addEventListener('fullscreenchange', function() {
+  var btn = document.getElementById('fullscreenBtn');
+  var minimizeBtn = document.getElementById('minimizeBtn');
+  if (!btn || !minimizeBtn) return;
+  if (document.fullscreenElement) {
+    btn.style.display = 'none';
+    minimizeBtn.style.display = '';
+  } else {
+    btn.style.display = '';
+    minimizeBtn.style.display = 'none';
+    restoreFilterPanel();
+  }
+});
+document.addEventListener('webkitfullscreenchange', function() {
+  var btn = document.getElementById('fullscreenBtn');
+  var minimizeBtn = document.getElementById('minimizeBtn');
+  if (!btn || !minimizeBtn) return;
+  if (document.webkitFullscreenElement) {
+    btn.style.display = 'none';
+    minimizeBtn.style.display = '';
+  } else {
+    btn.style.display = '';
+    minimizeBtn.style.display = 'none';
+    restoreFilterPanel();
+  }
+});
 
 function refreshMapData() {
   showToast('info', 'Refreshing map data...');
