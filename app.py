@@ -3466,6 +3466,9 @@ def handle_incidents():
         incident_type = (data.get('incident_type') or '').strip()
         if not incident_name or not incident_type:
             return jsonify({'success': False, 'message': 'Incident name and type are required'}), 400
+        coordinates = (data.get('coordinates') or '').strip()
+        if not coordinates:
+            return jsonify({'success': False, 'message': 'Coordinates are required'}), 400
         if Incident.query.filter_by(incident_name=incident_name).first():
             return jsonify({'success': False, 'message': f'Incident "{incident_name}" already exists'}), 409
         ward = parse_int_field(data, 'ward', minimum=1, default=None)
@@ -3518,6 +3521,8 @@ def manage_incident(id):
             if ward is not None and not is_valid_ward(ward):
                 return jsonify({'success': False, 'message': 'Invalid ward selected'}), 400
             incident.ward = ward
+        if 'coordinates' in data and not (data.get('coordinates') or '').strip():
+            return jsonify({'success': False, 'message': 'Coordinates are required'}), 400
         for field in ['status', 'description', 'fiscal_year']:
             if field in data:
                 setattr(incident, field, data[field])
@@ -3697,8 +3702,8 @@ def manage_relief_request(id):
             db.session.delete(req)
             db.session.commit()
             return jsonify({'success': True, 'message': 'Relief request deleted'})
-        if req.status == 'Completed':
-            return jsonify({'success': False, 'message': 'Cannot edit a completed relief request'}), 400
+        if req.status in ('Completed', 'Cancelled'):
+            return jsonify({'success': False, 'message': 'Cannot edit a completed or cancelled relief request'}), 400
         data = request.get_json()
         if data.get('phone') and not validate_phone(data.get('phone')):
             return jsonify({'success': False, 'message': 'Invalid phone number format'}), 400
@@ -3854,7 +3859,7 @@ def handle_dispatches():
         # Update status for all linked relief requests
         for rr_id in relief_request_ids:
             req = db_get(ReliefRequest, rr_id)
-            if req:
+            if req and req.status != 'Cancelled':
                 anything_done = any(ri.quantity_dispatched > 0 for ri in req.items) if req.items else False
                 if anything_done or req.distributed_cash_amount > 0:
                     req.status = 'Partial'
@@ -3919,7 +3924,7 @@ def handle_dispatch(id):
         # Reset relief request status for all linked requests
         for rr_id in old_db_rr_ids:
             old_req = db_get(ReliefRequest, rr_id)
-            if old_req:
+            if old_req and old_req.status != 'Cancelled':
                 old_req.status = 'Pending'
 
         # Delete old items
@@ -3979,7 +3984,7 @@ def handle_dispatch(id):
 
         for rr_id in relief_request_ids:
             req = db_get(ReliefRequest, rr_id)
-            if req and req.items:
+            if req and req.items and req.status != 'Cancelled':
                 anything_done = any(ri.quantity_dispatched > 0 for ri in req.items)
                 if anything_done or req.distributed_cash_amount > 0:
                     req.status = 'Partial'
@@ -4044,10 +4049,13 @@ def cancel_dispatch(id):
                     rr_item = ReliefRequestItem.query.filter_by(request_id=rr_id, item_id=item.item_id).first()
                     if rr_item:
                         rr_item.quantity_dispatched = max(0, (rr_item.quantity_dispatched or 0) - item.quantity)
-                # Reset RR status to Pending if nothing dispatched remains
+                # Cancel RR if nothing dispatched/cash-distributed remains
                 if req.items:
                     anything_dispatched = any((ri.quantity_dispatched or 0) > 0 for ri in req.items)
-                    if not anything_dispatched and (req.distributed_cash_amount or 0) <= 0:
+                    cash_distributed = (req.distributed_cash_amount or 0) > 0
+                    if not anything_dispatched and not cash_distributed:
+                        req.status = 'Cancelled'
+                    elif not anything_dispatched and cash_distributed:
                         req.status = 'Pending'
 
         # Update dispatch as cancelled
@@ -4145,11 +4153,13 @@ def handle_distributions():
         seen_beneficiaries = set()
         for ben_data in beneficiaries_payload:
             ben_id = ben_data.get('beneficiary_id')
+            item_name = (ben_data.get('item') or '').strip()
             family_name = (ben_data.get('family_name') or '').strip()
-            if ben_id and ben_id in seen_beneficiaries:
-                return jsonify({'success': False, 'message': f'Duplicate beneficiary "{family_name}" in the same distribution request'}), 400
+            dedup_key = (ben_id, item_name)
+            if ben_id and dedup_key in seen_beneficiaries:
+                return jsonify({'success': False, 'message': f'Duplicate beneficiary "{family_name}" with item "{item_name}" in the same distribution request'}), 400
             if ben_id:
-                seen_beneficiaries.add(ben_id)
+                seen_beneficiaries.add(dedup_key)
             existing_cash = db.session.query(CashDistributionBeneficiary).join(
                 CashDistribution, CashDistributionBeneficiary.distribution_id == CashDistribution.id
             ).filter(
@@ -4219,7 +4229,7 @@ def handle_distributions():
                 dp_rr_ids = [dp.relief_request_id]
             for rr_id in dp_rr_ids:
                 req = db_get(ReliefRequest, rr_id)
-                if req and req.id not in updated_req_ids:
+                if req and req.id not in updated_req_ids and req.status != 'Cancelled':
                     updated_req_ids.add(req.id)
                     for ben_data in beneficiaries_payload:
                         item_name = (ben_data.get('item') or '').strip()
@@ -4777,6 +4787,8 @@ def handle_cash_distributions():
             relief_req = db_get(ReliefRequest, data['relief_request_id'])
             if not relief_req:
                 return jsonify({'success': False, 'message': 'Relief request not found'}), 404
+            if relief_req.status == 'Cancelled':
+                return jsonify({'success': False, 'message': 'Cannot distribute cash to a cancelled relief request'}), 400
             if relief_req.incident_id != incident.id:
                 return jsonify({'success': False, 'message': 'Relief request does not match selected incident'}), 400
             max_amount = min(max_amount, relief_req.requested_cash_amount - relief_req.distributed_cash_amount)
@@ -4946,7 +4958,7 @@ def cancel_cash_distribution(id):
         # Recalculate ReliefRequest cash status if linked
         if dist.relief_request_id:
             relief_req = dist.relief_request
-            if relief_req:
+            if relief_req and relief_req.status != 'Cancelled':
                 relief_req.distributed_cash_amount = max(0, (relief_req.distributed_cash_amount or 0) - dist.total_amount)
                 if relief_req.distributed_cash_amount <= 0 and not any((ri.quantity_dispatched or 0) > 0 for ri in relief_req.items):
                     relief_req.status = 'Pending'
@@ -6391,7 +6403,7 @@ def get_dashboard():
 def get_relief_dashboard():
     try:
         active_fy = AppSettings.get_setting('active_fiscal_year', '2081/82')
-        req_fy = request.args.get('fiscal_year') or active_fy
+        req_fy = request.args.get('fiscal_year') or ''
         req_ward = request.args.get('ward', type=int)
         req_incident_type = request.args.get('incident_type')
 
@@ -6523,12 +6535,18 @@ def get_relief_dashboard():
         fy_labels = sorted(fy_map.keys())
         fy_counts = [fy_map[fy] for fy in fy_labels]
 
-        total_cash_receipts = CashReceipt.query.filter(
-            db.extract('year', CashReceipt.receipt_date) == int(active_fy.split('/')[0])
-        ).count()
-        total_cash_received = db.session.query(db.func.coalesce(db.func.sum(CashReceipt.amount_received), 0)).filter(
-            db.extract('year', CashReceipt.receipt_date) == int(active_fy.split('/')[0])
-        ).scalar()
+        cash_receipt_query = CashReceipt.query
+        if req_fy:
+            cash_receipt_query = cash_receipt_query.filter(
+                db.extract('year', CashReceipt.receipt_date) == int(req_fy.split('/')[0])
+            )
+        total_cash_receipts = cash_receipt_query.count()
+        total_cash_received = db.session.query(db.func.coalesce(db.func.sum(CashReceipt.amount_received), 0))
+        if req_fy:
+            total_cash_received = total_cash_received.filter(
+                db.extract('year', CashReceipt.receipt_date) == int(req_fy.split('/')[0])
+            )
+        total_cash_received = total_cash_received.scalar()
 
         # 8. Filter options
         all_fys = sorted(set(

@@ -118,8 +118,8 @@
                                     <input type="text" class="form-control" id="inc_fiscal_year" readonly>
                                 </div>
                                 <div class="col-md-4">
-                                    <label class="form-label">Coordinates</label>
-                                    <input type="text" class="form-control" id="inc_coordinates" placeholder="lat, lng">
+                                    <label class="form-label">Coordinates <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" id="inc_coordinates" placeholder="lat, lng" required>
                                 </div>
                                 <div class="col-md-4">
                                     <label class="form-label">Tole / Location</label>
@@ -660,6 +660,7 @@ async function saveIncident() {
     if (!body.incident_name) { showToast('danger', 'Incident name is required'); return; }
     if (!body.incident_type) { showToast('danger', 'Incident type is required'); return; }
     if (!body.ward) { showToast('danger', 'Ward is required'); return; }
+    if (!body.coordinates || !body.coordinates.trim()) { showToast('danger', 'Coordinates are required'); return; }
     // Reject inconsistent numeric fields
     if (body.affected_people > 0 && (body.affected_people_male + body.affected_people_female) !== body.affected_people) {
         showToast('danger', `Affected people (${body.affected_people}) must equal Male (${body.affected_people_male}) + Female (${body.affected_people_female})`);
@@ -754,7 +755,7 @@ async function showIncidentHistory(id) {
                 if (item._type === 'relief_request') {
                     html += ` <small class="text-muted">${esc(item.organization || '')} - ${esc(item.requester_name || '')}</small>`;
                     if (item.requested_cash_amount > 0) html += ` <span class="badge bg-light text-dark">Rs. ${item.requested_cash_amount}</span>`;
-                    html += ` <span class="badge bg-${item.status === 'Completed' ? 'success' : item.status === 'Partial' ? 'warning text-dark' : 'secondary'}">${esc(item.status)}</span>`;
+                    html += ` <span class="badge bg-${item.status === 'Completed' ? 'success' : item.status === 'Partial' ? 'warning text-dark' : item.status === 'Cancelled' ? 'secondary' : 'secondary'}">${esc(item.status)}</span>`;
                 } else if (item._type === 'dispatch') {
                     html += ` <small class="text-muted">→ ${esc(item.destination || '')}</small>`;
                     if (item.items) html += ` <span class="badge bg-light text-dark">${item.items.length} item(s)</span>`;

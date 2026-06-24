@@ -25,6 +25,7 @@
                 <option value="Pending">Pending</option>
                 <option value="Partial">Partial</option>
                 <option value="Completed">Completed</option>
+                <option value="Cancelled">Cancelled</option>
             </select>
             <input type="text" class="form-control form-control-sm" style="width:200px" id="rrSearch" placeholder="Search requests..." oninput="filterRR()">
         </div>
@@ -116,6 +117,7 @@
                                 <option value="Pending">Pending</option>
                                 <option value="Partial">Partial</option>
                                 <option value="Completed">Completed</option>
+                                <option value="Cancelled">Cancelled</option>
                             </select>
                         </div>
                         <div class="col-12">
@@ -332,7 +334,7 @@ function renderRR(data) {
     const pageData = paginator.getPageData(data);
     tbody.innerHTML = pageData.map(r => {
         const priorityColors = {Low: 'secondary', Medium: 'info', High: 'warning', Urgent: 'danger'};
-        const statusColors = {Pending: 'warning', Partial: 'info', Completed: 'success'};
+        const statusColors = {Pending: 'warning', Partial: 'info', Completed: 'success', Cancelled: 'secondary'};
         const itemsCount = r.items ? r.items.length : 0;
         const hasCash = r.requested_cash_amount > 0;
         const pct = hasCash ? Math.min(100, (r.distributed_cash_amount / r.requested_cash_amount) * 100) : 0;
@@ -347,8 +349,8 @@ function renderRR(data) {
             <td>${hasCash ? `<small class="text-nowrap">${Number(r.distributed_cash_amount).toLocaleString()} / ${Number(r.requested_cash_amount).toLocaleString()}</small><div class="progress" style="height:4px"><div class="progress-bar bg-success" style="width:${pct}%"></div></div>` : '-'}</td>
             <td><span class="badge bg-${statusColors[r.status] || 'secondary'}">${r.status}</span></td>
             <td class="text-end" onclick="event.stopPropagation()">
-                ${r.status === 'Completed'
-                    ? '<button class="btn btn-sm btn-outline-secondary" disabled title="Completed requests cannot be edited"><i class="bi bi-pencil"></i></button>'
+                ${r.status === 'Completed' || r.status === 'Cancelled'
+                    ? '<button class="btn btn-sm btn-outline-secondary" disabled title="Completed/cancelled requests cannot be edited"><i class="bi bi-pencil"></i></button>'
                     : '<button class="btn btn-sm btn-outline-primary" onclick="editRR(' + r.id + ')"><i class="bi bi-pencil"></i></button>'}
                 <button class="btn btn-sm btn-outline-secondary" onclick="window.open('/api/relief-requests/${r.id}/print','_blank')" title="Print"><i class="bi bi-printer"></i></button>
                 <button class="btn btn-sm btn-outline-danger" onclick="deleteRR(${r.id})"><i class="bi bi-trash"></i></button>

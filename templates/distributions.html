@@ -1395,6 +1395,7 @@ async function saveDistribution() {
     try {
         let itemsSaved = true;
         let savedDistNo = null;
+        let lastErrorMsg = '';
         // Save items distribution if there are item beneficiaries
         if (beneficiaries.length > 0) {
             const dispatch_ids = getSelectedDispatchIds();
@@ -1467,7 +1468,10 @@ async function saveDistribution() {
                     }
                 }
             }
-            if (!d.success) showToast('danger', d.message);
+            if (!d.success) {
+                lastErrorMsg = d.message;
+                showToast('danger', d.message);
+            }
         }
 
         if (itemsSaved) {
@@ -1518,7 +1522,7 @@ async function saveDistribution() {
             resetDistributionForm();
             loadDistributions();
         } else {
-            showToast('danger', d.message);
+            showToast('danger', lastErrorMsg || 'Failed to save distribution');
         }
     } catch(e) {
         showToast('danger', 'Error saving distribution: ' + e.message);

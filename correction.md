@@ -5,10 +5,7 @@
 Validation bypass in distribution when cash is also requested and "Cash Fund' has lower fund than asked, gives error but saved successfully though cash is not updated. Fix this
 //Relief distribution working mechanism: a beneficary can get cash or items or cash+items in a single fiscal year at once for single incident.
 
-**Dispatch form: also Batch no. and expiry not updated dynamically in dispatch Items list form. Also **update Relief Request selection field not to show completed relief requests.
 **Distribution: Also for some distribution creation I got this type of error for non duplicate beneficary,(Duplicate beneficiary "Mohan Sharma" in the same distribution request). This happens after clicking Reset button. It also deletes old distributions from list.
-**Benefeciries Form: In benefecaries form, increase field size for cash amount, photo and document and decrease for ID Number. Also fix document upload not working. And if there are multiple beneficary photo is also uploading for single beneficary.
-**Batch Tracking and Serial tracking: How are they implemented?
 
 #Alert/Notification system: Add alert and notification system and update below information. Alert and notification should be viewable for details in another notification page and add clear notification button to clear all existing ones and ready for new ones. Add some animated flash notifications for high alert notifications. Check status 24 hrs and re-show notifications for low stocks, expired items, active incidents. Show until they are updated. 
 **All stock receipts notification and also update in logs

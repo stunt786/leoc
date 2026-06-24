@@ -215,7 +215,7 @@ document.getElementById('dp_incident_id').addEventListener('change', function() 
     menu.innerHTML = '';
     document.getElementById('dp_rr_label').textContent = 'Select Relief Requests';
     if (!incidentId) return;
-    const filtered = allRequests.filter(r => r.incident_id === incidentId && r.status !== 'Completed');
+    const filtered = allRequests.filter(r => r.incident_id === incidentId && r.status !== 'Completed' && r.status !== 'Cancelled');
     filtered.forEach(r => {
         const li = document.createElement('li');
         li.style.padding = '2px 0';
