@@ -200,7 +200,7 @@ function renderTable(data) {
             <td>${r.contact_number || '-'}</td>
             <td><span class="badge ${priorityClass}">${r.evacuation_priority || 'Normal'}</span></td>
             <td>
-                <button class="btn btn-sm btn-outline-info" onclick="viewRecord(${r.id})" title="View"><i class="bi bi-eye"></i></button>
+                <button class="btn btn-sm btn-primary" onclick="viewRecord(${r.id})" title="View"><i class="bi bi-eye me-1"></i>View</button>
                 <button class="btn btn-sm btn-outline-primary" onclick="editRecord(${r.id})" title="Edit"><i class="bi bi-pencil"></i></button>
                 <button class="btn btn-sm btn-outline-danger" onclick="deleteRecord(${r.id})" title="Delete"><i class="bi bi-trash"></i></button>
             </td>
@@ -246,18 +246,24 @@ async function viewRecord(id) {
         const d = await r.json();
         if (!d.success) { showToast('danger', d.message); return; }
         const rec = d.data || d.record;
-        const priorityClass = rec.evacuation_priority === 'Critical' ? 'bg-danger' : rec.evacuation_priority === 'High' ? 'bg-warning text-dark' : 'bg-success';
+        const priorityBadge = rec.evacuation_priority === 'Critical' ? 'bg-danger' : rec.evacuation_priority === 'High' ? 'bg-warning text-dark' : 'bg-success';
         showViewModal(rec.head_of_household, [
-            {label:'Household ID', value:rec.household_id || rec.id},
-            {label:'Head of Household', value:rec.head_of_household},
-            {label:'Family Size', value:rec.family_size},
-            {label:'Category', value:rec.category},
-            {label:'Ward', value:rec.ward_name || rec.ward_id || '-'},
-            {label:'Settlement', value:rec.settlement},
-            {label:'Contact Number', value:rec.contact_number},
-            {label:'Coordinates', value:rec.coordinates},
-            {label:'Disaster Exposure', value:rec.disaster_exposure},
-            {label:'Evacuation Priority', value:rec.evacuation_priority || 'Normal', badge:priorityClass},
+            {title:'Household Information', fields:[
+                {label:'Household ID', value:rec.household_id || rec.id},
+                {label:'Head of Household', value:rec.head_of_household},
+                {label:'Family Size', value:rec.family_size},
+                {label:'Category', value:rec.category},
+            ]},
+            {title:'Location', fields:[
+                {label:'Ward', value:rec.ward_name || rec.ward_id || '-'},
+                {label:'Settlement', value:rec.settlement},
+                {label:'Coordinates', value:rec.coordinates},
+            ]},
+            {title:'Risk Assessment', fields:[
+                {label:'Disaster Exposure', value:rec.disaster_exposure},
+                {label:'Evacuation Priority', value:rec.evacuation_priority || 'Normal', badge:priorityBadge},
+                {label:'Contact Number', value:rec.contact_number},
+            ]},
         ]);
     } catch(e) {
         showToast('danger', 'Error loading record: ' + e.message);

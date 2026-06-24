@@ -179,7 +179,7 @@ async function loadData() {
     <td>${item.affected_households ?? '-'}</td>
     <td>${item.population_at_risk ?? '-'}</td>
     <td>
-      <button class="btn btn-sm btn-outline-info" onclick="viewRecord(${item.id})" title="View"><i class="bi bi-eye"></i></button>
+      <button class="btn btn-sm btn-primary" onclick="viewRecord(${item.id})" title="View"><i class="bi bi-eye me-1"></i>View</button>
       <button class="btn btn-sm btn-outline-primary" onclick="editRecord(${item.id})" title="Edit"><i class="bi bi-pencil"></i></button>
       <button class="btn btn-sm btn-outline-danger" onclick="deleteRecord(${item.id})" title="Delete"><i class="bi bi-trash"></i></button>
     </td>
@@ -198,15 +198,22 @@ async function viewRecord(id) {
   const d = await resp.json();
   if (!d.success) return;
   const item = d.data;
+  const levelBadge = 'bg-' + (item.risk_level === 'Very High' ? 'danger' : item.risk_level === 'High' ? 'warning' : item.risk_level === 'Moderate' ? 'info' : 'success');
   showViewModal(item.name, [
-    {label:'Name', value:item.name},
-    {label:'Risk Type', value:item.risk_type},
-    {label:'Risk Level', value:item.risk_level, badge:'bg-' + (item.risk_level === 'Very High' ? 'danger' : item.risk_level === 'High' ? 'warning' : item.risk_level === 'Moderate' ? 'info' : 'success')},
-    {label:'Coordinates', value:item.coordinates},
-    {label:'Area Coverage', value:item.area_coverage},
-    {label:'Affected Settlements', value:item.affected_settlements},
-    {label:'Affected Households', value:item.affected_households},
-    {label:'Population at Risk', value:item.population_at_risk},
+    {title:'Risk Zone Information', fields:[
+      {label:'Name', value:item.name},
+      {label:'Risk Type', value:item.risk_type},
+      {label:'Risk Level', value:item.risk_level, badge:levelBadge},
+    ]},
+    {title:'Location', fields:[
+      {label:'Coordinates', value:item.coordinates},
+      {label:'Area Coverage', value:item.area_coverage},
+    ]},
+    {title:'Affected Population', fields:[
+      {label:'Affected Settlements', value:item.affected_settlements},
+      {label:'Affected Households', value:item.affected_households},
+      {label:'Population at Risk', value:item.population_at_risk},
+    ]},
   ]);
 }
 

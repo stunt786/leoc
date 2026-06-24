@@ -203,7 +203,7 @@ async function loadData() {
     <td>${wardMap[item.ward_id] || '-'}</td>
     <td><span class="badge bg-${item.availability_status === 'Available' ? 'success' : 'danger'}">${item.availability_status || '-'}</span></td>
     <td class="text-end">
-      <button class="btn btn-sm btn-outline-info" onclick="viewRecord(${item.id})" title="View"><i class="bi bi-eye"></i></button>
+      <button class="btn btn-sm btn-primary" onclick="viewRecord(${item.id})" title="View"><i class="bi bi-eye me-1"></i>View</button>
       <button class="btn btn-sm btn-outline-success" onclick="dial('${item.mobile_number}')" title="Dial"><i class="bi bi-telephone-fill"></i></button>
       <button class="btn btn-sm btn-outline-primary" onclick="editRecord(${item.id})" title="Edit"><i class="bi bi-pencil"></i></button>
       <button class="btn btn-sm btn-outline-danger" onclick="deleteRecord(${item.id})" title="Delete"><i class="bi bi-trash"></i></button>
@@ -229,20 +229,31 @@ async function viewRecord(id) {
   const d = await resp.json();
   if (!d.success) return;
   const item = d.data || d.contact || d;
+  const availBadge = 'bg-' + (item.availability_status === 'Available' ? 'success' : 'danger');
   showViewModal(item.organization_name, [
-    {label:'Organization', value:item.organization_name},
-    {label:'Contact Person', value:item.contact_person},
-    {label:'Designation', value:item.designation},
-    {label:'Category', value:item.category, badge:'bg-info'},
-    {label:'Sub Category', value:item.sub_category},
-    {label:'Mobile Number', value:item.mobile_number},
-    {label:'Alternative Number', value:item.alternative_number},
-    {label:'Email', value:item.email},
-    {label:'Ward', value:wardMap[item.ward_id] || '-'},
-    {label:'Address', value:item.address},
-    {label:'Coordinates', value:item.coordinates},
-    {label:'Availability', value:item.availability_status, badge:'bg-' + (item.availability_status === 'Available' ? 'success' : 'danger')},
-    {label:'Service Area', value:item.service_area},
+    {title:'Organization', fields:[
+      {label:'Organization', value:item.organization_name},
+      {label:'Contact Person', value:item.contact_person},
+      {label:'Designation', value:item.designation},
+    ]},
+    {title:'Classification', fields:[
+      {label:'Category', value:item.category, badge:'bg-info'},
+      {label:'Sub Category', value:item.sub_category},
+    ]},
+    {title:'Contact Details', fields:[
+      {label:'Mobile Number', value:item.mobile_number},
+      {label:'Alternative Number', value:item.alternative_number},
+      {label:'Email', value:item.email},
+    ]},
+    {title:'Location', fields:[
+      {label:'Ward', value:wardMap[item.ward_id] || '-'},
+      {label:'Address', value:item.address},
+      {label:'Coordinates', value:item.coordinates},
+    ]},
+    {title:'Service Information', fields:[
+      {label:'Availability', value:item.availability_status, badge:availBadge},
+      {label:'Service Area', value:item.service_area},
+    ]},
   ]);
 }
 

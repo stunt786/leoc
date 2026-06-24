@@ -245,7 +245,7 @@ function renderData(data) {
         <td>${c.members_count || c.members ? (c.members_count || (Array.isArray(c.members) ? c.members.length : 0)) : 0}</td>
         <td>${c.meetings_count || 0}</td>
         <td class="text-end">
-            <button class="btn btn-sm btn-outline-info" onclick="viewRecord(${c.id})" title="View"><i class="bi bi-eye"></i></button>
+            <button class="btn btn-sm btn-primary" onclick="viewRecord(${c.id})" title="View"><i class="bi bi-eye me-1"></i>View</button>
             <button class="btn btn-sm btn-outline-info" onclick="openMeetings(${c.id})" title="Meetings"><i class="bi bi-calendar-event"></i></button>
             <button class="btn btn-sm btn-outline-primary" onclick="editRecord(${c.id})" title="Edit"><i class="bi bi-pencil"></i></button>
             <button class="btn btn-sm btn-outline-danger" onclick="deleteRecord(${c.id})" title="Delete"><i class="bi bi-trash"></i></button>
@@ -316,14 +316,18 @@ function viewRecord(id) {
     const c = committees.find(x => x.id === id);
     if (!c) return;
     const membersCount = c.members_count || (Array.isArray(c.members) ? c.members.length : 0);
+    const memberRows = (Array.isArray(c.members) ? c.members : []).map(m => [m.person_name || m.name || '-', m.role || m.position || '-', m.contact || m.contact_number || '-', m.ward || m.ward_name || '-']);
     showViewModal(c.committee_name, [
-        {label:'Committee Name', value:c.committee_name},
-        {label:'Committee Type', value:c.committee_type, badge:'bg-info'},
-        {label:'Formation Date', value:c.formation_date || '-'},
-        {label:'Tenure', value:c.tenure ? c.tenure + ' months' : '-'},
-        {label:'Members', value:membersCount},
-        {label:'Meetings', value:c.meetings_count || 0},
+        {title:'Committee Information', fields:[
+            {label:'Committee Name', value:c.committee_name},
+            {label:'Committee Type', value:c.committee_type, badge:'bg-info'},
+            {label:'Formation Date', value:c.formation_date || '-'},
+            {label:'Tenure', value:c.tenure ? c.tenure + ' months' : '-'},
+        ]},
     ]);
+    if (memberRows.length > 0) {
+        showViewTable('Committee Members (' + membersCount + ')', ['Name', 'Role', 'Contact', 'Ward'], memberRows);
+    }
 }
 
 function editRecord(id) {

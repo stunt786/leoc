@@ -270,7 +270,7 @@ function renderClusters(data) {
         <td>${c.contact_details || '-'}</td>
         <td>${(c.members && c.members.length) || 0}</td>
         <td>
-            <button class="btn btn-sm btn-outline-info" onclick="viewRecord(${c.id})" title="View"><i class="bi bi-eye"></i></button>
+            <button class="btn btn-sm btn-primary" onclick="viewRecord(${c.id})" title="View"><i class="bi bi-eye me-1"></i>View</button>
             <button class="btn btn-sm btn-outline-info" onclick="openMeetings(${c.id})" title="Meetings"><i class="bi bi-calendar-event"></i></button>
             <button class="btn btn-sm btn-outline-success" onclick="openDeployments(${c.id})" title="Deployments"><i class="bi bi-truck"></i></button>
             <button class="btn btn-sm btn-outline-primary" onclick="editRecord(${c.id})" title="Edit"><i class="bi bi-pencil"></i></button>
@@ -304,16 +304,23 @@ async function viewRecord(id) {
     const c = _clusters.find(x => x.id === id);
     if (!c) return;
     const membersCount = (c.members && c.members.length) || 0;
+    const memberRows = (c.members || []).map(m => [m.organization_name || '-', m.representative || '-', m.contact_number || '-', m.designation || '-']);
     showViewModal(c.cluster_name, [
-        {label:'Cluster Name', value:c.cluster_name},
-        {label:'Lead Organization', value:c.lead_organization || '-'},
-        {label:'Focal Person', value:c.focal_person || '-'},
-        {label:'Contact Details', value:c.contact_details || '-'},
-        {label:'Resource Capacity', value:c.resource_capacity || '-'},
-        {label:'Coverage Area', value:c.coverage_area || '-'},
-        {label:'Available Equipment', value:c.available_equipment || '-'},
-        {label:'Members', value:membersCount},
+        {title:'Cluster Information', fields:[
+            {label:'Cluster Name', value:c.cluster_name},
+            {label:'Lead Organization', value:c.lead_organization || '-'},
+            {label:'Focal Person', value:c.focal_person || '-'},
+            {label:'Contact Details', value:c.contact_details || '-'},
+        ]},
+        {title:'Resources & Coverage', fields:[
+            {label:'Resource Capacity', value:c.resource_capacity || '-'},
+            {label:'Coverage Area', value:c.coverage_area || '-'},
+            {label:'Available Equipment', value:c.available_equipment || '-'},
+        ]},
     ]);
+    if (memberRows.length > 0) {
+        showViewTable('Cluster Members (' + membersCount + ')', ['Organization', 'Representative', 'Contact', 'Designation'], memberRows);
+    }
 }
 
 async function editRecord(id) {

@@ -224,7 +224,7 @@ async function loadData() {
     <td><span class="badge bg-${item.current_status==='Operational'?'success':item.current_status==='Non-Operational'?'danger':'warning'}">${item.current_status}</span></td>
     <td>${item.contact_person || '-'}<br><small>${item.contact_number || ''}</small></td>
     <td>
-      <button class="btn btn-sm btn-outline-info" onclick="viewRecord(${item.id})" title="View"><i class="bi bi-eye"></i></button>
+      <button class="btn btn-sm btn-primary" onclick="viewRecord(${item.id})" title="View"><i class="bi bi-eye me-1"></i>View</button>
       <button class="btn btn-sm btn-outline-primary" onclick="editRecord(${item.id})" title="Edit"><i class="bi bi-pencil"></i></button>
       <button class="btn btn-sm btn-outline-danger" onclick="deleteRecord(${item.id})" title="Delete"><i class="bi bi-trash"></i></button>
     </td>
@@ -238,27 +238,65 @@ function openForm() {
   new bootstrap.Modal(document.getElementById('formModal')).show();
 }
 
+function parseFacilities(facilities) {
+  if (!facilities || !facilities.trim()) return [];
+  var iconMap = {
+    water:'bi-droplet', electricity:'bi-lightning-fill', toilet:'bi-door-open',
+    kitchen:'bi-cup-straw', internet:'bi-wifi', access:'bi-wheelchair',
+    disabled:'bi-wheelchair',     parking:'bi-car-front', security:'bi-shield-check',
+    lighting:'bi-lightbulb', gas:'bi-fire', drainage:'bi-trash3',
+    road:'bi-signpost-fill', solar:'bi-sun-fill', generator:'bi-battery-charging'
+  };
+  return facilities.split(',').map(function(f){return f.trim()}).filter(Boolean).map(function(f){
+    var key = f.toLowerCase(), matched = 'bi-check-circle-fill';
+    for (var ik in iconMap) { if (key.includes(ik)) { matched = iconMap[ik]; break; } }
+    return {icon:matched, text:f};
+  });
+}
+
 async function viewRecord(id) {
   const resp = await fetch(`/api/critical-infrastructure/${id}`);
   const d = await resp.json();
   if(!d.success) return;
   const item = d.data;
-  showViewModal(item.name, [
-    {label:'Infrastructure ID', value:item.infrastructure_id},
-    {label:'Name', value:item.name},
-    {label:'Type', value:item.infrastructure_type},
-    {label:'Ward', value:wardMap[item.ward_id] || '-'},
-    {label:'Description', value:item.description},
-    {label:'Settlement', value:item.settlement},
-    {label:'Coordinates', value:item.coordinates},
-    {label:'Elevation', value:item.elevation},
-    {label:'Capacity', value:item.capacity},
-    {label:'Status', value:item.current_status, badge:'bg-' + (item.current_status==='Operational'?'success':item.current_status==='Non-Operational'?'danger':'warning')},
-    {label:'Accessibility', value:item.accessibility_status},
-    {label:'Contact Person', value:item.contact_person},
-    {label:'Contact Number', value:item.contact_number},
-    {label:'Available Facilities', value:item.available_facilities},
-  ]);
+  var badgeCls = item.current_status==='Operational'?'view-badge-success':item.current_status==='Non-Operational'?'view-badge-danger':'view-badge-warning';
+  var facs = parseFacilities(item.available_facilities);
+  showDetailedViewModal({
+    logo:'bi-building-gear',
+    title:item.name,
+    hero:{
+      icon:'bi-building-gear',
+      name:item.name,
+      subtitle:(item.infrastructure_type||'') + (item.settlement ? ' \u2022 ' + item.settlement : ''),
+      status:item.current_status,
+      badgeClass:badgeCls
+    },
+    sections:[
+      {icon:'bi-info-circle', title:'Basic Information', columns:3, items:[
+        {label:'Infrastructure ID', value:item.infrastructure_id},
+        {label:'Name', value:item.name},
+        {label:'Type', value:item.infrastructure_type},
+        {label:'Ward', value:wardMap[item.ward_id] || '-'},
+        {label:'Description', value:item.description, fullWidth:true},
+        {label:'Settlement', value:item.settlement}
+      ]},
+      {icon:'bi-geo-alt-fill', title:'Location & Capacity', columns:3, items:[
+        {label:'Coordinates', value:item.coordinates || '-'},
+        {label:'Elevation', value:item.elevation ? item.elevation + ' m' : '-'},
+        {label:'Capacity', value:item.capacity || '-'}
+      ]},
+      {icon:'bi-telephone', title:'Contact Information', columns:3, items:[
+        {label:'Contact Person', value:item.contact_person},
+        {label:'Contact Number', value:item.contact_number},
+        {label:'Accessibility', value:item.accessibility_status}
+      ]}
+    ],
+    tags:facs,
+    footer:[
+      {icon:'bi-calendar', label:'Created On', value:item.created_at ? new Date(item.created_at).toLocaleDateString() : '-'},
+      {icon:'bi-pencil', label:'Last Updated', value:item.updated_at ? new Date(item.updated_at).toLocaleDateString() : '-'}
+    ]
+  });
 }
 
 async function editRecord(id) {

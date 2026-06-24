@@ -263,7 +263,7 @@ async function loadData() {
     <td>${item.shelter_manager || '-'}</td>
     <td>${item.contact_number || '-'}</td>
     <td>
-      <button class="btn btn-sm btn-outline-info" onclick="viewRecord(${item.id})" title="View"><i class="bi bi-eye"></i></button>
+      <button class="btn btn-sm btn-primary" onclick="viewRecord(${item.id})" title="View"><i class="bi bi-eye me-1"></i>View</button>
       <button class="btn btn-sm btn-outline-primary" onclick="editRecord(${item.id})" title="Edit"><i class="bi bi-pencil"></i></button>
       <button class="btn btn-sm btn-outline-danger" onclick="deleteRecord(${item.id})" title="Delete"><i class="bi bi-trash"></i></button>
     </td>
@@ -290,22 +290,32 @@ async function viewRecord(id) {
   if (item.medical_support) amenities.push('Medical');
   if (item.accessibility_support) amenities.push('Accessible');
   showViewModal(item.shelter_name, [
-    {label:'Shelter Name', value:item.shelter_name},
-    {label:'Shelter Type', value:item.shelter_type || '-'},
-    {label:'Ward', value:wardMap[item.ward_id] || '-'},
-    {label:'Location', value:item.location},
-    {label:'Coordinates', value:item.coordinates},
-    {label:'Total Capacity', value:item.total_capacity},
-    {label:'Male Capacity', value:item.male_capacity},
-    {label:'Female Capacity', value:item.female_capacity},
-    {label:'Children Capacity', value:item.children_capacity},
-    {label:'Current Occupancy', value:item.current_occupancy},
-    {label:'Available Space', value:item.available_space},
-    {label:'Amenities', value:amenities.join(', ') || 'None'},
-    {label:'Shelter Manager', value:item.shelter_manager},
-    {label:'Contact Number', value:item.contact_number},
-    {label:'Evacuation Routes', value:item.evacuation_routes},
-    {label:'Assembly Points', value:item.assembly_points},
+    {title:'Basic Information', fields:[
+      {label:'Shelter Name', value:item.shelter_name},
+      {label:'Shelter Type', value:item.shelter_type || '-'},
+      {label:'Ward', value:wardMap[item.ward_id] || '-'},
+    ]},
+    {title:'Location', fields:[
+      {label:'Location', value:item.location},
+      {label:'Coordinates', value:item.coordinates},
+      {label:'Evacuation Routes', value:item.evacuation_routes},
+      {label:'Assembly Points', value:item.assembly_points},
+    ]},
+    {title:'Capacity', fields:[
+      {label:'Total Capacity', value:item.total_capacity},
+      {label:'Male Capacity', value:item.male_capacity},
+      {label:'Female Capacity', value:item.female_capacity},
+      {label:'Children Capacity', value:item.children_capacity},
+      {label:'Current Occupancy', value:item.current_occupancy},
+      {label:'Available Space', value:item.available_space},
+    ]},
+    {title:'Amenities', fields:[
+      {label:'Available Amenities', value:amenities.join(', ') || 'None'},
+    ]},
+    {title:'Management', fields:[
+      {label:'Shelter Manager', value:item.shelter_manager},
+      {label:'Contact Number', value:item.contact_number},
+    ]},
   ]);
 }
 

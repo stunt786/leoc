@@ -1,20 +1,24 @@
 <!-- View Modal -->
 <div class="modal fade" id="viewModal" tabindex="-1">
-  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable view-modal-dialog">
     <div class="modal-content">
-      <div class="modal-header bg-info text-white">
-        <h5 class="modal-title"><i class="bi bi-eye me-2"></i>Record Details</h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      <div class="view-modal-header">
+        <div class="view-modal-title-wrap">
+          <div class="view-logo-box" id="viewModalLogo">
+            <i class="bi bi-eye"></i>
+          </div>
+          <h2 class="view-modal-heading" id="viewModalTitle">Record Details</h2>
+        </div>
+        <button type="button" class="view-close-btn" data-bs-dismiss="modal"><i class="bi bi-x-lg"></i></button>
       </div>
-      <div class="modal-body" id="viewModalBody"></div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-      </div>
+      <div class="view-content-wrapper" id="viewModalBody"></div>
     </div>
   </div>
 </div>
 
 <script>
+function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
 // ========== VALIDATION HELPERS ==========
 function validateEmail(email) {
   if (!email) return true;
@@ -85,18 +89,225 @@ function validateFormFields(rules) {
 }
 
 // ========== VIEW MODAL ==========
-function showViewModal(title, fields) {
+let _viewModalInstance = null;
+
+function getViewModal() {
+  const el = document.getElementById('viewModal');
+  if (!_viewModalInstance) {
+    _viewModalInstance = new bootstrap.Modal(el);
+    el.addEventListener('hidden.bs.modal', function() {
+      _viewModalInstance = null;
+    });
+    el.addEventListener('shown.bs.modal', function() {
+      document.querySelectorAll('.modal-backdrop').forEach(b => {
+        if (b.parentNode && b.parentNode.querySelectorAll('.modal-backdrop').length > 1) b.remove();
+      });
+    });
+  }
+  return _viewModalInstance;
+}
+
+function showViewModal(title, fieldsOrGroups) {
+  getViewModal().hide();
+  document.getElementById('viewModalTitle').textContent = esc(title);
+  document.getElementById('viewModalLogo').innerHTML = '<i class="fas fa-eye"></i>';
+  const isGrouped = Array.isArray(fieldsOrGroups) && fieldsOrGroups.length > 0 && fieldsOrGroups[0].fields;
   const body = document.getElementById('viewModalBody');
-  body.innerHTML = '<div class="card"><div class="card-header bg-light"><strong><i class="bi bi-info-circle me-2"></i>' + title + '</strong></div><div class="card-body"><div class="row">';
-  fields.forEach(f => {
-    if (f.hidden && !f.value) return;
-    const val = f.value || '-';
-    const badgeClass = f.badge || '';
-    const formattedVal = badgeClass ? '<span class="badge ' + badgeClass + '">' + val + '</span>' : val;
-    body.innerHTML += '<div class="col-md-6 mb-2"><small class="text-muted d-block">' + f.label + '</small><strong>' + formattedVal + '</strong></div>';
-  });
-  body.innerHTML += '</div></div></div>';
-  new bootstrap.Modal(document.getElementById('viewModal')).show();
+  body.innerHTML = '<div class="row g-4">';
+  if (isGrouped) {
+    fieldsOrGroups.forEach(g => {
+      if ((!g.fields || g.fields.length === 0) && (!g.rows || g.rows.length === 0)) return;
+
+      if (g.layout === 'grid') {
+        let html = '<div class="col-12"><div class="card border shadow-sm"><div class="card-header bg-light py-2 border-bottom"><strong class="small text-uppercase text-muted"><i class="bi bi-info-circle me-1"></i> ' + esc(g.title) + '</strong></div><div class="card-body p-4"><div class="row g-3">';
+        g.fields.forEach(f => {
+          if (f.hidden && !f.value) return;
+          const val = f.value || '-';
+          const badgeClass = f.badge || '';
+          const formattedVal = badgeClass ? '<span class="badge ' + badgeClass + '">' + val + '</span>' : val;
+          const colClass = f.fullWidth ? 'col-12' : 'col-md-6';
+          html += '<div class="' + colClass + '"><div class="view-field-row"><span class="view-field-label">' + esc(f.label) + '</span><span class="view-field-value">' + formattedVal + '</span></div></div>';
+        });
+        html += '</div></div></div></div>';
+        body.innerHTML += html;
+      } else if (g.layout === 'table') {
+        let html = '<div class="col-12"><div class="card border shadow-sm"><div class="card-header bg-light py-2 border-bottom"><strong class="small text-uppercase text-muted"><i class="bi bi-table me-1"></i> ' + esc(g.title) + '</strong></div><div class="card-body p-0"><table class="table table-sm table-bordered mb-0"><thead class="table-light"><tr>';
+        (g.columns || []).forEach(c => {
+          html += '<th class="small text-muted fw-semibold" style="padding:10px 14px">' + esc(c) + '</th>';
+        });
+        html += '</tr></thead><tbody>';
+        if (!g.rows || g.rows.length === 0) {
+          html += '<tr><td colspan="' + (g.columns || []).length + '" class="text-center text-muted small py-3">No data</td></tr>';
+        } else {
+          g.rows.forEach(row => {
+            html += '<tr>';
+            (g.columns || []).forEach((c, i) => {
+              const val = (row[i] !== undefined && row[i] !== null) ? row[i] : '-';
+              html += '<td style="padding:10px 14px;font-weight:500">' + val + '</td>';
+            });
+            html += '</tr>';
+          });
+        }
+        html += '</tbody></table></div></div></div>';
+        body.innerHTML += html;
+      } else {
+        body.innerHTML += '<div class="col-12"><div class="card border shadow-sm"><div class="card-header bg-light py-2 border-bottom"><strong class="small text-uppercase text-muted"><i class="bi bi-info-circle me-1"></i> ' + esc(g.title) + '</strong></div><div class="card-body p-0"><table class="table table-sm table-bordered mb-0"><tbody>';
+        g.fields.forEach(f => {
+          if (f.hidden && !f.value) return;
+          const val = f.value || '-';
+          const badgeClass = f.badge || '';
+          const formattedVal = badgeClass ? '<span class="badge ' + badgeClass + '">' + val + '</span>' : val;
+          body.innerHTML += '<tr><th class="text-muted small fw-normal" style="width:30%;background:#fafafa;vertical-align:middle;padding:8px 12px">' + esc(f.label) + '</th><td style="padding:8px 12px;font-weight:500">' + formattedVal + '</td></tr>';
+        });
+        body.innerHTML += '</tbody></table></div></div></div>';
+      }
+    });
+  } else {
+    const fields = fieldsOrGroups;
+    body.innerHTML += '<div class="col-12"><div class="card border shadow-sm"><div class="card-body p-0"><table class="table table-sm table-bordered mb-0"><tbody>';
+    fields.forEach(f => {
+      if (f.hidden && !f.value) return;
+      const val = f.value || '-';
+      const badgeClass = f.badge || '';
+      const formattedVal = badgeClass ? '<span class="badge ' + badgeClass + '">' + val + '</span>' : val;
+      body.innerHTML += '<tr><th class="text-muted small fw-normal" style="width:30%;background:#fafafa;vertical-align:middle;padding:8px 12px">' + f.label + '</th><td style="padding:8px 12px;font-weight:500">' + formattedVal + '</td></tr>';
+    });
+    body.innerHTML += '</tbody></table></div></div></div>';
+  }
+  body.innerHTML += '</div>';
+  setTimeout(() => getViewModal().show(), 150);
+}
+
+// ========== DETAILED VIEW MODAL (DESIGN VIEW) ==========
+function showDetailedViewModal(config) {
+  getViewModal().hide();
+  document.getElementById('viewModalTitle').textContent = esc(config.title || '');
+  if (config.logo) {
+    document.getElementById('viewModalLogo').innerHTML = '<i class="bi ' + config.logo + '"></i>';
+  } else {
+    document.getElementById('viewModalLogo').innerHTML = '<i class="bi bi-eye"></i>';
+  }
+  const body = document.getElementById('viewModalBody');
+  let html = '';
+
+  // Hero Card
+  if (config.hero) {
+    const hero = config.hero;
+    const hIcon = hero.icon || 'fa-building';
+    const hName = hero.name || config.title;
+    const hSub = hero.subtitle || '';
+    const hStatus = hero.status || '';
+    const hBadge = hero.badgeClass || 'view-badge-success';
+    html += '<div class="view-hero-card">';
+    html += '  <div class="view-hero-left">';
+    html += '    <div class="view-hero-icon"><i class="bi ' + hIcon + '"></i></div>';
+    html += '    <div class="view-hero-info">';
+    html += '      <h3>' + esc(hName) + '</h3>';
+    html += '      <p>' + esc(hSub) + '</p>';
+    html += '    </div>';
+    html += '  </div>';
+    if (hStatus) {
+      html += '  <div class="view-status-badge ' + hBadge + '">\u25CF ' + esc(hStatus) + '</div>';
+    }
+    html += '</div>';
+  }
+
+  // Grid sections
+  if (config.sections && config.sections.length > 0) {
+    html += '<div class="view-grid">';
+    config.sections.forEach(function(section) {
+      html += '<div class="view-info-card">';
+      html += '  <div class="view-section-header">';
+      const sIcon = section.icon || 'fa-circle-info';
+      html += '    <div class="view-section-icon"><i class="bi ' + sIcon + '"></i></div>';
+      html += '    <h4>' + esc(section.title) + '</h4>';
+      html += '  </div>';
+
+      if (section.items && section.items.length > 0) {
+        const cols = section.columns || 3;
+        html += '  <div class="view-info-row" style="grid-template-columns:repeat(' + cols + ',1fr)">';
+        section.items.forEach(function(item) {
+          if (item.hidden && !item.value) return;
+          const val = item.value || '-';
+          const fw = item.fullWidth ? ' view-full-width' : '';
+          const formatted = item.badge ? '<span class="badge ' + item.badge + '">' + val + '</span>' : esc(val);
+          html += '    <div class="view-info-item' + fw + '">';
+          html += '      <label>' + esc(item.label) + '</label>';
+          html += '      <span>' + formatted + '</span>';
+          html += '    </div>';
+        });
+        html += '  </div>';
+      }
+
+      if (section.tags && section.tags.length > 0) {
+        html += '  <div class="view-amenities">';
+        section.tags.forEach(function(tag) {
+          html += '    <div class="view-tag"><i class="bi ' + tag.icon + '"></i> ' + esc(tag.text) + '</div>';
+        });
+        html += '  </div>';
+      }
+
+      html += '</div>';
+    });
+    html += '</div>';
+  }
+
+  // Standalone tags
+  if (config.tags && config.tags.length > 0) {
+    html += '<div class="view-info-card view-tags-card">';
+    html += '  <div class="view-section-header">';
+    html += '    <div class="view-section-icon"><i class="bi bi-building"></i></div>';
+    html += '    <h4>Available Amenities</h4>';
+    html += '  </div>';
+    html += '  <div class="view-amenities">';
+    config.tags.forEach(function(tag) {
+      html += '    <div class="view-tag"><i class="bi ' + tag.icon + '"></i> ' + esc(tag.text) + '</div>';
+    });
+    html += '  </div>';
+    html += '</div>';
+  }
+
+  // Footer meta
+  if (config.footer && config.footer.length > 0) {
+    html += '<div class="view-footer-meta">';
+    html += '  <div class="view-meta-grid">';
+    config.footer.forEach(function(item) {
+      html += '    <div class="view-meta-item">';
+      html += '      <div class="view-meta-icon"><i class="bi ' + item.icon + '"></i></div>';
+      html += '      <div>';
+      html += '        <h5>' + esc(item.label) + '</h5>';
+      html += '        <p>' + esc(item.value || '-') + '</p>';
+      html += '      </div>';
+      html += '    </div>';
+    });
+    html += '  </div>';
+    html += '</div>';
+  }
+
+  body.innerHTML = html;
+  setTimeout(function() { getViewModal().show(); }, 150);
+}
+
+function showViewTable(title, columns, rows) {
+  const body = document.getElementById('viewModalBody');
+  let tableHtml = '<div class="col-12"><div class="card border shadow-sm"><div class="card-header bg-light py-2 border-bottom"><strong class="small text-uppercase text-muted"><i class="bi bi-table me-1"></i> ' + esc(title) + '</strong></div><div class="card-body p-0"><table class="table table-sm table-bordered mb-0"><thead class="table-light"><tr>';
+  columns.forEach(c => { tableHtml += '<th class="small text-muted fw-semibold" style="padding:8px 12px">' + esc(c) + '</th>'; });
+  tableHtml += '</tr></thead><tbody>';
+  if (!rows || rows.length === 0) {
+    tableHtml += '<tr><td colspan="' + columns.length + '" class="text-center text-muted small py-3">No records</td></tr>';
+  } else {
+    rows.forEach(row => {
+      tableHtml += '<tr>';
+      columns.forEach((c, i) => {
+        tableHtml += '<td style="padding:8px 12px">' + (row[i] || '-') + '</td>';
+      });
+      tableHtml += '</tr>';
+    });
+  }
+  tableHtml += '</tbody></table></div></div></div>';
+  const wrap = body.querySelector('.row.g-3');
+  if (wrap) wrap.innerHTML += tableHtml;
+  else body.innerHTML += tableHtml;
 }
 
 // ========== PRINT FUNCTIONALITY ==========

@@ -346,7 +346,7 @@ function renderVolunteers() {
             '<td>' + (skillsList || '<span class="text-muted">None</span>') + '</td>' +
             '<td><span class="badge ' + statusBadge + '">' + (v.availability_status || 'Available') + '</span></td>' +
             '<td class="text-end">' +
-            '<button class="btn btn-sm btn-outline-info me-1" onclick="viewRecord(' + v.id + ')" title="View"><i class="bi bi-eye"></i></button>' +
+            '<button class="btn btn-sm btn-primary me-1" onclick="viewRecord(' + v.id + ')" title="View"><i class="bi bi-eye me-1"></i>View</button>' +
             '<button class="btn btn-sm btn-outline-primary me-1" onclick="editRecord(' + v.id + ')" title="Edit"><i class="bi bi-pencil"></i></button>' +
             '<button class="btn btn-sm btn-outline-danger" onclick="deleteRecord(' + v.id + ')" title="Delete"><i class="bi bi-trash"></i></button>' +
             '</td>' +
@@ -380,19 +380,28 @@ async function viewRecord(id) {
         const skillsList = (v.skills || []).join(', ') || 'None';
         const statusBadge = v.availability_status === 'Available' ? 'bg-success' :
             v.availability_status === 'On Duty' ? 'bg-warning text-dark' : 'bg-secondary';
+        const trainingRows = (v.trainings || []).map(t => [t.training_name || '-', t.training_date || '-', t.certification_status || '-']);
         showViewModal(v.name, [
-            {label:'Volunteer ID', value:v.volunteer_code || v.id},
-            {label:'Name', value:v.name},
-            {label:'Gender', value:v.gender || '-'},
-            {label:'Age', value:v.age || '-'},
-            {label:'Ward', value:wardMap[v.ward_id] || '-'},
-            {label:'Contact Number', value:v.contact_number},
-            {label:'Email', value:v.email},
-            {label:'Skills', value:skillsList},
-            {label:'Home Coordinates', value:v.home_coordinates},
-            {label:'Availability', value:v.availability_status || 'Available', badge:statusBadge},
-            {label:'Trainings', value:(v.trainings || []).length + ' training(s)'},
+            {title:'Basic Information', fields:[
+                {label:'Volunteer ID', value:v.volunteer_code || v.id},
+                {label:'Name', value:v.name},
+                {label:'Gender', value:v.gender || '-'},
+                {label:'Age', value:v.age || '-'},
+            ]},
+            {title:'Contact & Location', fields:[
+                {label:'Ward', value:wardMap[v.ward_id] || '-'},
+                {label:'Contact Number', value:v.contact_number},
+                {label:'Email', value:v.email},
+                {label:'Home Coordinates', value:v.home_coordinates},
+            ]},
+            {title:'Skills & Status', fields:[
+                {label:'Skills', value:skillsList},
+                {label:'Availability', value:v.availability_status || 'Available', badge:statusBadge},
+            ]},
         ]);
+        if (trainingRows.length > 0) {
+            showViewTable('Trainings (' + trainingRows.length + ')', ['Training Name', 'Date', 'Status'], trainingRows);
+        }
     } catch (e) {
         showToast('danger', 'Error loading volunteer: ' + e.message);
     }

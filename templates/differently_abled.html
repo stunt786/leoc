@@ -231,7 +231,7 @@ function renderTable(data) {
             <td>${disabilities.join(', ') || '-'}</td>
             <td>${r.caregiver_name || '-'}</td>
             <td>
-                <button class="btn btn-sm btn-outline-info" onclick="viewRecord(${r.id})" title="View"><i class="bi bi-eye"></i></button>
+                <button class="btn btn-sm btn-primary" onclick="viewRecord(${r.id})" title="View"><i class="bi bi-eye me-1"></i>View</button>
                 <button class="btn btn-sm btn-outline-primary" onclick="editRecord(${r.id})" title="Edit"><i class="bi bi-pencil"></i></button>
                 <button class="btn btn-sm btn-outline-danger" onclick="deleteRecord(${r.id})" title="Delete"><i class="bi bi-trash"></i></button>
             </td>
@@ -273,16 +273,24 @@ async function viewRecord(id) {
         if (rec.intellectual_disability) disabilities.push('Intellectual');
         if (rec.multiple_disability) disabilities.push('Multiple');
         showViewModal(rec.person_name, [
-            {label:'Person Name', value:rec.person_name},
-            {label:'Gender', value:rec.gender || '-'},
-            {label:'Age', value:rec.age || '-'},
-            {label:'Ward', value:rec.ward_name || '-'},
-            {label:'Settlement', value:rec.settlement},
-            {label:'Contact Number', value:rec.contact_number},
-            {label:'Disabilities', value:disabilities.join(', ') || 'None'},
-            {label:'Caregiver Name', value:rec.caregiver_name},
-            {label:'Caregiver Contact', value:rec.caregiver_contact},
-            {label:'Coordinates', value:rec.coordinates},
+            {title:'Personal Information', fields:[
+                {label:'Person Name', value:rec.person_name},
+                {label:'Gender', value:rec.gender || '-'},
+                {label:'Age', value:rec.age || '-'},
+            ]},
+            {title:'Location', fields:[
+                {label:'Ward', value:rec.ward_name || '-'},
+                {label:'Settlement', value:rec.settlement},
+                {label:'Coordinates', value:rec.coordinates},
+            ]},
+            {title:'Disability Details', fields:[
+                {label:'Disabilities', value:disabilities.join(', ') || 'None'},
+            ]},
+            {title:'Caregiver Information', fields:[
+                {label:'Contact Number', value:rec.contact_number},
+                {label:'Caregiver Name', value:rec.caregiver_name},
+                {label:'Caregiver Contact', value:rec.caregiver_contact},
+            ]},
         ]);
     } catch(e) {
         showToast('danger', 'Error loading record: ' + e.message);
