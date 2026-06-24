@@ -15579,3 +15579,7 @@ sqlalchemy.exc.OperationalError: (psycopg2.OperationalError) connection to serve
 2026-06-24 06:04:05,917 INFO: LEOC Application started [in /app/app.py:166]
 2026-06-24 06:06:18,774 INFO: LEOC Application started [in /app/app.py:166]
 2026-06-24 06:06:18,888 INFO: LEOC Application started [in /app/app.py:166]
+2026-06-24 06:25:50,173 INFO: LEOC Application started [in /app/app.py:166]
+2026-06-24 06:25:50,178 INFO: LEOC Application started [in /app/app.py:166]
+2026-06-24 06:36:17,810 INFO: LEOC Application started [in /app/app.py:166]
+2026-06-24 06:36:17,850 INFO: LEOC Application started [in /app/app.py:166]
