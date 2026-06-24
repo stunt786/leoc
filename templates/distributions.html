@@ -1056,22 +1056,6 @@ async function viewDistribution(id) {
                 </div>
             </div>
 
-            <!-- Items Distributed Summary Table -->
-            <div class="card border-0 bg-light mb-3">
-                <div class="card-header bg-white py-2 d-flex justify-content-between align-items-center">
-                    <span class="fw-semibold"><i class="bi bi-box-seam me-1 text-primary"></i>Items Distributed Summary</span>
-                    <span class="badge bg-primary">${Object.keys(itemTotals).length} item(s)</span>
-                </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-sm table-bordered mb-0 small">
-                            <thead class="table-light"><tr><th>Item Name</th><th class="text-center" style="width:80px">Unit</th><th class="text-end" style="width:100px">Total Qty</th></tr></thead>
-                            <tbody>${itemSummaryRows || '<tr><td colspan="3" class="text-center text-muted py-2">No items distributed</td></tr>'}</tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-
             <!-- Beneficiaries -->
             <div class="d-flex justify-content-between align-items-center mb-2">
                 <h6 class="fw-semibold mb-0"><i class="bi bi-people me-1 text-primary"></i>Beneficiaries (${families.length})</h6>
@@ -1132,12 +1116,6 @@ async function viewDistribution(id) {
                             </div>
                         </div>
 
-                        <!-- Relief Items Table -->
-                        <div class="bg-light bg-opacity-50 rounded p-2 mb-2">
-                            <div class="fw-semibold small text-secondary mb-1"><i class="bi bi-box-seam me-1"></i>Relief Items</div>
-                            ${familyItemsTable(b.items)}
-                        </div>
-
                         <!-- Family Members Table -->
                         ${hasFamilyMembers ? `<div class="bg-light bg-opacity-50 rounded p-2 mb-2">
                             <div class="fw-semibold small text-secondary mb-1"><i class="bi bi-people me-1"></i>Family Members</div>
@@ -1159,6 +1137,22 @@ async function viewDistribution(id) {
                     </div>
                 </div>`;
             }).join('') : '<p class="text-muted small">No beneficiaries recorded</p>'}
+
+            <!-- Items Distributed Summary Table -->
+            <div class="card border-0 bg-light mt-3">
+                <div class="card-header bg-white py-2 d-flex justify-content-between align-items-center">
+                    <span class="fw-semibold"><i class="bi bi-box-seam me-1 text-primary"></i>Items Distributed Summary</span>
+                    <span class="badge bg-primary">${Object.keys(itemTotals).length} item(s)</span>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered mb-0 small">
+                            <thead class="table-light"><tr><th>Item Name</th><th class="text-center" style="width:80px">Unit</th><th class="text-end" style="width:100px">Total Qty</th></tr></thead>
+                            <tbody>${itemSummaryRows || '<tr><td colspan="3" class="text-center text-muted py-2">No items distributed</td></tr>'}</tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
 
             <div id="distViewCashInfo_${dist.id}"></div>
         </div>

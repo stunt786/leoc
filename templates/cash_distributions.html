@@ -127,6 +127,21 @@
         </div>
     </div>
 </div>
+
+<div class="modal fade" id="viewCdModal" tabindex="-1">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="bi bi-cash-stack me-2"></i><span id="viewCdTitle"></span></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="viewCdBody"></div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 {% block extra_js %}
 <script>
@@ -333,11 +348,98 @@ async function viewCd(id) {
     const d = await r.json();
     if (!d.success) return;
     const cd = d.distribution;
-    const srcMatch = (cd.remarks || '').match(/Source Distribution:\s*(\S+)/);
-    const srcInfo = srcMatch ? `Source Dist: ${srcMatch[1]} | ` : '';
-    const benList = (cd.beneficiaries||[]).map(b => `${b.name} (${b.amount})`).join(', ');
-    const fileInfo = [cd.photo_url ? `<a href="${cd.photo_url}" target="_blank">Photo</a>` : '', cd.document_url ? `<a href="${cd.document_url}" target="_blank">Document</a>` : ''].filter(Boolean).join(' | ');
-    showToast('info', `${srcInfo}${cd.distribution_no} | ${cd.distribution_date} | Fund: ${cd.fund_name} | Incident: ${cd.incident_name} | Type: ${cd.distribution_type} | Amount: ${Number(cd.total_amount).toLocaleString()} | Officer: ${cd.officer || '-'}${fileInfo ? ' | Files: ' + fileInfo : ''} | Beneficiaries: ${benList}`);
+    const bens = cd.beneficiaries || [];
+    document.getElementById('viewCdTitle').textContent = cd.distribution_no;
+
+    const benRows = bens.map((b, i) => `<tr>
+        <td>${i + 1}</td>
+        <td>${b.name}</td>
+        <td>${b.national_id || '-'}</td>
+        <td>${b.address || '-'}</td>
+        <td>${b.phone || '-'}</td>
+        <td class="text-end fw-semibold text-danger">${Number(b.amount).toLocaleString()}</td>
+    </tr>`).join('');
+
+    const totalAmount = bens.reduce((s, b) => s + (b.amount || 0), 0);
+
+    const photoHtml = cd.photo_url ? `<a href="${cd.photo_url}" target="_blank" class="btn btn-sm btn-outline-primary"><i class="bi bi-image me-1"></i>View Photo</a>` : '';
+    const docHtml = cd.document_url ? `<a href="${cd.document_url}" target="_blank" class="btn btn-sm btn-outline-secondary"><i class="bi bi-file-earmark-pdf me-1"></i>View Document</a>` : '';
+
+    document.getElementById('viewCdBody').innerHTML = `
+        <div class="row g-2 mb-3">
+            <div class="col-md-8">
+                <div class="card border-0 bg-light h-100">
+                    <div class="card-body py-2">
+                        <div class="row g-1 small">
+                            <div class="col-md-4"><strong>Dist No:</strong> ${cd.distribution_no}</div>
+                            <div class="col-md-4"><strong>Date:</strong> ${cd.distribution_date || '-'}</div>
+                            <div class="col-md-4"><strong>Type:</strong> ${cd.distribution_type || '-'}</div>
+                            <div class="col-md-4"><strong>Officer:</strong> ${cd.officer || '-'}</div>
+                            <div class="col-md-4"><strong>Fund:</strong> ${cd.fund_name || '-'}</div>
+                            <div class="col-md-4"><strong>Fiscal Year:</strong> ${cd.fiscal_year || '-'}</div>
+                            <div class="col-12"><strong>Remarks:</strong> ${cd.remarks || '-'}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card border-0 bg-light h-100">
+                    <div class="card-body py-2">
+                        <div class="row g-1 small">
+                            <div class="col-6"><strong>Incident:</strong> ${cd.incident_name || '-'}</div>
+                            <div class="col-6"><strong>Status:</strong> <span class="badge bg-${cd.status === 'Completed' ? 'success' : 'danger'}">${cd.status}</span></div>
+                            <div class="col-6"><strong>Total Amount:</strong> <strong class="text-danger">${Number(totalAmount).toLocaleString()}</strong></div>
+                            <div class="col-6"><strong>Beneficiaries:</strong> ${bens.length}</div>
+                            ${cd.cancel_reason ? `<div class="col-12"><strong>Cancel Reason:</strong> <span class="text-danger">${cd.cancel_reason}</span></div>` : ''}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card border-0 bg-light mb-3">
+            <div class="card-header bg-white py-2 d-flex justify-content-between align-items-center">
+                <span class="fw-semibold"><i class="bi bi-file-text me-1 text-primary"></i>Source Request</span>
+            </div>
+            <div class="card-body py-2">
+                <div class="row g-1 small">
+                    ${cd.request_number ? `<div class="col-md-4"><strong>Cash Request:</strong> ${cd.request_number}</div>` : ''}
+                    ${cd.relief_request_number ? `<div class="col-md-4"><strong>Relief Request:</strong> ${cd.relief_request_number}</div>` : ''}
+                </div>
+            </div>
+        </div>
+
+        <div class="card border-0 bg-light mb-3">
+            <div class="card-header bg-white py-2 d-flex justify-content-between align-items-center">
+                <span class="fw-semibold"><i class="bi bi-paperclip me-1 text-primary"></i>Attachments</span>
+            </div>
+            <div class="card-body py-2">
+                ${photoHtml || docHtml ? `<div class="d-flex gap-2">${photoHtml}${docHtml}</div>` : '<span class="text-muted small">No attachments</span>'}
+            </div>
+        </div>
+
+        <div class="card border-0 bg-light">
+            <div class="card-header bg-white py-2 d-flex justify-content-between align-items-center">
+                <span class="fw-semibold"><i class="bi bi-people me-1 text-primary"></i>Beneficiaries (${bens.length})</span>
+                <span class="badge bg-primary">Total: ${Number(totalAmount).toLocaleString()}</span>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered mb-0 small">
+                        <thead class="table-light"><tr>
+                            <th style="width:40px">#</th>
+                            <th>Name</th>
+                            <th>National ID</th>
+                            <th>Address</th>
+                            <th>Phone</th>
+                            <th class="text-end" style="width:120px">Amount</th>
+                        </tr></thead>
+                        <tbody>${benRows || '<tr><td colspan="6" class="text-center text-muted py-2">No beneficiaries</td></tr>'}</tbody>
+                    </table>
+                </div>
+            </div>
+        </div>`;
+    new bootstrap.Modal(document.getElementById('viewCdModal')).show();
 }
 
 function openCdModal() {

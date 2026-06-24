@@ -142,6 +142,13 @@ document.getElementById('crqForm').addEventListener('submit', async function(e) 
     if (!beneficiaryId) { showToast('danger', 'Beneficiary is required'); return; }
     if (!purpose) { showToast('danger', 'Purpose is required'); return; }
     if (!requestedAmount || requestedAmount <= 0) { showToast('danger', 'Requested amount is required and must be greater than 0'); return; }
+    if (!id) {
+        const dupe = _cashRequests.find(r => r.beneficiary_id === beneficiaryId && r.incident_id === incidentId && ['Pending', 'Approved', 'Partial'].includes(r.status));
+        if (dupe) {
+            showToast('danger', `Beneficiary already has an active cash request for this incident (Request #${dupe.request_number}). Only one request per beneficiary per incident per fiscal year is allowed.`);
+            return;
+        }
+    }
     const body = {
         request_date: document.getElementById('crqDate').value,
         incident_id: incidentId,

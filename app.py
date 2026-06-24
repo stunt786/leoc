@@ -1521,6 +1521,7 @@ class CashRequest(db.Model):
     requesting_office = db.Column(db.String(200))
     requester_name = db.Column(db.String(200))
     phone = db.Column(db.String(50))
+    fiscal_year = db.Column(db.String(20), index=True)
     priority = db.Column(db.String(20), default='Medium')
     requested_amount = db.Column(db.Float, nullable=False, default=0)
     purpose = db.Column(db.String(300))
@@ -1540,7 +1541,7 @@ class CashRequest(db.Model):
             'incident_id': self.incident_id,
             'incident_name': self.incident.incident_name if self.incident else None,
             'requesting_office': self.requesting_office, 'requester_name': self.requester_name,
-            'phone': self.phone, 'priority': self.priority,
+            'phone': self.phone, 'fiscal_year': self.fiscal_year, 'priority': self.priority,
             'requested_amount': self.requested_amount, 'purpose': self.purpose,
             'beneficiary_id': self.beneficiary_id,
             'beneficiary_name': self.beneficiary.name if self.beneficiary else None,
@@ -4224,6 +4225,11 @@ def handle_distributions():
             if total > remaining:
                 return jsonify({'success': False, 'message': f'Distributed quantity for "{item_name}" ({total}) exceeds remaining dispatched quantity ({remaining}) across {len(dispatches)} dispatch(es) (already distributed: {already})'}), 400
         fiscal_year = AppSettings.get_setting('active_fiscal_year', '2081/82')
+        has_relief_req = any(
+            dp.relief_request_id or
+            (json.loads(dp.relief_request_ids) if dp.relief_request_ids else [])
+            for dp in dispatches
+        )
         seen_beneficiaries = set()
         for ben_data in beneficiaries_payload:
             ben_id = ben_data.get('beneficiary_id')
@@ -4243,7 +4249,7 @@ def handle_distributions():
                     CashDistributionBeneficiary.name.ilike(family_name)
                 ) if ben_id else CashDistributionBeneficiary.name.ilike(family_name)
             ).first()
-            if existing_cash:
+            if existing_cash and not has_relief_req:
                 return jsonify({'success': False, 'message': f'Beneficiary "{family_name}" already received cash distribution in fiscal year {fiscal_year}. Cannot also receive relief items.'}), 400
             if ben_id:
                 existing_relief = db.session.query(DistributionBeneficiary).join(
@@ -4784,12 +4790,21 @@ def handle_cash_requests():
         phone = data.get('phone', '').strip()
         if phone and not validate_phone(phone):
             return jsonify({'success': False, 'message': 'Phone number format is invalid'}), 400
+        fiscal_year = AppSettings.get_setting('active_fiscal_year', '2081/82')
+        existing = CashRequest.query.filter(
+            CashRequest.beneficiary_id == beneficiary.id,
+            CashRequest.incident_id == incident.id,
+            CashRequest.fiscal_year == fiscal_year,
+            CashRequest.status.in_(['Pending', 'Approved', 'Partial'])
+        ).first()
+        if existing:
+            return jsonify({'success': False, 'message': f'Beneficiary "{beneficiary.name}" already has a cash request for this incident in fiscal year {fiscal_year} (Request #{existing.request_number}). Only one request per beneficiary per incident per fiscal year is allowed.'}), 400
         req = CashRequest(
             request_number=data.get('request_number') or generate_cash_request_no(),
             request_date=parse_bs_date_field(data, 'request_date', default=date.today()),
             incident_id=incident.id, requesting_office=data.get('requesting_office'),
             requester_name=data.get('requester_name'), phone=phone,
-            priority=data.get('priority', 'Medium'),
+            fiscal_year=fiscal_year, priority=data.get('priority', 'Medium'),
             requested_amount=requested_amount,
             purpose=purpose, beneficiary_id=beneficiary.id,
             remarks=data.get('remarks')
@@ -4825,6 +4840,11 @@ def manage_cash_request(id):
             db.session.delete(req)
             db.session.commit()
             return jsonify({'success': True, 'message': 'Cash request deleted'})
+        distributed = db.session.query(db.func.coalesce(db.func.sum(CashDistribution.total_amount), 0)).filter(
+            CashDistribution.cash_request_id == req.id
+        ).scalar()
+        if distributed and distributed > 0:
+            return jsonify({'success': False, 'message': 'Cannot edit: This cash request already has associated distributions. Reverse or remove distributions first.'}), 400
         data = request.get_json()
         if 'incident_id' in data:
             incident = db_get(Incident, data.get('incident_id'))
@@ -4856,6 +4876,17 @@ def manage_cash_request(id):
             req.requested_amount = parse_float_field(data, 'requested_amount', minimum=0.01, default=req.requested_amount)
         if data.get('request_date'):
             req.request_date = parse_bs_date_field(data, 'request_date', default=req.request_date)
+        fiscal_year = AppSettings.get_setting('active_fiscal_year', '2081/82')
+        existing = CashRequest.query.filter(
+            CashRequest.beneficiary_id == req.beneficiary_id,
+            CashRequest.incident_id == req.incident_id,
+            CashRequest.fiscal_year == fiscal_year,
+            CashRequest.id != id,
+            CashRequest.status.in_(['Pending', 'Approved', 'Partial'])
+        ).first()
+        if existing:
+            ben_name = req.requester_name or 'Unknown'
+            return jsonify({'success': False, 'message': f'Beneficiary "{ben_name}" already has a cash request for this incident in fiscal year {fiscal_year} (Request #{existing.request_number}). Only one request per beneficiary per incident per fiscal year is allowed.'}), 400
         db.session.commit()
         return jsonify({'success': True, 'message': 'Cash request updated', 'data': req.to_dict()})
     except ValueError as e:
@@ -4962,6 +4993,7 @@ def handle_cash_distributions():
             ).first()
             if existing:
                 return jsonify({'success': False, 'message': f'Beneficiary "{ben_name}" already received cash distribution in fiscal year {fiscal_year}.'}), 400
+            relief_request_id = data.get('relief_request_id')
             existing_relief = db.session.query(DistributionBeneficiary).join(
                 Distribution, DistributionBeneficiary.distribution_id == Distribution.id
             ).filter(
@@ -4972,7 +5004,20 @@ def handle_cash_distributions():
                 )
             ).first()
             if existing_relief:
-                return jsonify({'success': False, 'message': f'Beneficiary "{ben_name}" already received relief items in fiscal year {fiscal_year}. Cannot also receive cash.'}), 400
+                if relief_request_id:
+                    # Allow items+cash together when both come from the same relief request
+                    relief_dist = existing_relief.distribution
+                    same_rr = False
+                    if relief_dist and relief_dist.dispatch:
+                        dp_rr_ids = json.loads(relief_dist.dispatch.relief_request_ids) if relief_dist.dispatch.relief_request_ids else []
+                        if not dp_rr_ids and relief_dist.dispatch.relief_request_id:
+                            dp_rr_ids = [relief_dist.dispatch.relief_request_id]
+                        if int(relief_request_id) in dp_rr_ids or relief_dist.dispatch.relief_request_id == int(relief_request_id):
+                            same_rr = True
+                    if not same_rr:
+                        return jsonify({'success': False, 'message': f'Beneficiary "{ben_name}" already received relief items in fiscal year {fiscal_year} via a different relief request. Cannot also receive cash.'}), 400
+                else:
+                    return jsonify({'success': False, 'message': f'Beneficiary "{ben_name}" already received relief items in fiscal year {fiscal_year}. Cannot also receive cash.'}), 400
         dist = CashDistribution(
             distribution_no=data.get('distribution_no') or generate_cash_distribution_no(),
             distribution_date=parse_bs_date_field(data, 'distribution_date', default=date.today()),
@@ -8963,6 +9008,14 @@ def init_db():
                 if 'document' not in cdcols:
                     try:
                         db.session.execute(db.text("ALTER TABLE cash_distribution ADD COLUMN document VARCHAR(500)"))
+                        db.session.commit()
+                    except Exception:
+                        pass
+            if 'cash_request' in inspector.get_table_names():
+                crqcols = [c['name'] for c in inspector.get_columns('cash_request')]
+                if 'fiscal_year' not in crqcols:
+                    try:
+                        db.session.execute(db.text("ALTER TABLE cash_request ADD COLUMN fiscal_year VARCHAR(20)"))
                         db.session.commit()
                     except Exception:
                         pass
