@@ -8,7 +8,8 @@
 <div class="container-fluid">
   <div class="d-flex justify-content-between align-items-center mb-3">
     <h4 class="mb-0"><i class="bi bi-building me-2"></i>Shelter & Evacuation Management</h4>
-    <button class="btn btn-primary btn-sm" onclick="openForm()"><i class="bi bi-plus-lg"></i> Add Shelter</button>
+      <button class="btn btn-outline-success btn-sm me-1" onclick="printData('Shelter Management')"><i class="bi bi-printer"></i> Print</button>
+      <button class="btn btn-primary btn-sm" onclick="openForm()"><i class="bi bi-plus-lg"></i> Add Shelter</button>
   </div>
 
   <div class="row mb-3">
@@ -217,6 +218,7 @@
     </div>
   </div>
 </div>
+{% include "_module_shared.html" %}
 {% endblock %}
 {% block extra_js %}
 <script>
@@ -260,8 +262,9 @@ async function loadData() {
     <td>${item.shelter_manager || '-'}</td>
     <td>${item.contact_number || '-'}</td>
     <td>
-      <button class="btn btn-sm btn-outline-info" onclick="editRecord(${item.id})"><i class="bi bi-pencil"></i></button>
-      <button class="btn btn-sm btn-outline-danger" onclick="deleteRecord(${item.id})"><i class="bi bi-trash"></i></button>
+      <button class="btn btn-sm btn-outline-info" onclick="viewRecord(${item.id})" title="View"><i class="bi bi-eye"></i></button>
+      <button class="btn btn-sm btn-outline-primary" onclick="editRecord(${item.id})" title="Edit"><i class="bi bi-pencil"></i></button>
+      <button class="btn btn-sm btn-outline-danger" onclick="deleteRecord(${item.id})" title="Delete"><i class="bi bi-trash"></i></button>
     </td>
   </tr>`).join('');
 }
@@ -271,6 +274,38 @@ function openForm() {
   document.getElementById('recordId').value = '';
   document.getElementById('dataForm').reset();
   new bootstrap.Modal(document.getElementById('formModal')).show();
+}
+
+async function viewRecord(id) {
+  const resp = await fetch(`/api/shelters/${id}`);
+  const d = await resp.json();
+  if(!d.success) return;
+  const item = d.data;
+  const amenities = [];
+  if (item.water_available) amenities.push('Water');
+  if (item.toilet_available) amenities.push('Toilet');
+  if (item.electricity_available) amenities.push('Electricity');
+  if (item.kitchen_available) amenities.push('Kitchen');
+  if (item.medical_support) amenities.push('Medical');
+  if (item.accessibility_support) amenities.push('Accessible');
+  showViewModal(item.shelter_name, [
+    {label:'Shelter Name', value:item.shelter_name},
+    {label:'Shelter Type', value:item.shelter_type || '-'},
+    {label:'Ward', value:wardMap[item.ward_id] || '-'},
+    {label:'Location', value:item.location},
+    {label:'Coordinates', value:item.coordinates},
+    {label:'Total Capacity', value:item.total_capacity},
+    {label:'Male Capacity', value:item.male_capacity},
+    {label:'Female Capacity', value:item.female_capacity},
+    {label:'Children Capacity', value:item.children_capacity},
+    {label:'Current Occupancy', value:item.current_occupancy},
+    {label:'Available Space', value:item.available_space},
+    {label:'Amenities', value:amenities.join(', ') || 'None'},
+    {label:'Shelter Manager', value:item.shelter_manager},
+    {label:'Contact Number', value:item.contact_number},
+    {label:'Evacuation Routes', value:item.evacuation_routes},
+    {label:'Assembly Points', value:item.assembly_points},
+  ]);
 }
 
 async function editRecord(id) {
@@ -309,6 +344,12 @@ async function editRecord(id) {
 
 async function saveRecord() {
   const id = document.getElementById('recordId').value;
+  if (!validateFormFields([
+    {id:'shelter_name', label:'Shelter Name', required:true},
+    {id:'shelter_type', label:'Shelter Type', required:true},
+    {id:'contact_number', label:'Contact Number', phone:true},
+    {id:'coordinates', label:'Coordinates', coordinates:true},
+  ])) return;
   const data = {
     shelter_name: document.getElementById('shelter_name').value,
     shelter_type: document.getElementById('shelter_type').value,

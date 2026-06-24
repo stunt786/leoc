@@ -32,7 +32,7 @@ class CriticalInfrastructure(db.Model):
     available_facilities = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=utc_now)
     updated_at = db.Column(db.DateTime, default=utc_now, onupdate=utc_now)
-    created_by = db.Column(db.Integer, db.ForeignKey('user.id'))
+    created_by = db.Column(db.Integer)
 
     ward = db.relationship('Ward', backref='infrastructures', lazy=True)
     photos = db.relationship('InfrastructurePhoto', backref='infrastructure', lazy=True, cascade='all, delete-orphan')
@@ -110,7 +110,7 @@ class EmergencyFacility(db.Model):
     contact_number = db.Column(db.String(50))
     created_at = db.Column(db.DateTime, default=utc_now)
     updated_at = db.Column(db.DateTime, default=utc_now, onupdate=utc_now)
-    created_by = db.Column(db.Integer, db.ForeignKey('user.id'))
+    created_by = db.Column(db.Integer)
 
     ward = db.relationship('Ward', backref='emergency_facilities', lazy=True)
 
@@ -166,7 +166,7 @@ class RiskLayer(db.Model):
     population_at_risk = db.Column(db.Integer)
     created_at = db.Column(db.DateTime, default=utc_now)
     updated_at = db.Column(db.DateTime, default=utc_now, onupdate=utc_now)
-    created_by = db.Column(db.Integer, db.ForeignKey('user.id'))
+    created_by = db.Column(db.Integer)
 
     def to_dict(self):
         return {
@@ -210,7 +210,7 @@ class EmergencyContact(db.Model):
     service_area = db.Column(db.String(300))
     created_at = db.Column(db.DateTime, default=utc_now)
     updated_at = db.Column(db.DateTime, default=utc_now, onupdate=utc_now)
-    created_by = db.Column(db.Integer, db.ForeignKey('user.id'))
+    created_by = db.Column(db.Integer)
 
     ward = db.relationship('Ward', backref='emergency_contacts', lazy=True)
 
@@ -252,7 +252,7 @@ class Cluster(db.Model):
     gis_coverage_boundary = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=utc_now)
     updated_at = db.Column(db.DateTime, default=utc_now, onupdate=utc_now)
-    created_by = db.Column(db.Integer, db.ForeignKey('user.id'))
+    created_by = db.Column(db.Integer)
 
     members = db.relationship('ClusterMember', backref='cluster', lazy=True, cascade='all, delete-orphan')
     meetings = db.relationship('ClusterMeeting', backref='cluster', lazy=True, cascade='all, delete-orphan')
@@ -335,7 +335,7 @@ class VulnerableHousehold(db.Model):
     evacuation_priority = db.Column(db.String(20), default='Normal')
     created_at = db.Column(db.DateTime, default=utc_now)
     updated_at = db.Column(db.DateTime, default=utc_now, onupdate=utc_now)
-    created_by = db.Column(db.Integer, db.ForeignKey('user.id'))
+    created_by = db.Column(db.Integer)
 
     ward = db.relationship('Ward', backref='vulnerable_households', lazy=True)
 
@@ -376,7 +376,7 @@ class DisabledPerson(db.Model):
     coordinates = db.Column(db.String(100))
     created_at = db.Column(db.DateTime, default=utc_now)
     updated_at = db.Column(db.DateTime, default=utc_now, onupdate=utc_now)
-    created_by = db.Column(db.Integer, db.ForeignKey('user.id'))
+    created_by = db.Column(db.Integer)
 
     ward = db.relationship('Ward', backref='disabled_persons', lazy=True)
 
@@ -423,7 +423,7 @@ class HighRiskPerson(db.Model):
     coordinates = db.Column(db.String(100))
     created_at = db.Column(db.DateTime, default=utc_now)
     updated_at = db.Column(db.DateTime, default=utc_now, onupdate=utc_now)
-    created_by = db.Column(db.Integer, db.ForeignKey('user.id'))
+    created_by = db.Column(db.Integer)
 
     ward = db.relationship('Ward', backref='high_risk_persons', lazy=True)
 
@@ -457,7 +457,7 @@ class Volunteer(db.Model):
     availability_status = db.Column(db.String(20), default='Available')
     created_at = db.Column(db.DateTime, default=utc_now)
     updated_at = db.Column(db.DateTime, default=utc_now, onupdate=utc_now)
-    created_by = db.Column(db.Integer, db.ForeignKey('user.id'))
+    created_by = db.Column(db.Integer)
 
     ward = db.relationship('Ward', backref='volunteers', lazy=True)
     trainings = db.relationship('VolunteerTraining', backref='volunteer', lazy=True, cascade='all, delete-orphan')
@@ -500,7 +500,7 @@ class RapidResponseTeam(db.Model):
     base_coordinates = db.Column(db.String(100))
     created_at = db.Column(db.DateTime, default=utc_now)
     updated_at = db.Column(db.DateTime, default=utc_now, onupdate=utc_now)
-    created_by = db.Column(db.Integer, db.ForeignKey('user.id'))
+    created_by = db.Column(db.Integer)
 
     members = db.relationship('RRTMember', backref='team', lazy=True, cascade='all, delete-orphan')
     resources = db.relationship('RRTResource', backref='team', lazy=True, cascade='all, delete-orphan')
@@ -550,7 +550,7 @@ class DisasterCommittee(db.Model):
     tenure = db.Column(db.String(100))
     created_at = db.Column(db.DateTime, default=utc_now)
     updated_at = db.Column(db.DateTime, default=utc_now, onupdate=utc_now)
-    created_by = db.Column(db.Integer, db.ForeignKey('user.id'))
+    created_by = db.Column(db.Integer)
 
     members = db.relationship('CommitteeMember', backref='committee', lazy=True, cascade='all, delete-orphan')
     meetings = db.relationship('CommitteeMeeting', backref='committee', lazy=True, cascade='all, delete-orphan')
@@ -610,7 +610,7 @@ class Vehicle(db.Model):
     last_service_date = db.Column(db.Date)
     created_at = db.Column(db.DateTime, default=utc_now)
     updated_at = db.Column(db.DateTime, default=utc_now, onupdate=utc_now)
-    created_by = db.Column(db.Integer, db.ForeignKey('user.id'))
+    created_by = db.Column(db.Integer)
 
     def to_dict(self):
         return {
@@ -657,7 +657,7 @@ class Shelter(db.Model):
     linked_vulnerable_households = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=utc_now)
     updated_at = db.Column(db.DateTime, default=utc_now, onupdate=utc_now)
-    created_by = db.Column(db.Integer, db.ForeignKey('user.id'))
+    created_by = db.Column(db.Integer)
 
     ward = db.relationship('Ward', backref='shelters', lazy=True)
 

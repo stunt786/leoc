@@ -7,9 +7,12 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h4 class="mb-0"><i class="bi bi-person-heart me-2"></i>Differently Abled Persons Registry</h4>
-    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#daModal" onclick="openForm()">
+    <div>
+      <button class="btn btn-outline-success btn-sm me-1" onclick="printData('Differently Abled Registry')"><i class="bi bi-printer"></i> Print</button>
+      <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#daModal" onclick="openForm()">
         <i class="bi bi-plus-lg"></i> Add Person
-    </button>
+      </button>
+    </div>
 </div>
 <div class="row mb-3">
     <div class="col-md-3">
@@ -227,8 +230,9 @@ function renderTable(data) {
             <td>${disabilities.join(', ') || '-'}</td>
             <td>${r.caregiver_name || '-'}</td>
             <td>
-                <button class="btn btn-sm btn-outline-primary" onclick="editRecord(${r.id})"><i class="bi bi-pencil"></i></button>
-                <button class="btn btn-sm btn-outline-danger" onclick="deleteRecord(${r.id})"><i class="bi bi-trash"></i></button>
+                <button class="btn btn-sm btn-outline-info" onclick="viewRecord(${r.id})" title="View"><i class="bi bi-eye"></i></button>
+                <button class="btn btn-sm btn-outline-primary" onclick="editRecord(${r.id})" title="Edit"><i class="bi bi-pencil"></i></button>
+                <button class="btn btn-sm btn-outline-danger" onclick="deleteRecord(${r.id})" title="Delete"><i class="bi bi-trash"></i></button>
             </td>
         </tr>`;
     }).join('');
@@ -253,6 +257,35 @@ function openForm() {
     document.getElementById('daForm').reset();
     document.getElementById('daId').value = '';
     document.querySelector('#daTabs .nav-link').click();
+}
+
+async function viewRecord(id) {
+    try {
+        const r = await fetch(`/api/differently-abled/${id}`);
+        const d = await r.json();
+        if (!d.success) { showToast('danger', d.message); return; }
+        const rec = d.record || d.data || d;
+        const disabilities = [];
+        if (rec.physical_disability) disabilities.push('Physical');
+        if (rec.visual_disability) disabilities.push('Visual');
+        if (rec.hearing_disability) disabilities.push('Hearing');
+        if (rec.intellectual_disability) disabilities.push('Intellectual');
+        if (rec.multiple_disability) disabilities.push('Multiple');
+        showViewModal(rec.person_name, [
+            {label:'Person Name', value:rec.person_name},
+            {label:'Gender', value:rec.gender || '-'},
+            {label:'Age', value:rec.age || '-'},
+            {label:'Ward', value:rec.ward_name || '-'},
+            {label:'Settlement', value:rec.settlement},
+            {label:'Contact Number', value:rec.contact_number},
+            {label:'Disabilities', value:disabilities.join(', ') || 'None'},
+            {label:'Caregiver Name', value:rec.caregiver_name},
+            {label:'Caregiver Contact', value:rec.caregiver_contact},
+            {label:'Coordinates', value:rec.coordinates},
+        ]);
+    } catch(e) {
+        showToast('danger', 'Error loading record: ' + e.message);
+    }
 }
 
 async function editRecord(id) {
@@ -287,6 +320,14 @@ async function editRecord(id) {
 
 document.getElementById('daForm').addEventListener('submit', async function(e) {
     e.preventDefault();
+        if (!validateFormFields([
+            {id:'person_name', label:'Person Name', required:true},
+            {id:'gender', label:'Gender', required:true},
+            {id:'age', label:'Age', required:true, min:0, max:150},
+            {id:'contact_number', label:'Contact Number', phone:true},
+            {id:'caregiver_contact', label:'Caregiver Contact', phone:true},
+            {id:'coordinates', label:'Coordinates', coordinates:true},
+        ])) return;
     const id = document.getElementById('daId').value;
     const body = {
         person_name: document.getElementById('person_name').value,
@@ -343,4 +384,5 @@ async function deleteRecord(id) {
 initWardMap();
 loadData();
 </script>
+{% include "_module_shared.html" %}
 {% endblock %}

@@ -10,9 +10,12 @@
         <h4><i class="bi bi-people me-2"></i>Volunteer Management</h4>
         <p>Manage volunteers, skills, and availability</p>
     </div>
-    <button class="btn btn-primary" onclick="openForm()">
+    <div>
+      <button class="btn btn-outline-success btn-sm me-1" onclick="printData('Volunteer Management')"><i class="bi bi-printer"></i> Print</button>
+      <button class="btn btn-primary" onclick="openForm()">
         <i class="bi bi-plus-lg me-1"></i>Add Volunteer
-    </button>
+      </button>
+    </div>
 </div>
 
 <div class="card">
@@ -273,6 +276,7 @@
         </div>
     </div>
 </div>
+{% include "_module_shared.html" %}
 {% endblock %}
 
 {% block extra_js %}
@@ -341,8 +345,9 @@ function renderVolunteers() {
             '<td>' + (skillsList || '<span class="text-muted">None</span>') + '</td>' +
             '<td><span class="badge ' + statusBadge + '">' + (v.availability_status || 'Available') + '</span></td>' +
             '<td class="text-end">' +
-            '<button class="btn btn-sm btn-outline-primary me-1" onclick="editRecord(' + v.id + ')"><i class="bi bi-pencil"></i></button>' +
-            '<button class="btn btn-sm btn-outline-danger" onclick="deleteRecord(' + v.id + ')"><i class="bi bi-trash"></i></button>' +
+            '<button class="btn btn-sm btn-outline-info me-1" onclick="viewRecord(' + v.id + ')" title="View"><i class="bi bi-eye"></i></button>' +
+            '<button class="btn btn-sm btn-outline-primary me-1" onclick="editRecord(' + v.id + ')" title="Edit"><i class="bi bi-pencil"></i></button>' +
+            '<button class="btn btn-sm btn-outline-danger" onclick="deleteRecord(' + v.id + ')" title="Delete"><i class="bi bi-trash"></i></button>' +
             '</td>' +
             '</tr>';
     }).join('');
@@ -363,6 +368,33 @@ function openForm() {
     firstTab.show();
 
     new bootstrap.Modal(document.getElementById('volunteerModal')).show();
+}
+
+async function viewRecord(id) {
+    try {
+        const r = await fetch('/api/volunteers/' + id);
+        const d = await r.json();
+        if (!d.success) { showToast('danger', d.message); return; }
+        const v = d.volunteer;
+        const skillsList = (v.skills || []).join(', ') || 'None';
+        const statusBadge = v.availability_status === 'Available' ? 'bg-success' :
+            v.availability_status === 'On Duty' ? 'bg-warning text-dark' : 'bg-secondary';
+        showViewModal(v.name, [
+            {label:'Volunteer ID', value:v.volunteer_code || v.id},
+            {label:'Name', value:v.name},
+            {label:'Gender', value:v.gender || '-'},
+            {label:'Age', value:v.age || '-'},
+            {label:'Ward', value:wardMap[v.ward_id] || '-'},
+            {label:'Contact Number', value:v.contact_number},
+            {label:'Email', value:v.email},
+            {label:'Skills', value:skillsList},
+            {label:'Home Coordinates', value:v.home_coordinates},
+            {label:'Availability', value:v.availability_status || 'Available', badge:statusBadge},
+            {label:'Trainings', value:(v.trainings || []).length + ' training(s)'},
+        ]);
+    } catch (e) {
+        showToast('danger', 'Error loading volunteer: ' + e.message);
+    }
 }
 
 async function editRecord(id) {
@@ -406,6 +438,12 @@ async function saveRecord() {
     const id = document.getElementById('volunteer_id').value;
     const name = document.getElementById('vol_name').value.trim();
     if (!name) { showToast('danger', 'Volunteer name is required'); return; }
+    if (!validateFormFields([
+        {id:'vol_name', label:'Volunteer Name', required:true},
+        {id:'vol_contact_number', label:'Contact Number', phone:true},
+        {id:'vol_email', label:'Email', email:true},
+        {id:'home_coordinates', label:'Home Coordinates', coordinates:true},
+    ])) return;
 
     const skills = [];
     document.querySelectorAll('.skill-checkbox:checked').forEach(cb => skills.push(cb.value));

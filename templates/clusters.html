@@ -7,9 +7,12 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h4 class="mb-0"><i class="bi bi-diagram-3-fill me-2"></i>Cluster Coordination Management</h4>
-    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#clusterModal" onclick="openForm()">
+    <div>
+      <button class="btn btn-outline-success btn-sm me-1" onclick="printData('Cluster Coordination Management')"><i class="bi bi-printer"></i> Print</button>
+      <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#clusterModal" onclick="openForm()">
         <i class="bi bi-plus-lg"></i> Add Cluster
-    </button>
+      </button>
+    </div>
 </div>
 <div class="card shadow-sm">
     <div class="card-body">
@@ -250,10 +253,11 @@ function renderClusters(data) {
         <td>${c.contact_details || '-'}</td>
         <td>${(c.members && c.members.length) || 0}</td>
         <td>
+            <button class="btn btn-sm btn-outline-info" onclick="viewRecord(${c.id})" title="View"><i class="bi bi-eye"></i></button>
             <button class="btn btn-sm btn-outline-info" onclick="openMeetings(${c.id})" title="Meetings"><i class="bi bi-calendar-event"></i></button>
             <button class="btn btn-sm btn-outline-success" onclick="openDeployments(${c.id})" title="Deployments"><i class="bi bi-truck"></i></button>
-            <button class="btn btn-sm btn-outline-primary" onclick="editRecord(${c.id})"><i class="bi bi-pencil"></i></button>
-            <button class="btn btn-sm btn-outline-danger" onclick="deleteRecord(${c.id})"><i class="bi bi-trash"></i></button>
+            <button class="btn btn-sm btn-outline-primary" onclick="editRecord(${c.id})" title="Edit"><i class="bi bi-pencil"></i></button>
+            <button class="btn btn-sm btn-outline-danger" onclick="deleteRecord(${c.id})" title="Delete"><i class="bi bi-trash"></i></button>
         </td>
     </tr>`).join('');
     paginator.update(data.length);
@@ -277,6 +281,22 @@ function openForm() {
     document.getElementById('membersContainer').innerHTML = '<p class="text-muted text-center py-3 mb-0" id="noMembersMsg"><i class="bi bi-info-circle me-1"></i>No members added. Click "Add Member" below.</p>';
     const tabEl = document.querySelector('#clusterTab button[data-bs-target="#basic"]');
     if (tabEl) new bootstrap.Tab(tabEl).show();
+}
+
+async function viewRecord(id) {
+    const c = _clusters.find(x => x.id === id);
+    if (!c) return;
+    const membersCount = (c.members && c.members.length) || 0;
+    showViewModal(c.cluster_name, [
+        {label:'Cluster Name', value:c.cluster_name},
+        {label:'Lead Organization', value:c.lead_organization || '-'},
+        {label:'Focal Person', value:c.focal_person || '-'},
+        {label:'Contact Details', value:c.contact_details || '-'},
+        {label:'Resource Capacity', value:c.resource_capacity || '-'},
+        {label:'Coverage Area', value:c.coverage_area || '-'},
+        {label:'Available Equipment', value:c.available_equipment || '-'},
+        {label:'Members', value:membersCount},
+    ]);
 }
 
 async function editRecord(id) {
@@ -305,6 +325,12 @@ async function editRecord(id) {
 
 document.getElementById('clusterForm').addEventListener('submit', async function(e) {
     e.preventDefault();
+    if (!validateFormFields([
+        {id:'clusterName', label:'Cluster Name', required:true},
+        {id:'leadOrganization', label:'Lead Organization', required:true},
+        {id:'focalPerson', label:'Focal Person', required:true},
+        {id:'contactDetails', label:'Contact Details', required:true},
+    ])) return;
     const id = document.getElementById('clusterId').value;
     const members = [];
     document.querySelectorAll('#membersContainer .member-row').forEach(row => {
@@ -479,4 +505,5 @@ async function saveDeployment(clusterId) {
 
 loadData();
 </script>
+{% include "_module_shared.html" %}
 {% endblock %}

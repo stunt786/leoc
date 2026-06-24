@@ -10,9 +10,12 @@
         <h4><i class="bi bi-people-fill me-2"></i>Disaster Management Committees</h4>
         <p>Manage disaster management committees and their meetings</p>
     </div>
-    <button class="btn btn-primary" onclick="openForm()">
+    <div>
+      <button class="btn btn-outline-success btn-sm me-1" onclick="printData('Disaster Management Committees')"><i class="bi bi-printer"></i> Print</button>
+      <button class="btn btn-primary" onclick="openForm()">
         <i class="bi bi-plus-lg me-1"></i>Add Committee
-    </button>
+      </button>
+    </div>
 </div>
 
 <div class="card mt-3">
@@ -241,6 +244,7 @@ function renderData(data) {
         <td>${c.members_count || c.members ? (c.members_count || (Array.isArray(c.members) ? c.members.length : 0)) : 0}</td>
         <td>${c.meetings_count || 0}</td>
         <td class="text-end">
+            <button class="btn btn-sm btn-outline-info" onclick="viewRecord(${c.id})" title="View"><i class="bi bi-eye"></i></button>
             <button class="btn btn-sm btn-outline-info" onclick="openMeetings(${c.id})" title="Meetings"><i class="bi bi-calendar-event"></i></button>
             <button class="btn btn-sm btn-outline-primary" onclick="editRecord(${c.id})" title="Edit"><i class="bi bi-pencil"></i></button>
             <button class="btn btn-sm btn-outline-danger" onclick="deleteRecord(${c.id})" title="Delete"><i class="bi bi-trash"></i></button>
@@ -307,6 +311,20 @@ function openForm() {
     new bootstrap.Modal(document.getElementById('committeeModal')).show();
 }
 
+function viewRecord(id) {
+    const c = committees.find(x => x.id === id);
+    if (!c) return;
+    const membersCount = c.members_count || (Array.isArray(c.members) ? c.members.length : 0);
+    showViewModal(c.committee_name, [
+        {label:'Committee Name', value:c.committee_name},
+        {label:'Committee Type', value:c.committee_type, badge:'bg-info'},
+        {label:'Formation Date', value:c.formation_date || '-'},
+        {label:'Tenure', value:c.tenure ? c.tenure + ' months' : '-'},
+        {label:'Members', value:membersCount},
+        {label:'Meetings', value:c.meetings_count || 0},
+    ]);
+}
+
 function editRecord(id) {
     const c = committees.find(x => x.id === id);
     if (!c) return;
@@ -340,6 +358,11 @@ async function saveRecord() {
     if (!body.committee_type) { showToast('danger', 'Committee type is required'); return; }
     if (!body.formation_date) { showToast('danger', 'Formation date is required'); return; }
     if (!body.tenure) { showToast('danger', 'Tenure is required'); return; }
+    if (!validateFormFields([
+        {id:'committee_name', label:'Committee Name', required:true},
+        {id:'committee_type', label:'Committee Type', required:true},
+        {id:'formation_date', label:'Formation Date', required:true},
+    ])) return;
     body.members = getMembers();
     const url = id ? '/api/committees/' + id : '/api/committees';
     const method = id ? 'PUT' : 'POST';
@@ -436,4 +459,5 @@ async function saveMeeting() {
 
 document.addEventListener('DOMContentLoaded', loadData);
 </script>
+{% include "_module_shared.html" %}
 {% endblock %}

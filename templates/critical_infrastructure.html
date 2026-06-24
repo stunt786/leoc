@@ -10,6 +10,7 @@
     <h4 class="mb-0"><i class="bi bi-building-gear me-2"></i>Critical Infrastructure Registry</h4>
     <div>
       <button class="btn btn-outline-primary btn-sm me-1" onclick="showMap()"><i class="bi bi-map"></i> Map View</button>
+      <button class="btn btn-outline-success btn-sm me-1" onclick="printData('Critical Infrastructure Registry')"><i class="bi bi-printer"></i> Print</button>
       <button class="btn btn-primary btn-sm" onclick="openForm()"><i class="bi bi-plus-lg"></i> Add Infrastructure</button>
     </div>
   </div>
@@ -223,8 +224,9 @@ async function loadData() {
     <td><span class="badge bg-${item.current_status==='Operational'?'success':item.current_status==='Non-Operational'?'danger':'warning'}">${item.current_status}</span></td>
     <td>${item.contact_person || '-'}<br><small>${item.contact_number || ''}</small></td>
     <td>
-      <button class="btn btn-sm btn-outline-info" onclick="editRecord(${item.id})"><i class="bi bi-eye"></i></button>
-      <button class="btn btn-sm btn-outline-danger" onclick="deleteRecord(${item.id})"><i class="bi bi-trash"></i></button>
+      <button class="btn btn-sm btn-outline-info" onclick="viewRecord(${item.id})" title="View"><i class="bi bi-eye"></i></button>
+      <button class="btn btn-sm btn-outline-primary" onclick="editRecord(${item.id})" title="Edit"><i class="bi bi-pencil"></i></button>
+      <button class="btn btn-sm btn-outline-danger" onclick="deleteRecord(${item.id})" title="Delete"><i class="bi bi-trash"></i></button>
     </td>
   </tr>`).join('');
 }
@@ -234,6 +236,29 @@ function openForm() {
   document.getElementById('recordId').value = '';
   document.getElementById('dataForm').reset();
   new bootstrap.Modal(document.getElementById('formModal')).show();
+}
+
+async function viewRecord(id) {
+  const resp = await fetch(`/api/critical-infrastructure/${id}`);
+  const d = await resp.json();
+  if(!d.success) return;
+  const item = d.data;
+  showViewModal(item.name, [
+    {label:'Infrastructure ID', value:item.infrastructure_id},
+    {label:'Name', value:item.name},
+    {label:'Type', value:item.infrastructure_type},
+    {label:'Ward', value:wardMap[item.ward_id] || '-'},
+    {label:'Description', value:item.description},
+    {label:'Settlement', value:item.settlement},
+    {label:'Coordinates', value:item.coordinates},
+    {label:'Elevation', value:item.elevation},
+    {label:'Capacity', value:item.capacity},
+    {label:'Status', value:item.current_status, badge:'bg-' + (item.current_status==='Operational'?'success':item.current_status==='Non-Operational'?'danger':'warning')},
+    {label:'Accessibility', value:item.accessibility_status},
+    {label:'Contact Person', value:item.contact_person},
+    {label:'Contact Number', value:item.contact_number},
+    {label:'Available Facilities', value:item.available_facilities},
+  ]);
 }
 
 async function editRecord(id) {
@@ -262,6 +287,13 @@ async function editRecord(id) {
 
 async function saveRecord() {
   const id = document.getElementById('recordId').value;
+  const coords = document.getElementById('coordinates').value;
+  if (!validateFormFields([
+    {id:'name', label:'Infrastructure Name', required:true},
+    {id:'infrastructure_type', label:'Infrastructure Type', required:true},
+    {id:'contact_number', label:'Contact Number', phone:true},
+    {id:'coordinates', label:'Coordinates', coordinates:true},
+  ])) return;
   const data = {
     infrastructure_id: document.getElementById('infrastructure_id').value || undefined,
     name: document.getElementById('name').value,
@@ -303,4 +335,5 @@ initWardMap();
 loadTypes();
 loadData();
 </script>
+{% include "_module_shared.html" %}
 {% endblock %}

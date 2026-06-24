@@ -18384,3 +18384,16 @@ LINE 2: FROM critical_infrastructure
 [SQL: SELECT critical_infrastructure.id AS critical_infrastructure_id, critical_infrastructure.infrastructure_id AS critical_infrastructure_infrastructure_id, critical_infrastructure.name AS critical_infrastructure_name, critical_infrastructure.infrastructure_type AS critical_infrastructure_infrastructure_type, critical_infrastructure.description AS critical_infrastructure_description, critical_infrastructure.ward_id AS critical_infrastructure_ward_id, critical_infrastructure.settlement AS critical_infrastructure_settlement, critical_infrastructure.coordinates AS critical_infrastructure_coordinates, critical_infrastructure.elevation AS critical_infrastructure_elevation, critical_infrastructure.capacity AS critical_infrastructure_capacity, critical_infrastructure.current_status AS critical_infrastructure_current_status, critical_infrastructure.contact_person AS critical_infrastructure_contact_person, critical_infrastructure.contact_number AS critical_infrastructure_contact_number, critical_infrastructure.accessibility_status AS critical_infrastructure_accessibility_status, critical_infrastructure.available_facilities AS critical_infrastructure_available_facilities, critical_infrastructure.created_at AS critical_infrastructure_created_at, critical_infrastructure.updated_at AS critical_infrastructure_updated_at, critical_infrastructure.created_by AS critical_infrastructure_created_by 
 FROM critical_infrastructure]
 (Background on this error at: https://sqlalche.me/e/20/f405)
+2026-06-24 19:30:43,418 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:166]
+2026-06-24 19:31:08,306 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:166]
+2026-06-24 19:31:35,163 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:166]
+2026-06-24 19:31:43,477 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:166]
+2026-06-24 13:47:30,317 INFO: LEOC Application started [in /app/app.py:166]
+2026-06-24 13:47:30,317 INFO: LEOC Application started [in /app/app.py:166]
+2026-06-24 14:04:00,830 INFO: LEOC Application started [in /app/app.py:166]
+2026-06-24 14:04:00,830 INFO: LEOC Application started [in /app/app.py:166]
+2026-06-24 19:52:35,135 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:166]
+2026-06-24 14:08:17,840 INFO: LEOC Application started [in /app/app.py:166]
+2026-06-24 14:08:17,853 INFO: LEOC Application started [in /app/app.py:166]
+2026-06-24 14:11:09,819 INFO: LEOC Application started [in /app/app.py:166]
+2026-06-24 14:11:09,913 INFO: LEOC Application started [in /app/app.py:166]

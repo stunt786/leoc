@@ -10,9 +10,12 @@
         <h4><i class="bi bi-people-fill me-2"></i>Rapid Response Teams</h4>
         <p>Manage emergency response teams and their resources</p>
     </div>
-    <button class="btn btn-primary" onclick="openForm()">
+    <div>
+      <button class="btn btn-outline-success btn-sm me-1" onclick="printData('Rapid Response Teams')"><i class="bi bi-printer"></i> Print</button>
+      <button class="btn btn-primary" onclick="openForm()">
         <i class="bi bi-plus-lg me-1"></i>Add Team
-    </button>
+      </button>
+    </div>
 </div>
 
 <div class="card">
@@ -163,6 +166,7 @@
         </div>
     </div>
 </div>
+{% include "_module_shared.html" %}
 {% endblock %}
 
 {% block extra_js %}
@@ -208,6 +212,7 @@ function renderTable(data) {
             <td><span class="badge bg-dark">${membersCount}</span></td>
             <td><span class="badge bg-secondary">${resourcesCount}</span></td>
             <td class="text-end">
+                <button class="btn btn-sm btn-outline-info" onclick="viewRecord(${r.id})" title="View"><i class="bi bi-eye"></i></button>
                 <button class="btn btn-sm btn-outline-primary" onclick="editRecord(${r.id})" title="Edit"><i class="bi bi-pencil"></i></button>
                 <button class="btn btn-sm btn-outline-danger" onclick="deleteRecord(${r.id})" title="Delete"><i class="bi bi-trash"></i></button>
             </td>
@@ -252,6 +257,23 @@ function serializeResources() {
     }).filter(r => r.equipment_assigned || r.vehicles_assigned);
 }
 
+async function viewRecord(id) {
+    const r = records.find(x => x.id === id);
+    if (!r) return;
+    const membersCount = r.members ? r.members.length : 0;
+    const resourcesCount = r.resources ? r.resources.length : 0;
+    showViewModal(r.team_name, [
+        {label:'Team Name', value:r.team_name},
+        {label:'Team Type', value:r.team_type, badge:'bg-info'},
+        {label:'Coverage Area', value:r.coverage_area},
+        {label:'Team Leader', value:r.team_leader},
+        {label:'Contact Number', value:r.contact_number},
+        {label:'Base Coordinates', value:r.base_coordinates},
+        {label:'Members', value:membersCount},
+        {label:'Resources', value:resourcesCount},
+    ]);
+}
+
 async function editRecord(id) {
     const r = records.find(x => x.id === id);
     if (!r) return;
@@ -285,6 +307,12 @@ async function saveRecord() {
     if (!team_name) { showToast('danger', 'Team name is required'); return; }
     if (!team_type) { showToast('danger', 'Team type is required'); return; }
     if (!contact_number) { showToast('danger', 'Contact number is required'); return; }
+    if (!validateFormFields([
+        {id:'team_name', label:'Team Name', required:true},
+        {id:'team_type', label:'Team Type', required:true},
+        {id:'contact_number', label:'Contact Number', required:true, phone:true},
+        {id:'base_coordinates', label:'Base Coordinates', coordinates:true},
+    ])) return;
     const members = serializeMembers();
     if (members.length === 0) { showToast('danger', 'At least one team member is required'); return; }
     const body = {

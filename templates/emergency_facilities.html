@@ -10,6 +10,7 @@
     <h4 class="mb-0"><i class="bi bi-hospital me-2"></i>Emergency Facilities Registry</h4>
     <div>
       <button class="btn btn-outline-primary btn-sm me-1" onclick="showMap()"><i class="bi bi-map"></i> Map View</button>
+      <button class="btn btn-outline-success btn-sm me-1" onclick="printData('Emergency Facilities Registry')"><i class="bi bi-printer"></i> Print</button>
       <button class="btn btn-primary btn-sm" onclick="openForm()"><i class="bi bi-plus-lg"></i> Add Facility</button>
     </div>
   </div>
@@ -231,8 +232,9 @@ async function loadData() {
     <td>${item.current_occupancy || '0'}</td>
     <td>${item.focal_person || '-'}<br><small>${item.contact_number || ''}</small></td>
     <td>
-      <button class="btn btn-sm btn-outline-info" onclick="editRecord(${item.id})"><i class="bi bi-eye"></i></button>
-      <button class="btn btn-sm btn-outline-danger" onclick="deleteRecord(${item.id})"><i class="bi bi-trash"></i></button>
+      <button class="btn btn-sm btn-outline-info" onclick="viewRecord(${item.id})" title="View"><i class="bi bi-eye"></i></button>
+      <button class="btn btn-sm btn-outline-primary" onclick="editRecord(${item.id})" title="Edit"><i class="bi bi-pencil"></i></button>
+      <button class="btn btn-sm btn-outline-danger" onclick="deleteRecord(${item.id})" title="Delete"><i class="bi bi-trash"></i></button>
     </td>
   </tr>`).join('');
 }
@@ -242,6 +244,31 @@ function openForm() {
   document.getElementById('recordId').value = '';
   document.getElementById('dataForm').reset();
   new bootstrap.Modal(document.getElementById('formModal')).show();
+}
+
+async function viewRecord(id) {
+  const resp = await fetch(`/api/emergency-facilities/${id}`);
+  const d = await resp.json();
+  if(!d.success) return;
+  const item = d.data;
+  showViewModal(item.facility_name, [
+    {label:'Facility Name', value:item.facility_name},
+    {label:'Facility Type', value:item.facility_type},
+    {label:'Ward', value:wardMap[item.ward_id] || '-'},
+    {label:'Location Description', value:item.location_description},
+    {label:'Coordinates', value:item.coordinates},
+    {label:'Max Capacity', value:item.max_capacity},
+    {label:'Current Occupancy', value:item.current_occupancy},
+    {label:'Water', value:item.water_availability ? 'Yes' : 'No'},
+    {label:'Electricity', value:item.electricity_availability ? 'Yes' : 'No'},
+    {label:'Toilet', value:item.toilet_availability ? 'Yes' : 'No'},
+    {label:'Kitchen', value:item.kitchen_availability ? 'Yes' : 'No'},
+    {label:'Internet', value:item.internet_availability ? 'Yes' : 'No'},
+    {label:'Disabled Access', value:item.accessibility_disabled ? 'Yes' : 'No'},
+    {label:'Managing Organization', value:item.managing_organization},
+    {label:'Focal Person', value:item.focal_person},
+    {label:'Contact Number', value:item.contact_number},
+  ]);
 }
 
 async function editRecord(id) {
@@ -273,6 +300,12 @@ async function editRecord(id) {
 
 async function saveRecord() {
   const id = document.getElementById('recordId').value;
+  if (!validateFormFields([
+    {id:'facility_name', label:'Facility Name', required:true},
+    {id:'facility_type', label:'Facility Type', required:true},
+    {id:'contact_number', label:'Contact Number', phone:true},
+    {id:'coordinates', label:'Coordinates', coordinates:true},
+  ])) return;
   const data = {
     facility_name: document.getElementById('facility_name').value,
     facility_type: document.getElementById('facility_type').value,
@@ -317,4 +350,5 @@ initWardMap();
 loadTypes();
 loadData();
 </script>
+{% include "_module_shared.html" %}
 {% endblock %}

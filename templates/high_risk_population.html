@@ -7,9 +7,12 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h4 class="mb-0"><i class="bi bi-exclamation-triangle-fill me-2"></i>High Risk Population Registry</h4>
-    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#hrModal" onclick="openForm()">
+    <div>
+      <button class="btn btn-outline-success btn-sm me-1" onclick="printData('High Risk Population Registry')"><i class="bi bi-printer"></i> Print</button>
+      <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#hrModal" onclick="openForm()">
         <i class="bi bi-plus-lg"></i> Add Person
-    </button>
+      </button>
+    </div>
 </div>
 <div class="row mb-3">
     <div class="col-md-4">
@@ -208,8 +211,9 @@ async function loadData() {
             <td>${p.health_condition ? (p.health_condition.length > 40 ? p.health_condition.substring(0, 40) + '...' : p.health_condition) : '-'}</td>
             <td>${p.health_facility_linked || '-'}</td>
             <td>
-                <button class="btn btn-sm btn-outline-primary" onclick="editRecord(${p.id})"><i class="bi bi-pencil"></i></button>
-                <button class="btn btn-sm btn-outline-danger" onclick="deleteRecord(${p.id})"><i class="bi bi-trash"></i></button>
+                <button class="btn btn-sm btn-outline-info" onclick="viewRecord(${p.id})" title="View"><i class="bi bi-eye"></i></button>
+                <button class="btn btn-sm btn-outline-primary" onclick="editRecord(${p.id})" title="Edit"><i class="bi bi-pencil"></i></button>
+                <button class="btn btn-sm btn-outline-danger" onclick="deleteRecord(${p.id})" title="Delete"><i class="bi bi-trash"></i></button>
             </td>
         </tr>`).join('');
         document.getElementById('tableInfo').textContent = data.length + ' record' + (data.length !== 1 ? 's' : '');
@@ -221,6 +225,30 @@ async function loadData() {
 function openForm() {
     document.getElementById('hrForm').reset();
     document.getElementById('hrId').value = '';
+}
+
+async function viewRecord(id) {
+    try {
+        const r = await fetch(`/api/high-risk-population/${id}`);
+        const d = await r.json();
+        if (!d.success) { showToast('danger', d.message); return; }
+        const p = d.data;
+        showViewModal(p.person_name, [
+            {label:'Full Name', value:p.person_name},
+            {label:'Age', value:p.age ?? '-'},
+            {label:'Gender', value:p.gender || '-'},
+            {label:'Category', value:p.category, badge:'bg-danger'},
+            {label:'Contact Number', value:p.contact_number},
+            {label:'Ward', value:p.ward_name || '-'},
+            {label:'Settlement', value:p.settlement},
+            {label:'Health Condition', value:p.health_condition},
+            {label:'Health Facility', value:p.health_facility_linked},
+            {label:'Emergency Contact', value:p.emergency_contact},
+            {label:'Coordinates', value:p.coordinates},
+        ]);
+    } catch(e) {
+        showToast('danger', 'Error loading record: ' + e.message);
+    }
 }
 
 async function editRecord(id) {
@@ -249,6 +277,13 @@ async function editRecord(id) {
 
 document.getElementById('hrForm').addEventListener('submit', async function(e) {
     e.preventDefault();
+        if (!validateFormFields([
+            {id:'hrName', label:'Full Name', required:true},
+            {id:'hrAge', label:'Age', min:0, max:150},
+            {id:'hrCategory', label:'Category', required:true},
+            {id:'hrContact', label:'Contact Number', phone:true},
+            {id:'hrCoordinates', label:'Coordinates', coordinates:true},
+        ])) return;
     const id = document.getElementById('hrId').value;
     const body = {
         person_name: document.getElementById('hrName').value,
@@ -299,4 +334,5 @@ async function deleteRecord(id) {
 initWardMap();
 loadData();
 </script>
+{% include "_module_shared.html" %}
 {% endblock %}

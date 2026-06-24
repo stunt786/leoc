@@ -8,7 +8,10 @@
 <div class="container-fluid">
   <div class="d-flex justify-content-between align-items-center mb-3">
     <h4 class="mb-0"><i class="bi bi-telephone-fill me-2"></i>Emergency Contact Directory</h4>
-    <button class="btn btn-primary btn-sm" onclick="openForm()"><i class="bi bi-plus-lg"></i> Add Contact</button>
+    <div>
+      <button class="btn btn-outline-success btn-sm me-1" onclick="printData('Emergency Contact Directory')"><i class="bi bi-printer"></i> Print</button>
+      <button class="btn btn-primary btn-sm" onclick="openForm()"><i class="bi bi-plus-lg"></i> Add Contact</button>
+    </div>
   </div>
 
   <div class="row mb-3">
@@ -199,6 +202,7 @@ async function loadData() {
     <td>${wardMap[item.ward_id] || '-'}</td>
     <td><span class="badge bg-${item.availability_status === 'Available' ? 'success' : 'danger'}">${item.availability_status || '-'}</span></td>
     <td class="text-end">
+      <button class="btn btn-sm btn-outline-info" onclick="viewRecord(${item.id})" title="View"><i class="bi bi-eye"></i></button>
       <button class="btn btn-sm btn-outline-success" onclick="dial('${item.mobile_number}')" title="Dial"><i class="bi bi-telephone-fill"></i></button>
       <button class="btn btn-sm btn-outline-primary" onclick="editRecord(${item.id})" title="Edit"><i class="bi bi-pencil"></i></button>
       <button class="btn btn-sm btn-outline-danger" onclick="deleteRecord(${item.id})" title="Delete"><i class="bi bi-trash"></i></button>
@@ -217,6 +221,28 @@ function openForm() {
   document.getElementById('availability_status').value = 'Available';
   updateSubCategories();
   new bootstrap.Modal(document.getElementById('formModal')).show();
+}
+
+async function viewRecord(id) {
+  const resp = await fetch(`/api/emergency-contacts/${id}`);
+  const d = await resp.json();
+  if (!d.success) return;
+  const item = d.data || d.contact || d;
+  showViewModal(item.organization_name, [
+    {label:'Organization', value:item.organization_name},
+    {label:'Contact Person', value:item.contact_person},
+    {label:'Designation', value:item.designation},
+    {label:'Category', value:item.category, badge:'bg-info'},
+    {label:'Sub Category', value:item.sub_category},
+    {label:'Mobile Number', value:item.mobile_number},
+    {label:'Alternative Number', value:item.alternative_number},
+    {label:'Email', value:item.email},
+    {label:'Ward', value:wardMap[item.ward_id] || '-'},
+    {label:'Address', value:item.address},
+    {label:'Coordinates', value:item.coordinates},
+    {label:'Availability', value:item.availability_status, badge:'bg-' + (item.availability_status === 'Available' ? 'success' : 'danger')},
+    {label:'Service Area', value:item.service_area},
+  ]);
 }
 
 async function editRecord(id) {
@@ -246,7 +272,12 @@ async function editRecord(id) {
 async function saveRecord() {
   const id = document.getElementById('recordId').value;
   const mobile = document.getElementById('mobile_number').value;
-  if (!mobile) { showToast('danger', 'Mobile number is required'); return; }
+  if (!validateFormFields([
+    {id:'mobile_number', label:'Mobile Number', required:true, phone:true},
+    {id:'alternative_number', label:'Alternative Number', phone:true},
+    {id:'email', label:'Email', email:true},
+    {id:'coordinates', label:'Coordinates', coordinates:true},
+  ])) return;
   const data = {
     organization_name: document.getElementById('organization_name').value,
     contact_person: document.getElementById('contact_person').value,
@@ -284,4 +315,5 @@ async function deleteRecord(id) {
 initWardMap();
 loadData();
 </script>
+{% include "_module_shared.html" %}
 {% endblock %}

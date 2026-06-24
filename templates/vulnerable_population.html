@@ -7,9 +7,12 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h4 class="mb-0"><i class="bi bi-heart-pulse-fill me-2"></i>Vulnerable Population Registry</h4>
-    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#vpModal" onclick="openForm()">
+    <div>
+      <button class="btn btn-outline-success btn-sm me-1" onclick="printData('Vulnerable Population Registry')"><i class="bi bi-printer"></i> Print</button>
+      <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#vpModal" onclick="openForm()">
         <i class="bi bi-plus-lg"></i> Add Household
-    </button>
+      </button>
+    </div>
 </div>
 <div class="row mb-3">
     <div class="col-md-3">
@@ -196,8 +199,9 @@ function renderTable(data) {
             <td>${r.contact_number || '-'}</td>
             <td><span class="badge ${priorityClass}">${r.evacuation_priority || 'Normal'}</span></td>
             <td>
-                <button class="btn btn-sm btn-outline-primary" onclick="editRecord(${r.id})"><i class="bi bi-pencil"></i></button>
-                <button class="btn btn-sm btn-outline-danger" onclick="deleteRecord(${r.id})"><i class="bi bi-trash"></i></button>
+                <button class="btn btn-sm btn-outline-info" onclick="viewRecord(${r.id})" title="View"><i class="bi bi-eye"></i></button>
+                <button class="btn btn-sm btn-outline-primary" onclick="editRecord(${r.id})" title="Edit"><i class="bi bi-pencil"></i></button>
+                <button class="btn btn-sm btn-outline-danger" onclick="deleteRecord(${r.id})" title="Delete"><i class="bi bi-trash"></i></button>
             </td>
         </tr>`;
     }).join('');
@@ -235,6 +239,30 @@ function openForm() {
     document.getElementById('vpEvacPriority').value = 'Normal';
 }
 
+async function viewRecord(id) {
+    try {
+        const r = await fetch(`/api/vulnerable-population/${id}`);
+        const d = await r.json();
+        if (!d.success) { showToast('danger', d.message); return; }
+        const rec = d.data || d.record;
+        const priorityClass = rec.evacuation_priority === 'Critical' ? 'bg-danger' : rec.evacuation_priority === 'High' ? 'bg-warning text-dark' : 'bg-success';
+        showViewModal(rec.head_of_household, [
+            {label:'Household ID', value:rec.household_id || rec.id},
+            {label:'Head of Household', value:rec.head_of_household},
+            {label:'Family Size', value:rec.family_size},
+            {label:'Category', value:rec.category},
+            {label:'Ward', value:rec.ward_name || rec.ward_id || '-'},
+            {label:'Settlement', value:rec.settlement},
+            {label:'Contact Number', value:rec.contact_number},
+            {label:'Coordinates', value:rec.coordinates},
+            {label:'Disaster Exposure', value:rec.disaster_exposure},
+            {label:'Evacuation Priority', value:rec.evacuation_priority || 'Normal', badge:priorityClass},
+        ]);
+    } catch(e) {
+        showToast('danger', 'Error loading record: ' + e.message);
+    }
+}
+
 async function editRecord(id) {
     try {
         const r = await fetch(`/api/vulnerable-population/${id}`);
@@ -260,6 +288,13 @@ async function editRecord(id) {
 
 document.getElementById('vpForm').addEventListener('submit', async function(e) {
     e.preventDefault();
+        if (!validateFormFields([
+            {id:'vpHead', label:'Head of Household', required:true},
+            {id:'vpFamilySize', label:'Family Size', required:true, min:1},
+            {id:'vpCategory', label:'Category', required:true},
+            {id:'vpContact', label:'Contact Number', phone:true},
+            {id:'vpCoordinates', label:'Coordinates', coordinates:true},
+        ])) return;
     const id = document.getElementById('vpId').value;
     const body = {
         head_of_household: document.getElementById('vpHead').value,
@@ -308,4 +343,5 @@ async function deleteRecord(id) {
 initWardMap();
 loadData();
 </script>
+{% include "_module_shared.html" %}
 {% endblock %}

@@ -8,7 +8,10 @@
 <div class="container-fluid">
   <div class="d-flex justify-content-between align-items-center mb-3">
     <h4 class="mb-0"><i class="bi bi-exclamation-triangle me-2"></i>Risk Layer Management</h4>
-    <button class="btn btn-primary btn-sm" onclick="openForm()"><i class="bi bi-plus-lg"></i> Add Risk Zone</button>
+    <div>
+      <button class="btn btn-outline-success btn-sm me-1" onclick="printData('Risk Layer Management')"><i class="bi bi-printer"></i> Print</button>
+      <button class="btn btn-primary btn-sm" onclick="openForm()"><i class="bi bi-plus-lg"></i> Add Risk Zone</button>
+    </div>
   </div>
 
   <div class="row mb-3">
@@ -175,8 +178,9 @@ async function loadData() {
     <td>${item.affected_households ?? '-'}</td>
     <td>${item.population_at_risk ?? '-'}</td>
     <td>
-      <button class="btn btn-sm btn-outline-info" onclick="editRecord(${item.id})"><i class="bi bi-pencil"></i></button>
-      <button class="btn btn-sm btn-outline-danger" onclick="deleteRecord(${item.id})"><i class="bi bi-trash"></i></button>
+      <button class="btn btn-sm btn-outline-info" onclick="viewRecord(${item.id})" title="View"><i class="bi bi-eye"></i></button>
+      <button class="btn btn-sm btn-outline-primary" onclick="editRecord(${item.id})" title="Edit"><i class="bi bi-pencil"></i></button>
+      <button class="btn btn-sm btn-outline-danger" onclick="deleteRecord(${item.id})" title="Delete"><i class="bi bi-trash"></i></button>
     </td>
   </tr>`).join('');
 }
@@ -186,6 +190,23 @@ function openForm() {
   document.getElementById('recordId').value = '';
   document.getElementById('dataForm').reset();
   new bootstrap.Modal(document.getElementById('formModal')).show();
+}
+
+async function viewRecord(id) {
+  const resp = await fetch(`/api/risk-layers/${id}`);
+  const d = await resp.json();
+  if (!d.success) return;
+  const item = d.data;
+  showViewModal(item.name, [
+    {label:'Name', value:item.name},
+    {label:'Risk Type', value:item.risk_type},
+    {label:'Risk Level', value:item.risk_level, badge:'bg-' + (item.risk_level === 'Very High' ? 'danger' : item.risk_level === 'High' ? 'warning' : item.risk_level === 'Moderate' ? 'info' : 'success')},
+    {label:'Coordinates', value:item.coordinates},
+    {label:'Area Coverage', value:item.area_coverage},
+    {label:'Affected Settlements', value:item.affected_settlements},
+    {label:'Affected Households', value:item.affected_households},
+    {label:'Population at Risk', value:item.population_at_risk},
+  ]);
 }
 
 async function editRecord(id) {
@@ -209,6 +230,12 @@ async function editRecord(id) {
 
 async function saveRecord() {
   const id = document.getElementById('recordId').value;
+  if (!validateFormFields([
+    {id:'name', label:'Risk Zone Name', required:true},
+    {id:'risk_type', label:'Risk Type', required:true},
+    {id:'risk_level', label:'Risk Level', required:true},
+    {id:'coordinates', label:'Coordinates', coordinates:true},
+  ])) return;
   const data = {
     name: document.getElementById('name').value,
     risk_type: document.getElementById('risk_type').value,
@@ -259,4 +286,5 @@ async function deleteRecord(id) {
 
 loadData();
 </script>
+{% include "_module_shared.html" %}
 {% endblock %}
