@@ -344,6 +344,11 @@
                 </div>
                 <!-- NEW MODULES END -->
 
+                <a href="{{ url_for('new.gis_map_page') }}" class="nav-item {% if request.path == '/gis-map' %}active{% endif %}">
+                    <i class="bi bi-map-fill"></i>
+                    <span class="nav-label">GIS Map</span>
+                </a>
+
                 <div class="nav-section">
                     <a href="javascript:void(0)" class="nav-item nav-parent" data-target="section-analytics">
                         <i class="bi bi-bar-chart"></i>

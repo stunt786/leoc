@@ -1180,6 +1180,11 @@ def api_shelter_item(id):
 # API: GIS MAP DATA (All Layers)
 # ================================================================
 
+@new_bp.route('/gis-map')
+@login_required
+def gis_map_page():
+    return render_template('gis_map.html')
+
 @new_bp.route('/api/new-modules/map-data')
 @login_required
 def api_new_modules_map_data():

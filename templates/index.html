@@ -16,6 +16,7 @@
             <option value="overview">General Overview</option>
             <option value="relief">Relief Dashboard</option>
             <option value="incident">Incident Dashboard</option>
+            <option value="gis">GIS</option>
         </select>
     </div>
 </div>
@@ -867,6 +868,7 @@ function getStatusBadge(status) {
 
 function switchDashboardView() {
     const view = document.getElementById('dashboardView').value;
+    if (view === 'gis') { window.location.href = '/gis-map'; return; }
     document.getElementById('overviewDashboard').style.display = view === 'overview' ? '' : 'none';
     document.getElementById('reliefDashboard').style.display = view === 'relief' ? '' : 'none';
     document.getElementById('incidentDashboard').style.display = view === 'incident' ? '' : 'none';

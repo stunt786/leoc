@@ -329,7 +329,7 @@ async function deleteRecord(id) {
   else showToast('danger', result.message || 'Error deleting');
 }
 
-function showMap() { alert('Map view coming soon'); }
+function showMap() { window.location.href = '/gis-map'; }
 
 initWardMap();
 loadTypes();

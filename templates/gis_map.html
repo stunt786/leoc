@@ -1,0 +1,588 @@
+{% extends "base.html" %}
+{% block title %}GIS Map - LEOC{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('index') }}"><i class="bi bi-house-fill"></i></a></li>
+<li class="breadcrumb-item active">GIS Map</li>
+{% endblock %}
+{% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+html, body { height: 100%; }
+.wrapper { height: 100vh; display: flex; flex-direction: column; }
+.main-content { flex: 1; display: flex; flex-direction: column; padding: 0 !important; overflow: hidden; }
+.top-header { flex-shrink: 0; }
+.page-content { flex: 1; display: flex; flex-direction: column; padding: 0 !important; overflow: hidden; }
+.sidebar { z-index: 1000; }
+.footer { flex-shrink: 0; }
+
+.gis-container { display: flex; flex: 1; overflow: hidden; position: relative; }
+.gis-map-wrap { flex: 1; position: relative; display: flex; flex-direction: column; }
+#gisMap { flex: 1; width: 100%; z-index: 1; min-height: 400px; }
+.gis-filter-panel {
+  width: 320px; min-width: 320px; background: #fff; border-right: 1px solid #dee2e6;
+  overflow-y: auto; z-index: 2; display: flex; flex-direction: column;
+  transition: margin-left 0.3s ease;
+}
+.gis-filter-panel.collapsed { margin-left: -320px; }
+.gis-map-wrap { flex: 1; position: relative; }
+
+.filter-header {
+  padding: 12px 14px; border-bottom: 1px solid #dee2e6;
+  display: flex; justify-content: space-between; align-items: center;
+  background: #f8f9fa; flex-shrink: 0;
+}
+.filter-header h6 { margin: 0; font-weight: 700; font-size: 14px; }
+.filter-body { padding: 10px 14px; flex: 1; overflow-y: auto; }
+
+.filter-group { margin-bottom: 8px; }
+.filter-group-title {
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;
+  color: #6c757d; margin-bottom: 4px; padding: 4px 0; border-bottom: 1px solid #eee;
+}
+.filter-checkbox {
+  display: flex; align-items: center; gap: 8px; padding: 3px 4px;
+  border-radius: 4px; cursor: pointer; font-size: 13px;
+}
+.filter-checkbox:hover { background: #f0f0f0; }
+.filter-checkbox input[type="checkbox"] { margin: 0; cursor: pointer; }
+.layer-dot {
+  width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+  border: 1.5px solid rgba(0,0,0,0.15);
+}
+.layer-count {
+  margin-left: auto; font-size: 11px; color: #6c757d; background: #f0f0f0;
+  padding: 0 6px; border-radius: 8px; min-width: 18px; text-align: center;
+}
+.filter-actions { padding: 10px 14px; border-top: 1px solid #dee2e6; display: flex; gap: 6px; flex-wrap: wrap; flex-shrink: 0; background: #f8f9fa; }
+.filter-actions .btn { font-size: 12px; }
+
+.gis-tools {
+  position: absolute; top: 12px; right: 12px; z-index: 1000;
+  display: flex; gap: 6px; align-items: center;
+}
+.gis-tools .btn {
+  background: #fff; border: 1px solid #dee2e6; border-radius: 4px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.1); font-size: 13px; padding: 4px 10px;
+}
+.gis-tools .btn:hover { background: #f0f0f0; }
+
+.gis-search-box {
+  position: absolute; top: 12px; left: 12px; z-index: 1000;
+  background: #fff; border: 1px solid #dee2e6; border-radius: 4px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.1); padding: 4px 8px;
+  display: flex; align-items: center; gap: 6px; width: 240px;
+}
+.gis-search-box input {
+  border: none; outline: none; font-size: 13px; width: 100%;
+}
+
+/* ========== MARKER STYLES ========== */
+.gis-marker {
+  display: flex; align-items: center; justify-content: center;
+  font-weight: bold; color: #fff; cursor: pointer;
+  border: 3px solid #fff;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.35), 0 0 0 1px rgba(0,0,0,0.1);
+  transition: transform 0.15s;
+}
+.gis-marker:hover { transform: scale(1.15); z-index: 10000 !important; }
+.gis-marker i { font-size: 16px; line-height: 1; text-shadow: 0 1px 2px rgba(0,0,0,0.3); }
+
+/* Circle shape (default) */
+.gis-marker-circle { border-radius: 50%; }
+
+/* Diamond shape (for relief) */
+.gis-marker-diamond {
+  border-radius: 3px 50% 50% 50%; transform: rotate(45deg);
+}
+.gis-marker-diamond i { transform: rotate(-45deg); }
+
+/* Square with rounded corners (for infrastructure/fixed assets) */
+.gis-marker-square { border-radius: 6px; }
+
+/* Hexagon-ish (for response resources) */
+.gis-marker-hex {
+  border-radius: 50% 10% 50% 10%; transform: rotate(15deg);
+}
+.gis-marker-hex i { transform: rotate(-15deg); }
+
+/* Shield shape (for protection/risk) */
+.gis-marker-shield {
+  border-radius: 50% 50% 10% 10%;
+  border-bottom-width: 5px;
+}
+
+/* Category colors */
+.gis-marker-incident { background: #dc3545; }
+.gis-marker-relief { background: #15803d; }
+.gis-marker-infrastructure { background: #7c3aed; }
+.gis-marker-facility { background: #2563eb; }
+.gis-marker-shelter { background: #0d9488; }
+.gis-marker-risk { background: #ea580c; }
+.gis-marker-contact { background: #0891b2; color: #fff; }
+.gis-marker-vulnerable { background: #9333ea; }
+.gis-marker-disabled { background: #db2777; }
+.gis-marker-highrisk { background: #1e293b; }
+.gis-marker-volunteer { background: #be185d; }
+.gis-marker-rrt { background: #dc2626; }
+.gis-marker-vehicle { background: #d97706; color: #fff; }
+
+.gis-tip { font-size: 12px; line-height: 1.5; min-width: 200px; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+.gis-tip-header { color: #fff; font-weight: 700; font-size: 12px; padding: 5px 8px; border-radius: 6px 6px 0 0; }
+.gis-tip-body { background: #1e293b; color: #f1f5f9; padding: 6px 8px; border-radius: 0 0 6px 6px; display: flex; flex-direction: column; gap: 2px; }
+.gis-tip-body strong { color: #94a3b8; }
+
+/* Layer control styling */
+.leaflet-control-layers {
+  background: #fff !important;
+  border-radius: 8px !important;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.2) !important;
+  border: 1px solid #e2e8f0 !important;
+  font-size: 13px;
+}
+.leaflet-control-layers-expanded {
+  padding: 8px 12px !important;
+  max-height: 260px;
+  overflow-y: auto;
+}
+.leaflet-control-layers-toggle {
+  width: 36px !important;
+  height: 36px !important;
+  background-size: 18px 18px !important;
+  background-color: #1e293b;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  border: 1px solid #334155;
+  filter: brightness(1.2);
+}
+.leaflet-control-layers-toggle:hover { background-color: #0f172a; }
+.leaflet-control-layers-list { margin: 0 !important; }
+.leaflet-control-layers-base label,
+.leaflet-control-layers-overlays label {
+  display: flex !important; align-items: center; gap: 6px;
+  padding: 4px 6px; margin: 0; cursor: pointer; font-weight: 500;
+  border-radius: 4px; white-space: nowrap;
+}
+.leaflet-control-layers-base label:hover,
+.leaflet-control-layers-overlays label:hover { background: #f1f5f9; }
+.leaflet-control-layers-base input,
+.leaflet-control-layers-overlays input { margin: 0; cursor: pointer; accent-color: #2563eb; }
+.leaflet-control-layers-separator { margin: 6px 0 !important; }
+
+@media (max-width: 768px) {
+  .gis-filter-panel { position: absolute; left: 0; top: 0; bottom: 0; z-index: 999; box-shadow: 2px 0 12px rgba(0,0,0,0.2); }
+  .gis-filter-panel.collapsed { margin-left: -320px; }
+}
+</style>
+{% endblock %}
+{% block content %}
+<div class="gis-container">
+  <div class="gis-filter-panel" id="filterPanel">
+    <div class="filter-header">
+      <h6><i class="bi bi-funnel me-1"></i>Map Filters</h6>
+      <button class="btn btn-sm btn-outline-secondary py-0" onclick="toggleFilterPanel()" title="Toggle panel"><i class="bi bi-x-lg"></i></button>
+    </div>
+    <div class="filter-body">
+      <div class="filter-group mb-3">
+        <div class="filter-group-title">Ward</div>
+        <select class="form-select form-select-sm" id="wardFilter" onchange="applyFilters()">
+          <option value="">All Wards</option>
+          <option value="1">Ward 1</option>
+          <option value="2">Ward 2</option>
+          <option value="3">Ward 3</option>
+          <option value="4">Ward 4</option>
+          <option value="5">Ward 5</option>
+          <option value="6">Ward 6</option>
+          <option value="7">Ward 7</option>
+          <option value="8">Ward 8</option>
+          <option value="9">Ward 9</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <div class="filter-group-title">Operations</div>
+        <label class="filter-checkbox"><input type="checkbox" class="layer-toggle" data-layer="incidents" checked onchange="toggleLayer('incidents')"><span class="layer-dot" style="background:#dc3545"></span> Incidents <span class="layer-count" id="count-incidents">0</span></label>
+        <label class="filter-checkbox"><input type="checkbox" class="layer-toggle" data-layer="relief" checked onchange="toggleLayer('relief')"><span class="layer-dot" style="background:#15803d"></span> Relief Distributions <span class="layer-count" id="count-relief">0</span></label>
+      </div>
+
+      <div class="filter-group">
+        <div class="filter-group-title">Infrastructure</div>
+        <label class="filter-checkbox"><input type="checkbox" class="layer-toggle" data-layer="infrastructure" checked onchange="toggleLayer('infrastructure')"><span class="layer-dot" style="background:#6f42c1"></span> Critical Infrastructure <span class="layer-count" id="count-infrastructure">0</span></label>
+        <label class="filter-checkbox"><input type="checkbox" class="layer-toggle" data-layer="facilities" checked onchange="toggleLayer('facilities')"><span class="layer-dot" style="background:#0d6efd"></span> Emergency Facilities <span class="layer-count" id="count-facilities">0</span></label>
+        <label class="filter-checkbox"><input type="checkbox" class="layer-toggle" data-layer="shelters" checked onchange="toggleLayer('shelters')"><span class="layer-dot" style="background:#20c997"></span> Shelters <span class="layer-count" id="count-shelters">0</span></label>
+      </div>
+
+      <div class="filter-group">
+        <div class="filter-group-title">Risk & Directory</div>
+        <label class="filter-checkbox"><input type="checkbox" class="layer-toggle" data-layer="risk_layers" checked onchange="toggleLayer('risk_layers')"><span class="layer-dot" style="background:#fd7e14"></span> Risk Zones <span class="layer-count" id="count-risk_layers">0</span></label>
+        <label class="filter-checkbox"><input type="checkbox" class="layer-toggle" data-layer="contacts" checked onchange="toggleLayer('contacts')"><span class="layer-dot" style="background:#0dcaf0"></span> Emergency Contacts <span class="layer-count" id="count-contacts">0</span></label>
+      </div>
+
+      <div class="filter-group">
+        <div class="filter-group-title">Population Registry</div>
+        <label class="filter-checkbox"><input type="checkbox" class="layer-toggle" data-layer="vulnerable" checked onchange="toggleLayer('vulnerable')"><span class="layer-dot" style="background:#6610f2"></span> Vulnerable Households <span class="layer-count" id="count-vulnerable">0</span></label>
+        <label class="filter-checkbox"><input type="checkbox" class="layer-toggle" data-layer="disabled" checked onchange="toggleLayer('disabled')"><span class="layer-dot" style="background:#e83e8c"></span> Differently Abled <span class="layer-count" id="count-disabled">0</span></label>
+        <label class="filter-checkbox"><input type="checkbox" class="layer-toggle" data-layer="high_risk" checked onchange="toggleLayer('high_risk')"><span class="layer-dot" style="background:#212529"></span> High Risk Population <span class="layer-count" id="count-high_risk">0</span></label>
+      </div>
+
+      <div class="filter-group">
+        <div class="filter-group-title">Response Resources</div>
+        <label class="filter-checkbox"><input type="checkbox" class="layer-toggle" data-layer="volunteers" checked onchange="toggleLayer('volunteers')"><span class="layer-dot" style="background:#d63384"></span> Volunteers <span class="layer-count" id="count-volunteers">0</span></label>
+        <label class="filter-checkbox"><input type="checkbox" class="layer-toggle" data-layer="rrt" checked onchange="toggleLayer('rrt')"><span class="layer-dot" style="background:#e74c3c"></span> RRT <span class="layer-count" id="count-rrt">0</span></label>
+        <label class="filter-checkbox"><input type="checkbox" class="layer-toggle" data-layer="vehicles" checked onchange="toggleLayer('vehicles')"><span class="layer-dot" style="background:#ffc107"></span> Vehicles <span class="layer-count" id="count-vehicles">0</span></label>
+      </div>
+    </div>
+    <div class="filter-actions">
+      <button class="btn btn-outline-primary btn-sm" onclick="selectAll(true)"><i class="bi bi-check-all"></i> All</button>
+      <button class="btn btn-outline-secondary btn-sm" onclick="selectAll(false)"><i class="bi bi-x"></i> None</button>
+      <button class="btn btn-outline-info btn-sm" onclick="fitAllLayers()"><i class="bi bi-arrows-angle-expand"></i> Fit All</button>
+    </div>
+  </div>
+
+  <div class="gis-map-wrap">
+    <div class="gis-search-box">
+      <i class="bi bi-search text-muted"></i>
+      <input type="text" id="searchInput" placeholder="Search markers..." oninput="filterBySearch(this.value)">
+    </div>
+    <div class="gis-tools">
+      <button class="btn" onclick="toggleFilterPanel()" id="filterToggleBtn" title="Toggle filters"><i class="bi bi-layout-sidebar"></i> Filters</button>
+      <button class="btn" onclick="refreshMapData()" title="Refresh data"><i class="bi bi-arrow-clockwise"></i></button>
+      <span class="text-muted small" id="totalCount">0 points</span>
+    </div>
+    <div id="gisMap"></div>
+  </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+let mapInstance = null;
+let allData = {};
+let layerGroups = {};
+let markerMap = {};
+let boundaryBounds = null;
+let boundaryLayer = null;
+let wardsLayer = null;
+let boundaryGroup = null;
+let wardsGroup = null;
+const LAYER_COLORS = {
+  incidents: '#dc3545', relief: '#15803d', infrastructure: '#6f42c1',
+  facilities: '#0d6efd', shelters: '#20c997', risk_layers: '#fd7e14',
+  contacts: '#0dcaf0', vulnerable: '#6610f2', disabled: '#e83e8c',
+  high_risk: '#212529', volunteers: '#d63384', rrt: '#e74c3c', vehicles: '#ffc107'
+};
+const LAYER_NAMES = {
+  incidents: 'Incidents', relief: 'Relief', infrastructure: 'Infrastructure',
+  facilities: 'Facilities', shelters: 'Shelters', risk_layers: 'Risk Zones',
+  contacts: 'Contacts', vulnerable: 'Vulnerable', disabled: 'Disabled',
+  high_risk: 'High Risk', volunteers: 'Volunteers', rrt: 'RRT', vehicles: 'Vehicles'
+};
+const LAYER_ICONS = {
+  incidents: 'bi-lightning-charge-fill', relief: 'bi-box-seam-fill', infrastructure: 'bi-building-gear',
+  facilities: 'bi-hospital', shelters: 'bi-house-door', risk_layers: 'bi-exclamation-triangle',
+  contacts: 'bi-telephone', vulnerable: 'bi-heart', disabled: 'bi-person-wheelchair',
+  high_risk: 'bi-shield-exclamation', volunteers: 'bi-person-check', rrt: 'bi-flag',
+  vehicles: 'bi-truck'
+};
+
+const MARKER_SHAPES = {
+  incidents: 'gis-marker-circle', relief: 'gis-marker-diamond',
+  infrastructure: 'gis-marker-square', facilities: 'gis-marker-square',
+  shelters: 'gis-marker-square', risk_layers: 'gis-marker-shield',
+  contacts: 'gis-marker-circle', vulnerable: 'gis-marker-circle',
+  disabled: 'gis-marker-hex', high_risk: 'gis-marker-shield',
+  volunteers: 'gis-marker-hex', rrt: 'gis-marker-hex', vehicles: 'gis-marker-square'
+};
+
+function makeMarkerIcon(layerKey, iconClass) {
+  const cls = 'gis-marker gis-marker-' + layerKey + ' ' + (MARKER_SHAPES[layerKey] || 'gis-marker-circle');
+  return L.divIcon({
+    className: cls,
+    html: '<i class="bi ' + iconClass + '"></i>',
+    iconSize: [34, 34],
+    iconAnchor: [17, 17],
+    popupAnchor: [0, -17]
+  });
+}
+
+function tipHeader(color, text) {
+  return '<div class="gis-tip-header" style="background:' + color + '">' + text + '</div>';
+}
+function tipBody(rows) {
+  return '<div class="gis-tip-body">' + rows.map(r => '<div><strong>' + r.l + ':</strong> ' + r.v + '</div>').join('') + '</div>';
+}
+
+var osmLayer, satelliteLayer, layersControl;
+
+function initMap() {
+  const el = document.getElementById('gisMap');
+  mapInstance = L.map(el, { zoomControl: true, scrollWheelZoom: true, dragging: true, zoomSnap: 0.5, zoomDelta: 0.5 });
+
+  osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 18, minZoom: 10,
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+  });
+  satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    maxZoom: 18, minZoom: 10,
+    attribution: '&copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+  });
+  osmLayer.addTo(mapInstance);
+
+  L.control.scale({ position: 'bottomleft', imperial: false }).addTo(mapInstance);
+  ['incidents','relief','infrastructure','facilities','shelters','risk_layers','contacts','vulnerable','disabled','high_risk','volunteers','rrt','vehicles'].forEach(k => {
+    layerGroups[k] = L.layerGroup().addTo(mapInstance);
+    markerMap[k] = [];
+  });
+  loadAllData();
+}
+
+async function loadAllData() {
+  try {
+    const [mapResp, modulesResp] = await Promise.all([
+      fetch('/api/map/data'),
+      fetch('/api/new-modules/map-data')
+    ]);
+    const mapData = await mapResp.json();
+    const modulesData = await modulesResp.json();
+    if (!mapData.success) { showToast('danger', 'Failed to load base map data'); return; }
+    processMapData(mapData);
+    processModulesData(modulesData);
+  } catch(e) {
+    showToast('danger', 'Error loading map data: ' + e.message);
+  }
+}
+
+function processMapData(d) {
+  if (d.boundary && d.boundary.features) {
+    const tmp = L.geoJSON(d.boundary);
+    tmp.eachLayer(function(layer) {
+      if (layer.getBounds) boundaryBounds = layer.getBounds();
+    });
+  }
+  if (!boundaryBounds) { showToast('danger', 'No boundary data available'); return; }
+
+  boundaryGroup = L.layerGroup();
+  if (d.boundary && d.boundary.features) {
+    boundaryLayer = L.geoJSON(d.boundary, {
+      style: { color: '#b91c1c', weight: 3, fillColor: '#fef2f2', fillOpacity: 0.15 }
+    }).addTo(boundaryGroup);
+  }
+
+  wardsGroup = L.layerGroup();
+  if (d.wards && d.wards.features) {
+    const wardColors = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#06b6d4','#f97316','#14b8a6','#6366f1'];
+    wardsLayer = L.geoJSON(d.wards, {
+      style: function(f) {
+        const idx = d.wards.features.indexOf(f) % wardColors.length;
+        return { color: '#ca8a04', weight: 2, fillColor: wardColors[idx], fillOpacity: 0.06 };
+      },
+      onEachFeature: function(f, layer) {
+        if (f.properties && f.properties.name) {
+          layer.bindTooltip(f.properties.name, { sticky: true, direction: 'center', className: 'ward-label' });
+          const c = layer.getBounds().getCenter();
+          L.marker(c, {
+            icon: L.divIcon({ className: 'ward-label-marker', html: '<div class="ward-label" style="font-size:10px;font-weight:700;background:rgba(255,255,255,0.9);padding:2px 8px;border-radius:3px;border:1px solid #94a3b8;white-space:nowrap">' + f.properties.name + '</div>', iconSize: [0, 0] }),
+            interactive: false
+          }).addTo(wardsGroup);
+        }
+      }
+    }).addTo(wardsGroup);
+  }
+
+  boundaryGroup.addTo(mapInstance);
+  wardsGroup.addTo(mapInstance);
+
+  layersControl = L.control.layers({
+    '<span class="bi bi-globe2"></span> OpenStreetMap': osmLayer,
+    '<span class="bi bi-satellite"></span> Satellite': satelliteLayer
+  }, {
+    '<span style="color:#b91c1c">●</span> Thalara Boundary': boundaryGroup,
+    '<span style="color:#ca8a04">●</span> Ward Boundaries': wardsGroup
+  }, { position: 'topright' }).addTo(mapInstance);
+
+  if (d.incident_markers && d.incident_markers.length) {
+    d.incident_markers.forEach(function(m) {
+      const color = m.severity === 'high' ? '#dc3545' : m.severity === 'medium' ? '#d97706' : '#2563eb';
+      const mk = L.marker([m.lat, m.lng], { icon: makeMarkerIcon('incidents', 'bi-lightning-charge-fill') }).addTo(layerGroups.incidents);
+      mk.bindTooltip(tipHeader(color, m.name) + tipBody([
+        {l:'Type',v:m.type},{l:'Ward',v:m.ward_name || m.ward || 'N/A'},{l:'Severity',v:m.severity},
+        {l:'Deaths',v:(m.deaths||0).toLocaleString()},{l:'Injured',v:(m.injured||0).toLocaleString()},
+        {l:'Affected',v:(m.affected_people||0).toLocaleString()}
+      ]), { sticky: true, offset: [0, -8], className: 'incident-tip-container' });
+      mk._gisType = 'incidents';
+      mk._gisWard = m.ward;
+      mk._gisSearch = (m.name + ' ' + m.type + ' ' + (m.ward_name||'')).toLowerCase();
+      markerMap.incidents.push(mk);
+    });
+  }
+  document.getElementById('count-incidents').textContent = markerMap.incidents.length;
+
+  if (d.relief_markers && d.relief_markers.length) {
+    d.relief_markers.forEach(function(m) {
+      const mk = L.marker([m.lat, m.lng], { icon: makeMarkerIcon('relief', 'bi-box-seam-fill') }).addTo(layerGroups.relief);
+      mk.bindTooltip(tipHeader('#15803d', m.distribution_no) + tipBody([
+        {l:'Location',v:m.location||'N/A'},{l:'Date',v:m.date||'N/A'},
+        {l:'Beneficiaries',v:(m.beneficiary_count||0).toLocaleString()},
+        {l:'Items',v:(m.total_quantity||0).toLocaleString()}
+      ]), { sticky: true, offset: [0, -8], className: 'incident-tip-container' });
+      mk._gisType = 'relief';
+      mk._gisWard = '';
+      mk._gisSearch = (m.distribution_no + ' ' + (m.location||'') + ' ' + (m.incident_name||'')).toLowerCase();
+      markerMap.relief.push(mk);
+    });
+  }
+  document.getElementById('count-relief').textContent = markerMap.relief.length;
+
+  mapInstance.fitBounds(boundaryBounds, { padding: [15, 15] });
+  const z = mapInstance.getZoom();
+  if (z > 14) mapInstance.setZoom(14);
+
+  // Thalara boundary unchecked by default
+  document.getElementById('toggleBoundary').checked = false;
+  mapInstance.removeLayer(boundaryGroup);
+
+  updateTotalCount();
+}
+
+function processModulesData(d) {
+  const config = [
+    {key:'infrastructure', icon:'bi-building-gear', label:'Infrastructure', fields:[
+      {l:'Name',v:r=>r.name},{l:'Type',v:r=>r.type},{l:'Ward',v:r=>r.ward||'-'}
+    ]},
+    {key:'facilities', icon:'bi-hospital', label:'Facilities', fields:[
+      {l:'Name',v:r=>r.name},{l:'Type',v:r=>r.type},{l:'Capacity',v:r=>r.capacity||'-'}
+    ]},
+    {key:'shelters', icon:'bi-house-door', label:'Shelters', fields:[
+      {l:'Name',v:r=>r.name},{l:'Type',v:r=>r.type||'-'},{l:'Capacity',v:r=>r.capacity||'-'},{l:'Occupancy',v:r=>r.occupancy||0}
+    ]},
+    {key:'risk_layers', icon:'bi-exclamation-triangle', label:'Risk', fields:[
+      {l:'Name',v:r=>r.name},{l:'Type',v:r=>r.type},{l:'Level',v:r=>r.level},{l:'At Risk',v:r=>r.population||0}
+    ]},
+    {key:'contacts', icon:'bi-telephone', label:'Contact', fields:[
+      {l:'Name',v:r=>r.name||r.person_name||'-'},{l:'Role',v:r=>r.designation||r.role||'-'},{l:'Phone',v:r=>r.phone||r.contact||'-'}
+    ]},
+    {key:'volunteers', icon:'bi-person-check', label:'Volunteer', fields:[
+      {l:'Name',v:r=>r.name},{l:'Status',v:r=>r.status||'-'}
+    ]},
+    {key:'vehicles', icon:'bi-truck', label:'Vehicle', fields:[
+      {l:'Number',v:r=>r.number},{l:'Type',v:r=>r.type||'-'},{l:'Status',v:r=>r.status||'-'}
+    ]},
+    {key:'vulnerable', icon:'bi-heart', label:'Vulnerable', fields:[
+      {l:'Head',v:r=>r.head},{l:'Category',v:r=>r.category},{l:'Priority',v:r=>r.priority||'Normal'}
+    ]},
+    {key:'disabled', icon:'bi-person-wheelchair', label:'Disabled', fields:[
+      {l:'Name',v:r=>r.name}
+    ]},
+    {key:'high_risk', icon:'bi-shield-exclamation', label:'High Risk', fields:[
+      {l:'Name',v:r=>r.name},{l:'Category',v:r=>r.category}
+    ]},
+    {key:'rrt', icon:'bi-flag', label:'RRT', fields:[
+      {l:'Team',v:r=>r.name},{l:'Leader',v:r=>r.leader||'-'}
+    ]}
+  ];
+
+  config.forEach(function(cfg) {
+    const items = d[cfg.key] || [];
+    items.forEach(function(r) {
+      if (r.lat == null || r.lng == null) return;
+      const mk = L.marker([r.lat, r.lng], {
+        icon: makeMarkerIcon(cfg.key, cfg.icon)
+      }).addTo(layerGroups[cfg.key]);
+      const rows = cfg.fields.map(f => ({l: f.l, v: f.v(r)}));
+      mk.bindTooltip(tipHeader(LAYER_COLORS[cfg.key], cfg.label) + tipBody(rows), { sticky: true, offset: [0, -8] });
+      mk._gisType = cfg.key;
+      mk._gisWard = r.ward || r.ward_id || '';
+      mk._gisSearch = rows.map(rr => rr.v).join(' ').toLowerCase();
+      markerMap[cfg.key].push(mk);
+    });
+    document.getElementById('count-' + cfg.key).textContent = markerMap[cfg.key].length;
+  });
+
+  Object.keys(d).forEach(function(key) {
+    allData[key] = d[key];
+  });
+  updateTotalCount();
+}
+
+function toggleLayer(key) {
+  const checked = document.querySelector('.layer-toggle[data-layer="' + key + '"]').checked;
+  if (checked) {
+    layerGroups[key].addTo(mapInstance);
+  } else {
+    mapInstance.removeLayer(layerGroups[key]);
+  }
+}
+
+function toggleBoundaryLayer() {
+  const cb = document.getElementById('toggleBoundary');
+  if (cb.checked) boundaryGroup.addTo(mapInstance);
+  else mapInstance.removeLayer(boundaryGroup);
+}
+
+function toggleWardsLayer() {
+  const cb = document.getElementById('toggleWards');
+  if (cb.checked) wardsGroup.addTo(mapInstance);
+  else mapInstance.removeLayer(wardsGroup);
+}
+
+function selectAll(val) {
+  document.querySelectorAll('.layer-toggle').forEach(function(cb) {
+    cb.checked = val;
+    const key = cb.dataset.layer;
+    if (val) layerGroups[key].addTo(mapInstance);
+    else mapInstance.removeLayer(layerGroups[key]);
+  });
+}
+
+function applyFilters() {
+  const ward = document.getElementById('wardFilter').value;
+  Object.keys(markerMap).forEach(function(key) {
+    markerMap[key].forEach(function(mk) {
+      mk.setOpacity(1);
+      if (ward && mk._gisWard && mk._gisWard.toString() !== ward) {
+        mk.setOpacity(0.2);
+      }
+    });
+  });
+}
+
+function filterBySearch(query) {
+  const q = query.toLowerCase().trim();
+  Object.keys(markerMap).forEach(function(key) {
+    markerMap[key].forEach(function(mk) {
+      mk.setOpacity(1);
+      if (q && mk._gisSearch && !mk._gisSearch.includes(q)) {
+        mk.setOpacity(0.15);
+      }
+    });
+  });
+}
+
+function fitAllLayers() {
+  if (boundaryBounds) mapInstance.fitBounds(boundaryBounds, { padding: [15, 15] });
+}
+
+function refreshMapData() {
+  showToast('info', 'Refreshing map data...');
+  Object.keys(layerGroups).forEach(function(k) {
+    layerGroups[k].clearLayers();
+    markerMap[k] = [];
+  });
+  loadAllData();
+}
+
+function toggleFilterPanel() {
+  const panel = document.getElementById('filterPanel');
+  panel.classList.toggle('collapsed');
+}
+
+function updateTotalCount() {
+  let total = 0;
+  Object.keys(markerMap).forEach(function(k) { total += markerMap[k].length; });
+  document.getElementById('totalCount').textContent = total.toLocaleString() + ' points';
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  setTimeout(initMap, 200);
+});
+</script>
+{% endblock %}
