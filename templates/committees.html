@@ -315,19 +315,32 @@ function openForm() {
 function viewRecord(id) {
     const c = committees.find(x => x.id === id);
     if (!c) return;
-    const membersCount = c.members_count || (Array.isArray(c.members) ? c.members.length : 0);
-    const memberRows = (Array.isArray(c.members) ? c.members : []).map(m => [m.person_name || m.name || '-', m.role || m.position || '-', m.contact || m.contact_number || '-', m.ward || m.ward_name || '-']);
-    showViewModal(c.committee_name, [
-        {title:'Committee Information', fields:[
-            {label:'Committee Name', value:c.committee_name},
-            {label:'Committee Type', value:c.committee_type, badge:'bg-info'},
-            {label:'Formation Date', value:c.formation_date || '-'},
-            {label:'Tenure', value:c.tenure ? c.tenure + ' months' : '-'},
-        ]},
-    ]);
-    if (memberRows.length > 0) {
-        showViewTable('Committee Members (' + membersCount + ')', ['Name', 'Role', 'Contact', 'Ward'], memberRows);
-    }
+    var memberTags = (Array.isArray(c.members) ? c.members : []).map(function(m) {
+        return {icon:'bi-person', text: m.person_name || m.name || 'Member'};
+    });
+    showDetailedViewModal({
+        logo:'bi-people-fill',
+        title:c.committee_name,
+        hero:{
+            icon:'bi-people-fill',
+            name:c.committee_name,
+            subtitle:c.committee_type || '',
+            status:c.committee_type,
+            badgeClass:'view-badge-info'
+        },
+        sections:[
+            {icon:'bi-info-circle', title:'Committee Information', columns:3, items:[
+                {label:'Committee Name', value:c.committee_name},
+                {label:'Committee Type', value:c.committee_type},
+                {label:'Formation Date', value:c.formation_date || '-'},
+                {label:'Tenure', value:c.tenure ? c.tenure + ' months' : '-'}
+            ]}
+        ],
+        tags:memberTags,
+        footer:[
+            {icon:'bi-calendar', label:'Created On', value:c.created_at ? new Date(c.created_at).toLocaleDateString() : '-'}
+        ]
+    });
 }
 
 function editRecord(id) {

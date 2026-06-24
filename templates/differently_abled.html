@@ -266,32 +266,47 @@ async function viewRecord(id) {
         const d = await r.json();
         if (!d.success) { showToast('danger', d.message); return; }
         const rec = d.record || d.data || d;
-        const disabilities = [];
-        if (rec.physical_disability) disabilities.push('Physical');
-        if (rec.visual_disability) disabilities.push('Visual');
-        if (rec.hearing_disability) disabilities.push('Hearing');
-        if (rec.intellectual_disability) disabilities.push('Intellectual');
-        if (rec.multiple_disability) disabilities.push('Multiple');
-        showViewModal(rec.person_name, [
-            {title:'Personal Information', fields:[
-                {label:'Person Name', value:rec.person_name},
-                {label:'Gender', value:rec.gender || '-'},
-                {label:'Age', value:rec.age || '-'},
-            ]},
-            {title:'Location', fields:[
-                {label:'Ward', value:rec.ward_name || '-'},
-                {label:'Settlement', value:rec.settlement},
-                {label:'Coordinates', value:rec.coordinates},
-            ]},
-            {title:'Disability Details', fields:[
-                {label:'Disabilities', value:disabilities.join(', ') || 'None'},
-            ]},
-            {title:'Caregiver Information', fields:[
-                {label:'Contact Number', value:rec.contact_number},
-                {label:'Caregiver Name', value:rec.caregiver_name},
-                {label:'Caregiver Contact', value:rec.caregiver_contact},
-            ]},
-        ]);
+        var disabilityTags = [];
+        var dmap = {
+            physical_disability:{icon:'bi-person',label:'Physical'},
+            visual_disability:{icon:'bi-eye',label:'Visual'},
+            hearing_disability:{icon:'bi-ear',label:'Hearing'},
+            intellectual_disability:{icon:'bi-brain',label:'Intellectual'},
+            multiple_disability:{icon:'bi-files',label:'Multiple'}
+        };
+        for (var k in dmap) { if (rec[k]) disabilityTags.push({icon:dmap[k].icon,text:dmap[k].label + ' Disability'}); }
+        showDetailedViewModal({
+            logo:'bi-person-wheelchair',
+            title:rec.person_name,
+            hero:{
+                icon:'bi-person-wheelchair',
+                name:rec.person_name,
+                subtitle:(rec.gender || '') + (rec.age ? ' \u2022 ' + rec.age + ' yrs' : ''),
+                status:'',
+                badgeClass:''
+            },
+            sections:[
+                {icon:'bi-person', title:'Personal Information', columns:3, items:[
+                    {label:'Person Name', value:rec.person_name},
+                    {label:'Gender', value:rec.gender || '-'},
+                    {label:'Age', value:rec.age || '-'}
+                ]},
+                {icon:'bi-geo-alt-fill', title:'Location', columns:3, items:[
+                    {label:'Ward', value:rec.ward_name || '-'},
+                    {label:'Settlement', value:rec.settlement},
+                    {label:'Coordinates', value:rec.coordinates || '-'}
+                ]},
+                {icon:'bi-telephone', title:'Caregiver Information', columns:3, items:[
+                    {label:'Contact Number', value:rec.contact_number || '-'},
+                    {label:'Caregiver Name', value:rec.caregiver_name || '-'},
+                    {label:'Caregiver Contact', value:rec.caregiver_contact || '-'}
+                ]}
+            ],
+            tags:disabilityTags,
+            footer:[
+                {icon:'bi-calendar', label:'Created On', value:rec.created_at ? new Date(rec.created_at).toLocaleDateString() : '-'}
+            ]
+        });
     } catch(e) {
         showToast('danger', 'Error loading record: ' + e.message);
     }

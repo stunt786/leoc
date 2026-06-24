@@ -229,32 +229,42 @@ async function viewRecord(id) {
   const d = await resp.json();
   if (!d.success) return;
   const item = d.data || d.contact || d;
-  const availBadge = 'bg-' + (item.availability_status === 'Available' ? 'success' : 'danger');
-  showViewModal(item.organization_name, [
-    {title:'Organization', fields:[
-      {label:'Organization', value:item.organization_name},
-      {label:'Contact Person', value:item.contact_person},
-      {label:'Designation', value:item.designation},
-    ]},
-    {title:'Classification', fields:[
-      {label:'Category', value:item.category, badge:'bg-info'},
-      {label:'Sub Category', value:item.sub_category},
-    ]},
-    {title:'Contact Details', fields:[
-      {label:'Mobile Number', value:item.mobile_number},
-      {label:'Alternative Number', value:item.alternative_number},
-      {label:'Email', value:item.email},
-    ]},
-    {title:'Location', fields:[
-      {label:'Ward', value:wardMap[item.ward_id] || '-'},
-      {label:'Address', value:item.address},
-      {label:'Coordinates', value:item.coordinates},
-    ]},
-    {title:'Service Information', fields:[
-      {label:'Availability', value:item.availability_status, badge:availBadge},
-      {label:'Service Area', value:item.service_area},
-    ]},
-  ]);
+  var badgeCls = item.availability_status === 'Available' ? 'view-badge-success' : 'view-badge-danger';
+  showDetailedViewModal({
+    logo:'bi-telephone',
+    title:item.organization_name,
+    hero:{
+      icon:'bi-telephone',
+      name:item.organization_name,
+      subtitle:item.category + (item.sub_category ? ' \u2022 ' + item.sub_category : ''),
+      status:item.availability_status,
+      badgeClass:badgeCls
+    },
+    sections:[
+      {icon:'bi-building', title:'Organization', columns:3, items:[
+        {label:'Organization', value:item.organization_name},
+        {label:'Contact Person', value:item.contact_person},
+        {label:'Designation', value:item.designation}
+      ]},
+      {icon:'bi-telephone', title:'Contact Details', columns:3, items:[
+        {label:'Mobile Number', value:item.mobile_number},
+        {label:'Alternative Number', value:item.alternative_number || '-'},
+        {label:'Email', value:item.email || '-'}
+      ]},
+      {icon:'bi-geo-alt-fill', title:'Location', columns:3, items:[
+        {label:'Ward', value:wardMap[item.ward_id] || '-'},
+        {label:'Address', value:item.address, fullWidth:true},
+        {label:'Coordinates', value:item.coordinates || '-'}
+      ]},
+      {icon:'bi-info-circle', title:'Service Information', columns:2, items:[
+        {label:'Availability', value:item.availability_status},
+        {label:'Service Area', value:item.service_area}
+      ]}
+    ],
+    footer:[
+      {icon:'bi-calendar', label:'Created On', value:item.created_at ? new Date(item.created_at).toLocaleDateString() : '-'}
+    ]
+  });
 }
 
 async function editRecord(id) {

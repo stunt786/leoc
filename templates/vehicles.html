@@ -218,27 +218,41 @@ async function viewRecord(id) {
   const d = await resp.json();
   if (!d.success) return;
   const item = d.data || d.vehicle || d;
-  const statusBadge = item.status === 'Available' ? 'bg-success' : item.status === 'Deployed' ? 'bg-warning' : 'bg-danger';
-  showViewModal(item.vehicle_number, [
-    {title:'Vehicle Information', fields:[
-      {label:'Vehicle Number', value:item.vehicle_number},
-      {label:'Vehicle Type', value:item.vehicle_type, badge:'bg-secondary'},
-      {label:'Owner Organization', value:item.owner_organization},
-    ]},
-    {title:'Driver Details', fields:[
-      {label:'Driver Name', value:item.driver_name},
-      {label:'Driver Contact', value:item.driver_contact},
-    ]},
-    {title:'Status & Location', fields:[
-      {label:'Status', value:item.status || '-', badge:statusBadge},
-      {label:'Fuel Status', value:item.fuel_status},
-      {label:'Current Coordinates', value:item.current_coordinates},
-    ]},
-    {title:'Technical Details', fields:[
-      {label:'Capacity', value:item.capacity},
-      {label:'Last Service Date', value:item.last_service_date},
-    ]},
-  ]);
+  var badgeCls = item.status === 'Available' ? 'view-badge-success' : item.status === 'Deployed' ? 'view-badge-warning' : 'view-badge-danger';
+  showDetailedViewModal({
+    logo:'bi-truck',
+    title:item.vehicle_number,
+    hero:{
+      icon:'bi-truck',
+      name:item.vehicle_number,
+      subtitle:item.vehicle_type || '',
+      status:item.status || '-',
+      badgeClass:badgeCls
+    },
+    sections:[
+      {icon:'bi-info-circle', title:'Vehicle Information', columns:3, items:[
+        {label:'Vehicle Number', value:item.vehicle_number},
+        {label:'Vehicle Type', value:item.vehicle_type},
+        {label:'Owner Organization', value:item.owner_organization || '-'}
+      ]},
+      {icon:'bi-person', title:'Driver Details', columns:3, items:[
+        {label:'Driver Name', value:item.driver_name || '-'},
+        {label:'Driver Contact', value:item.driver_contact || '-'}
+      ]},
+      {icon:'bi-geo-alt-fill', title:'Status & Location', columns:3, items:[
+        {label:'Status', value:item.status || '-'},
+        {label:'Fuel Status', value:item.fuel_status || '-'},
+        {label:'Current Coordinates', value:item.current_coordinates || '-'}
+      ]},
+      {icon:'bi-wrench', title:'Technical Details', columns:3, items:[
+        {label:'Capacity', value:item.capacity || '-'},
+        {label:'Last Service Date', value:item.last_service_date || '-'}
+      ]}
+    ],
+    footer:[
+      {icon:'bi-calendar', label:'Created On', value:item.created_at ? new Date(item.created_at).toLocaleDateString() : '-'}
+    ]
+  });
 }
 
 async function editRecord(id) {

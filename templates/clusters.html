@@ -303,24 +303,37 @@ function openForm() {
 async function viewRecord(id) {
     const c = _clusters.find(x => x.id === id);
     if (!c) return;
-    const membersCount = (c.members && c.members.length) || 0;
-    const memberRows = (c.members || []).map(m => [m.organization_name || '-', m.representative || '-', m.contact_number || '-', m.designation || '-']);
-    showViewModal(c.cluster_name, [
-        {title:'Cluster Information', fields:[
-            {label:'Cluster Name', value:c.cluster_name},
-            {label:'Lead Organization', value:c.lead_organization || '-'},
-            {label:'Focal Person', value:c.focal_person || '-'},
-            {label:'Contact Details', value:c.contact_details || '-'},
-        ]},
-        {title:'Resources & Coverage', fields:[
-            {label:'Resource Capacity', value:c.resource_capacity || '-'},
-            {label:'Coverage Area', value:c.coverage_area || '-'},
-            {label:'Available Equipment', value:c.available_equipment || '-'},
-        ]},
-    ]);
-    if (memberRows.length > 0) {
-        showViewTable('Cluster Members (' + membersCount + ')', ['Organization', 'Representative', 'Contact', 'Designation'], memberRows);
-    }
+    var memberTags = (c.members || []).map(function(m) {
+        return {icon:'bi-person', text: m.organization_name || m.representative || 'Member'};
+    });
+    showDetailedViewModal({
+        logo:'bi-diagram-3',
+        title:c.cluster_name,
+        hero:{
+            icon:'bi-diagram-3',
+            name:c.cluster_name,
+            subtitle:c.lead_organization || '',
+            status:'Active',
+            badgeClass:'view-badge-success'
+        },
+        sections:[
+            {icon:'bi-info-circle', title:'Cluster Information', columns:3, items:[
+                {label:'Cluster Name', value:c.cluster_name},
+                {label:'Lead Organization', value:c.lead_organization || '-'},
+                {label:'Focal Person', value:c.focal_person || '-'},
+                {label:'Contact Details', value:c.contact_details, fullWidth:true}
+            ]},
+            {icon:'bi-boxes', title:'Resources & Coverage', columns:3, items:[
+                {label:'Resource Capacity', value:c.resource_capacity || '-'},
+                {label:'Coverage Area', value:c.coverage_area || '-'},
+                {label:'Available Equipment', value:c.available_equipment, fullWidth:true}
+            ]}
+        ],
+        tags:memberTags,
+        footer:[
+            {icon:'bi-calendar', label:'Created On', value:c.created_at ? new Date(c.created_at).toLocaleDateString() : '-'}
+        ]
+    });
 }
 
 async function editRecord(id) {

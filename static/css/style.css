@@ -976,6 +976,11 @@ h1,h2,h3,h4,h5,h6,p,span,div,td,th,label,.card-title,.stat-label {
   color: #b45309;
 }
 
+.view-badge-info {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
 /* Grid Layout */
 .view-grid {
   display: grid;

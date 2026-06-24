@@ -261,26 +261,36 @@ function serializeResources() {
 async function viewRecord(id) {
     const r = records.find(x => x.id === id);
     if (!r) return;
-    const memberRows = (r.members || []).map(m => [m.name || '-', m.role || '-', m.contact || m.contact_number || '-', m.specialization || m.skills || '-']);
-    const resourceRows = (r.resources || []).map(res => [res.name || res.resource_name || '-', res.type || res.resource_type || '-', res.quantity ?? '-', res.status || '-']);
-    showViewModal(r.team_name, [
-        {title:'Team Information', fields:[
-            {label:'Team Name', value:r.team_name},
-            {label:'Team Type', value:r.team_type, badge:'bg-info'},
-            {label:'Coverage Area', value:r.coverage_area},
-        ]},
-        {title:'Leadership', fields:[
-            {label:'Team Leader', value:r.team_leader},
-            {label:'Contact Number', value:r.contact_number},
-            {label:'Base Coordinates', value:r.base_coordinates},
-        ]},
-    ]);
-    if (memberRows.length > 0) {
-        showViewTable('Team Members (' + memberRows.length + ')', ['Name', 'Role', 'Contact', 'Specialization'], memberRows);
-    }
-    if (resourceRows.length > 0) {
-        showViewTable('Resources (' + resourceRows.length + ')', ['Resource', 'Type', 'Quantity', 'Status'], resourceRows);
-    }
+    var memberTags = (r.members || []).map(function(m) {
+        return {icon:'bi-person', text: m.name || 'Member'};
+    });
+    showDetailedViewModal({
+        logo:'bi-people-fill',
+        title:r.team_name,
+        hero:{
+            icon:'bi-people-fill',
+            name:r.team_name,
+            subtitle:r.team_type || '',
+            status:r.team_type,
+            badgeClass:'view-badge-info'
+        },
+        sections:[
+            {icon:'bi-info-circle', title:'Team Information', columns:3, items:[
+                {label:'Team Name', value:r.team_name},
+                {label:'Team Type', value:r.team_type || '-'},
+                {label:'Coverage Area', value:r.coverage_area || '-'}
+            ]},
+            {icon:'bi-person-badge', title:'Leadership', columns:3, items:[
+                {label:'Team Leader', value:r.team_leader || '-'},
+                {label:'Contact Number', value:r.contact_number || '-'},
+                {label:'Base Coordinates', value:r.base_coordinates || '-'}
+            ]}
+        ],
+        tags:memberTags,
+        footer:[
+            {icon:'bi-calendar', label:'Created On', value:r.created_at ? new Date(r.created_at).toLocaleDateString() : '-'}
+        ]
+    });
 }
 
 async function editRecord(id) {

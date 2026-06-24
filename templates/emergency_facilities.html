@@ -246,37 +246,59 @@ function openForm() {
   new bootstrap.Modal(document.getElementById('formModal')).show();
 }
 
+function facilityAmenities(item) {
+  var list = [];
+  var amap = {
+    water_availability:{icon:'bi-droplet',label:'Water Available'},
+    electricity_availability:{icon:'bi-lightning-fill',label:'Electricity'},
+    toilet_availability:{icon:'bi-door-open',label:'Toilet'},
+    kitchen_availability:{icon:'bi-cup-straw',label:'Kitchen'},
+    internet_availability:{icon:'bi-wifi',label:'Internet'},
+    accessibility_disabled:{icon:'bi-wheelchair',label:'Disabled Access'}
+  };
+  for (var k in amap) { if (item[k]) list.push({icon:amap[k].icon,text:amap[k].label}); }
+  return list;
+}
+
 async function viewRecord(id) {
   const resp = await fetch(`/api/emergency-facilities/${id}`);
   const d = await resp.json();
   if(!d.success) return;
   const item = d.data;
-  showViewModal(item.facility_name, [
-    {title:'Basic Information', fields:[
-      {label:'Facility Name', value:item.facility_name},
-      {label:'Facility Type', value:item.facility_type},
-      {label:'Ward', value:wardMap[item.ward_id] || '-'},
-      {label:'Location Description', value:item.location_description},
-    ]},
-    {title:'Location & Capacity', fields:[
-      {label:'Coordinates', value:item.coordinates},
-      {label:'Max Capacity', value:item.max_capacity},
-      {label:'Current Occupancy', value:item.current_occupancy},
-    ]},
-    {title:'Available Amenities', fields:[
-      {label:'Water', value:item.water_availability ? 'Yes' : 'No'},
-      {label:'Electricity', value:item.electricity_availability ? 'Yes' : 'No'},
-      {label:'Toilet', value:item.toilet_availability ? 'Yes' : 'No'},
-      {label:'Kitchen', value:item.kitchen_availability ? 'Yes' : 'No'},
-      {label:'Internet', value:item.internet_availability ? 'Yes' : 'No'},
-      {label:'Disabled Access', value:item.accessibility_disabled ? 'Yes' : 'No'},
-    ]},
-    {title:'Contact Information', fields:[
-      {label:'Managing Organization', value:item.managing_organization},
-      {label:'Focal Person', value:item.focal_person},
-      {label:'Contact Number', value:item.contact_number},
-    ]},
-  ]);
+  var facs = facilityAmenities(item);
+  showDetailedViewModal({
+    logo:'bi-hospital',
+    title:item.facility_name,
+    hero:{
+      icon:'bi-hospital',
+      name:item.facility_name,
+      subtitle:item.facility_type || '',
+      status:item.facility_type,
+      badgeClass:'view-badge-success'
+    },
+    sections:[
+      {icon:'bi-info-circle', title:'Basic Information', columns:3, items:[
+        {label:'Facility Name', value:item.facility_name},
+        {label:'Facility Type', value:item.facility_type},
+        {label:'Ward', value:wardMap[item.ward_id] || '-'},
+        {label:'Location Description', value:item.location_description, fullWidth:true}
+      ]},
+      {icon:'bi-geo-alt-fill', title:'Location & Capacity', columns:3, items:[
+        {label:'Coordinates', value:item.coordinates || '-'},
+        {label:'Max Capacity', value:item.max_capacity != null ? item.max_capacity : '-'},
+        {label:'Current Occupancy', value:item.current_occupancy != null ? item.current_occupancy : '-'}
+      ]},
+      {icon:'bi-telephone', title:'Contact Information', columns:3, items:[
+        {label:'Managing Organization', value:item.managing_organization},
+        {label:'Focal Person', value:item.focal_person},
+        {label:'Contact Number', value:item.contact_number}
+      ]}
+    ],
+    tags:facs,
+    footer:[
+      {icon:'bi-calendar', label:'Created On', value:item.created_at ? new Date(item.created_at).toLocaleDateString() : '-'}
+    ]
+  });
 }
 
 async function editRecord(id) {

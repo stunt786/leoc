@@ -234,27 +234,41 @@ async function viewRecord(id) {
         const d = await r.json();
         if (!d.success) { showToast('danger', d.message); return; }
         const p = d.data;
-        showViewModal(p.person_name, [
-            {title:'Personal Information', fields:[
-                {label:'Full Name', value:p.person_name},
-                {label:'Age', value:p.age ?? '-'},
-                {label:'Gender', value:p.gender || '-'},
-                {label:'Category', value:p.category, badge:'bg-danger'},
-            ]},
-            {title:'Location', fields:[
-                {label:'Ward', value:p.ward_name || '-'},
-                {label:'Settlement', value:p.settlement},
-                {label:'Coordinates', value:p.coordinates},
-            ]},
-            {title:'Health Information', fields:[
-                {label:'Health Condition', value:p.health_condition},
-                {label:'Health Facility', value:p.health_facility_linked},
-            ]},
-            {title:'Emergency Contacts', fields:[
-                {label:'Contact Number', value:p.contact_number},
-                {label:'Emergency Contact', value:p.emergency_contact},
-            ]},
-        ]);
+        var badgeCls = p.category === 'Critical' || p.category === 'High Risk' ? 'view-badge-danger' : 'view-badge-warning';
+        showDetailedViewModal({
+            logo:'bi-exclamation-triangle',
+            title:p.person_name,
+            hero:{
+                icon:'bi-exclamation-triangle',
+                name:p.person_name,
+                subtitle:p.category || '',
+                status:p.category,
+                badgeClass:badgeCls
+            },
+            sections:[
+                {icon:'bi-person', title:'Personal Information', columns:3, items:[
+                    {label:'Full Name', value:p.person_name},
+                    {label:'Age', value:p.age ?? '-'},
+                    {label:'Gender', value:p.gender || '-'}
+                ]},
+                {icon:'bi-geo-alt-fill', title:'Location', columns:3, items:[
+                    {label:'Ward', value:p.ward_name || '-'},
+                    {label:'Settlement', value:p.settlement},
+                    {label:'Coordinates', value:p.coordinates || '-'}
+                ]},
+                {icon:'bi-heart-pulse', title:'Health Information', columns:3, items:[
+                    {label:'Health Condition', value:p.health_condition, fullWidth:true},
+                    {label:'Health Facility', value:p.health_facility_linked || '-'}
+                ]},
+                {icon:'bi-telephone', title:'Emergency Contacts', columns:3, items:[
+                    {label:'Contact Number', value:p.contact_number || '-'},
+                    {label:'Emergency Contact', value:p.emergency_contact || '-'}
+                ]}
+            ],
+            footer:[
+                {icon:'bi-calendar', label:'Created On', value:p.created_at ? new Date(p.created_at).toLocaleDateString() : '-'}
+            ]
+        });
     } catch(e) {
         showToast('danger', 'Error loading record: ' + e.message);
     }

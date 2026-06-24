@@ -282,41 +282,49 @@ async function viewRecord(id) {
   const d = await resp.json();
   if(!d.success) return;
   const item = d.data;
-  const amenities = [];
-  if (item.water_available) amenities.push('Water');
-  if (item.toilet_available) amenities.push('Toilet');
-  if (item.electricity_available) amenities.push('Electricity');
-  if (item.kitchen_available) amenities.push('Kitchen');
-  if (item.medical_support) amenities.push('Medical');
-  if (item.accessibility_support) amenities.push('Accessible');
-  showViewModal(item.shelter_name, [
-    {title:'Basic Information', fields:[
-      {label:'Shelter Name', value:item.shelter_name},
-      {label:'Shelter Type', value:item.shelter_type || '-'},
-      {label:'Ward', value:wardMap[item.ward_id] || '-'},
-    ]},
-    {title:'Location', fields:[
-      {label:'Location', value:item.location},
-      {label:'Coordinates', value:item.coordinates},
-      {label:'Evacuation Routes', value:item.evacuation_routes},
-      {label:'Assembly Points', value:item.assembly_points},
-    ]},
-    {title:'Capacity', fields:[
-      {label:'Total Capacity', value:item.total_capacity},
-      {label:'Male Capacity', value:item.male_capacity},
-      {label:'Female Capacity', value:item.female_capacity},
-      {label:'Children Capacity', value:item.children_capacity},
-      {label:'Current Occupancy', value:item.current_occupancy},
-      {label:'Available Space', value:item.available_space},
-    ]},
-    {title:'Amenities', fields:[
-      {label:'Available Amenities', value:amenities.join(', ') || 'None'},
-    ]},
-    {title:'Management', fields:[
-      {label:'Shelter Manager', value:item.shelter_manager},
-      {label:'Contact Number', value:item.contact_number},
-    ]},
-  ]);
+  var amenityTags = [];
+  var amap = {water_available:{icon:'bi-droplet',label:'Water'}, toilet_available:{icon:'bi-door-open',label:'Toilet'}, electricity_available:{icon:'bi-lightning-fill',label:'Electricity'}, kitchen_available:{icon:'bi-cup-straw',label:'Kitchen'}, medical_support:{icon:'bi-heart-pulse',label:'Medical'}, accessibility_support:{icon:'bi-wheelchair',label:'Accessible'}};
+  for (var k in amap) { if (item[k]) amenityTags.push({icon:amap[k].icon,text:amap[k].label}); }
+  showDetailedViewModal({
+    logo:'bi-building',
+    title:item.shelter_name,
+    hero:{
+      icon:'bi-building',
+      name:item.shelter_name,
+      subtitle:item.shelter_type || '',
+      status:'Active',
+      badgeClass:'view-badge-success'
+    },
+    sections:[
+      {icon:'bi-info-circle', title:'Basic Information', columns:3, items:[
+        {label:'Shelter Name', value:item.shelter_name},
+        {label:'Shelter Type', value:item.shelter_type || '-'},
+        {label:'Ward', value:wardMap[item.ward_id] || '-'},
+        {label:'Location', value:item.location, fullWidth:true}
+      ]},
+      {icon:'bi-geo-alt-fill', title:'Location Details', columns:3, items:[
+        {label:'Coordinates', value:item.coordinates || '-'},
+        {label:'Evacuation Routes', value:item.evacuation_routes, fullWidth:true},
+        {label:'Assembly Points', value:item.assembly_points, fullWidth:true}
+      ]},
+      {icon:'bi-people', title:'Capacity', columns:3, items:[
+        {label:'Total Capacity', value:item.total_capacity != null ? item.total_capacity : '-'},
+        {label:'Male', value:item.male_capacity != null ? item.male_capacity : '-'},
+        {label:'Female', value:item.female_capacity != null ? item.female_capacity : '-'},
+        {label:'Children', value:item.children_capacity != null ? item.children_capacity : '-'},
+        {label:'Current Occupancy', value:item.current_occupancy != null ? item.current_occupancy : '-'},
+        {label:'Available Space', value:item.available_space != null ? item.available_space : '-'}
+      ]},
+      {icon:'bi-telephone', title:'Management', columns:3, items:[
+        {label:'Shelter Manager', value:item.shelter_manager || '-'},
+        {label:'Contact Number', value:item.contact_number || '-'}
+      ]}
+    ],
+    tags:amenityTags,
+    footer:[
+      {icon:'bi-calendar', label:'Created On', value:item.created_at ? new Date(item.created_at).toLocaleDateString() : '-'}
+    ]
+  });
 }
 
 async function editRecord(id) {

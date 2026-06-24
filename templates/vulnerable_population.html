@@ -246,25 +246,39 @@ async function viewRecord(id) {
         const d = await r.json();
         if (!d.success) { showToast('danger', d.message); return; }
         const rec = d.data || d.record;
-        const priorityBadge = rec.evacuation_priority === 'Critical' ? 'bg-danger' : rec.evacuation_priority === 'High' ? 'bg-warning text-dark' : 'bg-success';
-        showViewModal(rec.head_of_household, [
-            {title:'Household Information', fields:[
-                {label:'Household ID', value:rec.household_id || rec.id},
-                {label:'Head of Household', value:rec.head_of_household},
-                {label:'Family Size', value:rec.family_size},
-                {label:'Category', value:rec.category},
-            ]},
-            {title:'Location', fields:[
-                {label:'Ward', value:rec.ward_name || rec.ward_id || '-'},
-                {label:'Settlement', value:rec.settlement},
-                {label:'Coordinates', value:rec.coordinates},
-            ]},
-            {title:'Risk Assessment', fields:[
-                {label:'Disaster Exposure', value:rec.disaster_exposure},
-                {label:'Evacuation Priority', value:rec.evacuation_priority || 'Normal', badge:priorityBadge},
-                {label:'Contact Number', value:rec.contact_number},
-            ]},
-        ]);
+        var badgeCls = rec.evacuation_priority === 'Critical' ? 'view-badge-danger' : rec.evacuation_priority === 'High' ? 'view-badge-warning' : 'view-badge-success';
+        showDetailedViewModal({
+            logo:'bi-people',
+            title:rec.head_of_household,
+            hero:{
+                icon:'bi-people',
+                name:rec.head_of_household,
+                subtitle:rec.category || '',
+                status:rec.evacuation_priority || 'Normal',
+                badgeClass:badgeCls
+            },
+            sections:[
+                {icon:'bi-info-circle', title:'Household Information', columns:3, items:[
+                    {label:'Household ID', value:rec.household_id || rec.id},
+                    {label:'Head of Household', value:rec.head_of_household},
+                    {label:'Family Size', value:rec.family_size},
+                    {label:'Category', value:rec.category}
+                ]},
+                {icon:'bi-geo-alt-fill', title:'Location', columns:3, items:[
+                    {label:'Ward', value:rec.ward_name || rec.ward_id || '-'},
+                    {label:'Settlement', value:rec.settlement},
+                    {label:'Coordinates', value:rec.coordinates || '-'}
+                ]},
+                {icon:'bi-shield-exclamation', title:'Risk Assessment', columns:3, items:[
+                    {label:'Disaster Exposure', value:rec.disaster_exposure, fullWidth:true},
+                    {label:'Evacuation Priority', value:rec.evacuation_priority || 'Normal'},
+                    {label:'Contact Number', value:rec.contact_number || '-'}
+                ]}
+            ],
+            footer:[
+                {icon:'bi-calendar', label:'Created On', value:rec.created_at ? new Date(rec.created_at).toLocaleDateString() : '-'}
+            ]
+        });
     } catch(e) {
         showToast('danger', 'Error loading record: ' + e.message);
     }

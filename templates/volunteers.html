@@ -376,32 +376,39 @@ async function viewRecord(id) {
         const r = await fetch('/api/volunteers/' + id);
         const d = await r.json();
         if (!d.success) { showToast('danger', d.message); return; }
-        const v = d.volunteer;
-        const skillsList = (v.skills || []).join(', ') || 'None';
-        const statusBadge = v.availability_status === 'Available' ? 'bg-success' :
-            v.availability_status === 'On Duty' ? 'bg-warning text-dark' : 'bg-secondary';
-        const trainingRows = (v.trainings || []).map(t => [t.training_name || '-', t.training_date || '-', t.certification_status || '-']);
-        showViewModal(v.name, [
-            {title:'Basic Information', fields:[
-                {label:'Volunteer ID', value:v.volunteer_code || v.id},
-                {label:'Name', value:v.name},
-                {label:'Gender', value:v.gender || '-'},
-                {label:'Age', value:v.age || '-'},
-            ]},
-            {title:'Contact & Location', fields:[
-                {label:'Ward', value:wardMap[v.ward_id] || '-'},
-                {label:'Contact Number', value:v.contact_number},
-                {label:'Email', value:v.email},
-                {label:'Home Coordinates', value:v.home_coordinates},
-            ]},
-            {title:'Skills & Status', fields:[
-                {label:'Skills', value:skillsList},
-                {label:'Availability', value:v.availability_status || 'Available', badge:statusBadge},
-            ]},
-        ]);
-        if (trainingRows.length > 0) {
-            showViewTable('Trainings (' + trainingRows.length + ')', ['Training Name', 'Date', 'Status'], trainingRows);
-        }
+        const v = d.data || d.volunteer || d;
+        var badgeCls = v.availability_status === 'Available' ? 'view-badge-success' :
+            v.availability_status === 'On Duty' ? 'view-badge-warning' : 'view-badge-danger';
+        var skillTags = (v.skills || []).map(function(s) { return {icon:'bi-star', text:s}; });
+        showDetailedViewModal({
+            logo:'bi-people',
+            title:v.name,
+            hero:{
+                icon:'bi-people',
+                name:v.name,
+                subtitle:v.gender ? v.gender + (v.age ? ' \u2022 ' + v.age + ' yrs' : '') : '',
+                status:v.availability_status || 'Available',
+                badgeClass:badgeCls
+            },
+            sections:[
+                {icon:'bi-info-circle', title:'Basic Information', columns:3, items:[
+                    {label:'Volunteer ID', value:v.volunteer_code || v.id},
+                    {label:'Name', value:v.name},
+                    {label:'Gender', value:v.gender || '-'},
+                    {label:'Age', value:v.age || '-'}
+                ]},
+                {icon:'bi-geo-alt-fill', title:'Contact & Location', columns:3, items:[
+                    {label:'Ward', value:wardMap[v.ward_id] || '-'},
+                    {label:'Contact Number', value:v.contact_number || '-'},
+                    {label:'Email', value:v.email || '-'},
+                    {label:'Home Coordinates', value:v.home_coordinates || '-'}
+                ]}
+            ],
+            tags:skillTags,
+            footer:[
+                {icon:'bi-calendar', label:'Registered On', value:v.created_at ? new Date(v.created_at).toLocaleDateString() : '-'}
+            ]
+        });
     } catch (e) {
         showToast('danger', 'Error loading volunteer: ' + e.message);
     }

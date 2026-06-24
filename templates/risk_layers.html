@@ -198,23 +198,37 @@ async function viewRecord(id) {
   const d = await resp.json();
   if (!d.success) return;
   const item = d.data;
-  const levelBadge = 'bg-' + (item.risk_level === 'Very High' ? 'danger' : item.risk_level === 'High' ? 'warning' : item.risk_level === 'Moderate' ? 'info' : 'success');
-  showViewModal(item.name, [
-    {title:'Risk Zone Information', fields:[
-      {label:'Name', value:item.name},
-      {label:'Risk Type', value:item.risk_type},
-      {label:'Risk Level', value:item.risk_level, badge:levelBadge},
-    ]},
-    {title:'Location', fields:[
-      {label:'Coordinates', value:item.coordinates},
-      {label:'Area Coverage', value:item.area_coverage},
-    ]},
-    {title:'Affected Population', fields:[
-      {label:'Affected Settlements', value:item.affected_settlements},
-      {label:'Affected Households', value:item.affected_households},
-      {label:'Population at Risk', value:item.population_at_risk},
-    ]},
-  ]);
+  var badgeCls = item.risk_level === 'Very High' ? 'view-badge-danger' : item.risk_level === 'High' ? 'view-badge-warning' : item.risk_level === 'Moderate' ? 'view-badge-info' : 'view-badge-success';
+  showDetailedViewModal({
+    logo:'bi-exclamation-triangle',
+    title:item.name,
+    hero:{
+      icon:'bi-exclamation-triangle',
+      name:item.name,
+      subtitle:item.risk_type || '',
+      status:item.risk_level,
+      badgeClass:badgeCls
+    },
+    sections:[
+      {icon:'bi-info-circle', title:'Risk Zone Information', columns:3, items:[
+        {label:'Name', value:item.name},
+        {label:'Risk Type', value:item.risk_type},
+        {label:'Risk Level', value:item.risk_level}
+      ]},
+      {icon:'bi-geo-alt-fill', title:'Location', columns:3, items:[
+        {label:'Coordinates', value:item.coordinates || '-'},
+        {label:'Area Coverage', value:item.area_coverage != null ? item.area_coverage : '-'}
+      ]},
+      {icon:'bi-people-fill', title:'Affected Population', columns:3, items:[
+        {label:'Affected Settlements', value:item.affected_settlements, fullWidth:true},
+        {label:'Affected Households', value:item.affected_households != null ? item.affected_households : '-'},
+        {label:'Population at Risk', value:item.population_at_risk != null ? item.population_at_risk : '-'}
+      ]}
+    ],
+    footer:[
+      {icon:'bi-calendar', label:'Created On', value:item.created_at ? new Date(item.created_at).toLocaleDateString() : '-'}
+    ]
+  });
 }
 
 async function editRecord(id) {
