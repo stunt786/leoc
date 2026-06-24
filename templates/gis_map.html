@@ -112,19 +112,19 @@ html, body { height: 100%; }
 }
 
 /* Category colors */
-.gis-marker-incident { background: #dc3545; }
+.gis-marker-incidents { background: #dc3545; }
 .gis-marker-relief { background: #15803d; }
 .gis-marker-infrastructure { background: #7c3aed; }
-.gis-marker-facility { background: #2563eb; }
-.gis-marker-shelter { background: #0d9488; }
-.gis-marker-risk { background: #ea580c; }
-.gis-marker-contact { background: #0891b2; color: #fff; }
+.gis-marker-facilities { background: #2563eb; }
+.gis-marker-shelters { background: #0d9488; }
+.gis-marker-risk_layers { background: #ea580c; }
+.gis-marker-contacts { background: #0891b2; color: #fff; }
 .gis-marker-vulnerable { background: #9333ea; }
 .gis-marker-disabled { background: #db2777; }
-.gis-marker-highrisk { background: #1e293b; }
-.gis-marker-volunteer { background: #be185d; }
+.gis-marker-high_risk { background: #1e293b; }
+.gis-marker-volunteers { background: #be185d; }
 .gis-marker-rrt { background: #dc2626; }
-.gis-marker-vehicle { background: #d97706; color: #fff; }
+.gis-marker-vehicles { background: #d97706; color: #fff; }
 
 .gis-tip { font-size: 12px; line-height: 1.5; min-width: 200px; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
 .gis-tip-header { color: #fff; font-weight: 700; font-size: 12px; padding: 5px 8px; border-radius: 6px 6px 0 0; }
@@ -436,8 +436,7 @@ function processMapData(d) {
   const z = mapInstance.getZoom();
   if (z > 14) mapInstance.setZoom(14);
 
-  // Thalara boundary unchecked by default
-  document.getElementById('toggleBoundary').checked = false;
+  // Thalara boundary starts hidden (user can enable via layer control)
   mapInstance.removeLayer(boundaryGroup);
 
   updateTotalCount();
@@ -510,18 +509,6 @@ function toggleLayer(key) {
   } else {
     mapInstance.removeLayer(layerGroups[key]);
   }
-}
-
-function toggleBoundaryLayer() {
-  const cb = document.getElementById('toggleBoundary');
-  if (cb.checked) boundaryGroup.addTo(mapInstance);
-  else mapInstance.removeLayer(boundaryGroup);
-}
-
-function toggleWardsLayer() {
-  const cb = document.getElementById('toggleWards');
-  if (cb.checked) wardsGroup.addTo(mapInstance);
-  else mapInstance.removeLayer(wardsGroup);
 }
 
 function selectAll(val) {

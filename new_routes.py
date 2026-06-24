@@ -1212,6 +1212,13 @@ def api_new_modules_map_data():
         'population': r.population_at_risk,
     } for r in RiskLayer.query.all() if r.coordinates]
 
+    data['contacts'] = [{
+        'id': c.id, 'name': c.contact_person, 'designation': c.designation,
+        'phone': c.mobile_number,
+        'lat': float(c.coordinates.split(',')[0]) if c.coordinates else None,
+        'lng': float(c.coordinates.split(',')[1]) if c.coordinates else None,
+    } for c in EmergencyContact.query.all() if c.coordinates]
+
     data['shelters'] = [{
         'id': s.id, 'name': s.shelter_name, 'type': s.shelter_type,
         'lat': float(s.coordinates.split(',')[0]) if s.coordinates else None,

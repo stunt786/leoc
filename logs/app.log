@@ -18414,3 +18414,34 @@ FROM critical_infrastructure]
 2026-06-24 14:36:03,591 INFO: LEOC Application started [in /app/app.py:166]
 2026-06-24 14:38:56,603 INFO: LEOC Application started [in /app/app.py:166]
 2026-06-24 14:38:56,680 INFO: LEOC Application started [in /app/app.py:166]
+2026-06-24 20:35:22,466 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:166]
+2026-06-24 20:35:31,300 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:166]
+2026-06-24 20:36:31,867 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:166]
+2026-06-24 20:36:34,283 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:166]
+2026-06-24 20:36:35,442 ERROR: Exception on /api/new-modules/map-data [GET] [in /home/prakash/.local/lib/python3.12/site-packages/flask/app.py:825]
+Traceback (most recent call last):
+  File "/home/prakash/.local/lib/python3.12/site-packages/flask/app.py", line 1455, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/.local/lib/python3.12/site-packages/flask/app.py", line 869, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/.local/lib/python3.12/site-packages/flask/app.py", line 867, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/.local/lib/python3.12/site-packages/flask/app.py", line 852, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/.local/lib/python3.12/site-packages/flask_login/utils.py", line 290, in decorated_view
+    return current_app.ensure_sync(func)(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/new_routes.py", line 1216, in api_new_modules_map_data
+    'id': c.id, 'name': c.person_name, 'designation': c.designation,
+                        ^^^^^^^^^^^^^
+AttributeError: 'EmergencyContact' object has no attribute 'person_name'
+2026-06-24 20:37:00,715 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:166]
+2026-06-24 14:52:27,687 INFO: LEOC Application started [in /app/app.py:166]
+2026-06-24 14:52:27,687 INFO: LEOC Application started [in /app/app.py:166]
+2026-06-24 14:53:58,894 INFO: LEOC Application started [in /app/app.py:166]
+2026-06-24 14:53:58,976 INFO: LEOC Application started [in /app/app.py:166]
+2026-06-24 20:39:34,597 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:166]
