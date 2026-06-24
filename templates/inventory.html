@@ -298,6 +298,7 @@ async function loadInventory() {
         if (status) params.append('status', status);
         if (search) params.append('search', search);
 
+        params.set('grouped', '1');
         const r = await fetch(`/api/inventory?${params.toString()}`);
         const d = await r.json();
         if (!d.success) { showToast('danger', d.message); return; }

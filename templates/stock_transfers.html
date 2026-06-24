@@ -148,7 +148,7 @@ let warehouses = [];
 let itemsList = [];
 let paginator = new Paginator({perPage: 25, onPageChange: () => renderTransfers(transfers)});
 
-let inventoryByWarehouse = {};
+let _currentWhInventory = [];
 
 async function loadFormData() {
     try {
@@ -162,35 +162,32 @@ async function loadFormData() {
         const opts = warehouses.map(w => `<option value="${w.id}">${w.name} (${w.code || ''})</option>`).join('');
         fromSel.innerHTML = '<option value="">Select Warehouse</option>' + opts;
         toSel.innerHTML = '<option value="">Select Warehouse</option>' + opts;
-
-        const invR = await fetch('/api/inventory');
-        const invD = await invR.json();
-        if (invD.success) {
-            inventoryByWarehouse = {};
-            (invD.inventory || []).forEach(inv => {
-                if (!inventoryByWarehouse[inv.warehouse_id]) inventoryByWarehouse[inv.warehouse_id] = [];
-                inventoryByWarehouse[inv.warehouse_id].push(inv);
-            });
-        }
-
         loadTransfers();
     } catch (e) { showToast('danger', 'Error loading form data: ' + e.message); }
 }
 
-function filterItemsByWarehouse() {
+async function filterItemsByWarehouse() {
     const whId = parseInt(document.getElementById('from_warehouse_id').value);
     const itemSelects = document.querySelectorAll('#itemsBody .transfer-item');
-    const availableItemIds = new Set();
-    if (whId && inventoryByWarehouse[whId]) {
-        inventoryByWarehouse[whId].forEach(inv => {
-            if (inv.available_quantity > 0) availableItemIds.add(inv.item_id);
-        });
+    _currentWhInventory = [];
+    if (whId) {
+        try {
+            const resp = await fetch(`/api/inventory?warehouse_id=${whId}`);
+            const data = await resp.json();
+            if (data.success) _currentWhInventory = data.inventory || [];
+        } catch (e) { /* ignore */ }
     }
+    const stockMap = {};
+    const availableItemIds = new Set();
+    _currentWhInventory.forEach(inv => {
+        stockMap[inv.item_id] = inv.available_quantity;
+        if (inv.available_quantity > 0) availableItemIds.add(inv.item_id);
+    });
     itemSelects.forEach(sel => {
         const currentVal = sel.value;
         const filtered = whId ? itemsList.filter(i => availableItemIds.has(i.id)) : itemsList;
         const optsHtml = filtered.map(i =>
-            `<option value="${i.id}" data-unit="${i.unit || ''}" ${i.id == currentVal ? 'selected' : ''}>${i.item_code ? i.item_code + ' - ' : ''}${i.name}${whId ? ' (' + (inventoryByWarehouse[whId]?.find(inv => inv.item_id === i.id)?.available_quantity || 0) + ' in stock)' : ''}</option>`
+            `<option value="${i.id}" data-unit="${i.unit || ''}" ${i.id == currentVal ? 'selected' : ''}>${i.item_code ? i.item_code + ' - ' : ''}${i.name}${whId ? ' (' + (stockMap[i.id] || 0) + ' in stock)' : ''}</option>`
         ).join('');
         sel.innerHTML = '<option value="">Select Item</option>' + optsHtml;
         if (currentVal && !availableItemIds.has(parseInt(currentVal)) && whId) {
@@ -209,12 +206,14 @@ function resetForm() {
 function addItemRow(itemId = '', qty = '', unit = '', batchNo = '') {
     const tr = document.createElement('tr');
     const whId = parseInt(document.getElementById('from_warehouse_id').value);
-    const availableItemIds = whId && inventoryByWarehouse[whId]
-        ? new Set(inventoryByWarehouse[whId].filter(inv => inv.available_quantity > 0).map(inv => inv.item_id))
+    const stockMap = {};
+    _currentWhInventory.forEach(inv => { stockMap[inv.item_id] = inv.available_quantity; });
+    const availableItemIds = whId
+        ? new Set(_currentWhInventory.filter(inv => inv.available_quantity > 0).map(inv => inv.item_id))
         : null;
     const filtered = availableItemIds ? itemsList.filter(i => availableItemIds.has(i.id)) : itemsList;
     const itemOpts = filtered.map(i =>
-        `<option value="${i.id}" data-unit="${i.unit || ''}" ${i.id == itemId ? 'selected' : ''}>${i.item_code ? i.item_code + ' - ' : ''}${i.name}${whId ? ' (' + ((inventoryByWarehouse[whId]?.find(inv => inv.item_id === i.id)?.available_quantity) || 0) + ' in stock)' : ''}</option>`
+        `<option value="${i.id}" data-unit="${i.unit || ''}" ${i.id == itemId ? 'selected' : ''}>${i.item_code ? i.item_code + ' - ' : ''}${i.name}${whId ? ' (' + (stockMap[i.id] || 0) + ' in stock)' : ''}</option>`
     ).join('');
     tr.innerHTML = `
         <td>

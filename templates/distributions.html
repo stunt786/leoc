@@ -718,11 +718,12 @@ function addBeneficiaryFromDispatch() {
                 if (!benMap[key]) {
                     benMap[key] = { name: benName, items: {} };
                 }
-                // Aggregate dispatch items that this RR requested
-                const rrItemNames = new Set((rr.items || []).map(ri => ri.item_name));
-                dispatchItems.forEach((item) => {
-                    if (!rrItemNames.has(item.item_name)) return;
-                    benMap[key].items[item.item_name] = (benMap[key].items[item.item_name] || 0) + (item.quantity || 0);
+                // Use each relief request item's quantity per beneficiary, not the dispatch total
+                (rr.items || []).forEach(ri => {
+                    const itemName = ri.item_name;
+                    if (!itemName) return;
+                    const qty = ri.quantity_dispatched || ri.quantity_requested || 0;
+                    benMap[key].items[itemName] = (benMap[key].items[itemName] || 0) + qty;
                 });
             });
         } else {
@@ -740,9 +741,18 @@ function addBeneficiaryFromDispatch() {
             if (!benMap[key]) {
                 benMap[key] = { name: benName, items: {} };
             }
-            dispatchItems.forEach((item) => {
-                benMap[key].items[item.item_name] = (benMap[key].items[item.item_name] || 0) + (item.quantity || 0);
-            });
+            if (rr && rr.items) {
+                rr.items.forEach(ri => {
+                    const itemName = ri.item_name;
+                    if (!itemName) return;
+                    const qty = ri.quantity_dispatched || ri.quantity_requested || 0;
+                    benMap[key].items[itemName] = (benMap[key].items[itemName] || 0) + qty;
+                });
+            } else {
+                dispatchItems.forEach((item) => {
+                    benMap[key].items[item.item_name] = (benMap[key].items[item.item_name] || 0) + (item.quantity || 0);
+                });
+            }
         }
     });
 

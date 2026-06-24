@@ -3489,6 +3489,7 @@ def get_inventory():
         to_date_str = request.args.get('to_date')
         status = request.args.get('status')
         search = request.args.get('search')
+        grouped = request.args.get('grouped', type=int, default=0)
 
         query = Inventory.query.join(Item)
         if warehouse_id:
@@ -3520,84 +3521,114 @@ def get_inventory():
                 query = query.filter(Inventory.item_id == -1)
         inventory = query.order_by(Inventory.updated_at.desc()).all()
 
-        # Group by item_id, summing quantities across warehouses
-        groups = {}
-        for inv in inventory:
-            item_id = inv.item_id
-            if item_id not in groups:
-                item = inv.item
-                groups[item_id] = {
-                    'item_id': item_id,
-                    'item_name': item.name if item else None,
-                    'item_code': item.item_code if item else None,
-                    'item_uuid': item.uuid if item else None,
-                    'barcode': item.barcode if item else None,
-                    'category_name': item.category.name if item and item.category else None,
-                    'quantity': 0,
-                    'reserved_quantity': 0,
-                    'unit': item.unit if item else None,
-                    'minimum_stock': item.minimum_stock if item else 0,
-                    'expiry_tracking': item.expiry_tracking if item else False,
-                    'updated_at': inv.updated_at,
-                    'warehouse_ids': [],
-                    'warehouse_names': [],
-                    'has_expired': False,
-                }
-            rec = groups[item_id]
-            rec['quantity'] += inv.quantity
-            rec['reserved_quantity'] += inv.reserved_quantity
-            if inv.warehouse_id not in rec['warehouse_ids']:
-                rec['warehouse_ids'].append(inv.warehouse_id)
-                rec['warehouse_names'].append(inv.warehouse.name if inv.warehouse else 'Unknown')
-            if inv.updated_at and (not rec['updated_at'] or inv.updated_at > rec['updated_at']):
-                rec['updated_at'] = inv.updated_at
-
-        # Check expiry for tracking items
         today = date.today()
-        tracking_ids = [g['item_id'] for g in groups.values() if g['expiry_tracking']]
-        if tracking_ids:
-            expiry_query = db.session.query(StockReceiptItem.item_id).join(
-                StockReceipt, StockReceiptItem.receipt_id == StockReceipt.id
-            ).filter(
-                StockReceiptItem.item_id.in_(tracking_ids),
-                StockReceiptItem.expiry_date.isnot(None),
-                StockReceiptItem.expiry_date <= today
-            )
-            if warehouse_id:
-                expiry_query = expiry_query.filter(StockReceipt.warehouse_id == warehouse_id)
-            for eid in {r.item_id for r in expiry_query.all()}:
-                if eid in groups:
-                    groups[eid]['has_expired'] = True
 
-        results = []
-        for item_id, rec in groups.items():
-            rec['available_quantity'] = rec['quantity'] - rec['reserved_quantity']
+        if grouped:
+            # Group by item_id, summing quantities across warehouses
+            groups = {}
+            for inv in inventory:
+                item_id = inv.item_id
+                if item_id not in groups:
+                    item = inv.item
+                    groups[item_id] = {
+                        'item_id': item_id,
+                        'item_name': item.name if item else None,
+                        'item_code': item.item_code if item else None,
+                        'item_uuid': item.uuid if item else None,
+                        'barcode': item.barcode if item else None,
+                        'category_name': item.category.name if item and item.category else None,
+                        'quantity': 0,
+                        'reserved_quantity': 0,
+                        'unit': item.unit if item else None,
+                        'minimum_stock': item.minimum_stock if item else 0,
+                        'expiry_tracking': item.expiry_tracking if item else False,
+                        'updated_at': inv.updated_at,
+                        'warehouse_ids': [],
+                        'warehouse_names': [],
+                        'has_expired': False,
+                    }
+                rec = groups[item_id]
+                rec['quantity'] += inv.quantity
+                rec['reserved_quantity'] += inv.reserved_quantity
+                if inv.warehouse_id not in rec['warehouse_ids']:
+                    rec['warehouse_ids'].append(inv.warehouse_id)
+                    rec['warehouse_names'].append(inv.warehouse.name if inv.warehouse else 'Unknown')
+                if inv.updated_at and (not rec['updated_at'] or inv.updated_at > rec['updated_at']):
+                    rec['updated_at'] = inv.updated_at
 
-            if len(rec['warehouse_names']) == 1:
-                rec['warehouse_name'] = rec['warehouse_names'][0]
-                rec['warehouse_id'] = rec['warehouse_ids'][0]
-            else:
-                rec['warehouse_name'] = f"{len(rec['warehouse_names'])} Warehouses"
-                rec['warehouse_id'] = None
+            tracking_ids = [g['item_id'] for g in groups.values() if g['expiry_tracking']]
+            if tracking_ids:
+                expiry_query = db.session.query(StockReceiptItem.item_id).join(
+                    StockReceipt, StockReceiptItem.receipt_id == StockReceipt.id
+                ).filter(
+                    StockReceiptItem.item_id.in_(tracking_ids),
+                    StockReceiptItem.expiry_date.isnot(None),
+                    StockReceiptItem.expiry_date <= today
+                )
+                if warehouse_id:
+                    expiry_query = expiry_query.filter(StockReceipt.warehouse_id == warehouse_id)
+                for eid in {r.item_id for r in expiry_query.all()}:
+                    if eid in groups:
+                        groups[eid]['has_expired'] = True
 
-            if rec['expiry_tracking'] and rec['has_expired']:
-                rec['status'] = 'expired'
-            elif rec['available_quantity'] <= 0:
-                rec['status'] = 'out_of_stock'
-            elif rec['minimum_stock'] > 0 and rec['available_quantity'] <= rec['minimum_stock'] * 2:
-                rec['status'] = 'low_stock'
-            else:
-                rec['status'] = 'available'
+            results = []
+            for item_id, rec in groups.items():
+                rec['available_quantity'] = rec['quantity'] - rec['reserved_quantity']
 
-            del rec['warehouse_ids']
-            del rec['warehouse_names']
-            del rec['has_expired']
-            results.append(rec)
+                if len(rec['warehouse_names']) == 1:
+                    rec['warehouse_name'] = rec['warehouse_names'][0]
+                    rec['warehouse_id'] = rec['warehouse_ids'][0]
+                else:
+                    rec['warehouse_name'] = f"{len(rec['warehouse_names'])} Warehouses"
+                    rec['warehouse_id'] = None
 
-        results.sort(key=lambda r: r['updated_at'] or datetime.min, reverse=True)
+                if rec['expiry_tracking'] and rec['has_expired']:
+                    rec['status'] = 'expired'
+                elif rec['available_quantity'] <= 0:
+                    rec['status'] = 'out_of_stock'
+                elif rec['minimum_stock'] > 0 and rec['available_quantity'] <= rec['minimum_stock'] * 2:
+                    rec['status'] = 'low_stock'
+                else:
+                    rec['status'] = 'available'
 
-        if status:
-            results = [r for r in results if r['status'] == status]
+                del rec['warehouse_ids']
+                del rec['warehouse_names']
+                del rec['has_expired']
+                results.append(rec)
+
+            results.sort(key=lambda r: r['updated_at'] or datetime.min, reverse=True)
+
+            if status:
+                results = [r for r in results if r['status'] == status]
+        else:
+            # Original per-warehouse behavior
+            results = [inv.to_dict() for inv in inventory]
+            expired_item_ids = set()
+            tracking_ids = [r['item_id'] for r in results if r.get('expiry_tracking')]
+            if tracking_ids:
+                expiry_query = db.session.query(StockReceiptItem.item_id).join(
+                    StockReceipt, StockReceiptItem.receipt_id == StockReceipt.id
+                ).filter(
+                    StockReceiptItem.item_id.in_(tracking_ids),
+                    StockReceiptItem.expiry_date.isnot(None),
+                    StockReceiptItem.expiry_date <= today
+                )
+                if warehouse_id:
+                    expiry_query = expiry_query.filter(StockReceipt.warehouse_id == warehouse_id)
+                expired_item_ids = {r.item_id for r in expiry_query.all()}
+
+            for r in results:
+                if r.get('expiry_tracking') and r['item_id'] in expired_item_ids:
+                    r['status'] = 'expired'
+
+            if status == 'expired':
+                results = [r for r in results if r['status'] == 'expired']
+            elif status == 'low_stock':
+                results = [r for r in results if r['status'] == 'low_stock']
+            elif status == 'out_of_stock':
+                results = [r for r in results if r['status'] == 'out_of_stock']
+            elif status == 'available':
+                results = [r for r in results if r['status'] == 'available']
 
         return jsonify({'success': True, 'inventory': results})
     except Exception as e:
