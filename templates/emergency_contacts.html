@@ -25,6 +25,7 @@
         <option value="Emergency Services">Emergency Services</option>
         <option value="Utilities">Utilities</option>
         <option value="NGO/INGO">NGO/INGO</option>
+        <option value="Others">Others</option>
       </select>
     </div>
     <div class="col-md-3">
@@ -93,6 +94,7 @@
                 <option value="Emergency Services">Emergency Services</option>
                 <option value="Utilities">Utilities</option>
                 <option value="NGO/INGO">NGO/INGO</option>
+                <option value="Others">Others</option>
               </select>
             </div>
             <div class="col-md-6 mb-2">
@@ -157,12 +159,13 @@
 const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 const wardMap = {};
 const SUB_CATEGORIES = {
-  'Government': ['Mayor/Chairperson', 'Vice Chairperson', 'Chief Administrative Officer', 'Ward Chairperson'],
-  'Security': ['Nepal Police', 'Armed Police Force', 'Nepal Army'],
-  'Health': ['Hospital', 'Ambulance', 'Blood Bank'],
-  'Emergency Services': ['Fire Service', 'Rescue Team'],
-  'Utilities': ['Electricity', 'Drinking Water', 'Telecommunications'],
-  'NGO/INGO': ['Nepal Red Cross', 'Humanitarian Organizations']
+  'Government': ['Mayor/Chairperson', 'Vice Chairperson', 'Chief Administrative Officer', 'Ward Chairperson', 'Others'],
+  'Security': ['Nepal Police', 'Armed Police Force', 'Nepal Army', 'Others'],
+  'Health': ['Hospital', 'Ambulance', 'Blood Bank', 'Health Post', 'Others'],
+  'Emergency Services': ['Fire Service', 'Rescue Team', 'Others'],
+  'Utilities': ['Electricity', 'Drinking Water', 'Telecommunications', 'Others'],
+  'NGO/INGO': ['Nepal Red Cross', 'Humanitarian Organizations', 'Others'],
+  'Others': ['Others']
 };
 
 function updateSubCategories() {
@@ -315,6 +318,8 @@ async function saveRecord() {
     address: document.getElementById('address').value,
     service_area: document.getElementById('service_area').value
   };
+  const dupErr = await checkDuplicateRecords('/api/emergency-contacts', {mobile_number: mobile, email: data.email, organization_name: data.organization_name}, id, 'Contact');
+  if (dupErr) { showToast('danger', dupErr); return; }
   const url = id ? `/api/emergency-contacts/${id}` : '/api/emergency-contacts';
   const method = id ? 'PUT' : 'POST';
   const resp = await fetch(url, { method, headers: {'Content-Type':'application/json','X-CSRFToken':csrf}, body: JSON.stringify(data) });

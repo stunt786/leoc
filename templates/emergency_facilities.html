@@ -355,6 +355,8 @@ async function saveRecord() {
     focal_person: document.getElementById('focal_person').value,
     contact_number: document.getElementById('contact_number').value,
   };
+  const dupErr = await checkDuplicateRecords('/api/emergency-facilities', {facility_name: data.facility_name, contact_number: data.contact_number}, id, 'Facility');
+  if (dupErr) { showToast('danger', dupErr); return; }
   const url = id ? `/api/emergency-facilities/${id}` : '/api/emergency-facilities';
   const method = id ? 'PUT' : 'POST';
   const resp = await fetch(url, { method, headers: {'Content-Type':'application/json','X-CSRFToken':document.querySelector('meta[name="csrf-token"]').getAttribute('content')}, body: JSON.stringify(data) });

@@ -223,7 +223,7 @@
 {% endblock %}
 {% block extra_js %}
 <script>
-const SHELTER_TYPES = ['Temporary Shelter', 'Permanent Shelter', 'Community Building', 'School', 'Relief Centre'];
+const SHELTER_TYPES = ['Temporary Shelter', 'Permanent Shelter', 'Community Building', 'School', 'Relief Centre', 'Open Area/Open Space'];
 const wardMap = {};
 
 function initWardMap() {
@@ -395,6 +395,8 @@ async function saveRecord() {
     linked_risk_zones: document.getElementById('linked_risk_zones').value,
     linked_vulnerable_households: document.getElementById('linked_vulnerable_households').value,
   };
+  const dupErr = await checkDuplicateRecords('/api/shelters', {shelter_name: data.shelter_name, contact_number: data.contact_number}, id, 'Shelter');
+  if (dupErr) { showToast('danger', dupErr); return; }
   const url = id ? `/api/shelters/${id}` : '/api/shelters';
   const method = id ? 'PUT' : 'POST';
   const resp = await fetch(url, { method, headers: {'Content-Type':'application/json','X-CSRFToken':document.querySelector('meta[name="csrf-token"]').getAttribute('content')}, body: JSON.stringify(data) });

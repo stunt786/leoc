@@ -328,6 +328,8 @@ document.getElementById('vpForm').addEventListener('submit', async function(e) {
         disaster_exposure: document.getElementById('vpDisasterExposure').value,
         evacuation_priority: document.getElementById('vpEvacPriority').value
     };
+    const dupErr = await checkDuplicateRecords('/api/vulnerable-population', {head_of_household: body.head_of_household, contact_number: body.contact_number}, id, 'Record');
+    if (dupErr) { showToast('danger', dupErr); return; }
     const url = id ? `/api/vulnerable-population/${id}` : '/api/vulnerable-population';
     const method = id ? 'PUT' : 'POST';
     try {

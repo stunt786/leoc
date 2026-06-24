@@ -269,6 +269,8 @@ async function saveRecord() {
     affected_households: document.getElementById('affected_households').value || null,
     population_at_risk: document.getElementById('population_at_risk').value || null,
   };
+  const dupErr = await checkDuplicateRecords('/api/risk-layers', {name: data.name}, id, 'Risk zone');
+  if (dupErr) { showToast('danger', dupErr); return; }
   const url = id ? `/api/risk-layers/${id}` : '/api/risk-layers';
   const method = id ? 'PUT' : 'POST';
   const resp = await fetch(url, {

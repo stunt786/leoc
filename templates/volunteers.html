@@ -477,6 +477,9 @@ async function saveRecord() {
         availability_status: document.getElementById('availability_status').value
     };
 
+    const dupErr = await checkDuplicateRecords('/api/volunteers', {name: body.name, contact_number: body.contact_number, email: body.email}, id, 'Volunteer');
+    if (dupErr) { showToast('danger', dupErr); return; }
+
     const url = id ? '/api/volunteers/' + id : '/api/volunteers';
     const method = id ? 'PUT' : 'POST';
 

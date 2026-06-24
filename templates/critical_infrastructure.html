@@ -348,6 +348,8 @@ async function saveRecord() {
     accessibility_status: document.getElementById('accessibility_status').value,
     available_facilities: document.getElementById('available_facilities').value,
   };
+  const dupErr = await checkDuplicateRecords('/api/critical-infrastructure', {name: data.name, contact_number: data.contact_number}, id, 'Infrastructure');
+  if (dupErr) { showToast('danger', dupErr); return; }
   const url = id ? `/api/critical-infrastructure/${id}` : '/api/critical-infrastructure';
   const method = id ? 'PUT' : 'POST';
   const resp = await fetch(url, { method, headers: {'Content-Type':'application/json','X-CSRFToken':document.querySelector('meta[name="csrf-token"]').getAttribute('content')}, body: JSON.stringify(data) });

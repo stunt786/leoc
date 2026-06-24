@@ -8,7 +8,6 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h4 class="mb-0"><i class="bi bi-diagram-3-fill me-2"></i>Cluster Coordination Management</h4>
     <div>
-      <button class="btn btn-outline-success btn-sm me-1" onclick="printData('Cluster Coordination Management')"><i class="bi bi-printer"></i> Print</button>
       <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#clusterModal" onclick="openForm()">
         <i class="bi bi-plus-lg"></i> Add Cluster
       </button>
@@ -303,8 +302,8 @@ function openForm() {
 async function viewRecord(id) {
     const c = _clusters.find(x => x.id === id);
     if (!c) return;
-    var memberTags = (c.members || []).map(function(m) {
-        return {icon:'bi-person', text: m.organization_name || m.representative || 'Member'};
+    var memberRows = (c.members || []).map(function(m) {
+        return [m.organization_name || '-', m.representative || '-', m.contact_number || '-', m.designation || '-'];
     });
     showDetailedViewModal({
         logo:'bi-diagram-3',
@@ -317,19 +316,24 @@ async function viewRecord(id) {
             badgeClass:'view-badge-success'
         },
         sections:[
-            {icon:'bi-info-circle', title:'Cluster Information', columns:3, items:[
+            {icon:'bi-info-circle', title:'Basic Information', columns:3, items:[
                 {label:'Cluster Name', value:c.cluster_name},
                 {label:'Lead Organization', value:c.lead_organization || '-'},
                 {label:'Focal Person', value:c.focal_person || '-'},
                 {label:'Contact Details', value:c.contact_details, fullWidth:true}
             ]},
-            {icon:'bi-boxes', title:'Resources & Coverage', columns:3, items:[
+            {icon:'bi-tools', title:'Resources', columns:3, items:[
                 {label:'Resource Capacity', value:c.resource_capacity || '-'},
                 {label:'Coverage Area', value:c.coverage_area || '-'},
-                {label:'Available Equipment', value:c.available_equipment, fullWidth:true}
-            ]}
+                {label:'Available Equipment', value:c.available_equipment, fullWidth:true},
+                {label:'GIS Coverage Boundary', value:c.gis_coverage_boundary, fullWidth:true}
+            ]},
+            {icon:'bi-people', title:'Members (' + ((c.members||[]).length) + ')',
+             table:{
+                columns:['Organization','Representative','Contact','Designation'],
+                rows:memberRows
+             }}
         ],
-        tags:memberTags,
         footer:[
             {icon:'bi-calendar', label:'Created On', value:c.created_at ? new Date(c.created_at).toLocaleDateString() : '-'}
         ]
@@ -391,6 +395,8 @@ document.getElementById('clusterForm').addEventListener('submit', async function
         gis_coverage_boundary: document.getElementById('gisCoverageBoundary').value,
         members: members
     };
+    const dupErr = await checkDuplicateRecords('/api/clusters', {cluster_name: body.cluster_name}, id, 'Cluster');
+    if (dupErr) { showToast('danger', dupErr); return; }
     const url = id ? `/api/clusters/${id}` : '/api/clusters';
     const method = id ? 'PUT' : 'POST';
     try {

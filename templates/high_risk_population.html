@@ -321,6 +321,8 @@ document.getElementById('hrForm').addEventListener('submit', async function(e) {
         emergency_contact: document.getElementById('hrEmergency').value,
         coordinates: document.getElementById('hrCoordinates').value || null,
     };
+    const dupErr = await checkDuplicateRecords('/api/high-risk-population', {person_name: body.person_name, contact_number: body.contact_number}, id, 'Record');
+    if (dupErr) { showToast('danger', dupErr); return; }
     const url = id ? `/api/high-risk-population/${id}` : '/api/high-risk-population';
     const method = id ? 'PUT' : 'POST';
     try {

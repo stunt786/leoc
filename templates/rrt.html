@@ -344,6 +344,8 @@ async function saveRecord() {
         members,
         resources: serializeResources(),
     };
+    const dupErr = await checkDuplicateRecords('/api/rrt', {team_name: body.team_name, contact_number: body.contact_number}, id, 'Team');
+    if (dupErr) { showToast('danger', dupErr); return; }
     const url = id ? '/api/rrt/' + id : '/api/rrt';
     const method = id ? 'PUT' : 'POST';
     try {

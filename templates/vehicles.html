@@ -304,6 +304,8 @@ async function saveRecord() {
     capacity: parseFloat(document.getElementById('capacity').value) || null,
     last_service_date: document.getElementById('last_service_date').value || null
   };
+  const dupErr = await checkDuplicateRecords('/api/vehicles', {vehicle_number: data.vehicle_number, driver_contact: data.driver_contact}, id, 'Vehicle');
+  if (dupErr) { showToast('danger', dupErr); return; }
   const url = id ? `/api/vehicles/${id}` : '/api/vehicles';
   const method = id ? 'PUT' : 'POST';
   const resp = await fetch(url, { method, headers: {'Content-Type':'application/json','X-CSRFToken':csrf}, body: JSON.stringify(data) });

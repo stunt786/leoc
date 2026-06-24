@@ -9,7 +9,10 @@
           </div>
           <h2 class="view-modal-heading" id="viewModalTitle">Record Details</h2>
         </div>
-        <button type="button" class="view-close-btn" data-bs-dismiss="modal"><i class="bi bi-x-lg"></i></button>
+        <div class="d-flex align-items-center gap-2">
+          <button type="button" class="view-header-btn" onclick="printDetailedView()" title="Print"><i class="bi bi-printer"></i></button>
+          <button type="button" class="view-close-btn" data-bs-dismiss="modal"><i class="bi bi-x-lg"></i></button>
+        </div>
       </div>
       <div class="view-content-wrapper" id="viewModalBody"></div>
     </div>
@@ -179,18 +182,12 @@ function showViewModal(title, fieldsOrGroups) {
 }
 
 // ========== DETAILED VIEW MODAL (DESIGN VIEW) ==========
-function showDetailedViewModal(config) {
-  getViewModal().hide();
-  document.getElementById('viewModalTitle').textContent = esc(config.title || '');
-  if (config.logo) {
-    document.getElementById('viewModalLogo').innerHTML = '<i class="bi ' + config.logo + '"></i>';
-  } else {
-    document.getElementById('viewModalLogo').innerHTML = '<i class="bi bi-eye"></i>';
-  }
+var _lastDetailedConfig = null;
+
+function renderDetailedBody(config) {
   const body = document.getElementById('viewModalBody');
   let html = '';
 
-  // Hero Card
   if (config.hero) {
     const hero = config.hero;
     const hIcon = hero.icon || 'fa-building';
@@ -212,11 +209,11 @@ function showDetailedViewModal(config) {
     html += '</div>';
   }
 
-  // Grid sections
   if (config.sections && config.sections.length > 0) {
     html += '<div class="view-grid">';
     config.sections.forEach(function(section) {
-      html += '<div class="view-info-card">';
+      var secFull = section.fullWidth || section.table ? ' view-card-full' : '';
+      html += '<div class="view-info-card' + secFull + '">';
       html += '  <div class="view-section-header">';
       const sIcon = section.icon || 'fa-circle-info';
       html += '    <div class="view-section-icon"><i class="bi ' + sIcon + '"></i></div>';
@@ -247,12 +244,27 @@ function showDetailedViewModal(config) {
         html += '  </div>';
       }
 
+      if (section.table && section.table.columns && section.table.columns.length > 0) {
+        html += '  <div class="view-table-wrap"><table class="view-table"><thead><tr>';
+        section.table.columns.forEach(function(c) { html += '<th>' + esc(c) + '</th>'; });
+        html += '</tr></thead><tbody>';
+        if (!section.table.rows || section.table.rows.length === 0) {
+          html += '<tr><td colspan="' + section.table.columns.length + '" class="text-center text-muted small py-2">No records</td></tr>';
+        } else {
+          section.table.rows.forEach(function(row) {
+            html += '<tr>';
+            row.forEach(function(cell) { html += '<td>' + (cell != null ? cell : '-') + '</td>'; });
+            html += '</tr>';
+          });
+        }
+        html += '</tbody></table></div>';
+      }
+
       html += '</div>';
     });
     html += '</div>';
   }
 
-  // Standalone tags
   if (config.tags && config.tags.length > 0) {
     html += '<div class="view-info-card view-tags-card">';
     html += '  <div class="view-section-header">';
@@ -267,7 +279,6 @@ function showDetailedViewModal(config) {
     html += '</div>';
   }
 
-  // Footer meta
   if (config.footer && config.footer.length > 0) {
     html += '<div class="view-footer-meta">';
     html += '  <div class="view-meta-grid">';
@@ -285,7 +296,126 @@ function showDetailedViewModal(config) {
   }
 
   body.innerHTML = html;
+}
+
+function showDetailedViewModal(config) {
+  getViewModal().hide();
+  _lastDetailedConfig = config;
+  document.getElementById('viewModalTitle').textContent = esc(config.title || '');
+  if (config.logo) {
+    document.getElementById('viewModalLogo').innerHTML = '<i class="bi ' + config.logo + '"></i>';
+  } else {
+    document.getElementById('viewModalLogo').innerHTML = '<i class="bi bi-eye"></i>';
+  }
+  renderDetailedBody(config);
   setTimeout(function() { getViewModal().show(); }, 150);
+}
+
+function printDetailedView() {
+  var cfg = _lastDetailedConfig;
+  if (!cfg) { showToast('danger', 'No data to print'); return; }
+  var logoHtml = cfg.logo ? '<i class="bi ' + cfg.logo + '"></i>' : '<i class="bi bi-eye"></i>';
+  var win = window.open('', '_blank');
+  win.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' + esc(cfg.title || 'Record') + ' - Print</title>');
+  win.document.write('<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">');
+  win.document.write('<style>');
+  win.document.write('*{margin:0;padding:0;box-sizing:border-box}');
+  win.document.write('body{font-family:Inter,Segoe UI,sans-serif;color:#1f2937;padding:30px;background:#fff}');
+  win.document.write('.print-header{display:flex;align-items:center;gap:14px;padding-bottom:16px;border-bottom:2px solid #6d4aff;margin-bottom:20px}');
+  win.document.write('.print-logo{width:40px;height:40px;background:linear-gradient(135deg,#7c5cff,#5a38ff);border-radius:10px;color:#fff;display:flex;align-items:center;justify-content:center;font-size:20px}');
+  win.document.write('.print-header h1{font-size:22px;font-weight:700;color:#1f2937}');
+  win.document.write('.print-meta{font-size:12px;color:#6b7280;margin-top:20px;padding-top:12px;border-top:1px solid #e5e7eb;text-align:center}');
+  win.document.write('.hero-card{background:#fafbff;border:1px solid #e5e7eb;border-radius:10px;padding:16px 20px;display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}');
+  win.document.write('.hero-left{display:flex;align-items:center;gap:12px}');
+  win.document.write('.hero-icon{width:44px;height:44px;border-radius:50%;background:#f4f1ff;color:#6d4aff;display:flex;align-items:center;justify-content:center;font-size:20px}');
+  win.document.write('.hero-info h3{font-size:18px;font-weight:700;margin:0 0 2px}');
+  win.document.write('.hero-info p{font-size:12px;color:#6b7280;margin:0}');
+  win.document.write('.status-badge{padding:5px 14px;border-radius:20px;font-weight:600;font-size:12px;white-space:nowrap}');
+  win.document.write('.bg-green{background:#eafaf0;color:#15803d}.bg-red{background:#fef2f2;color:#dc2626}.bg-amber{background:#fffbeb;color:#b45309}.bg-blue{background:#eff6ff;color:#1d4ed8}');
+  win.document.write('.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}');
+  win.document.write('.card{border:1px solid #e5e7eb;border-radius:10px;padding:16px;background:#fff;break-inside:avoid}');
+  win.document.write('.card.full{grid-column:1/-1}');
+  win.document.write('.card h4{font-size:14px;font-weight:600;margin:0 0 12px;padding-bottom:10px;border-bottom:1px solid #e5e7eb}');
+  win.document.write('.row{display:grid;gap:10px}');
+  win.document.write('.field label{display:block;font-size:10.5px;color:#6b7280;font-weight:500;text-transform:uppercase;letter-spacing:0.3px;margin-bottom:3px}');
+  win.document.write('.field span{font-size:13.5px;font-weight:600;color:#1f2937}');
+  win.document.write('.full-w{grid-column:1/-1}');
+  win.document.write('.tags{display:flex;flex-wrap:wrap;gap:8px}');
+  win.document.write('.tag{padding:5px 12px;border:1px solid #e5e7eb;border-radius:8px;font-size:11.5px;font-weight:500;color:#4b5563;display:flex;align-items:center;gap:6px}');
+  win.document.write('.tag i{color:#6d4aff;font-size:12px}');
+  win.document.write('.ftr{margin-top:16px;border:1px solid #e5e7eb;border-radius:10px;padding:16px}');
+  win.document.write('.ftr-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}');
+  win.document.write('.ftr-item{display:flex;align-items:center;gap:12px}');
+  win.document.write('.ftr-icon{width:36px;height:36px;border-radius:50%;background:#f4f1ff;color:#6d4aff;display:flex;align-items:center;justify-content:center;font-size:14px}');
+  win.document.write('.ftr-item h5{font-size:11px;color:#6b7280;font-weight:500;text-transform:uppercase;letter-spacing:0.3px;margin:0 0 2px}');
+  win.document.write('.ftr-item p{font-size:13px;font-weight:600;color:#1f2937;margin:0}');
+  win.document.write('table.view-tbl{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px}');
+  win.document.write('table.view-tbl th{background:#f8fafc;font-weight:600;font-size:10.5px;text-transform:uppercase;letter-spacing:0.3px;color:#6b7280;padding:8px 10px;border:1px solid #e5e7eb;text-align:left}');
+  win.document.write('table.view-tbl td{padding:7px 10px;border:1px solid #e5e7eb;color:#1f2937}');
+  win.document.write('table.view-tbl tbody tr:nth-child(even){background:#fafafa}');
+  win.document.write('@media print{body{padding:15px}.grid{break-inside:auto}.card{break-inside:avoid}}');
+  win.document.write('@media(max-width:768px){.grid,.ftr-grid{grid-template-columns:1fr}.hero-card{flex-direction:column;gap:12px;text-align:center}.hero-left{flex-direction:column;text-align:center}}');
+  win.document.write('</style></head><body>');
+
+  win.document.write('<div class="print-header"><div class="print-logo">' + logoHtml + '</div><h1>' + esc(cfg.title || 'Record Details') + '</h1></div>');
+
+  if (cfg.hero) {
+    var h = cfg.hero;
+    var hBadgeMap = {'view-badge-success':'bg-green','view-badge-danger':'bg-red','view-badge-warning':'bg-amber','view-badge-info':'bg-blue'};
+    var pb = hBadgeMap[h.badgeClass] || 'bg-green';
+    win.document.write('<div class="hero-card"><div class="hero-left"><div class="hero-icon"><i class="bi ' + (h.icon||'fa-building') + '"></i></div><div class="hero-info"><h3>' + esc(h.name||cfg.title) + '</h3><p>' + esc(h.subtitle||'') + '</p></div></div>');
+    if (h.status) win.document.write('<div class="status-badge ' + pb + '">\u25CF ' + esc(h.status) + '</div>');
+    win.document.write('</div>');
+  }
+
+  if (cfg.sections) {
+    win.document.write('<div class="grid">');
+    cfg.sections.forEach(function(s) {
+      var isFull = s.table && s.table.columns && s.table.columns.length > 3;
+      win.document.write('<div class="card' + (isFull ? ' full' : '') + '"><h4>' + esc(s.title) + '</h4>');
+      if (s.items && s.items.length > 0) {
+        var cols = s.columns || 3;
+        win.document.write('<div class="row" style="grid-template-columns:repeat(' + cols + ',1fr)">');
+        s.items.forEach(function(it) {
+          var fw = it.fullWidth ? ' full-w' : '';
+          win.document.write('<div class="field' + fw + '"><label>' + esc(it.label) + '</label><span>' + (it.value||'-') + '</span></div>');
+        });
+        win.document.write('</div>');
+      }
+      if (s.table && s.table.columns) {
+        win.document.write('<table class="view-tbl"><thead><tr>');
+        s.table.columns.forEach(function(c) { win.document.write('<th>' + esc(c) + '</th>'); });
+        win.document.write('</tr></thead><tbody>');
+        if (s.table.rows && s.table.rows.length > 0) {
+          s.table.rows.forEach(function(r) {
+            win.document.write('<tr>');
+            r.forEach(function(c) { win.document.write('<td>' + (c!=null?c:'-') + '</td>'); });
+            win.document.write('</tr>');
+          });
+        }
+        win.document.write('</tbody></table>');
+      }
+      win.document.write('</div>');
+    });
+    win.document.write('</div>');
+  }
+
+  if (cfg.tags && cfg.tags.length > 0) {
+    win.document.write('<div class="card" style="margin-top:16px"><h4>Available Amenities</h4><div class="tags">');
+    cfg.tags.forEach(function(t) { win.document.write('<div class="tag"><i class="bi ' + t.icon + '"></i>' + esc(t.text) + '</div>'); });
+    win.document.write('</div></div>');
+  }
+
+  if (cfg.footer && cfg.footer.length > 0) {
+    win.document.write('<div class="ftr"><div class="ftr-grid">');
+    cfg.footer.forEach(function(f) { win.document.write('<div class="ftr-item"><div class="ftr-icon"><i class="bi ' + f.icon + '"></i></div><div><h5>' + esc(f.label) + '</h5><p>' + esc(f.value||'-') + '</p></div></div>'); });
+    win.document.write('</div></div>');
+  }
+
+  win.document.write('<div class="print-meta">Generated: ' + new Date().toLocaleString() + '</div>');
+  win.document.write('</body></html>');
+  win.document.close();
+  setTimeout(function() { win.document.title += ' - Print Preview'; }, 200);
 }
 
 function showViewTable(title, columns, rows) {
@@ -405,5 +535,24 @@ function printFilteredData(title, data, columns) {
   win.document.write('</body></html>');
   win.document.close();
   setTimeout(() => { win.print(); win.close(); }, 500);
+}
+
+async function checkDuplicateRecords(endpoint, checks, excludeId, label) {
+  try {
+    const r = await fetch(endpoint);
+    const d = await r.json();
+    if (!d.success || !d.data) return null;
+    const records = d.data;
+    for (const record of records) {
+      if (excludeId && String(record.id) === String(excludeId)) continue;
+      for (const [field, value] of Object.entries(checks)) {
+        if (!value) continue;
+        if (String(record[field] || '').toLowerCase() === String(value).toLowerCase()) {
+          return (label || 'A record') + ' with this ' + field.replace(/_/g, ' ') + ' already exists';
+        }
+      }
+    }
+  } catch (e) {}
+  return null;
 }
 </script>

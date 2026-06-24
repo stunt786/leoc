@@ -315,8 +315,8 @@ function openForm() {
 function viewRecord(id) {
     const c = committees.find(x => x.id === id);
     if (!c) return;
-    var memberTags = (Array.isArray(c.members) ? c.members : []).map(function(m) {
-        return {icon:'bi-person', text: m.person_name || m.name || 'Member'};
+    var memberRows = (Array.isArray(c.members) ? c.members : []).map(function(m) {
+        return [m.name || '-', m.position || '-', m.organization || '-', m.contact_number || '-'];
     });
     showDetailedViewModal({
         logo:'bi-people-fill',
@@ -334,9 +334,13 @@ function viewRecord(id) {
                 {label:'Committee Type', value:c.committee_type},
                 {label:'Formation Date', value:c.formation_date || '-'},
                 {label:'Tenure', value:c.tenure ? c.tenure + ' months' : '-'}
-            ]}
+            ]},
+            {icon:'bi-people', title:'Members (' + ((c.members||[]).length) + ')',
+             table:{
+                columns:['Name','Position','Organization','Contact'],
+                rows:memberRows
+             }}
         ],
-        tags:memberTags,
         footer:[
             {icon:'bi-calendar', label:'Created On', value:c.created_at ? new Date(c.created_at).toLocaleDateString() : '-'}
         ]
@@ -382,6 +386,8 @@ async function saveRecord() {
         {id:'formation_date', label:'Formation Date', required:true},
     ])) return;
     body.members = getMembers();
+    const dupErr = await checkDuplicateRecords('/api/committees', {committee_name: body.committee_name}, id, 'Committee');
+    if (dupErr) { showToast('danger', dupErr); return; }
     const url = id ? '/api/committees/' + id : '/api/committees';
     const method = id ? 'PUT' : 'POST';
     try {
