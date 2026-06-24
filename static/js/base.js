@@ -32,6 +32,30 @@
         }
     }
 
+    // ============ COLLAPSIBLE SUB-MENUS ============
+    document.querySelectorAll('.nav-parent').forEach(function(parent) {
+        parent.addEventListener('click', function(e) {
+            e.preventDefault();
+            const targetId = this.getAttribute('data-target');
+            const subMenu = document.getElementById(targetId);
+            if (subMenu) {
+                this.classList.toggle('open');
+                subMenu.classList.toggle('open');
+            }
+        });
+    });
+
+    // Auto-expand section containing active sub-item
+    document.querySelectorAll('.sub-menu').forEach(function(sub) {
+        if (sub.querySelector('.nav-item.active')) {
+            const parent = sub.closest('.nav-section')?.querySelector('.nav-parent');
+            if (parent) {
+                parent.classList.add('open');
+                sub.classList.add('open');
+            }
+        }
+    });
+
     // ============ THEME TOGGLE ============
     const themeToggle = document.getElementById('themeToggle');
     if (themeToggle) {

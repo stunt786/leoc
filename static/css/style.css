@@ -235,6 +235,96 @@ h1,h2,h3,h4,h5,h6,p,span,div,td,th,label,.card-title,.stat-label {
     padding: 8px 0;
 }
 
+/* ============ COLLAPSIBLE SUB-MENU ============ */
+.nav-section {
+    display: flex;
+    flex-direction: column;
+}
+
+.nav-parent {
+    display: flex;
+    align-items: center;
+    padding: 10px 20px;
+    color: rgba(255,255,255,0.65);
+    text-decoration: none;
+    transition: var(--transition);
+    gap: 12px;
+    cursor: pointer;
+    border-left: 3px solid transparent;
+    font-size: 0.875rem;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.nav-parent:hover {
+    color: #fff;
+    background: var(--sidebar-hover);
+    border-left-color: rgba(255,255,255,0.3);
+}
+
+.nav-parent.open {
+    color: #fff;
+    background: rgba(59,130,246,0.08);
+    border-left-color: var(--info);
+}
+
+.nav-parent i {
+    font-size: 1.2rem;
+    width: 22px;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.nav-parent .nav-label {
+    overflow: hidden;
+}
+
+.nav-arrow {
+    margin-left: auto;
+    font-size: 0.75rem !important;
+    width: auto !important;
+    transition: transform 0.3s ease;
+}
+
+.nav-parent.open .nav-arrow {
+    transform: rotate(180deg);
+}
+
+.sub-menu {
+    display: none;
+    overflow: hidden;
+}
+
+.sub-menu.open {
+    display: block;
+}
+
+.sub-menu .sub-item {
+    padding-left: 54px;
+    font-size: 0.82rem;
+}
+
+.sub-menu .sub-item i {
+    font-size: 0.95rem;
+    width: 18px;
+}
+
+.sidebar.collapsed .nav-section .sub-menu,
+.sidebar.collapsed .nav-arrow {
+    display: none !important;
+}
+
+.sidebar.collapsed .nav-parent {
+    padding: 12px 0;
+    justify-content: center;
+    border-left: none;
+}
+
+.sidebar.collapsed .nav-parent i {
+    font-size: 1.3rem;
+    margin: 0;
+}
+
 /* ============ MAIN CONTENT ============ */
 .main-content {
     margin-left: var(--sidebar-width);

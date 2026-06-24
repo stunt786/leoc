@@ -80,148 +80,193 @@
                     <span class="nav-label">Dashboard</span>
                 </a>
 
-                <div class="sidebar-divider">Master Data</div>
+                <div class="nav-section">
+                    <a href="javascript:void(0)" class="nav-item nav-parent" data-target="section-master-data">
+                        <i class="bi bi-database"></i>
+                        <span class="nav-label">Master Data</span>
+                        <i class="bi bi-chevron-down nav-arrow"></i>
+                    </a>
+                    <div class="sub-menu" id="section-master-data">
+                        <a href="{{ url_for('warehouses_page') }}" class="nav-item sub-item {% if request.path == '/warehouses' %}active{% endif %}">
+                            <i class="bi bi-building-fill"></i>
+                            <span class="nav-label">Warehouses</span>
+                        </a>
+                        <a href="{{ url_for('categories_page') }}" class="nav-item sub-item {% if request.path == '/categories' %}active{% endif %}">
+                            <i class="bi bi-tags-fill"></i>
+                            <span class="nav-label">Categories</span>
+                        </a>
+                        <a href="{{ url_for('items_page') }}" class="nav-item sub-item {% if request.path == '/items' %}active{% endif %}">
+                            <i class="bi bi-box-seam"></i>
+                            <span class="nav-label">Items</span>
+                        </a>
+                        <a href="{{ url_for('suppliers_page') }}" class="nav-item sub-item {% if request.path == '/suppliers' %}active{% endif %}">
+                            <i class="bi bi-building"></i>
+                            <span class="nav-label">Suppliers</span>
+                        </a>
+                    </div>
+                </div>
 
-                <a href="{{ url_for('warehouses_page') }}" class="nav-item {% if request.path == '/warehouses' %}active{% endif %}">
-                    <i class="bi bi-warehouse"></i>
-                    <span class="nav-label">Warehouses</span>
-                </a>
+                <div class="nav-section">
+                    <a href="javascript:void(0)" class="nav-item nav-parent" data-target="section-inventory">
+                        <i class="bi bi-inboxes"></i>
+                        <span class="nav-label">Inventory</span>
+                        <i class="bi bi-chevron-down nav-arrow"></i>
+                    </a>
+                    <div class="sub-menu" id="section-inventory">
+                        <a href="{{ url_for('stock_receipts_page') }}" class="nav-item sub-item {% if request.path == '/stock-receipts' %}active{% endif %}">
+                            <i class="bi bi-clipboard-check"></i>
+                            <span class="nav-label">Stock Receipt</span>
+                        </a>
+                        <a href="{{ url_for('inventory_page') }}" class="nav-item sub-item {% if request.path == '/inventory' %}active{% endif %}">
+                            <i class="bi bi-box-seam-fill"></i>
+                            <span class="nav-label">Inventory</span>
+                        </a>
+                        <a href="{{ url_for('stock_transfers_page') }}" class="nav-item sub-item {% if request.path == '/stock-transfers' %}active{% endif %}">
+                            <i class="bi bi-arrow-left-right"></i>
+                            <span class="nav-label">Stock Transfers</span>
+                        </a>
+                        <a href="{{ url_for('adjustments_page') }}" class="nav-item sub-item {% if request.path == '/adjustments' %}active{% endif %}">
+                            <i class="bi bi-sliders"></i>
+                            <span class="nav-label">Adjustments</span>
+                        </a>
+                    </div>
+                </div>
 
-                <a href="{{ url_for('categories_page') }}" class="nav-item {% if request.path == '/categories' %}active{% endif %}">
-                    <i class="bi bi-tags-fill"></i>
-                    <span class="nav-label">Categories</span>
-                </a>
+                <div class="nav-section">
+                    <a href="javascript:void(0)" class="nav-item nav-parent" data-target="section-operations">
+                        <i class="bi bi-gear-wide-connected"></i>
+                        <span class="nav-label">Operations</span>
+                        <i class="bi bi-chevron-down nav-arrow"></i>
+                    </a>
+                    <div class="sub-menu" id="section-operations">
+                        <a href="{{ url_for('incidents_page') }}" class="nav-item sub-item {% if request.path == '/incidents' %}active{% endif %}">
+                            <i class="bi bi-lightning-charge-fill"></i>
+                            <span class="nav-label">Incidents</span>
+                        </a>
+                        <a href="{{ url_for('relief_requests_page') }}" class="nav-item sub-item {% if request.path == '/relief-requests' %}active{% endif %}">
+                            <i class="bi bi-send"></i>
+                            <span class="nav-label">Relief Requests</span>
+                        </a>
+                        <a href="{{ url_for('dispatch_page') }}" class="nav-item sub-item {% if request.path == '/dispatch' %}active{% endif %}">
+                            <i class="bi bi-truck"></i>
+                            <span class="nav-label">Dispatch</span>
+                        </a>
+                        <a href="{{ url_for('distributions_page') }}" class="nav-item sub-item {% if request.path == '/distributions' %}active{% endif %}">
+                            <i class="bi bi-people"></i>
+                            <span class="nav-label">Distribution</span>
+                        </a>
+                    </div>
+                </div>
 
-                <a href="{{ url_for('items_page') }}" class="nav-item {% if request.path == '/items' %}active{% endif %}">
-                    <i class="bi bi-box-seam"></i>
-                    <span class="nav-label">Items</span>
-                </a>
+                <div class="nav-section">
+                    <a href="javascript:void(0)" class="nav-item nav-parent" data-target="section-finance">
+                        <i class="bi bi-cash-coin"></i>
+                        <span class="nav-label">Finance</span>
+                        <i class="bi bi-chevron-down nav-arrow"></i>
+                    </a>
+                    <div class="sub-menu" id="section-finance">
+                        <a href="{{ url_for('cash_funds_page') }}" class="nav-item sub-item {% if request.path == '/cash-funds' %}active{% endif %}">
+                            <i class="bi bi-wallet2"></i>
+                            <span class="nav-label">Cash Funds</span>
+                        </a>
+                        <a href="{{ url_for('cash_receipts_page') }}" class="nav-item sub-item {% if request.path == '/cash-receipts' %}active{% endif %}">
+                            <i class="bi bi-cash-coin"></i>
+                            <span class="nav-label">Cash Receipts</span>
+                        </a>
+                        <a href="{{ url_for('cash_requests_page') }}" class="nav-item sub-item {% if request.path == '/cash-requests' %}active{% endif %}">
+                            <i class="bi bi-send-exclamation"></i>
+                            <span class="nav-label">Cash Requests</span>
+                        </a>
+                        <a href="{{ url_for('cash_distributions_page') }}" class="nav-item sub-item {% if request.path == '/cash-distributions' %}active{% endif %}">
+                            <i class="bi bi-cash-stack"></i>
+                            <span class="nav-label">Cash Distribution</span>
+                        </a>
+                    </div>
+                </div>
 
-                <a href="{{ url_for('suppliers_page') }}" class="nav-item {% if request.path == '/suppliers' %}active{% endif %}">
-                    <i class="bi bi-building"></i>
-                    <span class="nav-label">Suppliers</span>
-                </a>
+                <div class="nav-section">
+                    <a href="javascript:void(0)" class="nav-item nav-parent" data-target="section-disaster">
+                        <i class="bi bi-megaphone"></i>
+                        <span class="nav-label">Disaster</span>
+                        <i class="bi bi-chevron-down nav-arrow"></i>
+                    </a>
+                    <div class="sub-menu" id="section-disaster">
+                        <a href="{{ url_for('disaster_reports_page') }}" class="nav-item sub-item {% if request.path == '/disaster-reports' %}active{% endif %}">
+                            <i class="bi bi-exclamation-triangle-fill"></i>
+                            <span class="nav-label">Daily Bulletin</span>
+                        </a>
+                        <a href="{{ url_for('weekly_forecast_page') }}" class="nav-item sub-item {% if request.path == '/weekly-forecast' %}active{% endif %}">
+                            <i class="bi bi-calendar-week-fill"></i>
+                            <span class="nav-label">Weekly Forecast</span>
+                        </a>
+                    </div>
+                </div>
 
-                <div class="sidebar-divider">Inventory</div>
+                <div class="nav-section">
+                    <a href="javascript:void(0)" class="nav-item nav-parent" data-target="section-people">
+                        <i class="bi bi-people"></i>
+                        <span class="nav-label">People</span>
+                        <i class="bi bi-chevron-down nav-arrow"></i>
+                    </a>
+                    <div class="sub-menu" id="section-people">
+                        <a href="{{ url_for('beneficiaries_page') }}" class="nav-item sub-item {% if request.path == '/beneficiaries' %}active{% endif %}">
+                            <i class="bi bi-people-fill"></i>
+                            <span class="nav-label">Beneficiaries</span>
+                        </a>
+                        <a href="{{ url_for('beneficiary_distributions_page') }}" class="nav-item sub-item {% if request.path == '/beneficiaries/distributions' %}active{% endif %}">
+                            <i class="bi bi-table"></i>
+                            <span class="nav-label">Distribution Records</span>
+                        </a>
+                    </div>
+                </div>
 
-                <a href="{{ url_for('stock_receipts_page') }}" class="nav-item {% if request.path == '/stock-receipts' %}active{% endif %}">
-                    <i class="bi bi-clipboard-check"></i>
-                    <span class="nav-label">Stock Receipt</span>
-                </a>
-
-                <a href="{{ url_for('inventory_page') }}" class="nav-item {% if request.path == '/inventory' %}active{% endif %}">
-                    <i class="bi bi-box-seam-fill"></i>
-                    <span class="nav-label">Inventory</span>
-                </a>
-
-                <a href="{{ url_for('stock_transfers_page') }}" class="nav-item {% if request.path == '/stock-transfers' %}active{% endif %}">
-                    <i class="bi bi-arrow-left-right"></i>
-                    <span class="nav-label">Stock Transfers</span>
-                </a>
-
-                <a href="{{ url_for('adjustments_page') }}" class="nav-item {% if request.path == '/adjustments' %}active{% endif %}">
-                    <i class="bi bi-sliders"></i>
-                    <span class="nav-label">Adjustments</span>
-                </a>
-
-                <div class="sidebar-divider">Operations</div>
-
-                <a href="{{ url_for('incidents_page') }}" class="nav-item {% if request.path == '/incidents' %}active{% endif %}">
-                    <i class="bi bi-lightning-charge-fill"></i>
-                    <span class="nav-label">Incidents</span>
-                </a>
-
-                <a href="{{ url_for('relief_requests_page') }}" class="nav-item {% if request.path == '/relief-requests' %}active{% endif %}">
-                    <i class="bi bi-send"></i>
-                    <span class="nav-label">Relief Requests</span>
-                   
-                </a>
-
-                <a href="{{ url_for('dispatch_page') }}" class="nav-item {% if request.path == '/dispatch' %}active{% endif %}">
-                    <i class="bi bi-truck"></i>
-                    <span class="nav-label">Dispatch</span>
-                </a>
-
-                <a href="{{ url_for('distributions_page') }}" class="nav-item {% if request.path == '/distributions' %}active{% endif %}">
-                    <i class="bi bi-people"></i>
-                    <span class="nav-label">Distribution</span>
-                </a>
-
-                <div class="sidebar-divider">Finance</div>
-
-                <a href="{{ url_for('cash_funds_page') }}" class="nav-item {% if request.path == '/cash-funds' %}active{% endif %}">
-                    <i class="bi bi-wallet2"></i>
-                    <span class="nav-label">Cash Funds</span>
-                </a>
-
-                <a href="{{ url_for('cash_receipts_page') }}" class="nav-item {% if request.path == '/cash-receipts' %}active{% endif %}">
-                    <i class="bi bi-cash-coin"></i>
-                    <span class="nav-label">Cash Receipts</span>
-                </a>
-
-                <a href="{{ url_for('cash_requests_page') }}" class="nav-item {% if request.path == '/cash-requests' %}active{% endif %}">
-                    <i class="bi bi-send-exclamation"></i>
-                    <span class="nav-label">Cash Requests</span>
-                </a>
-
-                <a href="{{ url_for('cash_distributions_page') }}" class="nav-item {% if request.path == '/cash-distributions' %}active{% endif %}">
-                    <i class="bi bi-cash-stack"></i>
-                    <span class="nav-label">Cash Distribution</span>
-                </a>
-
-                <div class="sidebar-divider">Disaster</div>
-
-                <a href="{{ url_for('disaster_reports_page') }}" class="nav-item {% if request.path == '/disaster-reports' %}active{% endif %}">
-                    <i class="bi bi-exclamation-triangle-fill"></i>
-                    <span class="nav-label">Daily Bulletin</span>
-                </a>
-
-                <a href="{{ url_for('weekly_forecast_page') }}" class="nav-item {% if request.path == '/weekly-forecast' %}active{% endif %}">
-                    <i class="bi bi-calendar-week-fill"></i>
-                    <span class="nav-label">Weekly Forecast</span>
-                </a>
-
-                <div class="sidebar-divider">People</div>
-
-                <a href="{{ url_for('beneficiaries_page') }}" class="nav-item {% if request.path == '/beneficiaries' %}active{% endif %}">
-                    <i class="bi bi-people-fill"></i>
-                    <span class="nav-label">Beneficiaries</span>
-                </a>
-                <a href="{{ url_for('beneficiary_distributions_page') }}" class="nav-item {% if request.path == '/beneficiaries/distributions' %}active{% endif %}">
-                    <i class="bi bi-table"></i>
-                    <span class="nav-label">Distribution Records</span>
-                </a>
-
-                <div class="sidebar-divider">Analytics</div>
-
-                <a href="{{ url_for('reports_page') }}" class="nav-item {% if request.path == '/reports' %}active{% endif %}">
-                    <i class="bi bi-file-text"></i>
-                    <span class="nav-label">Reports</span>
-                </a>
-
-                <a href="{{ url_for('archives_page') }}" class="nav-item {% if request.path == '/archives' %}active{% endif %}">
-                    <i class="bi bi-archive-fill"></i>
-                    <span class="nav-label">Archives</span>
-                </a>
+                <div class="nav-section">
+                    <a href="javascript:void(0)" class="nav-item nav-parent" data-target="section-analytics">
+                        <i class="bi bi-bar-chart"></i>
+                        <span class="nav-label">Analytics</span>
+                        <i class="bi bi-chevron-down nav-arrow"></i>
+                    </a>
+                    <div class="sub-menu" id="section-analytics">
+                        <a href="{{ url_for('reports_page') }}" class="nav-item sub-item {% if request.path == '/reports' %}active{% endif %}">
+                            <i class="bi bi-file-text"></i>
+                            <span class="nav-label">Reports</span>
+                        </a>
+                        <a href="{{ url_for('archives_page') }}" class="nav-item sub-item {% if request.path == '/archives' %}active{% endif %}">
+                            <i class="bi bi-archive-fill"></i>
+                            <span class="nav-label">Archives</span>
+                        </a>
+                    </div>
+                </div>
 
                 {% if current_user.role == 'admin' %}
+                <div class="nav-section">
+                    <a href="javascript:void(0)" class="nav-item nav-parent" data-target="section-system">
+                        <i class="bi bi-gear"></i>
+                        <span class="nav-label">System</span>
+                        <i class="bi bi-chevron-down nav-arrow"></i>
+                    </a>
+                    <div class="sub-menu" id="section-system">
+                        <a href="{{ url_for('users_page') }}" class="nav-item sub-item {% if request.path == '/users' %}active{% endif %}">
+                            <i class="bi bi-shield-lock-fill"></i>
+                            <span class="nav-label">Users</span>
+                        </a>
+                        <a href="{{ url_for('settings') }}" class="nav-item sub-item {% if request.path == '/settings' %}active{% endif %}">
+                            <i class="bi bi-gear-fill"></i>
+                            <span class="nav-label">Settings</span>
+                        </a>
+                        <a href="{{ url_for('logs_page') }}" class="nav-item sub-item {% if request.path == '/logs' %}active{% endif %}">
+                            <i class="bi bi-clock-history"></i>
+                            <span class="nav-label">Logs</span>
+                        </a>
+                    </div>
+                </div>
+                {% else %}
                 <div class="sidebar-divider">System</div>
-
-                <a href="{{ url_for('users_page') }}" class="nav-item {% if request.path == '/users' %}active{% endif %}">
-                    <i class="bi bi-shield-lock-fill"></i>
-                    <span class="nav-label">Users</span>
-                </a>
-
-                <a href="{{ url_for('settings') }}" class="nav-item {% if request.path == '/settings' %}active{% endif %}">
-                    <i class="bi bi-gear-fill"></i>
-                    <span class="nav-label">Settings</span>
-                </a>
-                {% endif %}
-
                 <a href="{{ url_for('logs_page') }}" class="nav-item {% if request.path == '/logs' %}active{% endif %}">
                     <i class="bi bi-clock-history"></i>
                     <span class="nav-label">Logs</span>
                 </a>
+                {% endif %}
             </div>
 
             <div class="sidebar-footer">
