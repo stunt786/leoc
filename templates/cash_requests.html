@@ -42,8 +42,8 @@
                     </div>
                     <div class="row g-2">
                         <div class="col-md-6 mb-3"><label class="form-label">Requesting Office</label><input class="form-control" name="requesting_office" id="crqOffice"></div>
-                        <div class="col-md-6 mb-3"><label class="form-label">Beneficiary</label>
-                            <select class="form-select" id="crqBeneficiary" onchange="onBeneficiaryChange()">
+                        <div class="col-md-6 mb-3"><label class="form-label">Beneficiary <span class="text-danger">*</span></label>
+                            <select class="form-select" id="crqBeneficiary" onchange="onBeneficiaryChange()" required>
                                 <option value="">Select Beneficiary</option>
                             </select>
                         </div>
@@ -52,7 +52,7 @@
                         <div class="col-md-6 mb-3"><label class="form-label">Requester Name</label><input class="form-control" name="requester_name" id="crqRequester"></div>
                         <div class="col-md-6 mb-3"><label class="form-label">Phone</label><input class="form-control" name="phone" id="crqPhone"></div>
                         <div class="col-md-4 mb-3"><label class="form-label">Priority</label><select class="form-select" name="priority" id="crqPriority"></select></div>
-                        <div class="col-md-4 mb-3"><label class="form-label">Purpose</label><select class="form-select" name="purpose" id="crqPurpose"></select></div>
+                        <div class="col-md-4 mb-3"><label class="form-label">Purpose <span class="text-danger">*</span></label><select class="form-select" name="purpose" id="crqPurpose" required></select></div>
                     </div>
                     <div class="row g-2">
                         <div class="col-md-6 mb-3"><label class="form-label">Requested Amount <span class="text-danger">*</span></label><input type="number" step="0.01" class="form-control" name="requested_amount" id="crqAmount" required></div>
@@ -134,16 +134,24 @@ async function loadData() {
 document.getElementById('crqForm').addEventListener('submit', async function(e) {
     e.preventDefault();
     const id = document.getElementById('crqId').value;
+    const incidentId = parseInt(document.getElementById('crqIncident').value);
+    const beneficiaryId = parseInt(document.getElementById('crqBeneficiary').value);
+    const purpose = document.getElementById('crqPurpose').value;
+    const requestedAmount = parseFloat(document.getElementById('crqAmount').value);
+    if (!incidentId) { showToast('danger', 'Incident is required'); return; }
+    if (!beneficiaryId) { showToast('danger', 'Beneficiary is required'); return; }
+    if (!purpose) { showToast('danger', 'Purpose is required'); return; }
+    if (!requestedAmount || requestedAmount <= 0) { showToast('danger', 'Requested amount is required and must be greater than 0'); return; }
     const body = {
         request_date: document.getElementById('crqDate').value,
-        incident_id: parseInt(document.getElementById('crqIncident').value),
+        incident_id: incidentId,
         requesting_office: document.getElementById('crqOffice').value,
         requester_name: document.getElementById('crqRequester').value,
         phone: document.getElementById('crqPhone').value,
         priority: document.getElementById('crqPriority').value,
-        purpose: document.getElementById('crqPurpose').value,
-        requested_amount: parseFloat(document.getElementById('crqAmount').value),
-        beneficiary_id: parseInt(document.getElementById('crqBeneficiary').value) || null,
+        purpose: purpose,
+        requested_amount: requestedAmount,
+        beneficiary_id: beneficiaryId,
         status: document.getElementById('crqStatus').value,
         remarks: document.getElementById('crqRemarks').value
     };

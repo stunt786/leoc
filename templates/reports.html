@@ -294,6 +294,9 @@ async function onTypeChange() {
     const type = document.getElementById('reportType').value;
     document.getElementById('downloadBtn').disabled = !type;
     document.getElementById('printBtn').disabled = !type;
+    // Clear date filters on type change so stale dates don't filter new report
+    document.getElementById('dateFrom').value = '';
+    document.getElementById('dateTo').value = '';
     if (type) {
         await loadReportData();
     } else {

@@ -2059,9 +2059,43 @@ def handle_setting(key):
         if 'value' not in data:
             return jsonify({'success': False, 'message': 'Setting value is required'}), 400
         setting = AppSettings.query.filter_by(setting_key=key).first()
+        value = data.get('value')
+
+        if key in ('fiscal_years', 'disaster_types', 'ssf_types') and setting:
+            try:
+                old_value = json.loads(setting.setting_value)
+            except (TypeError, json.JSONDecodeError):
+                old_value = []
+            if isinstance(old_value, list) and isinstance(value, list):
+                removed = [item for item in old_value if item not in value]
+                if removed:
+                    refs = {}
+                    for item in removed:
+                        if key == 'fiscal_years':
+                            total = (
+                                Incident.query.filter_by(fiscal_year=item).count() +
+                                DisasterAssessment.query.filter_by(fiscal_year=item).count() +
+                                CashFund.query.filter_by(fiscal_year=item).count() +
+                                Distribution.query.filter_by(fiscal_year=item).count() +
+                                CashDistribution.query.filter_by(fiscal_year=item).count()
+                            )
+                        elif key == 'disaster_types':
+                            total = (
+                                Incident.query.filter_by(incident_type=item).count() +
+                                DisasterAssessment.query.filter_by(disaster_type=item).count()
+                            )
+                        elif key == 'ssf_types':
+                            total = Beneficiary.query.filter_by(ssf_type=item).count()
+                        else:
+                            total = 0
+                        if total > 0:
+                            refs[item] = total
+                    if refs:
+                        parts = [f'"{k}" ({v} reference(s))' for k, v in refs.items()]
+                        return jsonify({'success': False, 'message': f'Cannot delete: {" ,".join(parts)} are in use. Remove or reassign them first.'}), 400
+
         if not setting:
             setting = AppSettings(setting_key=key)
-        value = data.get('value')
         setting.setting_value = json.dumps(value, ensure_ascii=False)
         db.session.add(setting)
         db.session.commit()
@@ -4523,10 +4557,19 @@ def handle_cash_requests():
         data = request.get_json()
         incident = db_get(Incident, data.get('incident_id'))
         requested_amount = parse_float_field(data, 'requested_amount', minimum=0.01)
+        beneficiary_id = data.get('beneficiary_id')
+        purpose = (data.get('purpose') or '').strip()
         if not incident:
-            return jsonify({'success': False, 'message': 'Incident not found'}), 404
+            return jsonify({'success': False, 'message': 'Incident is required'}), 400
+        if not beneficiary_id:
+            return jsonify({'success': False, 'message': 'Beneficiary is required'}), 400
+        beneficiary = db_get(Beneficiary, beneficiary_id)
+        if not beneficiary:
+            return jsonify({'success': False, 'message': 'Beneficiary not found'}), 404
+        if not purpose:
+            return jsonify({'success': False, 'message': 'Purpose is required'}), 400
         if requested_amount is None or requested_amount <= 0:
-            return jsonify({'success': False, 'message': 'Incident and amount are required'}), 400
+            return jsonify({'success': False, 'message': 'Requested amount must be greater than 0'}), 400
         phone = data.get('phone', '').strip()
         if phone and not validate_phone(phone):
             return jsonify({'success': False, 'message': 'Phone number format is invalid'}), 400
@@ -4537,7 +4580,7 @@ def handle_cash_requests():
             requester_name=data.get('requester_name'), phone=phone,
             priority=data.get('priority', 'Medium'),
             requested_amount=requested_amount,
-            purpose=data.get('purpose'), beneficiary_id=data.get('beneficiary_id') or None,
+            purpose=purpose, beneficiary_id=beneficiary.id,
             remarks=data.get('remarks')
         )
         db.session.add(req)
@@ -4577,12 +4620,25 @@ def manage_cash_request(id):
             if not incident:
                 return jsonify({'success': False, 'message': 'Incident not found'}), 404
             req.incident_id = incident.id
+        if 'beneficiary_id' in data:
+            ben_id = data.get('beneficiary_id')
+            if not ben_id:
+                return jsonify({'success': False, 'message': 'Beneficiary is required'}), 400
+            beneficiary = db_get(Beneficiary, ben_id)
+            if not beneficiary:
+                return jsonify({'success': False, 'message': 'Beneficiary not found'}), 404
+            req.beneficiary_id = beneficiary.id
+        if 'purpose' in data:
+            purpose_val = (data.get('purpose') or '').strip()
+            if not purpose_val:
+                return jsonify({'success': False, 'message': 'Purpose is required'}), 400
+            req.purpose = purpose_val
         if 'phone' in data:
             phone_val = (data.get('phone') or '').strip()
             if phone_val and not validate_phone(phone_val):
                 return jsonify({'success': False, 'message': 'Phone number format is invalid'}), 400
             req.phone = phone_val
-        for field in ['requesting_office', 'requester_name', 'priority', 'purpose', 'remarks', 'status', 'beneficiary_id']:
+        for field in ['requesting_office', 'requester_name', 'priority', 'remarks', 'status']:
             if field in data:
                 setattr(req, field, data[field])
         if 'requested_amount' in data:

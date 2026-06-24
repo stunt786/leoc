@@ -216,15 +216,18 @@ async function addListItem(key, inputId, containerId) {
 
 async function removeListItem(key, index, containerId) {
     const items = await getSetting(key) || [];
+    const removedItem = items[index];
     items.splice(index, 1);
-    await fetch(`/api/settings/${key}`, {
+    const resp = await fetch(`/api/settings/${key}`, {
         method: 'POST',
         headers: {'Content-Type':'application/json','X-CSRFToken':document.querySelector('meta[name="csrf-token"]').getAttribute('content')},
         body: JSON.stringify({value: items})
     });
+    const data = await resp.json();
+    if (!data.success) { showToast('danger', data.message); return; }
     renderList(key, containerId);
     if (key === 'fiscal_years') renderActiveFiscalYear();
-    showToast('success', `${key} updated`);
+    showToast('success', `"${removedItem}" deleted`);
 }
 
 document.getElementById('settingsForm').addEventListener('submit', async function(e) {

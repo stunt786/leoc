@@ -1,41 +1,27 @@
-Update Reports Section and its respective print section
-#Master Data
-**Suppliers Report: Add no of items supplied by supplier in list
-**warehouse Report: Add no of available items no in warehouse list
-**Items Master: Add no of Items available.  Also fix Unit column not displaying proper data and max stock column is also showing wrong data, fix proper data display
-#Inventory 
-**Inventory Report: Showing wrong data in Unit column. CRemove duplicate headers and add proper data . Add date field too
-**Stock Receipt Report: Fix column Header and respective data display
-**Stock Transfer Report: Fix Column header and respective data display
-**Stock book:Fix column header and respective data display
-**Bin card: Fix column header and respective data display
-**Adjustment Report: Fix column header and respective data display
-**Low stock report: Fix column header and respective data display and update headings accordingly
-**Expiry tracking: Fix column header and respective data display
-**Stock Movementreport: Fix column header and respective data display
-*Add options in Report to display or filter between non distributable items and distributable items
-#Operations 
-**Dispatch report: Fix column header and respective data display
-**Distribution Report: Fix column header and respective data display
-**Incident Report: Fix column header and respective data display
-**Relief Request Report: Fix column header and respective data display
-**Disaster Assessment report: Fix column header and respective data display
-#Finance
-**cash balance: Fix column header and respective data display
-**Cash Receipt: Fix column header and respective data display
-**Cash Request: Fix column header and respective data display
-**Cash Distribution: Fix column header and respective data display
-**Cancelled cash distributions: Fix column header and respective data display
-**Cash by Incident: Fix column header and respective data display
-**cash by funding source: Fix column header and respective data display
-**Yearly cash Report: Fix column header and respective data display
-#People
-**Beneficary report: Fix column header and respective data display. Also fix Error: 'Beneficiary' object has no attribute 'status'
-**Beneficary distribution History: Fix column header and respective data display. Also fix data error
-**Beneficary Demographics: Fix column header and respective data display. Also fix data error
-#System
-**Activity log report: Fix column header and respective data display, 
-**User activity summary: Fix column header and respective data display
-#Analytics: Fix column header and respective data display. Add additional options.
+**validation for Supplier form for phone, email and duplication entry based on phone, email or name match
+**Validation in incident form: Total affected people=male+female, death,injured and injured male/female should not be higher total no. of Male affected and female affected
+Validation on Affected Households: House destroyed and house damaged shouldn't be higer than affected households
+**Validation on benefaciries based on ID of family members too, already member of another family. And check ID within family members and other members and families, no duplicate entry based in ID check
+**'Cash Request' from Relief module not dynamically updated to cash request module, sometimes work and sometimes not. Also if Incident status is not activem cash request incident dropdown should be disabled i.e only distribution for active incidents is allowed.
+**Cash Distribution: cash request via relief distribution shows form error no beneficary found on cash distribution form.(selected cash request has no beneficary). And **Relief Distribution displays beneficary already have got cash in this fiscal year. Both cash distribution and relief distribution with has dynamic verifaction problem.
+Validation bypass in distribution when cash is also requested and "Cash Fund' has lower fund than asked, gives error but saved successfully though cash is not updated. Fix this
+//Relief distribution working mechanism: a beneficary can get cash or items or cash+items in a single fiscal year at once for single incident.
 
-For all above reports make all filterable options functional. Add additional reports and columns and info in report according to latest application changes. Make comprehensive upgrade to reports section
+**Daily Bulletin saved success message but not not actually saved. Also increase nextupdatetime field size while making weather_status and incident_reporting_status fields smaller
+**Reports: Data not fetched from db and showing empty data for 'Incident report'
+**Validation on Settings page: Add validation for fiscal Year, Disaster types, SSF Types, Wards if the fields are used in other forms like incident, beneficary, etc.
+**Validation in Cash request: Make compulsory fields, Incident, Beneficary, Purpose
+**Dispatch form: For Dispatched items section decrease the field size for 'Items' and adjust size of other fields for better visibility. Currently other fields likerequested, available, dispatched quantity are too small to type and see text in it. also Batch no. and expiry not updated dynamically in dispatch Items list form. Also **update Relief Request selection field not to show completed relief requests.
+**Distribution: In distribution page and in form field Dispatches selection, Only list dispatches whose distribution is not yet done. Don't show dispatches whose distribution is already completed. Also for some distribution creation I got this type of error for non duplicate beneficary,(Duplicate beneficiary "Mohan Sharma" in the same distribution request). This happens after clicking Reset button. It also deletes old distributions from list.
+**Benefeciries Form: In benefecaries form, increase field size for cash amount, photo and document and decrease for ID Number. Also fix document upload not working. And if there are multiple beneficary photo is also uploading for single beneficary.
+**Batch Tracking and Serial tracking: How are they implemented?
+
+#Alert/Notification system: Add alert and notification system and update below information. Alert and notification should be viewable for details in another notification page and add clear notification button to clear all existing ones and ready for new ones. Add some animated flash notifications for high alert notifications. Check status 24 hrs and re-show notifications for low stocks, expired items, active incidents. Show until they are updated. 
+**All stock receipts notification and also update in logs
+**All Stock transfer and adjustments also in logs
+**All Stock Items low, expiry status, status
+**All Incidents 
+**All Relief Requests
+**All Dispatches
+**All Distributions
+**All cash request and distributions

@@ -190,6 +190,11 @@
                                     <input type="number" class="form-control" id="inc_missing_female" min="0" value="0">
                                 </div>
                             </div>
+                            <div class="row g-2 mt-1" id="humanImpactValidation">
+                                <div class="col-md-4"><small id="val_total_people" class="form-text"></small></div>
+                                <div class="col-md-4"><small id="val_male" class="form-text"></small></div>
+                                <div class="col-md-4"><small id="val_female" class="form-text"></small></div>
+                            </div>
                         </div>
                     </div>
 
@@ -224,6 +229,9 @@
                                     <label class="form-label">Agriculture / Crop Damage</label>
                                     <input type="text" class="form-control" id="inc_agriculture_crop_damage" placeholder="Brief description">
                                 </div>
+                            </div>
+                            <div class="row mt-1" id="propertyDamageValidation">
+                                <div class="col"><small id="val_houses" class="form-text"></small></div>
                             </div>
                         </div>
                     </div>
@@ -393,6 +401,118 @@ document.getElementById('inc_incident_name').addEventListener('input', function(
     this.dataset.userEdited = '1';
 });
 
+let _autoCalcFlag = false;
+
+function setValidity(id, ok) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.classList.toggle('is-valid', ok && parseFloat(el.value) > 0);
+    el.classList.toggle('is-invalid', !ok && parseFloat(el.value) > 0);
+}
+
+function validateIncidentFields() {
+    const $ = id => document.getElementById(id);
+    const v = id => parseFloat($(id)?.value) || 0;
+    const ap = v('inc_affected_people'), ap_m = v('inc_affected_people_male'), ap_f = v('inc_affected_people_female');
+    const d_m = v('inc_death_male'), d_f = v('inc_death_female');
+    const i_m = v('inc_injured_male'), i_f = v('inc_injured_female');
+    const m_m = v('inc_missing_male'), m_f = v('inc_missing_female');
+    const hh = v('inc_affected_households'), h_dest = v('inc_house_destroyed'), h_dam = v('inc_house_damaged');
+
+    // Rule 1: Total = Male + Female
+    const totalOk = ap === 0 || (ap_m + ap_f) === ap;
+    const totalMsg = totalOk
+        ? (ap > 0 ? `<span class="text-success"><i class="bi bi-check-circle me-1"></i>${ap} = ${ap_m} (M) + ${ap_f} (F)</span>` : '')
+        : `<span class="text-danger"><i class="bi bi-exclamation-triangle me-1"></i>${ap} ≠ ${ap_m} + ${ap_f} = ${ap_m + ap_f}</span>`;
+    setValidity('inc_affected_people', totalOk);
+    setValidity('inc_affected_people_male', totalOk);
+    setValidity('inc_affected_people_female', totalOk);
+    const te = $('val_total_people');
+    if (te) te.innerHTML = totalMsg;
+
+    // Rule 2: Male sub-categories = Male total
+    const maleSum = d_m + i_m + m_m;
+    const maleOk = ap_m === 0 || maleSum === ap_m;
+    const maleMsg = maleOk
+        ? (ap_m > 0 ? `<span class="text-success"><i class="bi bi-check-circle me-1"></i>${d_m}+${i_m}+${m_m} = ${ap_m} (M)</span>` : '')
+        : `<span class="text-danger"><i class="bi bi-exclamation-triangle me-1"></i>${d_m}+${i_m}+${m_m} = ${maleSum} ≠ ${ap_m}</span>`;
+    setValidity('inc_death_male', maleOk);
+    setValidity('inc_injured_male', maleOk);
+    setValidity('inc_missing_male', maleOk);
+    const me = $('val_male');
+    if (me) me.innerHTML = maleMsg;
+
+    // Rule 3: Female sub-categories = Female total
+    const femaleSum = d_f + i_f + m_f;
+    const femaleOk = ap_f === 0 || femaleSum === ap_f;
+    const femaleMsg = femaleOk
+        ? (ap_f > 0 ? `<span class="text-success"><i class="bi bi-check-circle me-1"></i>${d_f}+${i_f}+${m_f} = ${ap_f} (F)</span>` : '')
+        : `<span class="text-danger"><i class="bi bi-exclamation-triangle me-1"></i>${d_f}+${i_f}+${m_f} = ${femaleSum} ≠ ${ap_f}</span>`;
+    setValidity('inc_death_female', femaleOk);
+    setValidity('inc_injured_female', femaleOk);
+    setValidity('inc_missing_female', femaleOk);
+    const fe = $('val_female');
+    if (fe) fe.innerHTML = femaleMsg;
+
+    // Rule 4: Households = Destroyed + Damaged
+    const houseSum = h_dest + h_dam;
+    const houseOk = hh === 0 || houseSum === hh;
+    const houseMsg = houseOk
+        ? (hh > 0 ? `<span class="text-success"><i class="bi bi-check-circle me-1"></i>${hh} = ${h_dest} (D) + ${h_dam} (Dmg)</span>` : '')
+        : `<span class="text-danger"><i class="bi bi-exclamation-triangle me-1"></i>${hh} ≠ ${h_dest} + ${h_dam} = ${houseSum}</span>`;
+    setValidity('inc_affected_households', houseOk);
+    setValidity('inc_house_destroyed', houseOk);
+    setValidity('inc_house_damaged', houseOk);
+    const he = $('val_houses');
+    if (he) he.innerHTML = houseMsg;
+}
+
+function autoCalcIncidentFields(changedId) {
+    if (_autoCalcFlag) return;
+    _autoCalcFlag = true;
+    const $ = id => document.getElementById(id);
+    const v = id => parseFloat($(id)?.value) || 0;
+    const s = (id, val) => { const el = $(id); if (el) el.value = val; };
+    const ap = v('inc_affected_people'), ap_m = v('inc_affected_people_male'), ap_f = v('inc_affected_people_female');
+    const d_m = v('inc_death_male'), d_f = v('inc_death_female');
+    const i_m = v('inc_injured_male'), i_f = v('inc_injured_female');
+    const hh = v('inc_affected_households'), h_dest = v('inc_house_destroyed'), h_dam = v('inc_house_damaged');
+
+    // Rule 1: Affected People = Male + Female
+    if (changedId === 'inc_affected_people' && (ap_m > 0 || ap_f > 0)) {
+        if (ap_m > 0) s('inc_affected_people_female', Math.max(0, ap - ap_m));
+        else s('inc_affected_people_male', Math.max(0, ap - ap_f));
+    } else if (changedId === 'inc_affected_people_male') {
+        if (ap > 0) s('inc_affected_people_female', Math.max(0, ap - ap_m));
+        else if (ap_f > 0) s('inc_affected_people', ap_m + ap_f);
+    } else if (changedId === 'inc_affected_people_female') {
+        if (ap > 0) s('inc_affected_people_male', Math.max(0, ap - ap_f));
+        else if (ap_m > 0) s('inc_affected_people', ap_m + ap_f);
+    }
+
+    // Rule 2+3: Death + Injured + Missing = Gender total (auto-fill missing)
+    const ap_m2 = v('inc_affected_people_male'), ap_f2 = v('inc_affected_people_female');
+    if (ap_m2 > 0 && !['inc_missing_male'].includes(changedId))
+        s('inc_missing_male', Math.max(0, ap_m2 - d_m - i_m));
+    if (ap_f2 > 0 && !['inc_missing_female'].includes(changedId))
+        s('inc_missing_female', Math.max(0, ap_f2 - d_f - i_f));
+
+    // Rule 4: Affected Households = Destroyed + Damaged
+    if (changedId === 'inc_affected_households') {
+        if (h_dest > 0) s('inc_house_damaged', Math.max(0, hh - h_dest));
+        else if (h_dam > 0) s('inc_house_destroyed', Math.max(0, hh - h_dam));
+    } else if (changedId === 'inc_house_destroyed') {
+        if (hh > 0) s('inc_house_damaged', Math.max(0, hh - h_dest));
+        else if (h_dam > 0) s('inc_affected_households', h_dest + h_dam);
+    } else if (changedId === 'inc_house_damaged') {
+        if (hh > 0) s('inc_house_destroyed', Math.max(0, hh - h_dam));
+        else if (h_dest > 0) s('inc_affected_households', h_dest + h_dam);
+    }
+
+    _autoCalcFlag = false;
+    validateIncidentFields();
+}
+
 async function loadIncidents() {
     const statusFilter = document.getElementById('statusFilter').value;
     const url = '/api/incidents' + (statusFilter ? '?status=' + statusFilter : '');
@@ -480,6 +600,15 @@ function serializeForm() {
     return body;
 }
 
+function clearValidation() {
+    document.querySelectorAll('#incidentForm input.is-valid, #incidentForm input.is-invalid')
+        .forEach(el => { el.classList.remove('is-valid', 'is-invalid'); });
+    ['val_total_people', 'val_male', 'val_female', 'val_houses'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = '';
+    });
+}
+
 function deserializeForm(i) {
     FIELD_MAP.forEach(f => {
         const el = document.getElementById(fieldId(f));
@@ -493,6 +622,7 @@ function deserializeForm(i) {
         }
     });
     document.getElementById('inc_ward').value = i.ward || '';
+    validateIncidentFields();
 }
 
 function resetIncidentForm() {
@@ -505,7 +635,7 @@ function resetIncidentForm() {
     delete document.getElementById('inc_incident_name').dataset.userEdited;
     // Zero out all number fields
     document.querySelectorAll('#incidentForm input[type="number"]').forEach(el => el.value = 0);
-    // Reset fiscal year to active
+    clearValidation();
     loadIncidentTypes();
 }
 
@@ -530,6 +660,23 @@ async function saveIncident() {
     if (!body.incident_name) { showToast('danger', 'Incident name is required'); return; }
     if (!body.incident_type) { showToast('danger', 'Incident type is required'); return; }
     if (!body.ward) { showToast('danger', 'Ward is required'); return; }
+    // Reject inconsistent numeric fields
+    if (body.affected_people > 0 && (body.affected_people_male + body.affected_people_female) !== body.affected_people) {
+        showToast('danger', `Affected people (${body.affected_people}) must equal Male (${body.affected_people_male}) + Female (${body.affected_people_female})`);
+        return;
+    }
+    if (body.affected_people_male > 0 && (body.death_male + body.injured_male + body.missing_male) !== body.affected_people_male) {
+        showToast('danger', `Male death+injured+missing (${body.death_male + body.injured_male + body.missing_male}) must equal Male affected (${body.affected_people_male})`);
+        return;
+    }
+    if (body.affected_people_female > 0 && (body.death_female + body.injured_female + body.missing_female) !== body.affected_people_female) {
+        showToast('danger', `Female death+injured+missing (${body.death_female + body.injured_female + body.missing_female}) must equal Female affected (${body.affected_people_female})`);
+        return;
+    }
+    if (body.affected_households > 0 && (body.house_destroyed + body.house_damaged) !== body.affected_households) {
+        showToast('danger', `Affected households (${body.affected_households}) must equal Houses Destroyed (${body.house_destroyed}) + Houses Damaged (${body.house_damaged})`);
+        return;
+    }
     const url = id ? '/api/incidents/' + id : '/api/incidents';
     const method = id ? 'PUT' : 'POST';
     const r = await fetch(url, {method, headers:{'Content-Type':'application/json','X-CSRFToken':csrf}, body: JSON.stringify(body)});
@@ -640,6 +787,16 @@ async function showIncidentHistory(id) {
 document.addEventListener('DOMContentLoaded', () => {
     loadIncidentTypes();
     loadIncidents();
+    const autoFields = [
+        'inc_affected_people', 'inc_affected_people_male', 'inc_affected_people_female',
+        'inc_death_male', 'inc_death_female', 'inc_injured_male', 'inc_injured_female',
+        'inc_missing_male', 'inc_missing_female',
+        'inc_house_destroyed', 'inc_house_damaged', 'inc_affected_households',
+    ];
+    autoFields.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('input', () => autoCalcIncidentFields(id));
+    });
 });
 </script>
 {% endblock %}
