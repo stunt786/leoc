@@ -560,7 +560,7 @@
         <div class="report-header">
             {% if sit_rep_no is not none %}
             <div class="sit-rep-box">
-                Sit Rep No: {{ sit_rep_no | to_nepali_num }}
+                Sit Rep No: {{ sit_rep_no }}
             </div>
             {% endif %}
             <img src="{{ url_for('static', filename='Emblem_of_Nepal.png') }}" alt="Logo">

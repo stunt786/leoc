@@ -1039,6 +1039,12 @@ async function loadReliefDashboard() {
         const wardLabels = data.dist_by_ward && data.dist_by_ward.labels.length ? data.dist_by_ward.labels : ['No data'];
         const wardCounts = data.dist_by_ward && data.dist_by_ward.labels.length ? data.dist_by_ward.counts : [0];
         if (reliefWardChartInstance) reliefWardChartInstance.destroy();
+        const reliefWardColors = [
+            '#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6',
+            '#06b6d4', '#f97316', '#14b8a6', '#f43f5e', '#6366f1',
+            '#84cc16', '#e11d48', '#0ea5e9', '#d946ef', '#22c55e',
+            '#eab308', '#a855f7', '#ec4899', '#14b8a6', '#f97316'
+        ];
         reliefWardChartInstance = new Chart(document.getElementById('reliefWardChart'), {
             type: 'bar',
             data: {
@@ -1046,7 +1052,7 @@ async function loadReliefDashboard() {
                 datasets: [{
                     label: 'Distributions',
                     data: wardCounts,
-                    backgroundColor: wardLabels.length === 1 && wardLabels[0] === 'No data' ? ['#e5e7eb'] : '#10b981',
+                    backgroundColor: wardLabels.length === 1 && wardLabels[0] === 'No data' ? ['#e5e7eb'] : wardLabels.map((_, i) => reliefWardColors[i % reliefWardColors.length]),
                     borderRadius: 4
                 }]
             },

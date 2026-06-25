@@ -1446,6 +1446,8 @@ class DisasterAssessment(db.Model):
 class DailyReportLog(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     report_date_bs = db.Column(db.String(20), unique=True, nullable=False, index=True)
+    fiscal_year = db.Column(db.String(20), index=True)
+    sequence_number = db.Column(db.Integer, default=0)
     created_at = db.Column(db.DateTime, default=utc_now)
 
 bulletin_incidents = db.Table('bulletin_incidents',
@@ -6225,12 +6227,26 @@ def generate_daily_report():
 
         sit_rep_no = None
         if start_bs == end_bs and start_bs:
-            log = DailyReportLog.query.filter_by(report_date_bs=start_bs).first()
-            if not log:
-                log = DailyReportLog(report_date_bs=start_bs)
-                db.session.add(log)
-                db.session.commit()
-            sit_rep_no = log.id
+            has_bulletin = DailyBulletin.query.filter_by(valid_from=start_bs).first() is not None
+            if has_bulletin:
+                fiscal_year = AppSettings.get_setting('active_fiscal_year', '2081/82')
+                fy_prefix = fiscal_year.split('/')[0][-2:] if '/' in fiscal_year else fiscal_year[:2]
+                log = DailyReportLog.query.filter_by(report_date_bs=start_bs).first()
+                if not log:
+                    max_seq = db.session.query(db.func.max(DailyReportLog.sequence_number)).filter(
+                        DailyReportLog.fiscal_year == fiscal_year
+                    ).scalar() or 0
+                    log = DailyReportLog(report_date_bs=start_bs, fiscal_year=fiscal_year, sequence_number=max_seq + 1)
+                    db.session.add(log)
+                    db.session.commit()
+                elif not log.fiscal_year or not log.sequence_number:
+                    max_seq = db.session.query(db.func.max(DailyReportLog.sequence_number)).filter(
+                        DailyReportLog.fiscal_year == fiscal_year
+                    ).scalar() or 0
+                    log.fiscal_year = fiscal_year
+                    log.sequence_number = max_seq + 1
+                    db.session.commit()
+                sit_rep_no = f"{fy_prefix}-{log.sequence_number:03d}"
 
         pdf = generate_disaster_pdf(incidents, total, ward_stats, disaster_type_stats,
                                      start_bs, end_bs, office_name, sit_rep_no, livestock_total)
@@ -6260,7 +6276,7 @@ def generate_disaster_pdf(incidents, total, ward_stats, type_stats, start_bs, en
     elements.append(pdf_text("स्थानीय आपतकालीन कार्य केन्द्र (LEOC)", subtitle_style))
     elements.append(pdf_text("दैनिक घटना प्रतिवेदन", subtitle_style))
     if sit_rep_no:
-        elements.append(pdf_text(f"Sit Rep No: {nepali_num_str(sit_rep_no)}", normal))
+        elements.append(pdf_text(f"Sit Rep No: {sit_rep_no}", normal))
     elements.append(Spacer(1, 6))
 
     date_str = f"{start_bs}" if start_bs == end_bs else f"{start_bs} देखि {end_bs}"
@@ -6429,12 +6445,26 @@ def daily_report_preview():
 
     sit_rep_no = None
     if start_bs == end_bs and start_bs:
-        log = DailyReportLog.query.filter_by(report_date_bs=start_bs).first()
-        if not log:
-            log = DailyReportLog(report_date_bs=start_bs)
-            db.session.add(log)
-            db.session.commit()
-        sit_rep_no = log.id
+        has_bulletin = DailyBulletin.query.filter_by(valid_from=start_bs).first() is not None
+        if has_bulletin:
+            fiscal_year = AppSettings.get_setting('active_fiscal_year', '2081/82')
+            fy_prefix = fiscal_year.split('/')[0][-2:] if '/' in fiscal_year else fiscal_year[:2]
+            log = DailyReportLog.query.filter_by(report_date_bs=start_bs).first()
+            if not log:
+                max_seq = db.session.query(db.func.max(DailyReportLog.sequence_number)).filter(
+                    DailyReportLog.fiscal_year == fiscal_year
+                ).scalar() or 0
+                log = DailyReportLog(report_date_bs=start_bs, fiscal_year=fiscal_year, sequence_number=max_seq + 1)
+                db.session.add(log)
+                db.session.commit()
+            elif not log.fiscal_year or not log.sequence_number:
+                max_seq = db.session.query(db.func.max(DailyReportLog.sequence_number)).filter(
+                    DailyReportLog.fiscal_year == fiscal_year
+                ).scalar() or 0
+                log.fiscal_year = fiscal_year
+                log.sequence_number = max_seq + 1
+                db.session.commit()
+            sit_rep_no = f"{fy_prefix}-{log.sequence_number:03d}"
 
     weather_status = request.args.get('weather', bulletin.weather_status if bulletin else '')
     notice_title = request.args.get('notice_title', bulletin.notice_title if bulletin else '')
@@ -9833,6 +9863,22 @@ def init_db():
                         db.session.execute(db.text("ALTER TABLE beneficiary ADD COLUMN status VARCHAR(20) DEFAULT 'Active'"))
                         db.session.commit()
                         print("[MIGRATE] Added 'status' column to beneficiary")
+                    except Exception:
+                        db.session.rollback()
+            if 'daily_report_log' in inspector.get_table_names():
+                drl_cols = [c['name'] for c in inspector.get_columns('daily_report_log')]
+                if 'fiscal_year' not in drl_cols:
+                    try:
+                        db.session.execute(db.text("ALTER TABLE daily_report_log ADD COLUMN fiscal_year VARCHAR(20)"))
+                        db.session.commit()
+                        print("[MIGRATE] Added 'fiscal_year' column to daily_report_log")
+                    except Exception:
+                        db.session.rollback()
+                if 'sequence_number' not in drl_cols:
+                    try:
+                        db.session.execute(db.text("ALTER TABLE daily_report_log ADD COLUMN sequence_number INTEGER DEFAULT 0"))
+                        db.session.commit()
+                        print("[MIGRATE] Added 'sequence_number' column to daily_report_log")
                     except Exception:
                         db.session.rollback()
         except Exception as e:
