@@ -1473,6 +1473,12 @@ async function loadIncidentDashboard() {
         // Incidents by Ward (bar)
         if (data.by_ward && data.by_ward.labels && data.by_ward.labels.length) {
             if (incWardChartInstance) incWardChartInstance.destroy();
+            const wardColors = [
+                '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
+                '#06b6d4', '#f97316', '#14b8a6', '#f43f5e', '#6366f1',
+                '#84cc16', '#e11d48', '#0ea5e9', '#d946ef', '#22c55e',
+                '#eab308', '#a855f7', '#ec4899', '#14b8a6', '#f97316'
+            ];
             incWardChartInstance = new Chart(document.getElementById('incWardChart'), {
                 type: 'bar',
                 data: {
@@ -1480,7 +1486,8 @@ async function loadIncidentDashboard() {
                     datasets: [{
                         label: 'Incidents',
                         data: data.by_ward.counts,
-                        backgroundColor: '#3b82f6', borderRadius: 4
+                        backgroundColor: data.by_ward.labels.map((_, i) => wardColors[i % wardColors.length]),
+                        borderRadius: 4
                     }]
                 },
                 options: {
@@ -1497,6 +1504,10 @@ async function loadIncidentDashboard() {
         // Incidents by Fiscal Year (bar)
         if (data.by_fiscal_year && data.by_fiscal_year.labels && data.by_fiscal_year.labels.length) {
             if (incFiscalYearChartInstance) incFiscalYearChartInstance.destroy();
+            const fyColors = [
+                '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
+                '#06b6d4', '#f97316', '#14b8a6', '#f43f5e', '#6366f1'
+            ];
             incFiscalYearChartInstance = new Chart(document.getElementById('incFiscalYearChart'), {
                 type: 'bar',
                 data: {
@@ -1504,7 +1515,7 @@ async function loadIncidentDashboard() {
                     datasets: [{
                         label: 'Incidents',
                         data: data.by_fiscal_year.counts,
-                        backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#f97316', '#14b8a6', '#f43f5e', '#6366f1'],
+                        backgroundColor: data.by_fiscal_year.labels.map((_, i) => fyColors[i % fyColors.length]),
                         borderRadius: 4
                     }]
                 },

@@ -233,7 +233,7 @@ async function loadFormData() {
         });
 
         const catSel = document.getElementById('filterCategory');
-        d.categories.forEach(c => {
+        (d.categories || []).forEach(c => {
             catSel.innerHTML += `<option value="${c.id}">${c.name}</option>`;
         });
 

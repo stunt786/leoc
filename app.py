@@ -5747,6 +5747,8 @@ def handle_beneficiaries():
             return jsonify({'success': False, 'message': 'Invalid ward selected'}), 400
         if not data.get('tole'):
             return jsonify({'success': False, 'message': 'Tole is required'}), 400
+        if not data.get('father_name'):
+            return jsonify({'success': False, 'message': "Father's name is required"}), 400
         phone = data.get('phone', '').strip()
         if phone and not validate_phone(phone):
             return jsonify({'success': False, 'message': 'Phone number format is invalid'}), 400
@@ -5835,6 +5837,8 @@ def manage_beneficiary(id):
             return jsonify({'success': False, 'message': 'National ID is required'}), 400
         if 'tole' in data and not data.get('tole'):
             return jsonify({'success': False, 'message': 'Tole is required'}), 400
+        if 'father_name' in data and not data.get('father_name'):
+            return jsonify({'success': False, 'message': "Father's name is required"}), 400
         if 'ward' in data:
             ward = parse_int_field(data, 'ward', minimum=1, default=None)
             if ward is None:
