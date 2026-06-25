@@ -504,6 +504,8 @@ class Warehouse(db.Model):
     phone = db.Column(db.String(50))
     capacity = db.Column(db.Float, default=0)
     remarks = db.Column(db.Text)
+    latitude = db.Column(db.Float)
+    longitude = db.Column(db.Float)
     created_at = db.Column(db.DateTime, default=utc_now)
     updated_at = db.Column(db.DateTime, default=utc_now, onupdate=utc_now)
 
@@ -512,6 +514,7 @@ class Warehouse(db.Model):
             'id': self.id, 'name': self.name, 'code': self.code,
             'address': self.address, 'contact_person': self.contact_person,
             'phone': self.phone, 'capacity': self.capacity, 'remarks': self.remarks,
+            'latitude': self.latitude, 'longitude': self.longitude,
             'created_at': ad_to_bs_date(self.created_at)
         }
 
@@ -2765,9 +2768,12 @@ def handle_warehouses():
         phone = data.get('phone')
         if not validate_phone(phone):
             return jsonify({'success': False, 'message': 'Phone number format is invalid'}), 400
+        lat = parse_float_field(data, 'latitude')
+        lng = parse_float_field(data, 'longitude')
         wh = Warehouse(name=name, code=(data.get('code') or '').strip(), address=data.get('address'),
                        contact_person=data.get('contact_person'), phone=phone,
-                       capacity=parse_int_field(data, 'capacity', minimum=0, default=0), remarks=data.get('remarks'))
+                       capacity=parse_int_field(data, 'capacity', minimum=0, default=0), remarks=data.get('remarks'),
+                       latitude=lat, longitude=lng)
         if not wh.code:
             wh.code = f"WH-{Warehouse.query.count() + 1}"
         db.session.add(wh)
@@ -2825,6 +2831,10 @@ def manage_warehouse(id):
                 setattr(wh, field, data[field])
         if 'capacity' in data:
             wh.capacity = parse_int_field(data, 'capacity', minimum=0, default=0)
+        if 'latitude' in data:
+            wh.latitude = parse_float_field(data, 'latitude')
+        if 'longitude' in data:
+            wh.longitude = parse_float_field(data, 'longitude')
         db.session.commit()
         return jsonify({'success': True, 'message': 'Warehouse updated', 'data': wh.to_dict()})
     except ValueError as e:
@@ -7556,12 +7566,28 @@ def get_map_data():
                 'sample_names': sample_names
             })
 
+        warehouses = Warehouse.query.filter(
+            Warehouse.latitude.isnot(None),
+            Warehouse.longitude.isnot(None)
+        ).all()
+        warehouse_markers = []
+        for w in warehouses:
+            warehouse_markers.append({
+                'id': w.id, 'name': w.name, 'code': w.code,
+                'address': w.address or '',
+                'lat': w.latitude, 'lng': w.longitude,
+                'capacity': w.capacity or 0,
+                'contact_person': w.contact_person or '',
+                'phone': w.phone or ''
+            })
+
         return jsonify({
             'success': True,
             'boundary': boundary,
             'wards': wards,
             'incident_markers': incident_markers,
-            'relief_markers': relief_markers
+            'relief_markers': relief_markers,
+            'warehouse_markers': warehouse_markers
         })
     except Exception as e:
         return jsonify({'success': False, 'message': friendly_message(e)}), 500
@@ -9545,6 +9571,19 @@ def init_db():
                         db.session.commit()
                     except Exception:
                         pass
+            if 'warehouse' in inspector.get_table_names():
+                wh_cols = [c['name'] for c in inspector.get_columns('warehouse')]
+                wh_mig = []
+                if 'latitude' not in wh_cols: wh_mig.append("latitude FLOAT")
+                if 'longitude' not in wh_cols: wh_mig.append("longitude FLOAT")
+                for col in wh_mig:
+                    try:
+                        db.session.execute(db.text(f"ALTER TABLE warehouse ADD COLUMN {col}"))
+                    except Exception:
+                        pass
+                if wh_mig:
+                    db.session.commit()
+
             if 'weekly_forecast' in inspector.get_table_names():
                 wf_cols = [c['name'] for c in inspector.get_columns('weekly_forecast')]
                 if 'date_from' not in wf_cols:

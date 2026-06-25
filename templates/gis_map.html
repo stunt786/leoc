@@ -210,6 +210,7 @@ html, body { height: 100%; }
         <div class="filter-group-title">Operations</div>
         <label class="filter-checkbox"><input type="checkbox" class="layer-toggle" data-layer="incidents" checked onchange="toggleLayer('incidents')"><span class="layer-dot" style="background:#dc3545"></span> Incidents <span class="layer-count" id="count-incidents">0</span></label>
         <label class="filter-checkbox"><input type="checkbox" class="layer-toggle" data-layer="relief" checked onchange="toggleLayer('relief')"><span class="layer-dot" style="background:#15803d"></span> Relief Distributions <span class="layer-count" id="count-relief">0</span></label>
+        <label class="filter-checkbox"><input type="checkbox" class="layer-toggle" data-layer="warehouses" checked onchange="toggleLayer('warehouses')"><span class="layer-dot" style="background:#795548"></span> Warehouses <span class="layer-count" id="count-warehouses">0</span></label>
       </div>
 
       <div class="filter-group">
@@ -279,20 +280,22 @@ const LAYER_COLORS = {
   incidents: '#dc3545', relief: '#15803d', infrastructure: '#7c3aed',
   facilities: '#2563eb', shelters: '#0d9488', risk_layers: '#ea580c',
   contacts: '#0891b2', vulnerable: '#9333ea', disabled: '#db2777',
-  high_risk: '#1e293b', volunteers: '#be185d', rrt: '#dc2626', vehicles: '#d97706'
+  high_risk: '#1e293b', volunteers: '#be185d', rrt: '#dc2626', vehicles: '#d97706',
+  warehouses: '#795548'
 };
 const LAYER_NAMES = {
   incidents: 'Incidents', relief: 'Relief', infrastructure: 'Infrastructure',
   facilities: 'Facilities', shelters: 'Shelters', risk_layers: 'Risk Zones',
   contacts: 'Contacts', vulnerable: 'Vulnerable', disabled: 'Disabled',
-  high_risk: 'High Risk', volunteers: 'Volunteers', rrt: 'RRT', vehicles: 'Vehicles'
+  high_risk: 'High Risk', volunteers: 'Volunteers', rrt: 'RRT', vehicles: 'Vehicles',
+  warehouses: 'Warehouses'
 };
 const LAYER_ICONS = {
   incidents: 'bi-lightning-charge-fill', relief: 'bi-box-seam-fill', infrastructure: 'bi-building-gear',
   facilities: 'bi-hospital', shelters: 'bi-house-door', risk_layers: 'bi-exclamation-triangle',
   contacts: 'bi-telephone', vulnerable: 'bi-heart', disabled: 'bi-person-wheelchair',
   high_risk: 'bi-shield-exclamation', volunteers: 'bi-person-check', rrt: 'bi-flag',
-  vehicles: 'bi-truck'
+  vehicles: 'bi-truck', warehouses: 'bi-warehouse'
 };
 const MARKER_SHAPES = {
   incidents: 'gis-marker-circle', relief: 'gis-marker-diamond',
@@ -300,7 +303,8 @@ const MARKER_SHAPES = {
   shelters: 'gis-marker-square', risk_layers: 'gis-marker-shield',
   contacts: 'gis-marker-circle', vulnerable: 'gis-marker-circle',
   disabled: 'gis-marker-hex', high_risk: 'gis-marker-shield',
-  volunteers: 'gis-marker-hex', rrt: 'gis-marker-hex', vehicles: 'gis-marker-square'
+  volunteers: 'gis-marker-hex', rrt: 'gis-marker-hex', vehicles: 'gis-marker-square',
+  warehouses: 'gis-marker-square'
 };
 
 // Sub-type icon maps for richer visualization
@@ -395,7 +399,7 @@ function initMap() {
   osmLayer.addTo(mapInstance);
 
   L.control.scale({ position: 'bottomleft', imperial: false }).addTo(mapInstance);
-  ['incidents','relief','infrastructure','facilities','shelters','risk_layers','contacts','vulnerable','disabled','high_risk','volunteers','rrt','vehicles'].forEach(k => {
+  ['incidents','relief','warehouses','infrastructure','facilities','shelters','risk_layers','contacts','vulnerable','disabled','high_risk','volunteers','rrt','vehicles'].forEach(k => {
     layerGroups[k] = L.markerClusterGroup({ chunkedLoading: true, maxClusterRadius: 60, spiderfyOnMaxZoom: true, showCoverageOnHover: false, zoomToBoundsOnClick: true }).addTo(mapInstance);
     markerMap[k] = [];
   });
@@ -501,6 +505,21 @@ function processMapData(d) {
     });
   }
   document.getElementById('count-relief').textContent = markerMap.relief.length;
+
+  if (d.warehouse_markers && d.warehouse_markers.length) {
+    d.warehouse_markers.forEach(function(m) {
+      const mk = L.marker([m.lat, m.lng], { icon: makeMarkerIcon('warehouses', 'bi-warehouse') }).addTo(layerGroups.warehouses);
+      mk.bindTooltip(tipHeader('#795548', m.name) + tipBody([
+        {l:'Code',v:m.code||'N/A'},{l:'Address',v:m.address||'N/A'},
+        {l:'Contact',v:m.contact_person||m.phone||'-'}
+      ]), { sticky: true, offset: [0, -8], className: 'incident-tip-container' });
+      mk._gisType = 'warehouses';
+      mk._gisWard = '';
+      mk._gisSearch = (m.name + ' ' + (m.code||'') + ' ' + (m.address||'')).toLowerCase();
+      markerMap.warehouses.push(mk);
+    });
+  }
+  document.getElementById('count-warehouses').textContent = markerMap.warehouses.length;
 
   mapInstance.fitBounds(boundaryBounds, { padding: [15, 15] });
   const z = mapInstance.getZoom();

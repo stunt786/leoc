@@ -59,6 +59,10 @@
                             <label class="form-label">Capacity</label>
                             <input type="number" class="form-control" id="capacity" step="0.01">
                         </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Coordinates (Lat, Lng)</label>
+                            <input type="text" class="form-control" id="coordinates" placeholder="e.g. 28.1234, 82.5678">
+                        </div>
                         <div class="col-12">
                             <label class="form-label">Remarks</label>
                             <textarea class="form-control" id="remarks" rows="2"></textarea>
@@ -121,6 +125,7 @@ function editWarehouse(id) {
         document.getElementById('contact_person').value = w.contact_person || '';
         document.getElementById('phone').value = w.phone || '';
         document.getElementById('capacity').value = w.capacity || '';
+        document.getElementById('coordinates').value = (w.latitude && w.longitude) ? w.latitude + ', ' + w.longitude : '';
         document.getElementById('remarks').value = w.remarks || '';
         new bootstrap.Modal(document.getElementById('warehouseModal')).show();
     }).catch(e => showToast('danger', 'Error: ' + e.message));
@@ -130,9 +135,20 @@ function validatePhone(phone) {
     return !phone || /^[\d\s\+\-\(\)]{7,20}$/.test(phone);
 }
 
+function parseCoordinates(val) {
+    if (!val) return { latitude: null, longitude: null };
+    const parts = val.split(',').map(s => s.trim());
+    if (parts.length === 2) {
+        const lat = parseFloat(parts[0]), lng = parseFloat(parts[1]);
+        if (!isNaN(lat) && !isNaN(lng)) return { latitude: lat, longitude: lng };
+    }
+    return { latitude: null, longitude: null };
+}
+
 function saveWarehouse() {
     const phone = document.getElementById('phone').value;
     if (phone && !validatePhone(phone)) { showToast('danger', 'Phone number format is invalid'); return; }
+    const coords = parseCoordinates(document.getElementById('coordinates').value);
     const data = {
         code: document.getElementById('code').value,
         name: document.getElementById('name').value,
@@ -140,6 +156,8 @@ function saveWarehouse() {
         contact_person: document.getElementById('contact_person').value,
         phone: phone,
         capacity: parseFloat(document.getElementById('capacity').value) || 0,
+        latitude: coords.latitude,
+        longitude: coords.longitude,
         remarks: document.getElementById('remarks').value
     };
     const url = editId ? `/api/warehouses/${editId}` : '/api/warehouses';
