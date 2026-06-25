@@ -192,6 +192,20 @@
                 </div>
             </div>
             <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-header"><span><i class="bi bi-upload me-2"></i>Import SQL Data</span></div>
+                    <div class="card-body">
+                        <label class="form-label small mb-1">Import rows from SQL file</label>
+                        <p class="small text-muted">Upload a .sql file with INSERT statements. Rows with IDs that already exist will be skipped.</p>
+                        <div class="input-group">
+                            <input type="file" class="form-control" id="importSqlFile" accept=".sql">
+                            <button class="btn btn-outline-primary" onclick="importSqlData()"><i class="bi bi-upload me-1"></i>Import</button>
+                        </div>
+                        <div id="importSqlResult" class="mt-2 small"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
                 <div class="card h-100 border-danger">
                     <div class="card-header text-danger"><span><i class="bi bi-exclamation-triangle-fill me-2"></i>Danger Zone</span></div>
                     <div class="card-body d-flex flex-column">
@@ -461,6 +475,38 @@ async function restoreBackup() {
         }
     } catch(e) {
         showToast('danger', 'Restore failed: ' + e.message);
+    }
+}
+
+async function importSqlData() {
+    const input = document.getElementById('importSqlFile');
+    const resultDiv = document.getElementById('importSqlResult');
+    if (!input.files.length) { showToast('warning', 'Please select a .sql file'); return; }
+    if (!confirm('Import INSERT statements from this SQL file? Records with existing IDs will be skipped.')) return;
+    const formData = new FormData();
+    formData.append('file', input.files[0]);
+    resultDiv.innerHTML = '<span class="text-primary">Importing...</span>';
+    try {
+        const resp = await fetch('/api/import-sql', {
+            method: 'POST',
+            headers: {'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')},
+            body: formData
+        });
+        const d = await resp.json();
+        if (d.success) {
+            resultDiv.innerHTML = `<span class="text-success"><i class="bi bi-check-circle me-1"></i>${d.message}</span>`;
+            if (d.errors && d.errors.length) {
+                resultDiv.innerHTML += `<div class="text-warning mt-1 small">${d.errors.length} error(s). Check server logs.</div>`;
+            }
+            showToast('success', d.message);
+            loadDbInfo();
+        } else {
+            resultDiv.innerHTML = `<span class="text-danger">${d.message}</span>`;
+            showToast('danger', d.message);
+        }
+    } catch(e) {
+        resultDiv.innerHTML = `<span class="text-danger">Import failed: ${e.message}</span>`;
+        showToast('danger', 'Import failed: ' + e.message);
     }
 }
 

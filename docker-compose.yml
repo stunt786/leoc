@@ -6,9 +6,9 @@ services:
     environment:
       POSTGRES_DB: leoc
       POSTGRES_USER: leoc
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-leoc_prod_pass}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - leoc_db_data:/var/lib/postgresql/data
     healthcheck:
@@ -25,22 +25,33 @@ services:
     ports:
       - "5002:5002"
     volumes:
-      - ./static/uploads:/app/static/uploads
-      - ./backups:/app/backups
-      - .:/app
+      - upload_data:/app/static/uploads
+      - backup_data:/app/backups
     environment:
       - FLASK_ENV=production
       - FLASK_DEBUG=False
-      - SECRET_KEY=${SECRET_KEY:-your-default-secret-key}
-      - SQLALCHEMY_DATABASE_URI=postgresql://leoc:${DB_PASSWORD:-leoc_prod_pass}@leoc-db:5432/leoc
-      - UPLOAD_FOLDER=/app/static/uploads
-      - CACHE_TIMEOUT=300
+      - SQLALCHEMY_DATABASE_URI=postgresql://leoc:${DB_PASSWORD}@leoc-db:5432/leoc
     depends_on:
       leoc-db:
         condition: service_healthy
     env_file:
       - .env
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5002/login"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
 
 volumes:
   leoc_db_data:
-  uploads:
+  upload_data:
+    driver_opts:
+      type: none
+      device: /opt/leoc/static/uploads
+      o: bind
+  backup_data:
+    driver_opts:
+      type: none
+      device: /opt/leoc/backups
+      o: bind

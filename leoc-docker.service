@@ -7,9 +7,9 @@ Wants=network-online.target
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-User=prakash
+User=root
 Group=docker
-WorkingDirectory=/home/prakash/Documents/App Development/leoc
+WorkingDirectory=/opt/leoc
 ExecStart=/usr/bin/docker compose up -d
 ExecStop=/usr/bin/docker compose down
 StandardOutput=journal

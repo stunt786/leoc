@@ -18689,3 +18689,7 @@ DETAIL:  Key (cluster_name)=(Health) already exists.
 2026-06-25 10:34:42,808 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:166]
 2026-06-25 04:51:31,444 INFO: LEOC Application started [in /app/app.py:166]
 2026-06-25 04:51:31,444 INFO: LEOC Application started [in /app/app.py:166]
+2026-06-25 05:11:56,744 INFO: LEOC Application started [in /app/app.py:166]
+2026-06-25 05:11:56,765 INFO: LEOC Application started [in /app/app.py:166]
+2026-06-25 05:19:16,399 INFO: LEOC Application started [in /app/app.py:166]
+2026-06-25 05:19:16,404 INFO: LEOC Application started [in /app/app.py:166]

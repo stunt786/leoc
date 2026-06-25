@@ -2722,6 +2722,107 @@ def restore_backup():
     except Exception as e:
         return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
+@app.route('/api/import-sql', methods=['POST'])
+@permission_required('manage_users')
+def import_sql():
+    try:
+        if 'file' not in request.files:
+            return jsonify({'success': False, 'message': 'No file provided'}), 400
+        f = request.files['file']
+        if f.filename == '':
+            return jsonify({'success': False, 'message': 'No file selected'}), 400
+        if not f.filename.endswith('.sql'):
+            return jsonify({'success': False, 'message': 'Please upload a .sql file'}), 400
+
+        sql_content = f.read().decode('utf-8-sig')
+        statements = re.split(r';\s*', sql_content)
+
+        # Extract INSERT statements and table names
+        insert_statements = []
+        table_names = set()
+        for stmt in statements:
+            stmt = stmt.strip()
+            if not stmt:
+                continue
+            if not stmt.upper().lstrip().startswith('INSERT INTO'):
+                continue
+            insert_statements.append(stmt)
+            m = re.match(r"\s*INSERT\s+INTO\s+([^\s(]+)", stmt, re.IGNORECASE)
+            if m:
+                raw = m.group(1).strip('`"[]')
+                table_names.add(raw)
+
+        if not insert_statements:
+            return jsonify({'success': False, 'message': 'No INSERT statements found in the SQL file.'}), 400
+
+        dialect = db.engine.dialect.name
+        conn = db.engine.raw_connection()
+        reset_tables = []
+        try:
+            cursor = conn.cursor()
+            # Reset auto-increment sequences for any empty tables
+            for table in table_names:
+                quoted = f'"{table}"' if '.' not in table else table
+                cursor.execute(f'SELECT COUNT(*) FROM {quoted}')
+                count = cursor.fetchone()[0]
+                if count == 0:
+                    if dialect == 'sqlite':
+                        seq_table = table.split('.')[-1]
+                        cursor.execute(f'DELETE FROM sqlite_sequence WHERE name="{seq_table}"')
+                    elif dialect == 'postgresql':
+                        seq_name = f'"{table}_id_seq"' if '.' not in table else f'"{table.split(".")[1]}_id_seq"'
+                        cursor.execute(f'ALTER SEQUENCE IF EXISTS {seq_name} RESTART WITH 1')
+                    reset_tables.append(table)
+
+            total = 0
+            inserted = 0
+            skipped = 0
+            errors = []
+
+            for stmt in insert_statements:
+                total += 1
+                if dialect == 'postgresql':
+                    exec_stmt = stmt.rstrip().rstrip(';') + ' ON CONFLICT DO NOTHING'
+                else:
+                    exec_stmt = re.sub(r'\AINSERT\s+INTO', 'INSERT OR IGNORE INTO', stmt, count=1, flags=re.IGNORECASE)
+                try:
+                    cursor.execute(exec_stmt)
+                    if cursor.rowcount != 0:
+                        inserted += 1
+                    else:
+                        skipped += 1
+                except Exception as e:
+                    skipped += 1
+                    errors.append(f"Statement {total}: {e}")
+
+            conn.commit()
+        finally:
+            conn.close()
+
+        # Flush SQLAlchemy session so subsequent ORM queries see the new data
+        db.session.remove()
+
+        parts = [f'Processed {total} INSERT statement(s)']
+        if inserted:
+            parts.append(f'{inserted} inserted')
+        if skipped:
+            parts.append(f'{skipped} skipped')
+        if reset_tables:
+            parts.append(f'Reset sequences for: {", ".join(reset_tables)}')
+
+        return jsonify({
+            'success': True,
+            'message': '. '.join(parts) + '.',
+            'total': total,
+            'inserted': inserted,
+            'skipped': skipped,
+            'reset_tables': reset_tables,
+            'errors': errors
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
+
+
 @app.route('/api/reset-db', methods=['POST'])
 @permission_required('manage_users')
 def reset_database():
