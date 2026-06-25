@@ -158,6 +158,7 @@
                     </div>
                 </div>
 
+                {% if current_user.role != 'viewer' %}
                 <div class="nav-section">
                     <a href="javascript:void(0)" class="nav-item nav-parent" data-target="section-finance">
                         <i class="bi bi-cash-coin"></i>
@@ -183,11 +184,12 @@
                         </a>
                     </div>
                 </div>
+                {% endif %}
 
                 <div class="nav-section">
                     <a href="javascript:void(0)" class="nav-item nav-parent" data-target="section-disaster">
                         <i class="bi bi-megaphone"></i>
-                        <span class="nav-label">Disaster</span>
+                        <span class="nav-label">Bulletin</span>
                         <i class="bi bi-chevron-down nav-arrow"></i>
                     </a>
                     <div class="sub-menu" id="section-disaster">

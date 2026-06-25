@@ -194,6 +194,9 @@ def api_critical_infrastructure():
             q = q.filter_by(infrastructure_type=infra_type)
         return jsonify({'success': True, 'data': [item.to_dict() for item in q.all()]})
 
+    if current_user.role == 'viewer':
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
+
     data = request.form.to_dict() if request.files else request.get_json(force=True)
     if isinstance(data, dict) and request.files:
         pass
@@ -249,6 +252,10 @@ def api_critical_infrastructure_item(id):
         result['documents'] = [{'id': d.id, 'url': d.filename, 'original_name': d.original_name} for d in item.documents]
         return jsonify({'success': True, 'data': result})
 
+    if request.method in ('PUT',) and current_user.role not in ('admin', 'data_entry', 'warehouse_manager', 'editor', 'operator', 'finance'):
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
+    if request.method == 'DELETE' and current_user.role not in ('admin', 'warehouse_manager', 'operator'):
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
     if request.method == 'DELETE':
         db.session.delete(item)
         db.session.commit()
@@ -275,6 +282,8 @@ def api_critical_infrastructure_item(id):
 @new_bp.route('/api/critical-infrastructure/<int:id>/upload', methods=['POST'])
 @login_required
 def api_infrastructure_upload(id):
+    if current_user.role == 'viewer':
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
     item = CriticalInfrastructure.query.get_or_404(id)
     if 'photo' in request.files:
         for f in request.files.getlist('photo'):
@@ -306,6 +315,9 @@ def api_emergency_facilities():
         if ftype:
             q = q.filter_by(facility_type=ftype)
         return jsonify({'success': True, 'data': [f.to_dict() for f in q.all()]})
+
+    if current_user.role == 'viewer':
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
 
     data = request.get_json(force=True)
     facility = EmergencyFacility(
@@ -340,6 +352,10 @@ def api_emergency_facility_item(id):
     facility = EmergencyFacility.query.get_or_404(id)
     if request.method == 'GET':
         return jsonify({'success': True, 'data': facility.to_dict()})
+    if request.method in ('PUT',) and current_user.role not in ('admin', 'data_entry', 'warehouse_manager', 'editor', 'operator', 'finance'):
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
+    if request.method == 'DELETE' and current_user.role not in ('admin', 'warehouse_manager', 'operator'):
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
     if request.method == 'DELETE':
         db.session.delete(facility)
         db.session.commit()
@@ -384,6 +400,9 @@ def api_risk_layers():
             q = q.filter_by(risk_level=level)
         return jsonify({'success': True, 'data': [r.to_dict() for r in q.all()]})
 
+    if current_user.role == 'viewer':
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
+
     data = request.get_json(force=True)
     layer = RiskLayer(
         name=data.get('name'),
@@ -409,6 +428,10 @@ def api_risk_layer_item(id):
     layer = RiskLayer.query.get_or_404(id)
     if request.method == 'GET':
         return jsonify({'success': True, 'data': layer.to_dict()})
+    if request.method in ('PUT',) and current_user.role not in ('admin', 'data_entry', 'warehouse_manager', 'editor', 'operator', 'finance'):
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
+    if request.method == 'DELETE' and current_user.role not in ('admin', 'warehouse_manager', 'operator'):
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
     if request.method == 'DELETE':
         db.session.delete(layer)
         db.session.commit()
@@ -448,6 +471,9 @@ def api_emergency_contacts():
             q = q.filter_by(ward_id=ward_id)
         return jsonify({'success': True, 'data': [c.to_dict() for c in q.all()]})
 
+    if current_user.role == 'viewer':
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
+
     data = request.get_json(force=True)
     contact = EmergencyContact(
         organization_name=data.get('organization_name'),
@@ -477,6 +503,10 @@ def api_emergency_contact_item(id):
     contact = EmergencyContact.query.get_or_404(id)
     if request.method == 'GET':
         return jsonify({'success': True, 'data': contact.to_dict()})
+    if request.method in ('PUT',) and current_user.role not in ('admin', 'data_entry', 'warehouse_manager', 'editor', 'operator', 'finance'):
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
+    if request.method == 'DELETE' and current_user.role not in ('admin', 'warehouse_manager', 'operator'):
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
     if request.method == 'DELETE':
         db.session.delete(contact)
         db.session.commit()
@@ -505,6 +535,8 @@ def api_emergency_contact_item(id):
 def api_clusters():
     if request.method == 'GET':
         return jsonify({'success': True, 'data': [c.to_dict() for c in Cluster.query.all()]})
+    if current_user.role == 'viewer':
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
     data = request.get_json(force=True)
     cluster = Cluster(
         cluster_name=data.get('cluster_name'),
@@ -533,6 +565,10 @@ def api_cluster_item(id):
     cluster = Cluster.query.get_or_404(id)
     if request.method == 'GET':
         return jsonify({'success': True, 'data': cluster.to_dict()})
+    if request.method in ('PUT',) and current_user.role not in ('admin', 'data_entry', 'warehouse_manager', 'editor', 'operator', 'finance'):
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
+    if request.method == 'DELETE' and current_user.role not in ('admin', 'warehouse_manager', 'operator'):
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
     if request.method == 'DELETE':
         db.session.delete(cluster)
         db.session.commit()
@@ -558,6 +594,8 @@ def api_cluster_meetings(id):
     cluster = Cluster.query.get_or_404(id)
     if request.method == 'GET':
         return jsonify({'success': True, 'data': [m.to_dict() for m in cluster.meetings]})
+    if current_user.role == 'viewer':
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
     data = request.get_json(force=True)
     meeting = ClusterMeeting(
         cluster_id=cluster.id,
@@ -577,6 +615,8 @@ def api_cluster_deployments(id):
     cluster = Cluster.query.get_or_404(id)
     if request.method == 'GET':
         return jsonify({'success': True, 'data': [d.to_dict() for d in cluster.deployments]})
+    if current_user.role == 'viewer':
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
     data = request.get_json(force=True)
     deployment = ClusterDeployment(
         cluster_id=cluster.id,
@@ -606,6 +646,8 @@ def api_vulnerable_population():
         if cat:
             q = q.filter_by(category=cat)
         return jsonify({'success': True, 'data': [h.to_dict() for h in q.all()]})
+    if current_user.role == 'viewer':
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
     data = request.get_json(force=True)
     hh = VulnerableHousehold(
         household_id=data.get('household_id') or f"VUL-{uuid.uuid4().hex[:8].upper()}",
@@ -632,6 +674,10 @@ def api_vulnerable_population_item(id):
     hh = VulnerableHousehold.query.get_or_404(id)
     if request.method == 'GET':
         return jsonify({'success': True, 'data': hh.to_dict()})
+    if request.method in ('PUT',) and current_user.role not in ('admin', 'data_entry', 'warehouse_manager', 'editor', 'operator', 'finance'):
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
+    if request.method == 'DELETE' and current_user.role not in ('admin', 'warehouse_manager', 'operator'):
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
     if request.method == 'DELETE':
         db.session.delete(hh)
         db.session.commit()
@@ -665,6 +711,8 @@ def api_differently_abled():
         if ward_id:
             q = q.filter_by(ward_id=ward_id)
         return jsonify({'success': True, 'data': [p.to_dict() for p in q.all()]})
+    if current_user.role == 'viewer':
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
     data = request.get_json(force=True)
     person = DisabledPerson(
         person_name=data.get('person_name'),
@@ -698,6 +746,10 @@ def api_differently_abled_item(id):
     person = DisabledPerson.query.get_or_404(id)
     if request.method == 'GET':
         return jsonify({'success': True, 'data': person.to_dict()})
+    if request.method in ('PUT',) and current_user.role not in ('admin', 'data_entry', 'warehouse_manager', 'editor', 'operator', 'finance'):
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
+    if request.method == 'DELETE' and current_user.role not in ('admin', 'warehouse_manager', 'operator'):
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
     if request.method == 'DELETE':
         db.session.delete(person)
         db.session.commit()
@@ -739,6 +791,8 @@ def api_high_risk_population():
         if cat:
             q = q.filter_by(category=cat)
         return jsonify({'success': True, 'data': [p.to_dict() for p in q.all()]})
+    if current_user.role == 'viewer':
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
     data = request.get_json(force=True)
     person = HighRiskPerson(
         person_name=data.get('person_name'),
@@ -766,6 +820,10 @@ def api_high_risk_population_item(id):
     person = HighRiskPerson.query.get_or_404(id)
     if request.method == 'GET':
         return jsonify({'success': True, 'data': person.to_dict()})
+    if request.method in ('PUT',) and current_user.role not in ('admin', 'data_entry', 'warehouse_manager', 'editor', 'operator', 'finance'):
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
+    if request.method == 'DELETE' and current_user.role not in ('admin', 'warehouse_manager', 'operator'):
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
     if request.method == 'DELETE':
         db.session.delete(person)
         db.session.commit()
@@ -806,6 +864,8 @@ def api_volunteers():
         if skill:
             q = q.filter(Volunteer.skills.contains(skill))
         return jsonify({'success': True, 'data': [v.to_dict() for v in q.all()]})
+    if current_user.role == 'viewer':
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
     data = request.get_json(force=True)
     skills = data.get('skills', [])
     if isinstance(skills, list):
@@ -844,6 +904,10 @@ def api_volunteer_item(id):
     volunteer = Volunteer.query.get_or_404(id)
     if request.method == 'GET':
         return jsonify({'success': True, 'data': volunteer.to_dict()})
+    if request.method in ('PUT',) and current_user.role not in ('admin', 'data_entry', 'warehouse_manager', 'editor', 'operator', 'finance'):
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
+    if request.method == 'DELETE' and current_user.role not in ('admin', 'warehouse_manager', 'operator'):
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
     if request.method == 'DELETE':
         db.session.delete(volunteer)
         db.session.commit()
@@ -879,6 +943,8 @@ def api_volunteer_item(id):
 @new_bp.route('/api/volunteers/<int:id>/trainings', methods=['POST'])
 @login_required
 def api_volunteer_add_training(id):
+    if current_user.role == 'viewer':
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
     volunteer = Volunteer.query.get_or_404(id)
     data = request.get_json(force=True)
     t = VolunteerTraining(
@@ -901,6 +967,8 @@ def api_volunteer_add_training(id):
 def api_rrt():
     if request.method == 'GET':
         return jsonify({'success': True, 'data': [t.to_dict() for t in RapidResponseTeam.query.all()]})
+    if current_user.role == 'viewer':
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
     data = request.get_json(force=True)
     team = RapidResponseTeam(
         team_name=data.get('team_name'),
@@ -928,6 +996,10 @@ def api_rrt_item(id):
     team = RapidResponseTeam.query.get_or_404(id)
     if request.method == 'GET':
         return jsonify({'success': True, 'data': team.to_dict()})
+    if request.method in ('PUT',) and current_user.role not in ('admin', 'data_entry', 'warehouse_manager', 'editor', 'operator', 'finance'):
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
+    if request.method == 'DELETE' and current_user.role not in ('admin', 'warehouse_manager', 'operator'):
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
     if request.method == 'DELETE':
         db.session.delete(team)
         db.session.commit()
@@ -961,6 +1033,8 @@ def api_rrt_item(id):
 def api_committees():
     if request.method == 'GET':
         return jsonify({'success': True, 'data': [c.to_dict() for c in DisasterCommittee.query.all()]})
+    if current_user.role == 'viewer':
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
     data = request.get_json(force=True)
     committee = DisasterCommittee(
         committee_name=data.get('committee_name'),
@@ -984,6 +1058,10 @@ def api_committee_item(id):
     committee = DisasterCommittee.query.get_or_404(id)
     if request.method == 'GET':
         return jsonify({'success': True, 'data': committee.to_dict()})
+    if request.method in ('PUT',) and current_user.role not in ('admin', 'data_entry', 'warehouse_manager', 'editor', 'operator', 'finance'):
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
+    if request.method == 'DELETE' and current_user.role not in ('admin', 'warehouse_manager', 'operator'):
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
     if request.method == 'DELETE':
         db.session.delete(committee)
         db.session.commit()
@@ -1010,6 +1088,8 @@ def api_committee_meetings(id):
     committee = DisasterCommittee.query.get_or_404(id)
     if request.method == 'GET':
         return jsonify({'success': True, 'data': [m.to_dict() for m in committee.meetings]})
+    if current_user.role == 'viewer':
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
     data = request.get_json(force=True)
     meeting = CommitteeMeeting(
         committee_id=committee.id,
@@ -1039,6 +1119,8 @@ def api_vehicles():
         if status:
             q = q.filter_by(status=status)
         return jsonify({'success': True, 'data': [v.to_dict() for v in q.all()]})
+    if current_user.role == 'viewer':
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
     data = request.get_json(force=True)
     vehicle = Vehicle(
         vehicle_number=data.get('vehicle_number'),
@@ -1065,6 +1147,10 @@ def api_vehicle_item(id):
     vehicle = Vehicle.query.get_or_404(id)
     if request.method == 'GET':
         return jsonify({'success': True, 'data': vehicle.to_dict()})
+    if request.method in ('PUT',) and current_user.role not in ('admin', 'data_entry', 'warehouse_manager', 'editor', 'operator', 'finance'):
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
+    if request.method == 'DELETE' and current_user.role not in ('admin', 'warehouse_manager', 'operator'):
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
     if request.method == 'DELETE':
         db.session.delete(vehicle)
         db.session.commit()
@@ -1100,6 +1186,8 @@ def api_shelters():
         if stype:
             q = q.filter_by(shelter_type=stype)
         return jsonify({'success': True, 'data': [s.to_dict() for s in q.all()]})
+    if current_user.role == 'viewer':
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
     data = request.get_json(force=True)
     shelter = Shelter(
         shelter_name=data.get('shelter_name'),
@@ -1140,6 +1228,10 @@ def api_shelter_item(id):
     shelter = Shelter.query.get_or_404(id)
     if request.method == 'GET':
         return jsonify({'success': True, 'data': shelter.to_dict()})
+    if request.method in ('PUT',) and current_user.role not in ('admin', 'data_entry', 'warehouse_manager', 'editor', 'operator', 'finance'):
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
+    if request.method == 'DELETE' and current_user.role not in ('admin', 'warehouse_manager', 'operator'):
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
     if request.method == 'DELETE':
         db.session.delete(shelter)
         db.session.commit()

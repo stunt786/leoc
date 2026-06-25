@@ -2385,7 +2385,7 @@ def get_settings():
         return jsonify({'success': False, 'message': friendly_message(e)}), 400
 
 @app.route('/api/settings/<key>', methods=['GET', 'POST'])
-@permission_required('edit')
+@login_required
 def handle_setting(key):
     if request.method == 'GET':
         try:
@@ -2400,6 +2400,8 @@ def handle_setting(key):
             return jsonify({'success': True, 'key': key, 'value': value})
         except Exception as e:
             return jsonify({'success': False, 'message': friendly_message(e)}), 400
+    if current_user.role not in ('admin', 'data_entry', 'warehouse_manager', 'editor', 'operator', 'finance'):
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
     try:
         data = request.get_json()
         if not isinstance(data, dict):
@@ -2545,11 +2547,15 @@ def handle_wards():
         return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 @app.route('/api/wards/<int:id>', methods=['PUT', 'DELETE'])
-@permission_required('edit')
+@login_required
 def manage_ward(id):
     ward = Ward.query.get(id)
     if not ward:
         return jsonify({'success': False, 'message': 'Ward not found'}), 404
+    if request.method in ('PUT',) and current_user.role not in ('admin', 'data_entry', 'warehouse_manager', 'editor', 'operator', 'finance'):
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
+    if request.method == 'DELETE' and current_user.role not in ('admin', 'warehouse_manager', 'operator'):
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
     try:
         if request.method == 'DELETE':
             incident_count = Incident.query.filter_by(ward=id).count()
@@ -2787,11 +2793,15 @@ def handle_warehouses():
         return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 @app.route('/api/warehouses/<int:id>', methods=['GET', 'PUT', 'DELETE'])
-@permission_required('edit')
+@login_required
 def manage_warehouse(id):
     wh = db_get(Warehouse, id)
     if not wh:
         return jsonify({'success': False, 'message': 'Warehouse not found'}), 404
+    if request.method in ('PUT',) and current_user.role not in ('admin', 'data_entry', 'warehouse_manager', 'editor', 'operator', 'finance'):
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
+    if request.method == 'DELETE' and current_user.role not in ('admin', 'warehouse_manager', 'operator'):
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
     try:
         if request.method == 'GET':
             return jsonify({'success': True, 'warehouse': wh.to_dict()})
@@ -2872,11 +2882,15 @@ def handle_categories():
         return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 @app.route('/api/categories/<int:id>', methods=['PUT', 'DELETE'])
-@permission_required('edit')
+@login_required
 def manage_category(id):
     cat = db_get(Category, id)
     if not cat:
         return jsonify({'success': False, 'message': 'Category not found'}), 404
+    if request.method in ('PUT',) and current_user.role not in ('admin', 'data_entry', 'warehouse_manager', 'editor', 'operator', 'finance'):
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
+    if request.method == 'DELETE' and current_user.role not in ('admin', 'warehouse_manager', 'operator'):
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
     try:
         if request.method == 'DELETE':
             if cat.is_predefined:
@@ -2984,11 +2998,15 @@ def handle_items():
         return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 @app.route('/api/items/<int:id>', methods=['PUT', 'DELETE'])
-@permission_required('edit')
+@login_required
 def manage_item(id):
     item = db_get(Item, id)
     if not item:
         return jsonify({'success': False, 'message': 'Item not found'}), 404
+    if request.method in ('PUT',) and current_user.role not in ('admin', 'data_entry', 'warehouse_manager', 'editor', 'operator', 'finance'):
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
+    if request.method == 'DELETE' and current_user.role not in ('admin', 'warehouse_manager', 'operator'):
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
     try:
         if request.method == 'DELETE':
             if item.photo:
@@ -3085,11 +3103,15 @@ def handle_suppliers():
         return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 @app.route('/api/suppliers/<int:id>', methods=['PUT', 'DELETE'])
-@permission_required('edit')
+@login_required
 def manage_supplier(id):
-    sup = db_get(Supplier, id)
-    if not sup:
+    supplier = db_get(Supplier, id)
+    if not supplier:
         return jsonify({'success': False, 'message': 'Supplier not found'}), 404
+    if request.method in ('PUT',) and current_user.role not in ('admin', 'data_entry', 'warehouse_manager', 'editor', 'operator', 'finance'):
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
+    if request.method == 'DELETE' and current_user.role not in ('admin', 'warehouse_manager', 'operator'):
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
     try:
         if request.method == 'DELETE':
             linked_receipts = StockReceipt.query.filter_by(supplier_id=sup.id).count()
@@ -3157,11 +3179,15 @@ def handle_warehouse_zones():
         return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 @app.route('/api/warehouse-zones/<int:id>', methods=['PUT', 'DELETE'])
-@permission_required('edit')
+@login_required
 def manage_warehouse_zone(id):
     zone = db_get(WarehouseZone, id)
     if not zone:
         return jsonify({'success': False, 'message': 'Zone not found'}), 404
+    if request.method in ('PUT',) and current_user.role not in ('admin', 'data_entry', 'warehouse_manager', 'editor', 'operator', 'finance'):
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
+    if request.method == 'DELETE' and current_user.role not in ('admin', 'warehouse_manager', 'operator'):
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
     try:
         if request.method == 'DELETE':
             db.session.delete(zone)
@@ -3864,7 +3890,7 @@ def _apply_incident_fields(incident, data):
         incident.missing_persons = (incident.missing_male or 0) + (incident.missing_female or 0)
 
 @app.route('/api/incidents', methods=['GET', 'POST'])
-@permission_required('edit')
+@login_required
 def handle_incidents():
     if request.method == 'GET':
         try:
@@ -3876,6 +3902,8 @@ def handle_incidents():
             return jsonify({'success': True, 'incidents': [i.to_dict() for i in incidents]})
         except Exception as e:
             return jsonify({'success': False, 'message': friendly_message(e)}), 500
+    if current_user.role not in ('admin', 'data_entry', 'warehouse_manager', 'editor', 'operator', 'finance'):
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
     try:
         data = request.get_json()
         if not isinstance(data, dict):
@@ -3922,11 +3950,15 @@ def handle_incidents():
         return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 @app.route('/api/incidents/<int:id>', methods=['PUT', 'DELETE'])
-@permission_required('edit')
+@login_required
 def manage_incident(id):
     incident = db_get(Incident, id)
     if not incident:
         return jsonify({'success': False, 'message': 'Incident not found'}), 404
+    if request.method in ('PUT',) and current_user.role not in ('admin', 'data_entry', 'warehouse_manager', 'editor', 'operator', 'finance'):
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
+    if request.method == 'DELETE' and current_user.role not in ('admin', 'warehouse_manager', 'operator'):
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
     try:
         if request.method == 'DELETE':
             db.session.delete(incident)
@@ -4146,11 +4178,15 @@ def handle_relief_requests():
         return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 @app.route('/api/relief-requests/<int:id>', methods=['GET', 'PUT', 'DELETE'])
-@permission_required('edit')
+@login_required
 def manage_relief_request(id):
     req = db_get(ReliefRequest, id)
     if not req:
         return jsonify({'success': False, 'message': 'Relief request not found'}), 404
+    if request.method in ('PUT',) and current_user.role not in ('admin', 'data_entry', 'warehouse_manager', 'editor', 'operator', 'finance'):
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
+    if request.method == 'DELETE' and current_user.role not in ('admin', 'warehouse_manager', 'operator'):
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
     try:
         if request.method == 'GET':
             return jsonify({'success': True, 'relief_request': req.to_dict()})
@@ -4803,6 +4839,8 @@ def get_distribution(id):
 @app.route('/api/distributions/<int:id>/upload-files', methods=['POST'])
 @login_required
 def upload_distribution_files(id):
+    if current_user.role == 'viewer':
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
     try:
         dist = db_get(Distribution, id)
         if not dist:
@@ -4869,6 +4907,8 @@ def upload_distribution_files(id):
 @app.route('/api/distributions/beneficiary/<int:id>/upload-photo', methods=['POST'])
 @login_required
 def upload_dist_beneficiary_photo(id):
+    if current_user.role == 'viewer':
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
     try:
         ben = db_get(DistributionBeneficiary, id)
         if not ben:
@@ -4903,6 +4943,8 @@ def upload_dist_beneficiary_photo(id):
 @app.route('/api/distributions/beneficiary/<int:id>/upload-document', methods=['POST'])
 @login_required
 def upload_dist_beneficiary_document(id):
+    if current_user.role == 'viewer':
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
     try:
         ben = db_get(DistributionBeneficiary, id)
         if not ben:
@@ -5011,11 +5053,15 @@ def handle_disaster_assessments():
         return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 @app.route('/api/disaster-assessments/<int:id>', methods=['GET', 'PUT', 'DELETE'])
-@permission_required('edit')
+@login_required
 def manage_disaster_assessment(id):
     assessment = db_get(DisasterAssessment, id)
     if not assessment:
         return jsonify({'success': False, 'message': 'Assessment not found'}), 404
+    if request.method in ('PUT',) and current_user.role not in ('admin', 'data_entry', 'warehouse_manager', 'editor', 'operator', 'finance'):
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
+    if request.method == 'DELETE' and current_user.role not in ('admin', 'warehouse_manager', 'operator'):
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
     try:
         if request.method == 'GET':
             return jsonify({'success': True, 'assessment': assessment.to_dict()})
@@ -5091,11 +5137,15 @@ def handle_cash_funds():
         return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 @app.route('/api/cash-funds/<int:id>', methods=['GET', 'PUT', 'DELETE'])
-@permission_required('edit')
+@login_required
 def manage_cash_fund(id):
     fund = CashFund.query.filter(CashFund.id == id).with_for_update().first()
     if not fund:
         return jsonify({'success': False, 'message': 'Fund not found'}), 404
+    if request.method in ('PUT',) and current_user.role not in ('admin', 'data_entry', 'warehouse_manager', 'editor', 'operator', 'finance'):
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
+    if request.method == 'DELETE' and current_user.role not in ('admin', 'warehouse_manager', 'operator'):
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
     try:
         if request.method == 'GET':
             return jsonify({'success': True, 'fund': fund.to_dict()})
@@ -5291,11 +5341,15 @@ def handle_cash_requests():
         return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 @app.route('/api/cash-requests/<int:id>', methods=['GET', 'PUT', 'DELETE'])
-@permission_required('edit')
+@login_required
 def manage_cash_request(id):
     req = db_get(CashRequest, id)
     if not req:
         return jsonify({'success': False, 'message': 'Cash request not found'}), 404
+    if request.method in ('PUT',) and current_user.role not in ('admin', 'data_entry', 'warehouse_manager', 'editor', 'operator', 'finance'):
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
+    if request.method == 'DELETE' and current_user.role not in ('admin', 'warehouse_manager', 'operator'):
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
     try:
         if request.method == 'GET':
             cr_dict = req.to_dict()
@@ -5649,6 +5703,8 @@ def cancel_cash_distribution(id):
 @app.route('/api/cash-distributions/<int:id>/upload-file', methods=['POST'])
 @login_required
 def upload_cash_distribution_file(id):
+    if current_user.role == 'viewer':
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
     dist = db_get(CashDistribution, id)
     if not dist:
         return jsonify({'success': False, 'message': 'Cash distribution not found'}), 404
@@ -5687,6 +5743,8 @@ def upload_cash_distribution_file(id):
 @app.route('/api/upload/cash-distribution-file', methods=['POST'])
 @login_required
 def upload_cash_distribution_file_temp():
+    if current_user.role == 'viewer':
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
     if 'file' not in request.files:
         return jsonify({'success': False, 'message': 'No file provided'}), 400
     file = request.files['file']
@@ -5818,11 +5876,15 @@ def handle_beneficiaries():
         return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 @app.route('/api/beneficiaries/<int:id>', methods=['GET', 'PUT', 'DELETE'])
-@permission_required('edit')
+@login_required
 def manage_beneficiary(id):
     ben = db_get(Beneficiary, id)
     if not ben:
         return jsonify({'success': False, 'message': 'Beneficiary not found'}), 404
+    if request.method in ('PUT',) and current_user.role not in ('admin', 'data_entry', 'warehouse_manager', 'editor', 'operator', 'finance'):
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
+    if request.method == 'DELETE' and current_user.role not in ('admin', 'warehouse_manager', 'operator'):
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
     try:
         if request.method == 'GET':
             return jsonify({'success': True, 'beneficiary': ben.to_dict()})
@@ -6522,6 +6584,9 @@ def handle_daily_bulletins():
         except Exception as e:
             return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
+    if current_user.role == 'viewer':
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
+
     try:
         data = request.get_json()
         if not data or not data.get('notice_title'):
@@ -6563,6 +6628,11 @@ def manage_daily_bulletin(id):
 
     if request.method == 'GET':
         return jsonify({'success': True, 'data': bulletin.to_dict()})
+
+    if request.method in ('PUT',) and current_user.role not in ('admin', 'data_entry', 'warehouse_manager', 'editor', 'operator', 'finance'):
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
+    if request.method == 'DELETE' and current_user.role not in ('admin', 'warehouse_manager', 'operator'):
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
 
     if request.method == 'DELETE':
         try:
@@ -6608,6 +6678,9 @@ def handle_weekly_forecasts():
         except Exception as e:
             return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
+    if current_user.role == 'viewer':
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
+
     try:
         data = request.get_json()
         if not data or not data.get('date_from'):
@@ -6639,6 +6712,11 @@ def manage_weekly_forecast(id):
     if request.method == 'GET':
         return jsonify({'success': True, 'data': forecast.to_dict()})
 
+    if request.method in ('PUT',) and current_user.role not in ('admin', 'data_entry', 'warehouse_manager', 'editor', 'operator', 'finance'):
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
+    if request.method == 'DELETE' and current_user.role not in ('admin', 'warehouse_manager', 'operator'):
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
+
     if request.method == 'DELETE':
         try:
             db.session.delete(forecast)
@@ -6667,6 +6745,8 @@ def manage_weekly_forecast(id):
 @app.route('/api/upload', methods=['POST'])
 @login_required
 def upload_file():
+    if current_user.role == 'viewer':
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
     try:
         if 'file' not in request.files:
             return jsonify({'success': False, 'message': 'No file provided'}), 400
@@ -6696,6 +6776,8 @@ def upload_file():
 @app.route('/api/upload/item-photo', methods=['POST'])
 @login_required
 def upload_item_photo():
+    if current_user.role == 'viewer':
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
     try:
         if 'file' not in request.files:
             return jsonify({'success': False, 'message': 'No file provided'}), 400
@@ -6735,6 +6817,9 @@ def handle_archives():
         if request.method == 'GET':
             docs = DocumentArchive.query.order_by(DocumentArchive.uploaded_at.desc()).all()
             return jsonify({'success': True, 'documents': [d.to_dict() for d in docs]})
+
+        if current_user.role == 'viewer':
+            return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
 
         # POST — create with file upload
         document_name = request.form.get('document_name', '').strip()
@@ -6785,6 +6870,11 @@ def manage_archive(id):
 
         if request.method == 'GET':
             return jsonify({'success': True, 'data': doc.to_dict()})
+
+        if request.method in ('PUT',) and current_user.role not in ('admin', 'data_entry', 'warehouse_manager', 'editor', 'operator', 'finance'):
+            return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
+        if request.method == 'DELETE' and current_user.role not in ('admin', 'warehouse_manager', 'operator'):
+            return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
 
         if request.method == 'DELETE':
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], doc.filename)
@@ -7777,6 +7867,8 @@ def get_notifications():
 @app.route('/api/notifications/<int:id>/clear', methods=['POST'])
 @login_required
 def clear_notification(id):
+    if current_user.role == 'viewer':
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
     try:
         notif = db_get(Notification, id)
         if not notif:
@@ -7792,6 +7884,8 @@ def clear_notification(id):
 @app.route('/api/notifications/clear', methods=['POST'])
 @login_required
 def clear_all_notifications():
+    if current_user.role == 'viewer':
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
     try:
         now = utc_now()
         updated = 0
