@@ -48,10 +48,10 @@ volumes:
   upload_data:
     driver_opts:
       type: none
-      device: /opt/leoc/static/uploads
+      device: ${APP_DIR:-/home/thalaramun/leoc}/static/uploads
       o: bind
   backup_data:
     driver_opts:
       type: none
-      device: /opt/leoc/backups
+      device: ${APP_DIR:-/home/thalaramun/leoc}/backups
       o: bind

@@ -40,7 +40,7 @@
                         <div class="col-md-6 mb-3"><label class="form-label">Distribution Type</label><select class="form-select" name="distribution_type" id="cdType"></select></div>
                     </div>
                     <div class="row g-2">
-                        <div class="col-md-4 mb-3"><label class="form-label">Fund <span class="text-danger">*</span></label><select class="form-select" name="fund_id" id="cdFund" required></select></div>
+                        <div class="col-md-4 mb-3"><label class="form-label">Fund <span class="text-danger">*</span></label><select class="form-select" name="fund_id" id="cdFund" required onchange="onFundChange()"></select></div>
                         <div class="col-md-4 mb-3"><label class="form-label">Incident <span class="text-danger">*</span></label><select class="form-select" name="incident_id" id="cdIncident" required onchange="onIncidentChange()"></select></div>
                         <div class="col-md-4 mb-3"><label class="form-label">Source Request <span class="text-danger">*</span></label>
                             <div class="d-flex gap-2 mb-1">
@@ -56,8 +56,9 @@
                         </div>
                     </div>
                     <div class="row g-2">
-                        <div class="col-md-6 mb-3"><label class="form-label">Officer</label><input class="form-control" name="officer" id="cdOfficer"></div>
-                        <div class="col-md-6 mb-3"><label class="form-label">Total Amount</label><input type="number" step="0.01" class="form-control" id="cdTotal" readonly></div>
+                        <div class="col-md-4 mb-3"><label class="form-label">Officer</label><input class="form-control" name="officer" id="cdOfficer"></div>
+                        <div class="col-md-4 mb-3"><label class="form-label">Total Amount</label><input type="number" step="0.01" class="form-control" id="cdTotal" readonly></div>
+                        <div class="col-md-4 mb-3"><label class="form-label">Fund Balance</label><input type="text" class="form-control" id="cdFundBalance" readonly></div>
                     </div>
                     <div class="mb-3"><label class="form-label">Remarks</label><textarea class="form-control" name="remarks" id="cdRemarks" rows="2"></textarea></div>
 
@@ -79,6 +80,7 @@
                     <div class="d-flex justify-content-between align-items-center mb-2">
                         <label class="form-label fw-bold mb-0">Beneficiaries</label>
                         <div>
+                            <button type="button" class="btn btn-sm btn-outline-success" onclick="addBeneficiaryRow()"><i class="bi bi-person-plus"></i> Add Beneficiary</button>
                             <button type="button" class="btn btn-sm btn-outline-info" onclick="addBeneficiaryFromRequest()"><i class="bi bi-person-plus"></i> Add from Request</button>
                         </div>
                     </div>
@@ -206,6 +208,7 @@ async function loadData() {
     cashRequestsData = d.cash_requests || [];
     beneficiariesData = d.beneficiaries || [];
     reliefRequestsData = d.requests || [];
+    window._cashFundsData = d.cash_funds || [];
     document.getElementById('cdFund').innerHTML = '<option value="">Select Fund</option>' + (d.cash_funds||[]).filter(f=>f.status==='Active').map(f => `<option value="${f.id}">${f.name} (Bal: ${Number(f.current_balance).toLocaleString()})</option>`).join('');
     document.getElementById('cdIncident').innerHTML = '<option value="">Select Incident</option>' + (d.incidents||[]).filter(i=>i.status==='Active').map(i => `<option value="${i.id}">${i.incident_name}</option>`).join('');
     onIncidentChange();
@@ -220,7 +223,7 @@ function onIncidentChange() {
         filteredCash = cashRequestsData.filter(rq => rq.incident_id === incidentId);
         filteredRelief = reliefRequestsData.filter(rr => rr.incident_id === incidentId);
     }
-    document.getElementById('cdRequest').innerHTML = '<option value="">Select Cash Request</option>' + filteredCash.filter(rq=>['Pending','Approved','Partial'].includes(rq.status)).map(rq => `<option value="${rq.id}">${rq.request_number} - ${Number(rq.requested_amount).toLocaleString()}</option>`).join('');
+    document.getElementById('cdRequest').innerHTML = '<option value="">Select Cash Request</option>' + filteredCash.filter(rq=>['Pending','Approved','Partial'].includes(rq.status) && (rq.remaining || 0) > 0).map(rq => `<option value="${rq.id}">${rq.request_number} - Remaining: ${Number(rq.remaining).toLocaleString()}</option>`).join('');
     document.getElementById('cdReliefRequest').innerHTML = '<option value="">Select Relief Request</option>' + filteredRelief.filter(rr => rr.requested_cash_amount > 0 && rr.cash_remaining > 0 && ['Pending','Partial'].includes(rr.status)).map(rr => `<option value="${rr.id}">${rr.request_number} - ${rr.incident_name || ''} (Cash: ${Number(rr.cash_remaining).toLocaleString()})</option>`).join('');
     document.getElementById('cdRequest').value = '';
     document.getElementById('cdReliefRequest').value = '';
@@ -278,7 +281,7 @@ function addBeneficiaryFromRequest() {
         <td><input class="form-control form-control-sm" name="ben_nid[]" value="${(ben.national_id||'').replace(/"/g, '&quot;')}"></td>
         <td><input class="form-control form-control-sm" name="ben_addr[]" value="${(ben.address||'').replace(/"/g, '&quot;')}"></td>
         <td><input class="form-control form-control-sm" name="ben_phone[]" value="${(ben.phone||'').replace(/"/g, '&quot;')}"></td>
-        <td><input type="number" step="0.01" class="form-control form-control-sm ben-amount" name="ben_amount[]" required oninput="calcTotal()" value="${cr.requested_amount || ''}"></td>
+            <td><input type="number" step="0.01" class="form-control form-control-sm ben-amount" name="ben_amount[]" required oninput="calcTotal()" value="${cr.remaining > 0 ? cr.remaining : (cr.requested_amount || '')}"></td>
         <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove();calcTotal()"><i class="bi bi-x"></i></button></td>
     `;
     tbody.appendChild(tr);
@@ -324,10 +327,31 @@ function addBeneficiaryRow() {
     calcTotal();
 }
 
+function onFundChange() {
+    const fundId = parseInt(document.getElementById('cdFund').value);
+    const fund = (window._cashFundsData || []).find(f => f.id === fundId);
+    document.getElementById('cdFundBalance').value = fund ? Number(fund.current_balance).toLocaleString() : '';
+    calcTotal();
+}
+
 function calcTotal() {
     let total = 0;
     document.querySelectorAll('.ben-amount').forEach(el => { const v = parseFloat(el.value); if (!isNaN(v)) total += v; });
     document.getElementById('cdTotal').value = total;
+    const fundBalanceEl = document.getElementById('cdFundBalance');
+    const fundBalance = parseFloat(fundBalanceEl.value.replace(/,/g, '')) || 0;
+    if (total > 0 && fundBalance > 0) {
+        if (total > fundBalance) {
+            fundBalanceEl.className = 'form-control text-danger fw-bold';
+            document.getElementById('cdTotal').className = 'form-control text-danger fw-bold';
+        } else {
+            fundBalanceEl.className = 'form-control text-success fw-bold';
+            document.getElementById('cdTotal').className = 'form-control';
+        }
+    } else {
+        fundBalanceEl.className = 'form-control';
+        document.getElementById('cdTotal').className = 'form-control';
+    }
 }
 
 document.getElementById('cdForm').addEventListener('submit', async function(e) {
@@ -344,6 +368,12 @@ document.getElementById('cdForm').addEventListener('submit', async function(e) {
         }
     });
     if (beneficiaries.length === 0) { showToast('danger', 'At least one beneficiary required'); return; }
+    const fundBal = parseFloat(document.getElementById('cdFundBalance').value.replace(/,/g, '')) || 0;
+    const total = beneficiaries.reduce((s, b) => s + (b.amount || 0), 0);
+    if (fundBal > 0 && total > fundBal) {
+        showToast('danger', `Total amount (${Number(total).toLocaleString()}) exceeds available fund balance (${Number(fundBal).toLocaleString()})`);
+        return;
+    }
     const useReliefReq = document.getElementById('srcReliefReq').checked;
     const cashReqId = parseInt(document.getElementById('cdRequest').value);
     const reliefReqId = parseInt(document.getElementById('cdReliefRequest').value);
@@ -472,6 +502,9 @@ async function viewCd(id) {
 function openCdModal() {
     document.getElementById('cdForm').reset();
     document.getElementById('cdTotal').value = '0';
+    document.getElementById('cdFundBalance').value = '';
+    document.getElementById('cdFundBalance').className = 'form-control';
+    document.getElementById('cdTotal').className = 'form-control';
     const tbody = document.getElementById('benBody');
     tbody.innerHTML = '';
     document.getElementById('cdPhoto').value = '';

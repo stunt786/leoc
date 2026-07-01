@@ -119,29 +119,39 @@
             </div>
 
             <hr>
-            <h6 class="mb-3"><i class="bi bi-box me-2"></i>Received Items</h6>
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                <h6 class="mb-0"><i class="bi bi-box me-2"></i>Received Items</h6>
+                <div class="d-flex gap-2 align-items-center">
+                    <select class="form-select form-select-sm" style="width:160px" id="itemCategoryFilter" onchange="applyItemFilters()">
+                        <option value="">All Categories</option>
+                    </select>
+                    <select class="form-select form-select-sm" style="width:160px" id="itemGroupFilter" onchange="applyItemFilters()">
+                        <option value="">All Groups</option>
+                    </select>
+                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="addItemRow()">
+                        <i class="bi bi-plus-lg me-1"></i>Add Item
+                    </button>
+                </div>
+            </div>
             <div class="table-responsive mb-3">
                 <table class="table table-bordered" id="itemsTable">
                     <thead class="table-light">
                         <tr>
-                            <th style="min-width:160px">Item *</th>
-                            <th style="min-width:80px">Unit</th>
-                            <th style="min-width:100px">Quantity *</th>
-                            <th style="min-width:100px">Batch No</th>
-                            <th style="min-width:100px">Serial No</th>
-                            <th style="min-width:110px">Mfg Date</th>
-                            <th style="min-width:110px">Expiry Date</th>
-                            <th style="min-width:100px">Unit Cost</th>
-                            <th style="min-width:100px">Total Cost</th>
-                            <th style="width:50px"></th>
+                            <th style="min-width:280px">Item *</th>
+                            <th style="min-width:60px">Unit</th>
+                            <th style="min-width:80px">Qty *</th>
+                            <th style="min-width:80px">Batch</th>
+                            <th style="min-width:80px">Serial</th>
+                            <th style="min-width:90px">Mfg</th>
+                            <th style="min-width:90px">Expiry</th>
+                            <th style="min-width:80px">Cost</th>
+                            <th style="min-width:80px">Total</th>
+                            <th style="width:40px"></th>
                         </tr>
                     </thead>
                     <tbody id="itemsBody"></tbody>
                 </table>
             </div>
-            <button type="button" class="btn btn-sm btn-outline-primary" onclick="addItemRow()">
-                <i class="bi bi-plus-lg me-1"></i>Add Item
-            </button>
 
             <div class="mt-4">
                 <button type="button" class="btn btn-primary" id="saveReceiptBtn" onclick="saveReceipt()"><i class="bi bi-check-lg me-1"></i>Save Receipt</button>
@@ -207,6 +217,8 @@ let receipts = [];
 let warehouses = [];
 let itemsList = [];
 let suppliers = [];
+let categories = [];
+let groups = [];
 let paginator = new Paginator({perPage: 25, onPageChange: () => renderReceipts(receipts)});
 
 async function loadFormData() {
@@ -232,6 +244,18 @@ async function loadFormData() {
         if (supSelect) {
             supSelect.innerHTML = '<option value="">None (Manual Entry)</option>' +
                 suppliers.map(s => `<option value="${s.id}">${s.name}${s.supplier_type ? ' (' + s.supplier_type + ')' : ''}</option>`).join('');
+        }
+        categories = d.categories || [];
+        const catFilter = document.getElementById('itemCategoryFilter');
+        if (catFilter) {
+            catFilter.innerHTML = '<option value="">All Categories</option>' +
+                categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+        }
+        groups = d.item_groups || [];
+        const grpFilter = document.getElementById('itemGroupFilter');
+        if (grpFilter) {
+            grpFilter.innerHTML = '<option value="">All Groups</option>' +
+                groups.map(g => `<option value="${g.id}">${g.name}</option>`).join('');
         }
         loadReceipts();
     } catch(e) {
@@ -289,6 +313,8 @@ function resetReceiptForm() {
     document.getElementById('receipt_no').value = 'RCPT-' + String(Date.now()).slice(-6);
     document.getElementById('receipt_date').value = today_bs;
     document.getElementById('itemsBody').innerHTML = '';
+    document.getElementById('itemCategoryFilter').value = '';
+    document.getElementById('itemGroupFilter').value = '';
     document.getElementById('saveReceiptBtn').innerHTML = '<i class="bi bi-check-lg me-1"></i>Save Receipt';
 }
 
@@ -345,11 +371,43 @@ function checkDuplicateItem(select) {
     }
 }
 
+function getFilteredItemOptions(currentItemId) {
+    const catId = document.getElementById('itemCategoryFilter').value;
+    const groupId = document.getElementById('itemGroupFilter').value;
+    const selectedIds = new Set();
+    document.querySelectorAll('#itemsBody tr .receipt-item').forEach(sel => {
+        if (sel.value && String(sel.value) !== String(currentItemId)) {
+            selectedIds.add(String(sel.value));
+        }
+    });
+    return itemsList
+        .filter(i => {
+            if (catId && String(i.category_id) !== catId) return false;
+            if (groupId && String(i.group_id || '') !== groupId) return false;
+            return true;
+        })
+        .map(i => {
+            const isSelected = selectedIds.has(String(i.id));
+            const disabled = isSelected ? 'disabled' : '';
+            const cls = isSelected ? ' class="text-muted"' : '';
+            return `<option value="${i.id}" data-unit="${i.unit || ''}" data-storage-life-days="${i.storage_life_days || ''}" data-expiry-tracking="${!!i.expiry_tracking}" ${String(i.id) === String(currentItemId) ? 'selected' : ''} ${disabled}${cls}>${i.item_code ? i.item_code + ' - ' : ''}${i.name}</option>`;
+        })
+        .join('');
+}
+
+function applyItemFilters() {
+    document.querySelectorAll('#itemsBody tr').forEach(row => {
+        const sel = row.querySelector('.receipt-item');
+        if (!sel) return;
+        const currentVal = sel.value;
+        sel.innerHTML = '<option value="">Select Item</option>' + getFilteredItemOptions(currentVal);
+        sel.value = currentVal;
+    });
+}
+
 function addItemRow(itemId = '', unit = '', qty = '', batchNo = '', serialNo = '', mfgDate = '', expiryDate = '', unitCost = '') {
     const tr = document.createElement('tr');
-    const itemOpts = itemsList.map(i =>
-        `<option value="${i.id}" data-unit="${i.unit || ''}" data-storage-life-days="${i.storage_life_days || ''}" data-expiry-tracking="${!!i.expiry_tracking}" ${i.id == itemId ? 'selected' : ''}>${i.item_code ? i.item_code + ' - ' : ''}${i.name}</option>`
-    ).join('');
+    const itemOpts = getFilteredItemOptions(itemId);
     tr.innerHTML = `
         <td>
             <select class="form-select form-select-sm receipt-item" onchange="checkDuplicateItem(this); updateItemUnit(this); autoFillUnitCost(this); autoFillDates(this);">

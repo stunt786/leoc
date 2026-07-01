@@ -593,7 +593,7 @@ class CommitteeMeeting(db.Model):
 # MODULE 12: VEHICLE MANAGEMENT
 # ============================================
 
-VEHICLE_TYPES = ['Ambulance', 'Fire Engine', 'Excavator', 'Tractor', 'Pickup', 'Truck', 'Jeep', 'Motorcycle', 'Boat']
+VEHICLE_TYPES = ['Ambulance', 'Fire Engine', 'Backhule Loader', 'Tractor', 'Pickup', 'Truck', 'Jeep', 'Motorcycle', 'Van']
 
 class Vehicle(db.Model):
     __tablename__ = 'vehicle'

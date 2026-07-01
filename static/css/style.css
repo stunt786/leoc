@@ -985,6 +985,45 @@ h1,h2,h3,h4,h5,h6,p,span,div,td,th,label,.card-title,.stat-label {
     width: 100%;
 }
 
+.category-labels {
+    max-height: 280px;
+    overflow-y: auto;
+    padding: 4px 0;
+}
+
+.category-labels li {
+    display: flex;
+    align-items: center;
+    padding: 5px 8px;
+    font-size: 0.85rem;
+    border-bottom: 1px solid #f0f0f0;
+    gap: 8px;
+}
+
+.category-labels li:last-child {
+    border-bottom: none;
+}
+
+.category-labels .color-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.category-labels .label-text {
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.category-labels .label-value {
+    font-weight: 600;
+    flex-shrink: 0;
+}
+
 /* ============ MODALS ============ */
 .modal-content {
     border: none;

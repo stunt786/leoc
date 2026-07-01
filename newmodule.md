@@ -553,13 +553,13 @@ Vehicle Types
 
 * Ambulance
 * Fire Engine
-* Excavator
+* Backhule Loader
 * Tractor
 * Pickup
 * Truck
 * Jeep
 * Motorcycle
-* Boat
+* Van
 
 Fields
 

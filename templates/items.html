@@ -143,6 +143,24 @@
                                     </select>
                                 </div>
                                 <div class="col-md-6">
+                                    <label class="form-label">Group</label>
+                                    <div class="input-group">
+                                        <select class="form-select" id="item_group_id">
+                                            <option value="">No Group</option>
+                                        </select>
+                                        <button class="btn btn-outline-secondary" type="button" onclick="showNewGroupInput()" title="Add new group">
+                                            <i class="bi bi-plus-lg"></i>
+                                        </button>
+                                    </div>
+                                    <div id="newGroupInput" class="mt-2" style="display:none">
+                                        <div class="input-group input-group-sm">
+                                            <input type="text" class="form-control" id="newGroupName" placeholder="New group name" maxlength="200">
+                                            <button class="btn btn-success" type="button" onclick="createGroup()"><i class="bi bi-check"></i></button>
+                                            <button class="btn btn-outline-secondary" type="button" onclick="hideNewGroupInput()"><i class="bi bi-x"></i></button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
                                     <label class="form-label">Unit *</label>
                                     <select class="form-select" id="item_unit" required>
                                         <option value="">Select Unit</option>
@@ -388,6 +406,7 @@
 const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 let items = [];
 let categories = [];
+let groups = [];
 let paginator = new Paginator({perPage: 25, onPageChange: () => renderItems(items)});
 let historyPaginator = new Paginator({perPage: 25, onPageChange: () => renderHistoryEvents(_historyAllEvents)});
 
@@ -403,6 +422,11 @@ async function loadData() {
         catFilter.innerHTML = '<option value="">All Categories</option>' + opts;
         catSelect.innerHTML = '<option value="">Select Category</option>' + opts;
         document.getElementById('totalCategories').textContent = categories.length;
+
+        groups = d.item_groups || [];
+        const groupSel = document.getElementById('item_group_id');
+        groupSel.innerHTML = '<option value="">No Group</option>' +
+            groups.map(g => `<option value="${g.id}">${g.name}</option>`).join('');
 
         const units = d.units || [];
         const unitSel = document.getElementById('item_unit');
@@ -487,7 +511,42 @@ function resetForm() {
     document.getElementById('item_code').value = '';
     document.getElementById('item_status').value = 'Active';
     document.getElementById('item_is_distributable').checked = true;
+    document.getElementById('item_group_id').value = '';
+    hideNewGroupInput();
     resetPhotoPreview();
+}
+
+function showNewGroupInput() {
+    document.getElementById('newGroupInput').style.display = 'block';
+    document.getElementById('newGroupName').focus();
+}
+
+function hideNewGroupInput() {
+    document.getElementById('newGroupInput').style.display = 'none';
+    document.getElementById('newGroupName').value = '';
+}
+
+async function createGroup() {
+    const name = document.getElementById('newGroupName').value.trim();
+    if (!name) { showToast('danger', 'Please enter a group name'); return; }
+    try {
+        const r = await fetch('/api/item-groups', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrf},
+            body: JSON.stringify({name})
+        });
+        const d = await r.json();
+        if (!d.success) { showToast('danger', d.message); return; }
+        const group = d.item_group;
+        groups.push(group);
+        const sel = document.getElementById('item_group_id');
+        sel.innerHTML += `<option value="${group.id}">${group.name}</option>`;
+        sel.value = group.id;
+        hideNewGroupInput();
+        showToast('success', 'Group created');
+    } catch(e) {
+        showToast('danger', 'Error: ' + e.message);
+    }
 }
 
 function resetPhotoPreview() {
@@ -549,6 +608,7 @@ async function editItem(id) {
     document.getElementById('item_name').value = i.name;
     document.getElementById('item_local_name').value = i.local_name || '';
     document.getElementById('item_category_id').value = i.category_id || '';
+    document.getElementById('item_group_id').value = i.group_id || '';
     document.getElementById('item_unit').value = i.unit || '';
     document.getElementById('item_description').value = i.description || '';
     document.getElementById('item_minimum_stock').value = i.minimum_stock ?? '';
@@ -600,6 +660,7 @@ async function saveItem() {
         name: document.getElementById('item_name').value,
         local_name: document.getElementById('item_local_name').value,
         category_id: parseInt(document.getElementById('item_category_id').value) || null,
+        group_id: parseInt(document.getElementById('item_group_id').value) || null,
         unit: document.getElementById('item_unit').value,
         description: document.getElementById('item_description').value,
         minimum_stock: parseInt(document.getElementById('item_minimum_stock').value) || 0,

@@ -6,7 +6,7 @@
 set -euo pipefail
 
 # --- Configuration (override via env vars if needed) ---
-APP_DIR="${APP_DIR:-/opt/leoc}"
+APP_DIR="${APP_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
 BACKUP_ROOT="${BACKUP_ROOT:-${APP_DIR}/backups}"
 COMPOSE_PROJECT="${COMPOSE_PROJECT:-leoc}"
 DB_NAME="${DB_NAME:-leoc}"

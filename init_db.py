@@ -55,15 +55,29 @@ def create_user_table():
     return False
 
 def seed_default_users():
-    """Seed default users if admin doesn't exist."""
+    """Seed default users and reset the admin password when admin exists."""
     from werkzeug.security import generate_password_hash
     import secrets
+    admin_password = os.getenv('ADMIN_PASSWORD') or 'admin123'
+    if not os.getenv('ADMIN_PASSWORD'):
+        print("[!] ADMIN_PASSWORD not set. Using default admin password: admin123")
     existing = db.session.execute(text("SELECT id FROM \"user\" WHERE username = 'admin'")).fetchone()
-    if not existing:
-        admin_password = os.getenv('ADMIN_PASSWORD')
-        if not admin_password:
-            admin_password = secrets.token_urlsafe(16)
-            print(f"[!] ADMIN_PASSWORD not set. Generated: {admin_password}")
+    if existing:
+        db.session.execute(
+            text("""
+                UPDATE "user"
+                SET password_hash = :p,
+                    role = 'admin',
+                    full_name = 'System Administrator',
+                    is_active = :active
+                WHERE username = 'admin'
+            """),
+            {'p': generate_password_hash(admin_password), 'active': True}
+        )
+        db.session.commit()
+        print("[OK] Reset admin password")
+        return
+    else:
         editor_pw = os.getenv('EDITOR_PASSWORD') or secrets.token_urlsafe(16)
         viewer_pw = os.getenv('VIEWER_PASSWORD') or secrets.token_urlsafe(16)
         operator_pw = os.getenv('OPERATOR_PASSWORD') or secrets.token_urlsafe(16)

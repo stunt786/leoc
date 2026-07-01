@@ -152,7 +152,14 @@
                 <span><i class="bi bi-pie-chart-fill me-2 text-primary"></i>Stock by Category</span>
             </div>
             <div class="card-body">
-                <div class="chart-container"><canvas id="categoryChart"></canvas></div>
+                <div class="row g-2 align-items-start">
+                    <div class="col-6">
+                        <div class="chart-container"><canvas id="categoryChart"></canvas></div>
+                    </div>
+                    <div class="col-6">
+                        <ul id="categoryLabels" class="list-unstyled mb-0 category-labels"></ul>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -313,7 +320,14 @@
                     <span><i class="bi bi-bar-chart-fill me-2 text-primary"></i>Distributed Items</span>
                 </div>
                 <div class="card-body">
-                    <div class="chart-container"><canvas id="reliefItemsChart"></canvas></div>
+                    <div class="row g-2 align-items-start">
+                        <div class="col-6">
+                            <div class="chart-container"><canvas id="reliefItemsChart"></canvas></div>
+                        </div>
+                        <div class="col-6">
+                            <ul id="reliefItemsLabels" class="list-unstyled mb-0 category-labels"></ul>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -905,6 +919,7 @@ async function loadDashboard() {
         if (data.stock_by_category && data.stock_by_category.length) {
             const labels = data.stock_by_category.map(c => c.category);
             const values = data.stock_by_category.map(c => c.total);
+            const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#f97316'];
             if (categoryChartInstance) categoryChartInstance.destroy();
             categoryChartInstance = new Chart(document.getElementById('categoryChart'), {
                 type: 'doughnut',
@@ -912,17 +927,20 @@ async function loadDashboard() {
                     labels: labels,
                     datasets: [{
                         data: values,
-                        backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#f97316']
+                        backgroundColor: colors
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: true,
                     plugins: {
-                        legend: { position: 'bottom', labels: { padding: 12, boxWidth: 12 } }
+                        legend: { display: false }
                     }
                 }
             });
+            document.getElementById('categoryLabels').innerHTML = labels.map((label, i) =>
+                `<li><span class="color-dot" style="background:${colors[i % colors.length]}"></span><span class="label-text">${label}</span><span class="label-value">${values[i].toLocaleString()}</span></li>`
+            ).join('');
         }
 
         if (data.low_stock_items && data.low_stock_items.length) {
@@ -1016,6 +1034,7 @@ async function loadReliefDashboard() {
 
         const itemsLabels = data.items_distributed && data.items_distributed.length ? data.items_distributed.map(i => i.item) : ['No data'];
         const itemsValues = data.items_distributed && data.items_distributed.length ? data.items_distributed.map(i => i.total) : [0];
+        const reliefColors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#f97316', '#14b8a6', '#f43f5e', '#6366f1'];
         if (reliefItemsChartInstance) reliefItemsChartInstance.destroy();
         reliefItemsChartInstance = new Chart(document.getElementById('reliefItemsChart'), {
             type: 'doughnut',
@@ -1023,7 +1042,7 @@ async function loadReliefDashboard() {
                 labels: itemsLabels,
                 datasets: [{
                     data: itemsValues,
-                    backgroundColor: itemsLabels.length === 1 && itemsLabels[0] === 'No data' ? ['#e5e7eb'] : ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#f97316', '#14b8a6', '#f43f5e', '#6366f1'],
+                    backgroundColor: itemsLabels.length === 1 && itemsLabels[0] === 'No data' ? ['#e5e7eb'] : reliefColors,
                     borderWidth: 1
                 }]
             },
@@ -1031,10 +1050,15 @@ async function loadReliefDashboard() {
                 responsive: true,
                 maintainAspectRatio: true,
                 plugins: {
-                    legend: { position: 'bottom', labels: { padding: 12, boxWidth: 12 } }
+                    legend: { display: false }
                 }
             }
         });
+        if (data.items_distributed && data.items_distributed.length) {
+            document.getElementById('reliefItemsLabels').innerHTML = data.items_distributed.map((i, idx) =>
+                `<li><span class="color-dot" style="background:${reliefColors[idx % reliefColors.length]}"></span><span class="label-text">${i.item}</span><span class="label-value">${i.total.toLocaleString()}</span></li>`
+            ).join('');
+        }
 
         const wardLabels = data.dist_by_ward && data.dist_by_ward.labels.length ? data.dist_by_ward.labels : ['No data'];
         const wardCounts = data.dist_by_ward && data.dist_by_ward.labels.length ? data.dist_by_ward.counts : [0];

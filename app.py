@@ -146,7 +146,8 @@ app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 is_prod = os.getenv('FLASK_ENV') == 'production'
 is_debug = os.getenv('FLASK_DEBUG', 'False').lower() in ('true', '1', 'yes')
-app.config['SESSION_COOKIE_SECURE'] = is_prod and not is_debug
+app.config['SESSION_COOKIE_SECURE'] = os.getenv('SESSION_COOKIE_SECURE', str(is_prod and not is_debug)).lower() in ('true', '1', 'yes')
+app.config['TEMPLATES_AUTO_RELOAD'] = True
 
 csrf = CSRFProtect(app)
 limiter = Limiter(
@@ -571,6 +572,16 @@ class Category(db.Model):
     def to_dict(self):
         return {'id': self.id, 'name': self.name, 'name_np': self.name_np, 'description': self.description, 'is_predefined': self.is_predefined}
 
+# ============ ITEM GROUP MODEL ============
+class ItemGroup(db.Model):
+    __tablename__ = 'item_group'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(200), nullable=False, unique=True)
+    created_at = db.Column(db.DateTime, default=utc_now)
+
+    def to_dict(self):
+        return {'id': self.id, 'name': self.name}
+
 # ============ ITEM MASTER MODEL (Module 5) ============
 class Item(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -579,6 +590,8 @@ class Item(db.Model):
     barcode = db.Column(db.String(100))
     qr_code = db.Column(db.Text)
     category_id = db.Column(db.Integer, db.ForeignKey('category.id'), nullable=False, index=True)
+    group_id = db.Column(db.Integer, db.ForeignKey('item_group.id'), nullable=True, index=True)
+    group = db.relationship('ItemGroup', backref=db.backref('items', lazy=True))
     name = db.Column(db.String(200), nullable=False, unique=True, index=True)
     local_name = db.Column(db.String(200))
     description = db.Column(db.Text)
@@ -606,6 +619,8 @@ class Item(db.Model):
             'barcode': self.barcode, 'qr_code': self.qr_code,
             'category_id': self.category_id,
             'category_name': self.category.name if self.category else None,
+            'group_id': self.group_id,
+            'group_name': self.group.name if self.group else None,
             'name': self.name, 'local_name': self.local_name,
             'description': self.description, 'unit': self.unit,
             'minimum_stock': self.minimum_stock, 'max_stock': self.max_stock,
@@ -1809,6 +1824,14 @@ class CashRequest(db.Model):
     beneficiary = db.relationship('Beneficiary', backref=db.backref('cash_requests', lazy=True))
 
     def to_dict(self):
+        already_distributed = db.session.query(
+            db.func.coalesce(db.func.sum(CashDistributionBeneficiary.amount), 0)
+        ).join(
+            CashDistribution, CashDistributionBeneficiary.distribution_id == CashDistribution.id
+        ).filter(
+            CashDistribution.cash_request_id == self.id
+        ).scalar()
+        remaining = self.requested_amount - already_distributed
         return {
             'id': self.id, 'request_number': self.request_number,
             'request_date': ad_to_bs_date(self.request_date),
@@ -1819,7 +1842,8 @@ class CashRequest(db.Model):
             'requested_amount': self.requested_amount, 'purpose': self.purpose,
             'beneficiary_id': self.beneficiary_id,
             'beneficiary_name': self.beneficiary.name if self.beneficiary else None,
-            'remarks': self.remarks, 'status': self.status
+            'remarks': self.remarks, 'status': self.status,
+            'remaining': remaining
         }
 
 # ============ CASH DISTRIBUTION MODEL ============
@@ -3073,7 +3097,9 @@ def handle_items():
             uuid=str(uuid_lib.uuid4()),
             item_code=data.get('item_code') or generate_item_code(),
             barcode=data.get('barcode'), qr_code=data.get('qr_code'),
-            category_id=data['category_id'], name=name,
+            category_id=data['category_id'],
+            group_id=data.get('group_id') or None,
+            name=name,
             local_name=data.get('local_name'), description=data.get('description'),
             unit=data['unit'],
             minimum_stock=minimum_stock,
@@ -3136,6 +3162,8 @@ def manage_item(id):
             if not category:
                 return jsonify({'success': False, 'message': 'Category not found'}), 404
             item.category_id = category.id
+        if 'group_id' in data:
+            item.group_id = data['group_id'] or None
         if 'minimum_stock' in data:
             item.minimum_stock = parse_int_field(data, 'minimum_stock', minimum=0, default=0)
         if 'max_stock' in data:
@@ -7238,10 +7266,14 @@ def get_dashboard():
         for r in StockReceipt.query.order_by(StockReceipt.date.desc()).limit(5).all():
             receipt_data = r.to_dict()
             receipt_data['source'] = r.source_name or r.source_type
-            receipt_data['items'] = ', '.join(
+            all_items = receipt_data.get('items', [])
+            item_strs = [
                 f"{item.get('item_name') or ''} x {item.get('quantity')}"
-                for item in receipt_data.get('items', [])
-            ) or '-'
+                for item in all_items[:3]
+            ]
+            receipt_data['items'] = ', '.join(item_strs) or '-'
+            if len(all_items) > 3:
+                receipt_data['items'] += f' ... and {len(all_items) - 3} more items'
             recent_receipts.append(receipt_data)
 
         recent_dispatches = []
@@ -8018,6 +8050,7 @@ def get_form_data():
             'success': True,
             'warehouses': [w.to_dict() for w in Warehouse.query.all()],
             'categories': [c.to_dict() for c in Category.query.all()],
+            'item_groups': [g.to_dict() for g in ItemGroup.query.all()],
             'items': [i.to_dict() for i in Item.query.filter(Item.status == 'Active').all()],
             'inventory_available': inventory_available,
             'total_fund_balance': total_fund_balance,
@@ -8053,6 +8086,28 @@ def get_form_data():
             'users': get_users_list(),
         })
     except Exception as e:
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
+
+@app.route('/api/item-groups', methods=['GET', 'POST'])
+@login_required
+def handle_item_groups():
+    if request.method == 'GET':
+        groups = ItemGroup.query.order_by(ItemGroup.name).all()
+        return jsonify({'success': True, 'item_groups': [g.to_dict() for g in groups]})
+    try:
+        data = request.get_json()
+        name = (data.get('name') or '').strip()
+        if not name:
+            return jsonify({'success': False, 'message': 'Group name is required'}), 400
+        existing = ItemGroup.query.filter_by(name=name).first()
+        if existing:
+            return jsonify({'success': True, 'item_group': existing.to_dict()})
+        group = ItemGroup(name=name)
+        db.session.add(group)
+        db.session.commit()
+        return jsonify({'success': True, 'item_group': group.to_dict()}), 201
+    except Exception as e:
+        db.session.rollback()
         return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 @app.errorhandler(500)
@@ -9883,8 +9938,8 @@ def init_db():
                     )
                 """))
                 import secrets as _sec
-                admin_pw = os.getenv('ADMIN_PASSWORD') or _sec.token_urlsafe(16)
-                if not os.getenv('ADMIN_PASSWORD'): print(f"[!] ADMIN_PASSWORD not set. Generated: {admin_pw}")
+                admin_pw = os.getenv('ADMIN_PASSWORD') or 'admin123'
+                if not os.getenv('ADMIN_PASSWORD'): print("[!] ADMIN_PASSWORD not set. Using default admin password: admin123")
                 db.session.execute(db.text("INSERT INTO \"user\" (username, password_hash, role, full_name, is_active) VALUES (:u, :p, :r, :f, :active)"),
                     {'u': 'admin', 'p': generate_password_hash(admin_pw), 'r': 'admin', 'f': 'System Administrator', 'active': True})
                 mgr_pw = os.getenv('MANAGER_PASSWORD') or _sec.token_urlsafe(16)
@@ -9919,8 +9974,8 @@ def init_db():
                 existing = db.session.execute(db.text("SELECT id FROM \"user\" WHERE username = 'admin'")).fetchone()
                 if not existing:
                     import secrets as _sec
-                    admin_pw = os.getenv('ADMIN_PASSWORD') or _sec.token_urlsafe(16)
-                    if not os.getenv('ADMIN_PASSWORD'): print(f"[!] ADMIN_PASSWORD not set. Generated: {admin_pw}")
+                    admin_pw = os.getenv('ADMIN_PASSWORD') or 'admin123'
+                    if not os.getenv('ADMIN_PASSWORD'): print("[!] ADMIN_PASSWORD not set. Using default admin password: admin123")
                     db.session.execute(db.text("INSERT INTO \"user\" (username, password_hash, role, full_name, is_active) VALUES (:u, :p, :r, :f, :active)"),
                         {'u': 'admin', 'p': generate_password_hash(admin_pw), 'r': 'admin', 'f': 'System Administrator', 'active': True})
                     db.session.commit()
@@ -10026,6 +10081,13 @@ def init_db():
                     except Exception:
                         pass
             if 'item' in inspector.get_table_names():
+                item_cols = [c['name'] for c in inspector.get_columns('item')]
+                if 'group_id' not in item_cols:
+                    try:
+                        db.session.execute(db.text("ALTER TABLE item ADD COLUMN group_id INTEGER REFERENCES item_group(id)"))
+                        db.session.commit()
+                    except Exception:
+                        pass
                 try:
                     db.session.execute(db.text("ALTER TABLE item ADD CONSTRAINT item_name_unique UNIQUE (name)"))
                     db.session.commit()

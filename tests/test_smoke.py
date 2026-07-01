@@ -39,6 +39,7 @@ class SmokeTestCase(unittest.TestCase):
 
     def make_client(self):
         app_module.app.config['TESTING'] = True
+        app_module.app.config['WTF_CSRF_ENABLED'] = False
         return app_module.app.test_client()
 
     def login_admin(self):
@@ -98,8 +99,23 @@ class SmokeTestCase(unittest.TestCase):
             'start_date': '2082-01-01',
             'status': 'Active',
             'description': 'Smoke test incident',
+            'coordinates': '85.324, 27.717',
+            'affected_households': 5,
         }
         response = client.post('/api/incidents', json=payload)
+        self.assertEqual(response.status_code, 201, response.get_json())
+        return response.get_json()['data']
+
+    def create_beneficiary(self, client, name=None):
+        payload = {
+            'name': name or f'Beneficiary-{uuid.uuid4().hex[:8]}',
+            'national_id': f'ID-{uuid.uuid4().hex[:8]}',
+            'ward': 1,
+            'tole': 'Smoke Tole',
+            'father_name': 'Father Name',
+            'phone': '9800000000',
+        }
+        response = client.post('/api/beneficiaries', json=payload)
         self.assertEqual(response.status_code, 201, response.get_json())
         return response.get_json()['data']
 
@@ -183,6 +199,7 @@ class SmokeTestCase(unittest.TestCase):
                 'incident_name': 'Flood Event',
                 'incident_type': 'Flood',
                 'ward': 99,
+                'coordinates': '85.324, 27.717',
             },
         )
         self.assertEqual(bad_incident.status_code, 400)
@@ -304,6 +321,7 @@ class SmokeTestCase(unittest.TestCase):
     def test_cash_flow_smoke(self):
         client = self.login_admin()
         incident = self.create_incident(client, name=f'CashIncident-{uuid.uuid4().hex[:8]}', incident_type='Fire', ward=2)
+        beneficiary = self.create_beneficiary(client)
 
         fund_response = client.post(
             '/api/cash-funds',
@@ -321,6 +339,7 @@ class SmokeTestCase(unittest.TestCase):
             '/api/cash-requests',
             json={
                 'incident_id': incident['id'],
+                'beneficiary_id': beneficiary['id'],
                 'requesting_office': 'Smoke Office',
                 'requester_name': 'Smoke Requester',
                 'phone': '9800000000',
