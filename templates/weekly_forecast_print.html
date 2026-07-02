@@ -191,20 +191,35 @@
       text-align: center;
       padding: 6px 5px;
       border: 1px solid #d0dff0;
-      vertical-align: top;
+      vertical-align: middle;
       line-height: 1.3;
       background: #f9fbff;
     }
     .weather-icon { font-size: 26pt; display: block; margin-bottom: 2px; }
+    .weather-text {
+      font-size: 8.5pt;
+      max-width: 240px;
+      margin: 0 auto;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+      hyphens: auto;
+    }
+    .weather-desc {
+      font-size: 8pt;
+      color: #666;
+      max-width: 240px;
+      margin: 2px auto 0;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+    }
 
     /* Suggestions row */
     .suggestion-cell {
-      text-align: center;
-      padding: 6px 5px;
+      padding: 8px 10px;
       border: 1px solid #d0dff0;
       vertical-align: top;
       font-size: 9.5pt;
-      line-height: 1.4;
+      line-height: 1.5;
       background: white;
     }
     .suggestion-icon { font-size: 18pt; display: block; margin-bottom: 2px; color: #27ae60; }
@@ -339,10 +354,10 @@
     <div class="meta-item"><strong>वर्षा/हिमपात:</strong> {{ forecast.rainfall_snowfall }}</div>
     {% endif %}
     {% if forecast.high_temperature %}
-    <div class="meta-item"><strong>उच्च तापक्रम:</strong> {{ forecast.high_temperature }}</div>
+    <div class="meta-item"><strong>उच्च तापक्रम:</strong> {{ forecast.high_temperature }}°C</div>
     {% endif %}
     {% if forecast.low_temperature %}
-    <div class="meta-item"><strong>न्यून तापक्रम:</strong> {{ forecast.low_temperature }}</div>
+    <div class="meta-item"><strong>न्यून तापक्रम:</strong> {{ forecast.low_temperature }}°C</div>
     {% endif %}
     {% if forecast.weather_status %}
     <div class="meta-item"><strong>मौसम:</strong> {{ forecast.weather_status }}</div>
@@ -393,11 +408,11 @@
             {% else %}
               <span class="weather-icon">🌤️</span>
             {% endif %}
-            <small style="font-size:8.5pt;">
+            <div class="weather-text">
               {{ forecast.start_weather or forecast.weather_status or '-' }}
-            </small>
+            </div>
             {% if forecast.start_weather_desc %}
-              <br><small style="font-size:8pt; color:#666;">{{ forecast.start_weather_desc }}</small>
+              <div class="weather-desc">{{ forecast.start_weather_desc }}</div>
             {% endif %}
           </td>
 
@@ -418,11 +433,11 @@
             {% else %}
               <span class="weather-icon">🌤️</span>
             {% endif %}
-            <small style="font-size:8.5pt;">
+            <div class="weather-text">
               {{ forecast.mid_weather or forecast.weather_status or '-' }}
-            </small>
+            </div>
             {% if forecast.mid_weather_desc %}
-              <br><small style="font-size:8pt; color:#666;">{{ forecast.mid_weather_desc }}</small>
+              <div class="weather-desc">{{ forecast.mid_weather_desc }}</div>
             {% endif %}
           </td>
 
@@ -443,21 +458,21 @@
             {% else %}
               <span class="weather-icon">🌤️</span>
             {% endif %}
-            <small style="font-size:8.5pt;">
+            <div class="weather-text">
               {{ forecast.end_weather or forecast.weather_status or '-' }}
-            </small>
+            </div>
             {% if forecast.end_weather_desc %}
-              <br><small style="font-size:8pt; color:#666;">{{ forecast.end_weather_desc }}</small>
+              <div class="weather-desc">{{ forecast.end_weather_desc }}</div>
             {% endif %}
           </td>
         </tr>
 
-        <!-- Suggestions row: merged into single cell -->
+        <!-- Suggestions row: merged into single cell, vertical stack -->
         <tr>
           <td class="row-label" style="background:#27ae60;">सुझाव</td>
           <td class="suggestion-cell" colspan="7">
-            <div style="display:flex; gap:12px; flex-wrap:wrap;">
-              <div style="flex:1; min-width:200px; text-align:left; border-right:1px solid #d0dff0; padding-right:10px;">
+            <div style="text-align:left;">
+              <div style="margin-bottom:6px; padding-bottom:6px; border-bottom:1px dashed #d0dff0;">
                 <span style="font-weight:700; color:#1a3c6e; font-size:9pt;">साताको शुरुबात (शुक्र-शनि):</span><br>
                 {% if forecast.start_suggestion %}
                   {{ forecast.start_suggestion }}
@@ -469,7 +484,7 @@
                   -
                 {% endif %}
               </div>
-              <div style="flex:1; min-width:200px; text-align:left; border-right:1px solid #d0dff0; padding-right:10px;">
+              <div style="margin-bottom:6px; padding-bottom:6px; border-bottom:1px dashed #d0dff0;">
                 <span style="font-weight:700; color:#1a3c6e; font-size:9pt;">साताको मध्य (आइत-बुध):</span><br>
                 {% if forecast.mid_suggestion %}
                   {{ forecast.mid_suggestion }}
@@ -481,7 +496,7 @@
                   -
                 {% endif %}
               </div>
-              <div style="flex:1; min-width:180px; text-align:left;">
+              <div>
                 <span style="font-weight:700; color:#1a3c6e; font-size:9pt;">साताको अन्त्य (बिही):</span><br>
                 {% if forecast.end_suggestion %}
                   {{ forecast.end_suggestion }}
