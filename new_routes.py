@@ -1294,6 +1294,7 @@ def api_new_modules_map_data():
         'lat': float(f.coordinates.split(',')[0]) if f.coordinates else None,
         'lng': float(f.coordinates.split(',')[1]) if f.coordinates else None,
         'capacity': f.max_capacity, 'occupancy': f.current_occupancy,
+        'polygon': f.polygon_boundary,
     } for f in EmergencyFacility.query.all() if f.coordinates]
 
     data['risk_layers'] = [{

@@ -5453,6 +5453,14 @@ def handle_cash_requests():
         ).first()
         if existing:
             return jsonify({'success': False, 'message': f'Beneficiary "{beneficiary.name}" already has a cash request for this incident in fiscal year {fiscal_year} (Request #{existing.request_number}). Only one request per beneficiary per incident per fiscal year is allowed.'}), 400
+        if incident.affected_households is None or incident.affected_households < 1:
+            return jsonify({'success': False, 'message': 'Selected incident does not have any affected households. Please update the incident first.'}), 400
+        existing_cr_count = CashRequest.query.filter(
+            CashRequest.incident_id == incident.id,
+            CashRequest.status != 'Rejected'
+        ).count()
+        if existing_cr_count >= incident.affected_households:
+            return jsonify({'success': False, 'message': f'This incident has only {incident.affected_households} affected households. Only {incident.affected_households} cash request(s) can be created.'}), 400
         req = CashRequest(
             request_number=data.get('request_number') or generate_cash_request_no(),
             request_date=parse_bs_date_field(data, 'request_date', default=date.today()),
@@ -5577,6 +5585,17 @@ def manage_cash_request(id):
         if existing:
             ben_name = req.requester_name or 'Unknown'
             return jsonify({'success': False, 'message': f'Beneficiary "{ben_name}" already has a cash request for this incident in fiscal year {fiscal_year} (Request #{existing.request_number}). Only one request per beneficiary per incident per fiscal year is allowed.'}), 400
+        update_incident = db_get(Incident, req.incident_id)
+        if update_incident:
+            if update_incident.affected_households is None or update_incident.affected_households < 1:
+                return jsonify({'success': False, 'message': 'Selected incident does not have any affected households. Please update the incident first.'}), 400
+            update_cr_count = CashRequest.query.filter(
+                CashRequest.incident_id == update_incident.id,
+                CashRequest.status != 'Rejected',
+                CashRequest.id != id
+            ).count()
+            if update_cr_count >= update_incident.affected_households:
+                return jsonify({'success': False, 'message': f'This incident has only {update_incident.affected_households} affected households. Only {update_incident.affected_households} cash request(s) can be created.'}), 400
         db.session.commit()
         return jsonify({'success': True, 'message': 'Cash request updated', 'data': req.to_dict()})
     except ValueError as e:

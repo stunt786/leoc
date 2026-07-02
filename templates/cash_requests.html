@@ -38,7 +38,7 @@
                 <div class="modal-body">
                     <div class="row g-2">
                         <div class="col-md-6 mb-3"><label class="form-label">Request Date</label><input type="text" class="form-control nepali-date" placeholder="YYYY-MM-DD" name="request_date" id="crqDate" value="{{ today_bs }}"></div>
-                        <div class="col-md-6 mb-3"><label class="form-label">Incident <span class="text-danger">*</span></label><select class="form-select" name="incident_id" id="crqIncident" required></select></div>
+                        <div class="col-md-6 mb-3"><label class="form-label">Incident <span class="text-danger">*</span></label><select class="form-select" name="incident_id" id="crqIncident" onchange="onCrqIncidentChange()" required></select><small class="text-muted" id="crqIncidentInfo"></small></div>
                     </div>
                     <div class="row g-2">
                         <div class="col-md-6 mb-3"><label class="form-label">Requesting Office</label><input class="form-control" name="requesting_office" id="crqOffice"></div>
@@ -89,6 +89,7 @@
 <script>
 const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 let beneficiaries = [];
+let incidentsData = [];
 let _cashRequests = [];
 let paginator = new Paginator({perPage: 25, onPageChange: () => renderCashRequests(_cashRequests)});
 
@@ -98,6 +99,22 @@ function onBeneficiaryChange() {
     if (ben) {
         if (!document.getElementById('crqRequester').value) document.getElementById('crqRequester').value = ben.name;
         if (!document.getElementById('crqPhone').value) document.getElementById('crqPhone').value = ben.phone || '';
+    }
+}
+
+function onCrqIncidentChange() {
+    const incidentId = parseInt(document.getElementById('crqIncident').value);
+    const infoEl = document.getElementById('crqIncidentInfo');
+    if (!incidentId) { infoEl.textContent = ''; return; }
+    const inc = incidentsData.find(i => i.id === incidentId);
+    if (!inc) { infoEl.textContent = ''; return; }
+    const existingCount = _cashRequests.filter(r => r.incident_id === incidentId && r.status !== 'Rejected').length;
+    const limit = inc.affected_households || 0;
+    if (limit < 1) {
+        infoEl.innerHTML = `<span class="text-danger">Affected households: 0 — cannot create cash request</span>`;
+    } else {
+        const remaining = Math.max(0, limit - existingCount - (document.getElementById('crqId').value ? 0 : 1));
+        infoEl.textContent = `Affected households: ${limit} | Requests: ${existingCount} | Remaining: ${remaining}`;
     }
 }
 
@@ -142,7 +159,8 @@ async function loadData() {
     const d = await r.json();
     if (!d.success) return;
     beneficiaries = d.beneficiaries || [];
-    document.getElementById('crqIncident').innerHTML = '<option value="">Select Incident</option>' + (d.incidents||[]).map(i => `<option value="${i.id}">${i.incident_name}</option>`).join('');
+    incidentsData = (d.incidents || []).filter(i => i.status === 'Active');
+    document.getElementById('crqIncident').innerHTML = '<option value="">Select Incident</option>' + incidentsData.map(i => `<option value="${i.id}">${i.incident_name}</option>`).join('');
     document.getElementById('crqPriority').innerHTML = (d.cash_priorities||d.priorities||['Low','Medium','High','Urgent']).map(p => `<option value="${p}" ${p==='Medium'?'selected':''}>${p}</option>`).join('');
     document.getElementById('crqPurpose').innerHTML = '<option value="">Select Purpose</option>' + (d.cash_purposes||[]).map(p => `<option value="${p}">${p}</option>`).join('');
     document.getElementById('crqBeneficiary').innerHTML = '<option value="">Select Beneficiary</option>' + beneficiaries.map(b => `<option value="${b.id}">${b.name}${b.phone ? ' - ' + b.phone : ''}${b.ward_name ? ' (' + b.ward_name + ')' : ''}</option>`).join('');
@@ -165,6 +183,17 @@ document.getElementById('crqForm').addEventListener('submit', async function(e) 
             showToast('danger', `Beneficiary already has an active cash request for this incident (Request #${dupe.request_number}). Only one request per beneficiary per incident per fiscal year is allowed.`);
             return;
         }
+    }
+    const incData = incidentsData.find(i => i.id === incidentId);
+    const affectedHH = incData ? (incData.affected_households || 0) : 0;
+    if (affectedHH < 1) {
+        showToast('danger', 'Selected incident does not have any affected households. Please update the incident first.');
+        return;
+    }
+    const existingCRCount = _cashRequests.filter(r => r.incident_id === incidentId && r.status !== 'Rejected').length;
+    if (!id && existingCRCount >= affectedHH) {
+        showToast('danger', `This incident has only ${affectedHH} affected households. Only ${affectedHH} cash request(s) can be created.`);
+        return;
     }
     const body = {
         request_date: document.getElementById('crqDate').value,
@@ -304,7 +333,7 @@ async function viewCrq(id) {
     new bootstrap.Modal(document.getElementById('viewCrqModal')).show();
 }
 
-function openCrqModal() { document.getElementById('crqForm').reset(); document.getElementById('crqId').value = ''; document.getElementById('crqBeneficiary').value = ''; }
+function openCrqModal() { document.getElementById('crqForm').reset(); document.getElementById('crqId').value = ''; document.getElementById('crqBeneficiary').value = ''; document.getElementById('crqIncidentInfo').textContent = ''; }
 
 async function editCrq(id) {
     const r = await fetch(`/api/cash-requests/${id}`);
@@ -315,6 +344,7 @@ async function editCrq(id) {
     document.getElementById('crqId').value = cr.id;
     document.getElementById('crqDate').value = cr.request_date;
     document.getElementById('crqIncident').value = cr.incident_id;
+    onCrqIncidentChange();
     document.getElementById('crqOffice').value = cr.requesting_office || '';
     document.getElementById('crqRequester').value = cr.requester_name || '';
     document.getElementById('crqPhone').value = cr.phone || '';

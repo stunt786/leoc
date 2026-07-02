@@ -180,6 +180,43 @@ html, body { height: 100%; }
   .gis-filter-panel { position: absolute; left: 0; top: 0; bottom: 0; z-index: 999; box-shadow: 2px 0 12px rgba(0,0,0,0.2); }
   .gis-filter-panel.collapsed { margin-left: -320px; }
 }
+
+/* Map Legend */
+.gis-legend {
+  background: #fff; border-radius: 8px; box-shadow: 0 2px 12px rgba(0,0,0,0.2);
+  border: 1px solid #e2e8f0; font-size: 11px; line-height: 1.5;
+  max-height: 320px; overflow-y: auto; padding: 0;
+}
+.gis-legend-toggle {
+  background: #1e293b; color: #fff; border: none; border-radius: 6px;
+  width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
+  cursor: pointer; font-size: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+.gis-legend-toggle:hover { background: #0f172a; }
+.gis-legend-header {
+  font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: 0.3px;
+  padding: 6px 10px; border-bottom: 1px solid #e2e8f0; background: #f8f9fa;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.gis-legend-header button { background: none; border: none; cursor: pointer; font-size: 14px; color: #6c757d; padding: 0; line-height: 1; }
+.gis-legend-header button:hover { color: #212529; }
+.gis-legend-body { padding: 6px 10px; }
+.gis-legend-section { margin-bottom: 6px; }
+.gis-legend-section:last-child { margin-bottom: 0; }
+.gis-legend-section-title { font-weight: 700; font-size: 10px; text-transform: uppercase; color: #6c757d; letter-spacing: 0.3px; margin-bottom: 3px; }
+.gis-legend-item { display: flex; align-items: center; gap: 6px; padding: 1px 0; }
+.gis-legend-swatch {
+  width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0;
+  border: 1px solid rgba(0,0,0,0.12);
+}
+.gis-legend-line {
+  width: 14px; height: 0; flex-shrink: 0;
+  border-top: 3px solid; border-radius: 0;
+}
+.gis-legend-dash {
+  width: 14px; height: 0; flex-shrink: 0;
+  border-top: 3px dashed; border-radius: 0;
+}
 </style>
 {% endblock %}
 {% block content %}
@@ -217,6 +254,7 @@ html, body { height: 100%; }
         <div class="filter-group-title">Infrastructure</div>
         <label class="filter-checkbox"><input type="checkbox" class="layer-toggle" data-layer="infrastructure" checked onchange="toggleLayer('infrastructure')"><span class="layer-dot" style="background:#6f42c1"></span> Critical Infrastructure <span class="layer-count" id="count-infrastructure">0</span></label>
         <label class="filter-checkbox"><input type="checkbox" class="layer-toggle" data-layer="facilities" checked onchange="toggleLayer('facilities')"><span class="layer-dot" style="background:#0d6efd"></span> Emergency Facilities <span class="layer-count" id="count-facilities">0</span></label>
+        <label class="filter-checkbox" style="padding-left:24px;font-size:12px"><input type="checkbox" class="layer-toggle" data-layer="facility_polygons" checked onchange="toggleLayer('facility_polygons')"><span class="layer-dot" style="background:#2563eb;border-radius:3px"></span> Boundary Polygons <span class="layer-count" id="count-facility_polygons">0</span></label>
         <label class="filter-checkbox"><input type="checkbox" class="layer-toggle" data-layer="shelters" checked onchange="toggleLayer('shelters')"><span class="layer-dot" style="background:#20c997"></span> Shelters <span class="layer-count" id="count-shelters">0</span></label>
         <label class="filter-checkbox" style="padding-left:24px;font-size:12px"><input type="checkbox" class="layer-toggle" data-layer="shelter_polygons" checked onchange="toggleLayer('shelter_polygons')"><span class="layer-dot" style="background:#312E81;border-radius:3px"></span> Boundary Polygons <span class="layer-count" id="count-shelter_polygons">0</span></label>
       </div>
@@ -224,6 +262,7 @@ html, body { height: 100%; }
       <div class="filter-group">
         <div class="filter-group-title">Risk & Directory</div>
         <label class="filter-checkbox"><input type="checkbox" class="layer-toggle" data-layer="risk_layers" checked onchange="toggleLayer('risk_layers')"><span class="layer-dot" style="background:#fd7e14"></span> Risk Zones <span class="layer-count" id="count-risk_layers">0</span></label>
+        <label class="filter-checkbox" style="padding-left:24px;font-size:12px"><input type="checkbox" class="layer-toggle" data-layer="risk_polygons" checked onchange="toggleLayer('risk_polygons')"><span class="layer-dot" style="background:#ea580c;border-radius:3px"></span> Boundary Polygons <span class="layer-count" id="count-risk_polygons">0</span></label>
         <label class="filter-checkbox"><input type="checkbox" class="layer-toggle" data-layer="contacts" checked onchange="toggleLayer('contacts')"><span class="layer-dot" style="background:#0dcaf0"></span> Emergency Contacts <span class="layer-count" id="count-contacts">0</span></label>
       </div>
 
@@ -399,12 +438,53 @@ function initMap() {
   osmLayer.addTo(mapInstance);
 
   L.control.scale({ position: 'bottomleft', imperial: false }).addTo(mapInstance);
+
+  // Legend control
+  var legend = L.control({ position: 'bottomleft' });
+  legend.onAdd = function() {
+    var div = L.DomUtil.create('div', 'gis-legend');
+    div.innerHTML = '<div class="gis-legend-header">Map Legend <button onclick="this.closest(\'.gis-legend\').querySelector(\'.gis-legend-body\').style.display=this.closest(\'.gis-legend\').querySelector(\'.gis-legend-body\').style.display===\'none\'?\'\':\'none\'">&#x25B2;</button></div><div class="gis-legend-body">'
+      + '<div class="gis-legend-section"><div class="gis-legend-section-title">Risk Level (Polygons &amp; Markers)</div>'
+      + '<div class="gis-legend-item"><span class="gis-legend-swatch" style="background:#22c55e"></span> Low</div>'
+      + '<div class="gis-legend-item"><span class="gis-legend-swatch" style="background:#eab308"></span> Moderate</div>'
+      + '<div class="gis-legend-item"><span class="gis-legend-swatch" style="background:#ef4444"></span> High</div>'
+      + '<div class="gis-legend-item"><span class="gis-legend-swatch" style="background:#7f1d1d"></span> Very High</div>'
+      + '</div>'
+      + '<div class="gis-legend-section"><div class="gis-legend-section-title">Incident Severity</div>'
+      + '<div class="gis-legend-item"><span class="gis-legend-swatch" style="background:#2563eb"></span> Low</div>'
+      + '<div class="gis-legend-item"><span class="gis-legend-swatch" style="background:#d97706"></span> Medium</div>'
+      + '<div class="gis-legend-item"><span class="gis-legend-swatch" style="background:#dc3545"></span> High</div>'
+      + '<div class="gis-legend-item"><span class="gis-legend-swatch" style="background:#7f1d1d"></span> Critical</div>'
+      + '</div>'
+      + '<div class="gis-legend-section"><div class="gis-legend-section-title">Population Priority</div>'
+      + '<div class="gis-legend-item"><span class="gis-legend-swatch" style="background:#22c55e"></span> Normal</div>'
+      + '<div class="gis-legend-item"><span class="gis-legend-swatch" style="background:#eab308"></span> High</div>'
+      + '<div class="gis-legend-item"><span class="gis-legend-swatch" style="background:#ef4444"></span> Critical</div>'
+      + '</div>'
+      + '<div class="gis-legend-section"><div class="gis-legend-section-title">Boundary Polygons</div>'
+      + '<div class="gis-legend-item"><span class="gis-legend-swatch" style="background:#ea580c;opacity:0.35"></span> Risk Zone Areas</div>'
+      + '<div class="gis-legend-item"><span class="gis-legend-swatch" style="background:#2563eb;opacity:0.3"></span> Facility Areas</div>'
+      + '<div class="gis-legend-item"><span class="gis-legend-swatch" style="background:#312E81;opacity:0.3"></span> Shelter Areas</div>'
+      + '</div>'
+      + '<div class="gis-legend-section"><div class="gis-legend-section-title">Map Boundaries</div>'
+      + '<div class="gis-legend-item"><span class="gis-legend-line" style="border-color:#b91c1c"></span> Thalara Boundary</div>'
+      + '<div class="gis-legend-item"><span class="gis-legend-line" style="border-color:#ca8a04"></span> Ward Boundaries</div>'
+      + '</div>'
+      + '</div>';
+    L.DomEvent.disableClickPropagation(div);
+    return div;
+  };
+  legend.addTo(mapInstance);
   ['incidents','relief','warehouses','infrastructure','facilities','shelters','risk_layers','contacts','vulnerable','disabled','high_risk','volunteers','rrt','vehicles'].forEach(k => {
     layerGroups[k] = L.markerClusterGroup({ chunkedLoading: true, maxClusterRadius: 60, spiderfyOnMaxZoom: true, showCoverageOnHover: false, zoomToBoundsOnClick: true }).addTo(mapInstance);
     markerMap[k] = [];
   });
   layerGroups.shelter_polygons = L.layerGroup().addTo(mapInstance);
   markerMap.shelter_polygons = [];
+  layerGroups.risk_polygons = L.layerGroup().addTo(mapInstance);
+  markerMap.risk_polygons = [];
+  layerGroups.facility_polygons = L.layerGroup().addTo(mapInstance);
+  markerMap.facility_polygons = [];
   loadAllData();
 }
 
@@ -469,7 +549,9 @@ function processMapData(d) {
     '<span class="bi bi-satellite"></span> Satellite': satelliteLayer
   }, {
     '<span style="color:#b91c1c">●</span> Thalara Boundary': boundaryGroup,
-    '<span style="color:#ca8a04">●</span> Ward Boundaries': wardsGroup
+    '<span style="color:#ca8a04">●</span> Ward Boundaries': wardsGroup,
+    '<span style="color:#ea580c">●</span> Risk Zone Polygons': layerGroups.risk_polygons,
+    '<span style="color:#2563eb">●</span> Facility Polygons': layerGroups.facility_polygons
   }, { position: 'bottomright' }).addTo(mapInstance);
 
   if (d.incident_markers && d.incident_markers.length) {
@@ -604,6 +686,41 @@ function processModulesData(d) {
   });
   document.getElementById('count-shelter_polygons').textContent = markerMap.shelter_polygons.length;
 
+  // Render risk layer boundary polygons from GeoJSON
+  (d.risk_layers || []).forEach(function(r) {
+    if (r.polygon && r.lat != null && r.lng != null) {
+      try {
+        var geojson = (typeof r.polygon === 'string') ? JSON.parse(r.polygon) : r.polygon;
+        var polyColor = RISK_LEVEL_COLORS[r.level] || '#ea580c';
+        var polyLayer = L.geoJSON(geojson, {
+          style: { color: polyColor, weight: 2.5, fillColor: polyColor, fillOpacity: 0.18, dashArray: r.level === 'Low' ? '5,5' : null }
+        }).addTo(layerGroups.risk_polygons);
+        polyLayer.bindTooltip(tipHeader(polyColor, r.name + ' Boundary') + tipBody([
+          {l:'Type',v:r.type},{l:'Level',v:r.level},{l:'At Risk',v:(r.population||0).toLocaleString() + ' people'}
+        ]), { sticky: true });
+        markerMap.risk_polygons.push(polyLayer);
+      } catch(e) { console.warn('Invalid boundary polygon for risk layer', r.id, e); }
+    }
+  });
+  document.getElementById('count-risk_polygons').textContent = markerMap.risk_polygons.length;
+
+  // Render facility boundary polygons from GeoJSON
+  (d.facilities || []).forEach(function(f) {
+    if (f.polygon && f.lat != null && f.lng != null) {
+      try {
+        var geojson = (typeof f.polygon === 'string') ? JSON.parse(f.polygon) : f.polygon;
+        var polyLayer = L.geoJSON(geojson, {
+          style: { color: '#2563eb', weight: 2, fillColor: '#2563eb', fillOpacity: 0.15 }
+        }).addTo(layerGroups.facility_polygons);
+        polyLayer.bindTooltip(tipHeader('#2563eb', f.name + ' Boundary') + tipBody([
+          {l:'Type',v:f.type},{l:'Capacity',v:(f.capacity||0).toLocaleString()},{l:'Occupancy',v:(f.occupancy||0).toLocaleString()}
+        ]), { sticky: true });
+        markerMap.facility_polygons.push(polyLayer);
+      } catch(e) { console.warn('Invalid boundary polygon for facility', f.id, e); }
+    }
+  });
+  document.getElementById('count-facility_polygons').textContent = markerMap.facility_polygons.length;
+
   Object.keys(d).forEach(function(key) {
     allData[key] = d[key];
   });
@@ -632,6 +749,7 @@ function applyFilters() {
   const ward = document.getElementById('wardFilter').value;
   Object.keys(markerMap).forEach(function(key) {
     markerMap[key].forEach(function(mk) {
+      if (!mk.setOpacity) return;
       mk.setOpacity(1);
       if (ward && mk._gisWard && mk._gisWard.toString() !== ward) {
         mk.setOpacity(0.2);
@@ -644,6 +762,7 @@ function filterBySearch(query) {
   const q = query.toLowerCase().trim();
   Object.keys(markerMap).forEach(function(key) {
     markerMap[key].forEach(function(mk) {
+      if (!mk.setOpacity) return;
       mk.setOpacity(1);
       if (q && mk._gisSearch && !mk._gisSearch.includes(q)) {
         mk.setOpacity(0.15);
