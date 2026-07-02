@@ -262,11 +262,6 @@ async function loadData() {
     document.getElementById('cdType').innerHTML = (d.distribution_types||['Individual','Family','Community','Local Government','Organization']).map(t => `<option value="${t}">${t}</option>`).join('');
 }
 
-function getSelectedCashRequestIds() {
-    const sel = document.getElementById('cdRequest');
-    return Array.from(sel.selectedOptions).map(o => parseInt(o.value)).filter(v => !isNaN(v));
-}
-
 function onIncidentChange() {
     const incidentId = parseInt(document.getElementById('cdIncident').value);
     let filteredCash = cashRequestsData;
@@ -316,26 +311,31 @@ function addBeneficiaryFromRequest() {
     }
     const sel = document.getElementById('cdRequest');
     if (!selectedCashRequests.length) { showToast('warning', 'Please add at least one cash request first'); return; }
-    const crId = selectedCashRequests[0].id;
-    const cr = cashRequestsData.find(r => r.id === crId);
-    if (!cr || !cr.beneficiary_id) { showToast('warning', 'Selected cash request has no beneficiary'); return; }
-    const ben = beneficiariesData.find(b => b.id === cr.beneficiary_id);
-    if (!ben) { showToast('warning', 'Beneficiary not found'); return; }
     const existingNames = document.querySelectorAll('#benBody input[name="ben_name[]"]');
-    for (const inp of existingNames) {
-        if (inp.value.trim().toLowerCase() === ben.name.trim().toLowerCase()) {
-            showToast('warning', 'Beneficiary "' + ben.name + '" is already in the list');
-            return;
+    const existingSet = new Set(Array.from(existingNames).map(inp => inp.value.trim().toLowerCase()));
+    let selectedCr = null;
+    for (const sr of selectedCashRequests) {
+        const crCheck = cashRequestsData.find(r => r.id === sr.id);
+        if (crCheck && crCheck.beneficiary_id) {
+            const benCheck = beneficiariesData.find(b => b.id === crCheck.beneficiary_id);
+            if (benCheck && !existingSet.has(benCheck.name.trim().toLowerCase())) {
+                selectedCr = crCheck;
+                break;
+            }
         }
     }
+    if (!selectedCr) { showToast('warning', 'No more unprocessed cash requests available'); return; }
+    const ben = beneficiariesData.find(b => b.id === selectedCr.beneficiary_id);
+    if (!ben) { showToast('warning', 'Beneficiary not found'); return; }
     const tbody = document.getElementById('benBody');
     const tr = document.createElement('tr');
+    tr.setAttribute('data-cr-id', selectedCr.id);
     tr.innerHTML = `
         <td><input class="form-control form-control-sm" name="ben_name[]" required value="${ben.name.replace(/"/g, '&quot;')}" data-ben-id="${ben.id}"></td>
         <td><input class="form-control form-control-sm" name="ben_nid[]" value="${(ben.national_id||'').replace(/"/g, '&quot;')}"></td>
         <td><input class="form-control form-control-sm" name="ben_addr[]" value="${(ben.address||'').replace(/"/g, '&quot;')}"></td>
         <td><input class="form-control form-control-sm" name="ben_phone[]" value="${(ben.phone||'').replace(/"/g, '&quot;')}"></td>
-            <td><input type="number" step="0.01" class="form-control form-control-sm ben-amount" name="ben_amount[]" required oninput="calcTotal()" value="${cr.remaining > 0 ? cr.remaining : (cr.requested_amount || '')}"></td>
+            <td><input type="number" step="0.01" class="form-control form-control-sm ben-amount" name="ben_amount[]" required oninput="calcTotal()" value="${selectedCr.remaining > 0 ? selectedCr.remaining : (selectedCr.requested_amount || '')}"></td>
         <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove();calcTotal()"><i class="bi bi-x"></i></button></td>
     `;
     tbody.appendChild(tr);
@@ -431,7 +431,8 @@ document.getElementById('cdForm').addEventListener('submit', async function(e) {
         const amount = parseFloat(inputs[4].value);
         if (name && amount > 0) {
             const benId = inputs[0].getAttribute('data-ben-id');
-            beneficiaries.push({ name, national_id: inputs[1].value, address: inputs[2].value, phone: inputs[3].value, amount, beneficiary_id: benId ? parseInt(benId) : undefined });
+            const crId = tr.getAttribute('data-cr-id');
+            beneficiaries.push({ name, national_id: inputs[1].value, address: inputs[2].value, phone: inputs[3].value, amount, beneficiary_id: benId ? parseInt(benId) : undefined, cash_request_id: crId ? parseInt(crId) : undefined });
         }
     });
     if (beneficiaries.length === 0) { showToast('danger', 'At least one beneficiary required'); return; }
@@ -449,7 +450,9 @@ document.getElementById('cdForm').addEventListener('submit', async function(e) {
         const rr = reliefRequestsData.find(r => r.id === reliefReqId);
         requestRemaining = rr ? (rr.cash_remaining || 0) : 0;
     } else {
-        cashReqIds.forEach(function(id) {
+        const allCrIds = [...new Set(beneficiaries.map(b => b.cash_request_id).filter(Boolean))];
+        const idsToCheck = allCrIds.length ? allCrIds : cashReqIds;
+        idsToCheck.forEach(function(id) {
             const cr = cashRequestsData.find(r => r.id === id);
             if (cr) requestRemaining += (cr.remaining || 0);
         });
@@ -472,7 +475,10 @@ document.getElementById('cdForm').addEventListener('submit', async function(e) {
     body.photo = document.getElementById('cdPhoto').value || undefined;
     body.document = document.getElementById('cdDocument').value || undefined;
     if (useReliefReq) body.relief_request_id = reliefReqId;
-    else body.cash_request_ids = cashReqIds;
+    else {
+        const allCrIds = [...new Set(beneficiaries.map(b => b.cash_request_id).filter(Boolean))];
+        body.cash_request_ids = allCrIds.length ? allCrIds : cashReqIds;
+    }
     try {
         const r = await fetch('/api/cash-distributions', {method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':csrf}, body: JSON.stringify(body)});
         const d = await r.json();

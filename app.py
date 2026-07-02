@@ -1829,10 +1829,7 @@ class CashRequest(db.Model):
         ).join(
             CashDistribution, CashDistributionBeneficiary.distribution_id == CashDistribution.id
         ).filter(
-            db.or_(
-                CashDistribution.cash_request_id == self.id,
-                CashDistribution.cash_request_ids.like(f'%"{self.id}"%')
-            ),
+            CashDistributionBeneficiary.cash_request_id == self.id,
             CashDistribution.status != 'Cancelled'
         ).scalar()
         remaining = self.requested_amount - already_distributed
@@ -1915,6 +1912,7 @@ class CashDistributionBeneficiary(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     distribution_id = db.Column(db.Integer, db.ForeignKey('cash_distribution.id'), nullable=False, index=True)
     beneficiary_id = db.Column(db.Integer, db.ForeignKey('beneficiary.id'), nullable=True, index=True)
+    cash_request_id = db.Column(db.Integer, db.ForeignKey('cash_request.id'), nullable=True, index=True)
     name = db.Column(db.String(200), nullable=False)
     national_id = db.Column(db.String(100))
     address = db.Column(db.String(300))
@@ -1925,7 +1923,7 @@ class CashDistributionBeneficiary(db.Model):
         return {
             'id': self.id, 'name': self.name, 'national_id': self.national_id,
             'address': self.address, 'phone': self.phone, 'amount': self.amount,
-            'beneficiary_id': self.beneficiary_id
+            'beneficiary_id': self.beneficiary_id, 'cash_request_id': self.cash_request_id
         }
 
 # ============ BENEFICIARY MODEL (shared) ============
@@ -5418,11 +5416,10 @@ def handle_cash_requests():
         result = []
         for r in cash_reqs:
             d = r.to_dict()
-            d['distributed_amount'] = db.session.query(db.func.coalesce(db.func.sum(CashDistribution.total_amount), 0)).filter(
-                db.or_(
-                    CashDistribution.cash_request_id == r.id,
-                    CashDistribution.cash_request_ids.like(f'%"{r.id}"%')
-                ),
+            d['distributed_amount'] = db.session.query(db.func.coalesce(db.func.sum(CashDistributionBeneficiary.amount), 0)).join(
+                CashDistribution, CashDistributionBeneficiary.distribution_id == CashDistribution.id
+            ).filter(
+                CashDistributionBeneficiary.cash_request_id == r.id,
                 CashDistribution.status != 'Cancelled'
             ).scalar()
             result.append(d)
@@ -5500,16 +5497,16 @@ def manage_cash_request(id):
         if request.method == 'GET':
             cr_dict = req.to_dict()
             cr_dict['distributions'] = [d.to_dict() for d in CashDistribution.query.filter(
-                db.or_(
-                    CashDistribution.cash_request_id == req.id,
-                    CashDistribution.cash_request_ids.like(f'%"{req.id}"%')
+                CashDistribution.id.in_(
+                    db.session.query(CashDistributionBeneficiary.distribution_id).filter(
+                        CashDistributionBeneficiary.cash_request_id == req.id
+                    )
                 )
             ).order_by(CashDistribution.distribution_date.desc()).all()]
-            cr_dict['distributed_amount'] = db.session.query(db.func.coalesce(db.func.sum(CashDistribution.total_amount), 0)).filter(
-                db.or_(
-                    CashDistribution.cash_request_id == req.id,
-                    CashDistribution.cash_request_ids.like(f'%"{req.id}"%')
-                ),
+            cr_dict['distributed_amount'] = db.session.query(db.func.coalesce(db.func.sum(CashDistributionBeneficiary.amount), 0)).join(
+                CashDistribution, CashDistributionBeneficiary.distribution_id == CashDistribution.id
+            ).filter(
+                CashDistributionBeneficiary.cash_request_id == req.id,
                 CashDistribution.status != 'Cancelled'
             ).scalar()
             return jsonify({'success': True, 'cash_request': cr_dict})
@@ -5517,9 +5514,10 @@ def manage_cash_request(id):
             if req.status == 'Rejected':
                 return jsonify({'success': False, 'message': 'Cannot delete a rejected/cancelled cash request'}), 400
             related_dists = CashDistribution.query.filter(
-                db.or_(
-                    CashDistribution.cash_request_id == req.id,
-                    CashDistribution.cash_request_ids.like(f'%"{req.id}"%')
+                CashDistribution.id.in_(
+                    db.session.query(CashDistributionBeneficiary.distribution_id).filter(
+                        CashDistributionBeneficiary.cash_request_id == req.id
+                    )
                 )
             ).count()
             if related_dists:
@@ -5527,11 +5525,10 @@ def manage_cash_request(id):
             db.session.delete(req)
             db.session.commit()
             return jsonify({'success': True, 'message': 'Cash request deleted'})
-        distributed = db.session.query(db.func.coalesce(db.func.sum(CashDistribution.total_amount), 0)).filter(
-            db.or_(
-                CashDistribution.cash_request_id == req.id,
-                CashDistribution.cash_request_ids.like(f'%"{req.id}"%')
-            ),
+        distributed = db.session.query(db.func.coalesce(db.func.sum(CashDistributionBeneficiary.amount), 0)).join(
+            CashDistribution, CashDistributionBeneficiary.distribution_id == CashDistribution.id
+        ).filter(
+            CashDistributionBeneficiary.cash_request_id == req.id,
             CashDistribution.status != 'Cancelled'
         ).scalar()
         if distributed and distributed > 0:
@@ -5657,10 +5654,7 @@ def handle_cash_distributions():
             ).join(
                 CashDistribution, CashDistributionBeneficiary.distribution_id == CashDistribution.id
             ).filter(
-                db.or_(
-                    CashDistribution.cash_request_id == cr.id,
-                    CashDistribution.cash_request_ids.like(f'%"{cr.id}"%')
-                ),
+                CashDistributionBeneficiary.cash_request_id == cr.id,
                 CashDistribution.status != 'Cancelled'
             ).scalar()
             remaining = cr.requested_amount - already_distributed
@@ -5760,7 +5754,8 @@ def handle_cash_distributions():
                 distribution_id=dist.id, name=ben_data['name'].strip(),
                 national_id=ben_data.get('national_id'), address=ben_data.get('address'),
                 phone=ben_data.get('phone'), amount=amount,
-                beneficiary_id=ben_data.get('beneficiary_id')
+                beneficiary_id=ben_data.get('beneficiary_id'),
+                cash_request_id=ben_data.get('cash_request_id')
             )
             db.session.add(ben)
         fund.current_balance -= total
@@ -5770,10 +5765,7 @@ def handle_cash_distributions():
             total_distributed = db.session.query(db.func.coalesce(db.func.sum(CashDistributionBeneficiary.amount), 0)).join(
                 CashDistribution, CashDistributionBeneficiary.distribution_id == CashDistribution.id
             ).filter(
-                db.or_(
-                    CashDistribution.cash_request_id == cr.id,
-                    CashDistribution.cash_request_ids.like(f'%"{cr.id}"%')
-                )
+                CashDistributionBeneficiary.cash_request_id == cr.id
             ).scalar()
             if total_distributed >= cr.requested_amount:
                 cr.status = 'Completed'
@@ -9860,6 +9852,23 @@ def init_db():
                         db.session.commit()
                     except Exception:
                         pass
+            if 'cash_distribution_beneficiary' in inspector.get_table_names():
+                cdbcols = [c['name'] for c in inspector.get_columns('cash_distribution_beneficiary')]
+                if 'cash_request_id' not in cdbcols:
+                    try:
+                        db.session.execute(db.text("ALTER TABLE cash_distribution_beneficiary ADD COLUMN cash_request_id INTEGER REFERENCES cash_request(id)"))
+                        db.session.commit()
+                    except Exception:
+                        pass
+                try:
+                    db.session.execute(db.text("""
+                        UPDATE cash_distribution_beneficiary SET cash_request_id = (
+                            SELECT cash_request_id FROM cash_distribution WHERE id = distribution_id
+                        ) WHERE cash_request_id IS NULL
+                    """))
+                    db.session.commit()
+                except Exception:
+                    db.session.rollback()
             if 'cash_request' in inspector.get_table_names():
                 crqcols = [c['name'] for c in inspector.get_columns('cash_request')]
                 if 'fiscal_year' not in crqcols:

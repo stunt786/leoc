@@ -68,6 +68,22 @@
         </div>
     </div>
 </div>
+
+<div class="modal fade" id="viewCrqModal" tabindex="-1">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="bi bi-send-exclamation me-2"></i><span id="viewCrqTitle"></span></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="viewCrqBody"></div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 {% block extra_js %}
 <script>
@@ -178,18 +194,114 @@ async function viewCrq(id) {
     const d = await r.json();
     if (!d.success) return;
     const cr = d.cash_request;
-    const distInfo = (cr.distributions||[]).length ? (cr.distributions||[]).map(cd =>
-        `${cd.distribution_no} (${cd.distribution_date}, ${cd.fund_name||'-'}, Amt: ${Number(cd.total_amount).toLocaleString()}, Status: ${cd.status})`
-    ).join('; ') : 'None';
-    const lines = [
-        `<strong>Request:</strong> ${cr.request_number} | ${cr.request_date}`,
-        `<strong>Incident:</strong> ${cr.incident_name || '-'} | <strong>Priority:</strong> ${cr.priority} | <strong>Status:</strong> ${cr.status}`,
-        `<strong>Requester:</strong> ${cr.requester_name || '-'} | ${cr.phone || '-'} | ${cr.requesting_office || '-'}`,
-        `<strong>Amount:</strong> Requested ${Number(cr.requested_amount).toLocaleString()} | Distributed ${Number(cr.distributed_amount || 0).toLocaleString()}`,
-        `<strong>Purpose:</strong> ${cr.purpose || '-'}${cr.beneficiary_name ? ' | <strong>Beneficiary:</strong> ' + cr.beneficiary_name : ''}`,
-        `<strong>Distributions:</strong> ${distInfo}`
-    ];
-    showToast('info', lines.join(' | '));
+    document.getElementById('viewCrqTitle').textContent = cr.request_number;
+
+    const distAmt = cr.distributed_amount || 0;
+    const remaining = (cr.requested_amount || 0) - distAmt;
+    const progress = cr.requested_amount > 0 ? Math.min(100, (distAmt / cr.requested_amount) * 100) : 0;
+
+    const distributions = cr.distributions || [];
+    const distRows = distributions.map((cd, i) => {
+        const bens = cd.beneficiaries || [];
+        const benNames = bens.map(b => `${b.name} (${Number(b.amount).toLocaleString()})`).join(', ');
+        return `<tr>
+            <td>${i + 1}</td>
+            <td>${cd.distribution_no}</td>
+            <td>${cd.distribution_date || '-'}</td>
+            <td>${cd.fund_name || '-'}</td>
+            <td class="text-end fw-semibold text-danger">${Number(cd.total_amount).toLocaleString()}</td>
+            <td class="small">${benNames || '-'}</td>
+            <td><span class="badge bg-${cd.status === 'Completed' ? 'success' : cd.status === 'Cancelled' ? 'danger' : 'secondary'}">${cd.status}</span></td>
+        </tr>`;
+    }).join('');
+
+    document.getElementById('viewCrqBody').innerHTML = `
+        <div class="row g-2 mb-3">
+            <div class="col-md-8">
+                <div class="card border-0 bg-light h-100">
+                    <div class="card-body py-2">
+                        <div class="row g-1 small">
+                            <div class="col-md-4"><strong>Req No:</strong> ${cr.request_number}</div>
+                            <div class="col-md-4"><strong>Date:</strong> ${cr.request_date || '-'}</div>
+                            <div class="col-md-4"><strong>Priority:</strong> <span class="badge ${cr.priority === 'Urgent' ? 'bg-danger' : cr.priority === 'High' ? 'bg-warning' : cr.priority === 'Medium' ? 'bg-info' : 'bg-secondary'}">${cr.priority}</span></div>
+                            <div class="col-md-4"><strong>Incident:</strong> ${cr.incident_name || '-'}</div>
+                            <div class="col-md-4"><strong>Purpose:</strong> ${cr.purpose || '-'}</div>
+                            <div class="col-md-4"><strong>Fiscal Year:</strong> ${cr.fiscal_year || '-'}</div>
+                            <div class="col-12"><strong>Remarks:</strong> ${cr.remarks || '-'}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card border-0 bg-light h-100">
+                    <div class="card-body py-2">
+                        <div class="row g-1 small">
+                            <div class="col-6"><strong>Status:</strong> <span class="badge bg-${cr.status === 'Completed' ? 'success' : cr.status === 'Approved' ? 'primary' : cr.status === 'Rejected' ? 'danger' : cr.status === 'Partial' ? 'warning' : 'secondary'}">${cr.status}</span></div>
+                            <div class="col-6"><strong>Beneficiary:</strong> ${cr.beneficiary_name || '-'}</div>
+                            <div class="col-6"><strong>Requested:</strong> <strong>${Number(cr.requested_amount).toLocaleString()}</strong></div>
+                            <div class="col-6"><strong>Distributed:</strong> <strong class="text-success">${Number(distAmt).toLocaleString()}</strong></div>
+                            <div class="col-6"><strong>Remaining:</strong> <strong class="text-${remaining > 0 ? 'warning' : 'success'}">${Number(remaining).toLocaleString()}</strong></div>
+                            <div class="col-6"><strong>Distributions:</strong> ${distributions.length}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card border-0 bg-light mb-3">
+            <div class="card-header bg-white py-2 d-flex justify-content-between align-items-center">
+                <span class="fw-semibold"><i class="bi bi-person me-1 text-primary"></i>Requester Info</span>
+            </div>
+            <div class="card-body py-2">
+                <div class="row g-1 small">
+                    <div class="col-md-4"><strong>Name:</strong> ${cr.requester_name || '-'}</div>
+                    <div class="col-md-4"><strong>Phone:</strong> ${cr.phone || '-'}</div>
+                    <div class="col-md-4"><strong>Office:</strong> ${cr.requesting_office || '-'}</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card border-0 bg-light mb-3">
+            <div class="card-header bg-white py-2 d-flex justify-content-between align-items-center">
+                <span class="fw-semibold"><i class="bi bi-bar-chart me-1 text-primary"></i>Distribution Progress</span>
+                <span class="badge bg-${progress >= 100 ? 'success' : progress > 0 ? 'warning' : 'secondary'}">${Math.round(progress)}%</span>
+            </div>
+            <div class="card-body py-2">
+                <div class="progress mb-2" style="height:8px">
+                    <div class="progress-bar ${progress >= 100 ? 'bg-success' : progress > 0 ? 'bg-warning' : ''}" style="width:${progress}%"></div>
+                </div>
+                <div class="row g-1 small">
+                    <div class="col-md-4"><strong>Requested:</strong> ${Number(cr.requested_amount).toLocaleString()}</div>
+                    <div class="col-md-4"><strong>Distributed:</strong> <span class="text-success">${Number(distAmt).toLocaleString()}</span></div>
+                    <div class="col-md-4"><strong>Remaining:</strong> <span class="text-${remaining > 0 ? 'danger' : 'success'}">${Number(remaining).toLocaleString()}</span></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card border-0 bg-light">
+            <div class="card-header bg-white py-2 d-flex justify-content-between align-items-center">
+                <span class="fw-semibold"><i class="bi bi-cash-stack me-1 text-primary"></i>Distributions (${distributions.length})</span>
+                <span class="badge bg-primary">Total: ${Number(distAmt).toLocaleString()}</span>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered mb-0 small">
+                        <thead class="table-light"><tr>
+                            <th style="width:40px">#</th>
+                            <th>Dist No</th>
+                            <th>Date</th>
+                            <th>Fund</th>
+                            <th class="text-end" style="width:120px">Amount</th>
+                            <th>Beneficiaries</th>
+                            <th>Status</th>
+                        </tr></thead>
+                        <tbody>${distRows || '<tr><td colspan="7" class="text-center text-muted py-2">No distributions yet</td></tr>'}</tbody>
+                    </table>
+                </div>
+            </div>
+        </div>`;
+
+    new bootstrap.Modal(document.getElementById('viewCrqModal')).show();
 }
 
 function openCrqModal() { document.getElementById('crqForm').reset(); document.getElementById('crqId').value = ''; document.getElementById('crqBeneficiary').value = ''; }
