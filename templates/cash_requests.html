@@ -1,0 +1,407 @@
+{% extends "base.html" %}
+{% block title %}Cash Requests - LEOC{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('index') }}"><i class="bi bi-house-fill"></i></a></li>
+<li class="breadcrumb-item active">Cash Requests</li>
+{% endblock %}
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap5.min.css" rel="stylesheet">
+{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="mb-0"><i class="bi bi-send-exclamation me-2"></i>Cash Requests</h4>
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#crqModal" onclick="openCrqModal()">
+        <i class="bi bi-plus-lg"></i> New Request
+    </button>
+</div>
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle" id="crqTable">
+                <thead class="table-light"><tr>
+                    <th>Req No</th><th>Date</th><th>Incident</th><th>Requester</th>
+                    <th>Requested</th><th>Distributed</th><th>Priority</th><th>Status</th><th>Actions</th>
+                </tr></thead>
+                <tbody id="crqBody"></tbody>
+            </table>
+        </div>
+        <div class="d-flex justify-content-between align-items-center mt-2 px-2">
+            <small class="text-muted" id="tableInfo">0 records</small>
+            <nav><ul class="pagination pagination-sm mb-0" id="pagination"></ul></nav>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="crqModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title">Cash Request</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <form id="crqForm">
+                <input type="hidden" name="id" id="crqId">
+                <div class="modal-body">
+                    <div class="row g-2">
+                        <div class="col-md-6 mb-3"><label class="form-label">Request Date</label><input type="text" class="form-control nepali-date" placeholder="YYYY-MM-DD" name="request_date" id="crqDate" value="{{ today_bs }}"></div>
+                        <div class="col-md-6 mb-3"><label class="form-label">Incident <span class="text-danger">*</span></label><select class="form-select" name="incident_id" id="crqIncident" onchange="onCrqIncidentChange()" required></select><small class="text-muted" id="crqIncidentInfo"></small></div>
+                    </div>
+                    <div class="row g-2">
+                        <div class="col-md-6 mb-3"><label class="form-label">Requesting Office</label><input class="form-control" name="requesting_office" id="crqOffice"></div>
+                        <div class="col-md-6 mb-3"><label class="form-label">Beneficiary <span class="text-danger">*</span></label>
+                            <select class="form-select" id="crqBeneficiary" onchange="onBeneficiaryChange()" required>
+                                <option value="">Select Beneficiary</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row g-2">
+                        <div class="col-md-6 mb-3"><label class="form-label">Requester Name</label><input class="form-control" name="requester_name" id="crqRequester"></div>
+                        <div class="col-md-6 mb-3"><label class="form-label">Phone</label><input class="form-control" name="phone" id="crqPhone"></div>
+                        <div class="col-md-4 mb-3"><label class="form-label">Priority</label><select class="form-select" name="priority" id="crqPriority"></select></div>
+                        <div class="col-md-4 mb-3"><label class="form-label">Purpose <span class="text-danger">*</span></label><select class="form-select" name="purpose" id="crqPurpose" required></select></div>
+                    </div>
+                    <div class="row g-2">
+                        <div class="col-md-6 mb-3"><label class="form-label">Requested Amount <span class="text-danger">*</span></label><input type="number" step="0.01" class="form-control" name="requested_amount" id="crqAmount" required></div>
+                        <div class="col-md-6 mb-3"><label class="form-label">Status</label><select class="form-select" name="status" id="crqStatus"><option value="Pending">Pending</option><option value="Approved">Approved</option><option value="Rejected">Rejected</option><option value="Partial">Partial</option><option value="Completed">Completed</option></select></div>
+                    </div>
+                    <div class="mb-3"><label class="form-label">Remarks</label><textarea class="form-control" name="remarks" id="crqRemarks" rows="2"></textarea></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg"></i> Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="viewCrqModal" tabindex="-1">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="bi bi-send-exclamation me-2"></i><span id="viewCrqTitle"></span></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="viewCrqBody"></div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
+<script>
+const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+let beneficiaries = [];
+let incidentsData = [];
+let _cashRequests = [];
+let paginator = new Paginator({perPage: 25, onPageChange: () => renderCashRequests(_cashRequests)});
+let beneficiaryTomSelect = null;
+
+function getBeneficiaryTomSelect() {
+    if (beneficiaryTomSelect) return beneficiaryTomSelect;
+    const el = document.getElementById('crqBeneficiary');
+    if (!el) return null;
+    beneficiaryTomSelect = new TomSelect(el, {
+        maxOptions: null,
+        placeholder: 'Search by name, phone, or ward...',
+        dropdownParent: 'body',
+        onChange: function(value) {
+            if (!value) return;
+            const id = parseInt(value);
+            const ben = beneficiaries.find(b => b.id === id);
+            if (ben) {
+                if (!document.getElementById('crqRequester').value) document.getElementById('crqRequester').value = ben.name;
+                if (!document.getElementById('crqPhone').value) document.getElementById('crqPhone').value = ben.phone || '';
+            }
+        }
+    });
+    return beneficiaryTomSelect;
+}
+
+function onBeneficiaryChange() {
+    const ts = getBeneficiaryTomSelect();
+    if (!ts) return;
+    const id = parseInt(ts.getValue());
+    const ben = beneficiaries.find(b => b.id === id);
+    if (ben) {
+        if (!document.getElementById('crqRequester').value) document.getElementById('crqRequester').value = ben.name;
+        if (!document.getElementById('crqPhone').value) document.getElementById('crqPhone').value = ben.phone || '';
+    }
+}
+
+function onCrqIncidentChange() {
+    const incidentId = parseInt(document.getElementById('crqIncident').value);
+    const infoEl = document.getElementById('crqIncidentInfo');
+    if (!incidentId) { infoEl.textContent = ''; return; }
+    const inc = incidentsData.find(i => i.id === incidentId);
+    if (!inc) { infoEl.textContent = ''; return; }
+    const existingCount = _cashRequests.filter(r => r.incident_id === incidentId && r.status !== 'Rejected').length;
+    const limit = inc.affected_households || 0;
+    if (limit < 1) {
+        infoEl.innerHTML = `<span class="text-danger">Affected households: 0 — cannot create cash request</span>`;
+    } else {
+        const remaining = Math.max(0, limit - existingCount - (document.getElementById('crqId').value ? 0 : 1));
+        infoEl.textContent = `Affected households: ${limit} | Requests: ${existingCount} | Remaining: ${remaining}`;
+    }
+}
+
+function renderCashRequests(data) {
+    const t = document.getElementById('crqBody');
+    if (data.length === 0) { t.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-3">No requests found</td></tr>'; paginator.update(0); return; }
+    const pageData = paginator.getPageData(data);
+    t.innerHTML = pageData.map(cr => {
+        const rejected = cr.status === 'Rejected';
+        const distAmt = cr.distributed_amount || 0;
+        const progress = cr.requested_amount > 0 ? Math.min(100, (distAmt / cr.requested_amount) * 100) : 0;
+        return `<tr class="${rejected ? 'table-danger text-decoration-line-through' : ''}">
+        <td>${cr.request_number}</td><td>${cr.request_date}</td>
+        <td>${cr.incident_name || '-'}</td>
+        <td>${cr.requester_name || cr.requesting_office || '-'}</td>
+        <td class="fw-bold">${Number(cr.requested_amount).toLocaleString()}</td>
+        <td>
+            <span class="fw-bold text-success">${Number(distAmt).toLocaleString()}</span>
+            <div class="progress mt-1" style="height:3px"><div class="progress-bar ${progress >= 100 ? 'bg-success' : progress > 0 ? 'bg-warning' : ''}" style="width:${progress}%"></div></div>
+        </td>
+        <td><span class="badge ${cr.priority === 'Urgent' ? 'bg-danger' : cr.priority === 'High' ? 'bg-warning' : cr.priority === 'Medium' ? 'bg-info' : 'bg-secondary'}">${cr.priority}</span></td>
+        <td><span class="badge ${cr.status === 'Completed' ? 'bg-success' : cr.status === 'Approved' ? 'bg-primary' : cr.status === 'Rejected' ? 'bg-danger' : cr.status === 'Partial' ? 'bg-warning' : 'bg-secondary'}">${cr.status}</span></td>
+        <td>
+            <button class="btn btn-sm btn-outline-primary" onclick="viewCrq(${cr.id})" title="View"><i class="bi bi-eye"></i></button>
+            <button class="btn btn-sm btn-outline-primary" onclick="editCrq(${cr.id})" ${rejected ? 'disabled' : ''}><i class="bi bi-pencil"></i></button>
+            <button class="btn btn-sm btn-outline-danger" onclick="deleteCrq(${cr.id})" ${rejected ? 'disabled' : ''}><i class="bi bi-trash"></i></button>
+        </td>
+    </tr>`}).join('');
+    paginator.update(data.length);
+}
+
+async function loadRequests() {
+    const r = await fetch('/api/cash-requests');
+    const d = await r.json();
+    if (!d.success) { showToast('danger', d.message); return; }
+    _cashRequests = d.cash_requests;
+    renderCashRequests(_cashRequests);
+}
+
+async function loadData() {
+    const r = await fetch('/api/data');
+    const d = await r.json();
+    if (!d.success) return;
+    beneficiaries = d.beneficiaries || [];
+    incidentsData = (d.incidents || []).filter(i => i.status === 'Active');
+    document.getElementById('crqIncident').innerHTML = '<option value="">Select Incident</option>' + incidentsData.map(i => `<option value="${i.id}">${i.incident_name}</option>`).join('');
+    document.getElementById('crqPriority').innerHTML = (d.cash_priorities||d.priorities||['Low','Medium','High','Urgent']).map(p => `<option value="${p}" ${p==='Medium'?'selected':''}>${p}</option>`).join('');
+    document.getElementById('crqPurpose').innerHTML = '<option value="">Select Purpose</option>' + (d.cash_purposes||[]).map(p => `<option value="${p}">${p}</option>`).join('');
+    document.getElementById('crqBeneficiary').innerHTML = '<option value="">Select Beneficiary</option>' + beneficiaries.map(b => `<option value="${b.id}">${b.name}${b.phone ? ' - ' + b.phone : ''}${b.ward_name ? ' (' + b.ward_name + ')' : ''}</option>`).join('');
+    if (beneficiaryTomSelect) beneficiaryTomSelect.destroy();
+    beneficiaryTomSelect = null;
+    getBeneficiaryTomSelect();
+}
+
+document.getElementById('crqForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const id = document.getElementById('crqId').value;
+    const incidentId = parseInt(document.getElementById('crqIncident').value);
+    const beneficiaryTs = getBeneficiaryTomSelect();
+    const beneficiaryId = parseInt(beneficiaryTs ? beneficiaryTs.getValue() : document.getElementById('crqBeneficiary').value);
+    const purpose = document.getElementById('crqPurpose').value;
+    const requestedAmount = parseFloat(document.getElementById('crqAmount').value);
+    if (!incidentId) { showToast('danger', 'Incident is required'); return; }
+    if (!beneficiaryId) { showToast('danger', 'Beneficiary is required'); return; }
+    if (!purpose) { showToast('danger', 'Purpose is required'); return; }
+    if (!requestedAmount || requestedAmount <= 0) { showToast('danger', 'Requested amount is required and must be greater than 0'); return; }
+    if (!id) {
+        const dupe = _cashRequests.find(r => r.beneficiary_id === beneficiaryId && r.incident_id === incidentId && ['Pending', 'Approved', 'Partial'].includes(r.status));
+        if (dupe) {
+            showToast('danger', `Beneficiary already has an active cash request for this incident (Request #${dupe.request_number}). Only one request per beneficiary per incident per fiscal year is allowed.`);
+            return;
+        }
+    }
+    const incData = incidentsData.find(i => i.id === incidentId);
+    const affectedHH = incData ? (incData.affected_households || 0) : 0;
+    if (affectedHH < 1) {
+        showToast('danger', 'Selected incident does not have any affected households. Please update the incident first.');
+        return;
+    }
+    const existingCRCount = _cashRequests.filter(r => r.incident_id === incidentId && r.status !== 'Rejected').length;
+    if (!id && existingCRCount >= affectedHH) {
+        showToast('danger', `This incident has only ${affectedHH} affected households. Only ${affectedHH} cash request(s) can be created.`);
+        return;
+    }
+    const body = {
+        request_date: document.getElementById('crqDate').value,
+        incident_id: incidentId,
+        requesting_office: document.getElementById('crqOffice').value,
+        requester_name: document.getElementById('crqRequester').value,
+        phone: document.getElementById('crqPhone').value,
+        priority: document.getElementById('crqPriority').value,
+        purpose: purpose,
+        requested_amount: requestedAmount,
+        beneficiary_id: beneficiaryId,
+        status: document.getElementById('crqStatus').value,
+        remarks: document.getElementById('crqRemarks').value
+    };
+    const url = id ? `/api/cash-requests/${id}` : '/api/cash-requests';
+    const method = id ? 'PUT' : 'POST';
+    try {
+        const r = await fetch(url, {method, headers:{'Content-Type':'application/json','X-CSRFToken':csrf}, body: JSON.stringify(body)});
+        const d = await r.json();
+        if (d.success) { showToast('success', d.message); bootstrap.Modal.getInstance(document.getElementById('crqModal')).hide(); loadRequests(); }
+        else showToast('danger', d.message);
+    } catch(e) { showToast('danger', e.message); }
+});
+
+async function viewCrq(id) {
+    const r = await fetch(`/api/cash-requests/${id}`);
+    const d = await r.json();
+    if (!d.success) return;
+    const cr = d.cash_request;
+    document.getElementById('viewCrqTitle').textContent = cr.request_number;
+
+    const distAmt = cr.distributed_amount || 0;
+    const remaining = (cr.requested_amount || 0) - distAmt;
+    const progress = cr.requested_amount > 0 ? Math.min(100, (distAmt / cr.requested_amount) * 100) : 0;
+
+    const distributions = cr.distributions || [];
+    const distRows = distributions.map((cd, i) => {
+        const bens = cd.beneficiaries || [];
+        const benNames = bens.map(b => `${b.name} (${Number(b.amount).toLocaleString()})`).join(', ');
+        return `<tr>
+            <td>${i + 1}</td>
+            <td>${cd.distribution_no}</td>
+            <td>${cd.distribution_date || '-'}</td>
+            <td>${cd.fund_name || '-'}</td>
+            <td class="text-end fw-semibold text-danger">${Number(cd.total_amount).toLocaleString()}</td>
+            <td class="small">${benNames || '-'}</td>
+            <td><span class="badge bg-${cd.status === 'Completed' ? 'success' : cd.status === 'Cancelled' ? 'danger' : 'secondary'}">${cd.status}</span></td>
+        </tr>`;
+    }).join('');
+
+    document.getElementById('viewCrqBody').innerHTML = `
+        <div class="row g-2 mb-3">
+            <div class="col-md-8">
+                <div class="card border-0 bg-light h-100">
+                    <div class="card-body py-2">
+                        <div class="row g-1 small">
+                            <div class="col-md-4"><strong>Req No:</strong> ${cr.request_number}</div>
+                            <div class="col-md-4"><strong>Date:</strong> ${cr.request_date || '-'}</div>
+                            <div class="col-md-4"><strong>Priority:</strong> <span class="badge ${cr.priority === 'Urgent' ? 'bg-danger' : cr.priority === 'High' ? 'bg-warning' : cr.priority === 'Medium' ? 'bg-info' : 'bg-secondary'}">${cr.priority}</span></div>
+                            <div class="col-md-4"><strong>Incident:</strong> ${cr.incident_name || '-'}</div>
+                            <div class="col-md-4"><strong>Purpose:</strong> ${cr.purpose || '-'}</div>
+                            <div class="col-md-4"><strong>Fiscal Year:</strong> ${cr.fiscal_year || '-'}</div>
+                            <div class="col-12"><strong>Remarks:</strong> ${cr.remarks || '-'}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card border-0 bg-light h-100">
+                    <div class="card-body py-2">
+                        <div class="row g-1 small">
+                            <div class="col-6"><strong>Status:</strong> <span class="badge bg-${cr.status === 'Completed' ? 'success' : cr.status === 'Approved' ? 'primary' : cr.status === 'Rejected' ? 'danger' : cr.status === 'Partial' ? 'warning' : 'secondary'}">${cr.status}</span></div>
+                            <div class="col-6"><strong>Beneficiary:</strong> ${cr.beneficiary_name || '-'}</div>
+                            <div class="col-6"><strong>Requested:</strong> <strong>${Number(cr.requested_amount).toLocaleString()}</strong></div>
+                            <div class="col-6"><strong>Distributed:</strong> <strong class="text-success">${Number(distAmt).toLocaleString()}</strong></div>
+                            <div class="col-6"><strong>Remaining:</strong> <strong class="text-${remaining > 0 ? 'warning' : 'success'}">${Number(remaining).toLocaleString()}</strong></div>
+                            <div class="col-6"><strong>Distributions:</strong> ${distributions.length}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card border-0 bg-light mb-3">
+            <div class="card-header bg-white py-2 d-flex justify-content-between align-items-center">
+                <span class="fw-semibold"><i class="bi bi-person me-1 text-primary"></i>Requester Info</span>
+            </div>
+            <div class="card-body py-2">
+                <div class="row g-1 small">
+                    <div class="col-md-4"><strong>Name:</strong> ${cr.requester_name || '-'}</div>
+                    <div class="col-md-4"><strong>Phone:</strong> ${cr.phone || '-'}</div>
+                    <div class="col-md-4"><strong>Office:</strong> ${cr.requesting_office || '-'}</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card border-0 bg-light mb-3">
+            <div class="card-header bg-white py-2 d-flex justify-content-between align-items-center">
+                <span class="fw-semibold"><i class="bi bi-bar-chart me-1 text-primary"></i>Distribution Progress</span>
+                <span class="badge bg-${progress >= 100 ? 'success' : progress > 0 ? 'warning' : 'secondary'}">${Math.round(progress)}%</span>
+            </div>
+            <div class="card-body py-2">
+                <div class="progress mb-2" style="height:8px">
+                    <div class="progress-bar ${progress >= 100 ? 'bg-success' : progress > 0 ? 'bg-warning' : ''}" style="width:${progress}%"></div>
+                </div>
+                <div class="row g-1 small">
+                    <div class="col-md-4"><strong>Requested:</strong> ${Number(cr.requested_amount).toLocaleString()}</div>
+                    <div class="col-md-4"><strong>Distributed:</strong> <span class="text-success">${Number(distAmt).toLocaleString()}</span></div>
+                    <div class="col-md-4"><strong>Remaining:</strong> <span class="text-${remaining > 0 ? 'danger' : 'success'}">${Number(remaining).toLocaleString()}</span></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card border-0 bg-light">
+            <div class="card-header bg-white py-2 d-flex justify-content-between align-items-center">
+                <span class="fw-semibold"><i class="bi bi-cash-stack me-1 text-primary"></i>Distributions (${distributions.length})</span>
+                <span class="badge bg-primary">Total: ${Number(distAmt).toLocaleString()}</span>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered mb-0 small">
+                        <thead class="table-light"><tr>
+                            <th style="width:40px">#</th>
+                            <th>Dist No</th>
+                            <th>Date</th>
+                            <th>Fund</th>
+                            <th class="text-end" style="width:120px">Amount</th>
+                            <th>Beneficiaries</th>
+                            <th>Status</th>
+                        </tr></thead>
+                        <tbody>${distRows || '<tr><td colspan="7" class="text-center text-muted py-2">No distributions yet</td></tr>'}</tbody>
+                    </table>
+                </div>
+            </div>
+        </div>`;
+
+    new bootstrap.Modal(document.getElementById('viewCrqModal')).show();
+}
+
+function openCrqModal() { document.getElementById('crqForm').reset(); document.getElementById('crqId').value = ''; const ts = getBeneficiaryTomSelect(); if (ts) ts.clear(); document.getElementById('crqIncidentInfo').textContent = ''; }
+
+async function editCrq(id) {
+    const r = await fetch(`/api/cash-requests/${id}`);
+    const d = await r.json();
+    if (!d.success) return;
+    const cr = d.cash_request;
+    if (cr.status === 'Rejected') { showToast('warning', 'This cash request was rejected/cancelled and cannot be edited.'); return; }
+    document.getElementById('crqId').value = cr.id;
+    document.getElementById('crqDate').value = cr.request_date;
+    document.getElementById('crqIncident').value = cr.incident_id;
+    onCrqIncidentChange();
+    document.getElementById('crqOffice').value = cr.requesting_office || '';
+    document.getElementById('crqRequester').value = cr.requester_name || '';
+    document.getElementById('crqPhone').value = cr.phone || '';
+    const ts = getBeneficiaryTomSelect();
+    if (ts) ts.setValue(cr.beneficiary_id ? String(cr.beneficiary_id) : '');
+    else document.getElementById('crqBeneficiary').value = cr.beneficiary_id || '';
+    document.getElementById('crqPriority').value = cr.priority;
+    document.getElementById('crqPurpose').value = cr.purpose || '';
+    document.getElementById('crqAmount').value = cr.requested_amount;
+    document.getElementById('crqStatus').value = cr.status;
+    document.getElementById('crqRemarks').value = cr.remarks || '';
+    new bootstrap.Modal(document.getElementById('crqModal')).show();
+}
+
+async function deleteCrq(id) {
+    const cr = _cashRequests.find(r => r.id === id);
+    if (cr && cr.status === 'Rejected') { showToast('warning', 'This cash request was rejected/cancelled and cannot be deleted.'); return; }
+    if (!confirm('Delete this request?')) return;
+    const r = await fetch(`/api/cash-requests/${id}`, {method:'DELETE', headers:{'X-CSRFToken':csrf}});
+    const d = await r.json();
+    if (d.success) { showToast('success', d.message); loadRequests(); }
+    else showToast('danger', d.message);
+}
+
+loadRequests();
+loadData();
+</script>
+{% endblock %}

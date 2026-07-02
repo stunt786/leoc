@@ -1,0 +1,18 @@
+[Unit]
+Description=LEOC Docker Compose - Auto-start leoc-db and leoc-app
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=root
+Group=docker
+WorkingDirectory=/home/thalaramun/leoc
+ExecStart=/usr/bin/docker compose up -d
+ExecStop=/usr/bin/docker compose down
+StandardOutput=journal
+
+[Install]
+WantedBy=multi-user.target

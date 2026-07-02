@@ -1,0 +1,1606 @@
+{% extends "base.html" %}
+{% block title %}Distribution - LEOC{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('index') }}"><i class="bi bi-house-fill"></i></a></li>
+<li class="breadcrumb-item">Operations</li>
+<li class="breadcrumb-item active">Distribution</li>
+{% endblock %}
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center">
+    <div>
+        <h4><i class="bi bi-people me-2"></i>Distribution Management</h4>
+        <p>Final distribution of relief supplies to beneficiaries</p>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header">
+        <span><i class="bi bi-plus-circle me-2 text-primary"></i>Record Distribution</span>
+    </div>
+    <div class="card-body">
+        <form id="distributionForm">
+            <input type="hidden" id="dist_id">
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">Distribution Number</label>
+                    <input type="text" class="form-control" id="dist_distribution_no" readonly>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Dispatches <span class="text-muted small">(select multiple)</span></label>
+                    <div class="dropdown">
+                        <button class="form-select text-start" type="button" data-bs-toggle="dropdown" id="dist_dispatch_btn" aria-expanded="false">
+                            <i class="bi bi-chevron-down float-end"></i>
+                            <span id="dist_dispatch_label">Select Dispatches</span>
+                        </button>
+                        <ul class="dropdown-menu p-2 w-100" id="dist_dispatch_menu" style="max-height:250px;overflow-y:auto">
+                        </ul>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Incident</label>
+                    <input type="text" class="form-control" id="dist_incident" readonly>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Location</label>
+                    <input type="text" class="form-control" id="dist_location">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Coordinates (Lat, Lng)</label>
+                    <input type="text" class="form-control" id="dist_coordinates" placeholder="e.g. 29.4479, 80.9092">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Distribution Date</label>
+                    <input type="text" class="form-control nepali-date" placeholder="YYYY-MM-DD" id="dist_distribution_date">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Officer</label>
+                    <input type="text" class="form-control" id="dist_officer">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Import from Relief Request</label>
+                    <div class="input-group">
+                        <select class="form-select" id="dist_import_rr" disabled>
+                            <option value="">Auto — selects with dispatches</option>
+                        </select>
+                        <button type="button" class="btn btn-outline-info" onclick="importFromReliefRequest()" title="Import from auto-selected RR"><i class="bi bi-download"></i></button>
+                    </div>
+                </div>
+                <div class="col-12">
+                    <label class="form-label">Remarks</label>
+                    <textarea class="form-control" id="dist_remarks" rows="2"></textarea>
+                </div>
+            </div>
+
+            <hr>
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <label class="form-label mb-0 fw-bold"><i class="bi bi-people me-1"></i>Beneficiaries</label>
+                <div>
+                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="addBeneficiaryRow()"><i class="bi bi-plus-lg"></i> Add Beneficiary</button>
+                    <button type="button" class="btn btn-sm btn-outline-info" onclick="openBeneficiaryPicker()"><i class="bi bi-person-lines-fill"></i> Select from Registry</button>
+                    <button type="button" class="btn btn-sm btn-outline-success" onclick="addBeneficiaryFromDispatch()"><i class="bi bi-truck"></i> Add from Dispatch</button>
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm table-bordered mb-0" id="beneficiaryTable">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="min-width:160px">Family Name</th>
+                            <th style="min-width:90px">ID Number</th>
+                            <th style="width:80px">Members</th>
+                            <th>Items</th>
+                            <th style="width:90px">Receive Cash?</th>
+                            <th style="width:160px">Cash Amount</th>
+                            <th style="width:40px"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="beneficiaryBody">
+<tr><td colspan="7" class="text-center text-muted py-3">Add beneficiaries to this distribution</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <hr>
+            <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                    <label class="form-label fw-bold"><i class="bi bi-images me-1"></i>Upload Photos</label>
+                    <input type="file" class="form-control" id="distPhotoFiles" accept="image/jpeg,image/png,image/gif" multiple onchange="previewDistPhotos(this)">
+                    <div id="distPhotoPreview" class="d-flex flex-wrap gap-2 mt-2"></div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label fw-bold"><i class="bi bi-file-earmark-pdf me-1"></i>Upload Documents (PDF)</label>
+                    <input type="file" class="form-control" id="distDocFiles" accept="application/pdf" multiple onchange="previewDistDocs(this)">
+                    <div id="distDocPreview" class="d-flex flex-wrap gap-2 mt-2"></div>
+                </div>
+            </div>
+            <hr>
+            <label class="form-label fw-bold"><i class="bi bi-box-seam me-1"></i>Dispatch Items Summary</label>
+            <div class="table-responsive mb-2">
+                <table class="table table-sm table-bordered mb-0" id="dispatchItemsSummaryTable">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Item</th>
+                            <th class="text-center" style="width:100px">Dispatched</th>
+                            <th class="text-center" style="width:100px">Distributed</th>
+                            <th class="text-center" style="width:100px">Remaining</th>
+                        </tr>
+                    </thead>
+                    <tbody id="dispatchItemsSummaryBody">
+                        <tr><td colspan="4" class="text-center text-muted py-2">Select a dispatch to view items</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div id="cashFundSection" style="display:none" class="row g-2 mb-3 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label fw-bold small mb-1"><i class="bi bi-cash-stack me-1 text-success"></i>Cash Summary</label>
+                    <div id="cashInfoDisplay" class="small"></div>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Fund <span class="text-danger">*</span></label>
+                    <select class="form-select" id="cdFund">
+                        <option value="">Select Fund</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Distribution Type</label>
+                    <select class="form-select" id="cdType"></select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Total Cash</label>
+                    <input type="text" class="form-control" id="cdTotal" readonly value="0">
+                </div>
+            </div>
+
+            <div class="mt-3">
+                <button type="button" class="btn btn-primary" onclick="saveDistribution()"><i class="bi bi-check-lg me-1"></i>Save Distribution</button>
+                <button type="button" class="btn btn-secondary" onclick="resetDistributionForm()"><i class="bi bi-arrow-counterclockwise me-1"></i>Reset</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-list-check me-2 text-primary"></i>Recent Distributions</span>
+        <input type="text" class="form-control form-control-sm" style="width:200px" id="distSearch" placeholder="Search..." oninput="filterDistributions()">
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Distribution #</th>
+                        <th>Beneficiary</th>
+                        <th>Incident</th>
+                        <th>Location</th>
+                        <th>Date</th>
+                        <th>Officer</th>
+                        <th>Beneficiaries</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="distributionTableBody">
+                    <tr><td colspan="8" class="text-center py-4"><div class="spinner-border text-primary"></div></td></tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="d-flex justify-content-between align-items-center mt-2 px-2">
+            <small class="text-muted" id="tableInfo">0 records</small>
+            <nav><ul class="pagination pagination-sm mb-0" id="pagination"></ul></nav>
+        </div>
+    </div>
+</div>
+
+<!-- Beneficiary Picker Modal -->
+<div class="modal fade" id="benPickerModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-person-lines-fill me-2"></i>Select Beneficiary from Registry</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <input type="text" class="form-control" id="benPickerSearch" placeholder="Search by name, ID, phone..." oninput="filterBenPicker()">
+                </div>
+                <div class="table-responsive" style="max-height:350px">
+                    <table class="table table-sm table-hover mb-0">
+                        <thead class="table-light sticky-top">
+                            <tr><th>Name</th><th>Father's Name</th><th>National ID</th><th>Ward</th><th>Members</th><th></th></tr>
+                        </thead>
+                        <tbody id="benPickerBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+let distributions = [];
+let dispatchItemsCache = {};
+let dispatchDetailsCache = {};
+let dispatchRRMap = {};
+let beneficiaries = [];
+let paginator = new Paginator({perPage: 25, onPageChange: () => renderDistributions(distributions)});
+let benPickerModal = null;
+let isSaving = false;
+let reliefRequestCashMap = {};
+
+let warehouseList = [];
+let pendingPhotoFiles = [];
+let pendingDocFiles = [];
+
+async function loadFormData() {
+    try {
+        const r = await fetch('/api/data');
+        if (!r.ok) { showToast('danger', 'Failed to load form data'); return; }
+        const d = await r.json();
+        if (!d.success) { showToast('danger', d.message); return; }
+
+        const dispMenu = document.getElementById('dist_dispatch_menu');
+        const dispatches = d.dispatches || [];
+        const pending = dispatches.filter(dp => !dp.has_distribution && dp.status !== 'Cancelled');
+        const completed = dispatches.filter(dp => dp.has_distribution);
+        dispatchRRMap = {};
+        dispMenu.innerHTML = '';
+        if (pending.length === 0) {
+            const li = document.createElement('li');
+            li.style.padding = '2px 0';
+            const label = document.createElement('label');
+            label.className = 'dropdown-item text-muted py-1';
+            label.style.cursor = 'default';
+            label.textContent = 'No pending dispatches available';
+            li.appendChild(label);
+            dispMenu.appendChild(li);
+        }
+        pending.forEach(dp => {
+            dispatchRRMap[dp.id] = dp.relief_request_ids || (dp.relief_request_id ? [dp.relief_request_id] : []);
+            dispatchItemsCache[dp.id] = dp.items || [];
+            dispatchDetailsCache[dp.id] = dp;
+            const li = document.createElement('li');
+            li.style.padding = '2px 0';
+            const label = document.createElement('label');
+            label.className = 'dropdown-item d-flex align-items-center gap-2 py-1';
+            label.style.cursor = 'pointer';
+            const cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.className = 'form-check-input m-0 dispatch-checkbox';
+            cb.value = dp.id;
+            cb.addEventListener('change', updateDispatchLabel);
+            label.appendChild(cb);
+            label.appendChild(document.createTextNode(` ${dp.dispatch_number} - ${dp.incident_name || ''} (${dp.date || ''})`));
+            li.appendChild(label);
+            dispMenu.appendChild(li);
+        });
+        if (completed.length > 0) {
+            const sep = document.createElement('li');
+            sep.style.padding = '2px 0';
+            const sepLabel = document.createElement('label');
+            sepLabel.className = 'dropdown-item text-muted small py-1';
+            sepLabel.style.cursor = 'default';
+            sepLabel.innerHTML = `<hr class="my-1">${completed.length} dispatch(es) already distributed — not shown`;
+            sep.appendChild(sepLabel);
+            dispMenu.appendChild(sep);
+        }
+
+        document.getElementById('dist_distribution_date').value = today_bs;
+        document.getElementById('dist_distribution_no').value = 'DIST-' + String(Date.now()).slice(-4);
+
+        // Cache relief request cash data
+        (d.requests || []).forEach(rr => {
+            reliefRequestCashMap[rr.id] = rr;
+        });
+
+        // Relief request import dropdown — populated dynamically when dispatches are selected
+        document.getElementById('dist_import_rr').innerHTML = '<option value="">Auto — selects with dispatches</option>';
+
+        // Load cash distribution data (fund sources from Fund Management)
+        const fundSel = document.getElementById('cdFund');
+        const activeFunds = (d.cash_funds||[]).filter(f=>f.status==='Active');
+        if (activeFunds.length > 0) {
+            fundSel.innerHTML = '<option value="">Select Fund</option>' + activeFunds.map(f =>
+                `<option value="${f.id}">${f.name}${f.funding_source ? ' (' + f.funding_source + ')' : ''} — Bal: ${Number(f.current_balance).toLocaleString()}</option>`
+            ).join('');
+        } else {
+            fundSel.innerHTML = '<option value="">Select Fund</option><option value="" disabled>── No funds found ──</option><option value="" disabled class="text-muted">Create a fund in Fund Management first</option>';
+        }
+
+        const typeSel = document.getElementById('cdType');
+        typeSel.innerHTML = (d.distribution_types||['Individual','Family','Community','Local Government','Organization']).map(t =>
+            `<option value="${t}">${t}</option>`
+        ).join('');
+
+        warehouseList = d.warehouses || [];
+    } catch(e) {
+        showToast('danger', 'Error loading form data: ' + e.message);
+    }
+}
+
+async function loadBeneficiaries() {
+    try {
+        const r = await fetch('/api/beneficiaries');
+        if (!r.ok) { showToast('danger', 'Failed to load beneficiaries'); return; }
+        const d = await r.json();
+        if (d.success) beneficiaries = d.beneficiaries || [];
+        else showToast('danger', d.message);
+    } catch(e) {
+        showToast('danger', 'Error loading beneficiaries: ' + e.message);
+    }
+}
+
+function getSelectedDispatchIds() {
+    return Array.from(document.querySelectorAll('#dist_dispatch_menu .dispatch-checkbox:checked')).map(cb => parseInt(cb.value));
+}
+
+function updateDispatchLabel() {
+    const checked = document.querySelectorAll('#dist_dispatch_menu .dispatch-checkbox:checked');
+    const label = document.getElementById('dist_dispatch_label');
+    label.textContent = checked.length === 0 ? 'Select Dispatches' : `${checked.length} dispatch(es) selected`;
+    onDispatchChange();
+}
+
+async function onDispatchChange() {
+    const selectedIds = getSelectedDispatchIds();
+    if (selectedIds.length === 0) {
+        document.getElementById('dist_incident').value = '';
+        document.getElementById('beneficiaryBody').innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">Add beneficiaries to this distribution</td></tr>';
+        document.getElementById('dispatchItemsSummaryBody').innerHTML = '<tr><td colspan="4" class="text-center text-muted py-2">Select dispatches to view items</td></tr>';
+        document.getElementById('cashFundSection').style.display = 'none';
+        return;
+    }
+
+    // Use pre-populated cache from initial data load
+    let allItems = [];
+    let incidentName = '';
+    let incidentId = null;
+    let rrIds = [];
+
+    for (const dpId of selectedIds) {
+        const dp = dispatchDetailsCache[dpId];
+        if (!dp) continue;
+        if (!incidentName) {
+            incidentName = dp.incident_name || '';
+            incidentId = dp.incident_id;
+        }
+        allItems = allItems.concat(dp.items || []);
+        const ids = dp.relief_request_ids || (dp.relief_request_id ? [dp.relief_request_id] : []);
+        ids.forEach(id => { if (id && !rrIds.includes(id)) rrIds.push(id); });
+    }
+
+    document.getElementById('dist_incident').value = incidentName;
+
+    // Aggregate items by name (sum quantities across dispatches)
+    const aggregated = {};
+    allItems.forEach(item => {
+        const key = item.item_name;
+        if (!aggregated[key]) {
+            aggregated[key] = { item_name: key, quantity: 0, dispatched_total: 0 };
+        }
+        aggregated[key].dispatched_total += item.quantity || 0;
+    });
+
+    updateDispatchSummary(aggregated);
+
+    const existingRows = document.querySelectorAll('#beneficiaryBody tr');
+    existingRows.forEach(tr => {
+        tr.querySelectorAll('.ben-item').forEach(itemSelect => updateItemDropdown(itemSelect, aggregated));
+    });
+    updateDistributedQtySummary();
+
+    // Show/hide cash section based on relief requests
+    const cashSection = document.getElementById('cashFundSection');
+    const cashInfo = document.getElementById('cashInfoDisplay');
+    cashSection.style.display = 'none';
+
+    let totalCashRemaining = 0;
+    let totalReqAmount = 0;
+    let totalDistAmount = 0;
+    let cashPurpose = '';
+    let rrNumbers = [];
+
+    for (const rrId of rrIds) {
+        if (reliefRequestCashMap[rrId] && reliefRequestCashMap[rrId].cash_remaining > 0) {
+            const rr = reliefRequestCashMap[rrId];
+            totalCashRemaining += rr.cash_remaining || 0;
+            totalReqAmount += rr.requested_cash_amount || 0;
+            totalDistAmount += rr.distributed_cash_amount || 0;
+            cashPurpose = rr.cash_purpose || cashPurpose;
+            rrNumbers.push(rr.request_number);
+        }
+    }
+
+    if (totalCashRemaining > 0) {
+        const pct = totalReqAmount > 0 ? Math.min(100, (totalDistAmount / totalReqAmount) * 100) : 0;
+        cashInfo.innerHTML = `
+            <span class="text-nowrap">Req: <strong>${Number(totalReqAmount).toLocaleString()}</strong></span>
+            <span class="text-nowrap ms-2">Dist: <strong>${Number(totalDistAmount).toLocaleString()}</strong></span>
+            <span class="text-nowrap ms-2">Rem: <strong class="text-success">${Number(totalCashRemaining).toLocaleString()}</strong></span>
+            <span class="text-nowrap ms-2">Purpose: <strong>${cashPurpose || '-'}</strong></span>
+            <span class="text-nowrap ms-2 badge bg-success">${rrNumbers.join(', ')}</span>
+            <div class="progress mt-1" style="height:3px;max-width:300px"><div class="progress-bar bg-success" style="width:${pct}%"></div></div>
+        `;
+        cashSection.style.display = '';
+    }
+
+    // Auto-populate relief request dropdown from selected dispatches
+    const rrSel = document.getElementById('dist_import_rr');
+    if (rrIds.length === 1) {
+        const rr = reliefRequestCashMap[rrIds[0]];
+        if (rr) {
+            rrSel.innerHTML = `<option value="${rr.id}">${rr.request_number} - ${rr.requester_name || rr.organization || ''}</option>`;
+            rrSel.value = rr.id;
+        }
+    } else if (rrIds.length > 1) {
+        const labels = rrIds.map(id => {
+            const rr = reliefRequestCashMap[id];
+            return rr ? `${rr.request_number} (${rr.requester_name || rr.organization || ''})` : null;
+        }).filter(Boolean);
+        rrSel.innerHTML = `<option value="">${labels.length} relief requests linked — select one via Import button</option>` + rrIds.map(id => {
+            const rr = reliefRequestCashMap[id];
+            return rr ? `<option value="${rr.id}">${rr.request_number} - ${rr.requester_name || rr.organization || ''}</option>` : '';
+        }).join('');
+        rrSel.value = '';
+    } else {
+        rrSel.innerHTML = '<option value="">Auto — selects with dispatches</option>';
+        rrSel.value = '';
+    }
+}
+
+function updateItemDropdown(selectEl, itemAggregated) {
+    const aggregatedItems = itemAggregated || (() => {
+        // Build aggregated map from all selected dispatches
+        const selectedIds = getSelectedDispatchIds();
+        const agg = {};
+        selectedIds.forEach(dpId => {
+            (dispatchItemsCache[dpId] || []).forEach(item => {
+                if (!agg[item.item_name]) agg[item.item_name] = { item_name: item.item_name, quantity: 0 };
+                agg[item.item_name].quantity += item.quantity || 0;
+            });
+        });
+        return agg;
+    })();
+
+    const currentVal = selectEl.value;
+    selectEl.innerHTML = '<option value="">Select Item</option>' +
+        Object.keys(aggregatedItems).map(name => `<option value="${name}">${name}</option>`).join('');
+    if (currentVal) selectEl.value = currentVal;
+}
+
+function updateDispatchSummary(aggregated) {
+    const tbody = document.getElementById('dispatchItemsSummaryBody');
+    const keys = Object.keys(aggregated);
+    if (keys.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-2">No items in selected dispatches</td></tr>';
+        return;
+    }
+    tbody.innerHTML = keys.map(name => `<tr data-item="${name}">
+        <td>${name}</td>
+        <td class="text-center dispatched-qty">${aggregated[name].dispatched_total}</td>
+        <td class="text-center distributed-qty">0</td>
+        <td class="text-center remaining-qty">${aggregated[name].dispatched_total}</td>
+    </tr>`).join('');
+}
+
+function updateDistributedQtySummary() {
+    const rows = document.querySelectorAll('#dispatchItemsSummaryBody tr[data-item]');
+    if (rows.length === 0) return;
+    const totals = {};
+    document.querySelectorAll('#beneficiaryBody tr').forEach(tr => {
+        tr.querySelectorAll('.ben-item-row').forEach(row => {
+            const itemEl = row.querySelector('.ben-item');
+            const qtyEl = row.querySelector('.ben-qty');
+            if (!itemEl || !qtyEl) return;
+            const item = itemEl.value;
+            const qty = parseInt(qtyEl.value) || 0;
+            if (item) totals[item] = (totals[item] || 0) + qty;
+        });
+    });
+    rows.forEach(tr => {
+        const itemName = tr.getAttribute('data-item');
+        const dispatched = parseInt(tr.querySelector('.dispatched-qty').textContent) || 0;
+        const distributed = totals[itemName] || 0;
+        const remaining = dispatched - distributed;
+        tr.querySelector('.distributed-qty').textContent = distributed;
+        tr.querySelector('.remaining-qty').textContent = remaining;
+        tr.querySelector('.remaining-qty').classList.toggle('text-danger', remaining < 0);
+    });
+}
+
+function addBeneficiaryRow(data) {
+    data = data || {};
+    const tbody = document.getElementById('beneficiaryBody');
+    const placeholder = tbody.querySelector('tr td[colspan]');
+    if (placeholder) tbody.innerHTML = '';
+
+    // Build aggregated item list from all selected dispatches
+    const selectedIds = getSelectedDispatchIds();
+    const aggregatedItems = {};
+    selectedIds.forEach(dpId => {
+        (dispatchItemsCache[dpId] || []).forEach(item => {
+            if (!aggregatedItems[item.item_name]) aggregatedItems[item.item_name] = { item_name: item.item_name, quantity: 0 };
+            aggregatedItems[item.item_name].quantity += item.quantity || 0;
+        });
+    });
+    const itemOptions = Object.keys(aggregatedItems).map(name => `<option value="${name}">${name}</option>`).join('');
+
+    const tr = document.createElement('tr');
+    const benId = data.id || '';
+    const familyName = data.name || data.family_name || '';
+    const idNumber = data.national_id || data.id_number || '';
+    const members = data.family_members || data.members || 1;
+    const item = data.item || '';
+    const qty = data.quantity || '';
+    tr.innerHTML = `
+        <input type="hidden" class="ben-beneficiary-id" value="${benId}">
+        <td>
+            <input type="text" class="form-control form-control-sm ben-family-name" value="${familyName}" placeholder="Family name" list="benDatalist" autocomplete="off" oninput="onBenNameInput(this)" onblur="onBenNameBlur(this)">
+        </td>
+        <td style="width:90px"><input type="text" class="form-control form-control-sm ben-id-number" value="${idNumber}" placeholder="ID"></td>
+        <td style="width:80px"><input type="number" class="form-control form-control-sm ben-members" value="${members}" min="1"></td>
+        <td>
+            <div class="ben-items-container">
+                <div class="ben-item-row mb-1">
+                    <div class="d-flex gap-1 align-items-center">
+                        <select class="form-select form-select-sm ben-item" onchange="updateDistributedQtySummary()">
+                            <option value="">Select Item</option>
+                            ${itemOptions}
+                        </select>
+                        <input type="number" class="form-control form-control-sm ben-qty" style="width:80px" value="${qty || 1}" min="1" oninput="updateDistributedQtySummary()">
+                        <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeBeneficiaryItem(this)"><i class="bi bi-x"></i></button>
+                    </div>
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-primary" onclick="addBeneficiaryItem(this)">+ Item</button>
+            </div>
+        </td>
+        <td class="text-center" style="width:90px">
+            <div class="form-check">
+                <input type="checkbox" class="form-check-input ben-receive-cash" onchange="toggleCashField(this); updateCashTotal()">
+            </div>
+        </td>
+        <td style="width:160px">
+            <input type="number" step="0.01" class="form-control form-control-sm ben-cash-amount" placeholder="Amount" disabled oninput="updateCashTotal()">
+        </td>
+        <td style="width:40px"><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove(); updateDistributedQtySummary(); updateCashTotal()"><i class="bi bi-trash"></i></button></td>
+    `;
+    tbody.appendChild(tr);
+    updateDistributedQtySummary();
+    updateCashTotal();
+}
+
+function addBeneficiaryItem(btn) {
+    const container = btn.closest('.ben-items-container');
+    const selectedIds = getSelectedDispatchIds();
+    const aggregatedItems = {};
+    selectedIds.forEach(dpId => {
+        (dispatchItemsCache[dpId] || []).forEach(item => {
+            if (!aggregatedItems[item.item_name]) aggregatedItems[item.item_name] = { item_name: item.item_name, quantity: 0 };
+            aggregatedItems[item.item_name].quantity += item.quantity || 0;
+        });
+    });
+    const itemOptions = Object.keys(aggregatedItems).map(name => `<option value="${name}">${name}</option>`).join('');
+
+    const row = document.createElement('div');
+    row.className = 'ben-item-row mb-1';
+    row.innerHTML = `
+        <div class="d-flex gap-1 align-items-center">
+            <select class="form-select form-select-sm ben-item" onchange="updateDistributedQtySummary()">
+                <option value="">Select Item</option>
+                ${itemOptions}
+            </select>
+            <input type="number" class="form-control form-control-sm ben-qty" style="width:80px" value="1" min="1" oninput="updateDistributedQtySummary()">
+            <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeBeneficiaryItem(this)"><i class="bi bi-x"></i></button>
+        </div>
+    `;
+    container.insertBefore(row, btn);
+    updateDistributedQtySummary();
+}
+
+function toggleCashField(checkbox) {
+    const amtInput = checkbox.closest('tr').querySelector('.ben-cash-amount');
+    amtInput.disabled = !checkbox.checked;
+    if (!checkbox.checked) amtInput.value = '';
+}
+
+function updateCashTotal() {
+    let total = 0;
+    document.querySelectorAll('#beneficiaryBody tr').forEach(tr => {
+        const cb = tr.querySelector('.ben-receive-cash');
+        const amt = tr.querySelector('.ben-cash-amount');
+        if (cb && cb.checked && amt) {
+            const v = parseFloat(amt.value);
+            if (!isNaN(v)) total += v;
+        }
+    });
+    document.getElementById('cdTotal').value = total;
+}
+
+function removeBeneficiaryItem(btn) {
+    const row = btn.closest('.ben-item-row');
+    const container = row.closest('.ben-items-container');
+    row.remove();
+    // Keep at least one empty item row
+    if (container.querySelectorAll('.ben-item-row').length === 0) {
+        addBeneficiaryItem(container.querySelector('button'));
+    }
+    updateDistributedQtySummary();
+}
+
+function onBenNameInput(input) {
+    const val = input.value.toLowerCase();
+    const match = beneficiaries.find(b => b.name.toLowerCase() === val);
+    if (match) {
+        fillBenRow(input, match);
+    }
+}
+
+function onBenNameBlur(input) {
+    const val = input.value.toLowerCase();
+    const match = beneficiaries.find(b => b.name.toLowerCase() === val);
+    if (match) {
+        fillBenRow(input, match);
+    }
+}
+
+function fillBenRow(input, ben) {
+    const tr = input.closest('tr');
+    tr.querySelector('.ben-beneficiary-id').value = ben.id;
+    tr.querySelector('.ben-id-number').value = ben.national_id || '';
+    tr.querySelector('.ben-members').value = ben.family_members || 1;
+}
+
+async function openBeneficiaryPicker() {
+    await loadBeneficiaries();
+    renderBenPicker(beneficiaries);
+    if (!benPickerModal) {
+        benPickerModal = new bootstrap.Modal(document.getElementById('benPickerModal'));
+    }
+    benPickerModal.show();
+}
+
+function filterBenPicker() {
+    const q = document.getElementById('benPickerSearch').value.toLowerCase();
+    const filtered = beneficiaries.filter(b =>
+        (b.name && b.name.toLowerCase().includes(q)) ||
+        (b.father_name && b.father_name.toLowerCase().includes(q)) ||
+        (b.national_id && b.national_id.toLowerCase().includes(q)) ||
+        (b.phone && b.phone.toLowerCase().includes(q))
+    );
+    renderBenPicker(filtered);
+}
+
+function renderBenPicker(list) {
+    const tbody = document.getElementById('benPickerBody');
+    if (list.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">No beneficiaries found</td></tr>';
+        return;
+    }
+    tbody.innerHTML = list.map(b => `<tr>
+        <td>${b.name}</td>
+        <td>${b.father_name || '-'}</td>
+        <td>${b.national_id || '-'}</td>
+        <td>${b.ward_name || b.ward || '-'}</td>
+        <td>${b.family_members || 1}</td>
+        <td><button class="btn btn-sm btn-outline-primary" onclick="selectBeneficiaryFromPicker(${b.id})"><i class="bi bi-plus-lg"></i></button></td>
+    </tr>`).join('');
+}
+
+function selectBeneficiaryFromPicker(id) {
+    const ben = beneficiaries.find(b => b.id === id);
+    if (ben) {
+        addBeneficiaryRow(ben);
+        benPickerModal.hide();
+    }
+}
+
+function addBeneficiaryFromDispatch() {
+    const dispatchIds = getSelectedDispatchIds();
+    if (dispatchIds.length === 0) { showToast('warning', 'Please select at least one dispatch first'); return; }
+
+    // Build aggregated beneficiary map: name -> { name, items: { item_name: total_qty } }
+    const benMap = {};
+
+    dispatchIds.forEach((did) => {
+        const dp = dispatchDetailsCache[did];
+        if (!dp) return;
+
+        const dispatchItems = dispatchItemsCache[did] || [];
+        const linkedRRs = dp.relief_requests || [];
+
+        if (linkedRRs.length > 0) {
+            linkedRRs.forEach((rr) => {
+                const benName = (rr.requester_name || rr.organization || '').trim();
+                if (!benName) return;
+                const key = benName.toLowerCase();
+                if (!benMap[key]) {
+                    benMap[key] = { name: benName, items: {} };
+                }
+                // Use each relief request item's quantity per beneficiary, not the dispatch total
+                (rr.items || []).forEach(ri => {
+                    const itemName = ri.item_name;
+                    if (!itemName) return;
+                    const qty = ri.quantity_dispatched || ri.quantity_requested || 0;
+                    benMap[key].items[itemName] = (benMap[key].items[itemName] || 0) + qty;
+                });
+            });
+        } else {
+            // Fallback: single relief request or use receiver/destination
+            let rr = null;
+            const rrId = parseInt(document.getElementById('dist_import_rr').value);
+            if (rrId && reliefRequestCashMap[rrId] && reliefRequestCashMap[rrId].id === dp.relief_request_id) {
+                rr = reliefRequestCashMap[rrId];
+            } else if (dp.relief_request_id && reliefRequestCashMap[dp.relief_request_id]) {
+                rr = reliefRequestCashMap[dp.relief_request_id];
+            }
+            const benName = (rr ? (rr.requester_name || rr.organization || '') : (dp.receiver || dp.destination || '')).trim();
+            if (!benName) return;
+            const key = benName.toLowerCase();
+            if (!benMap[key]) {
+                benMap[key] = { name: benName, items: {} };
+            }
+            if (rr && rr.items) {
+                rr.items.forEach(ri => {
+                    const itemName = ri.item_name;
+                    if (!itemName) return;
+                    const qty = ri.quantity_dispatched || ri.quantity_requested || 0;
+                    benMap[key].items[itemName] = (benMap[key].items[itemName] || 0) + qty;
+                });
+            } else {
+                dispatchItems.forEach((item) => {
+                    benMap[key].items[item.item_name] = (benMap[key].items[item.item_name] || 0) + (item.quantity || 0);
+                });
+            }
+        }
+    });
+
+    const keys = Object.keys(benMap);
+    if (keys.length === 0) {
+        showToast('warning', 'No relief request or receiver found for selected dispatches. Add beneficiaries manually.');
+        return;
+    }
+
+    // Create one row per unique beneficiary with aggregated items
+    keys.forEach(key => {
+        const ben = benMap[key];
+        const match = beneficiaries.find(b => b.name && b.name.toLowerCase() === key);
+        const benData = match ? match : { name: ben.name };
+        addBeneficiaryRow(benData);
+
+        const rows = document.querySelectorAll('#beneficiaryBody tr');
+        const lastRow = rows[rows.length - 1];
+        const itemsContainer = lastRow.querySelector('.ben-items-container');
+        const defaultRow = itemsContainer.querySelector('.ben-item-row');
+        if (defaultRow) defaultRow.remove();
+
+        const itemEntries = Object.entries(ben.items);
+        if (itemEntries.length === 0) return;
+
+        const itemNames = Object.keys(ben.items);
+        const itemOptions = itemNames.map(name => `<option value="${name}">${name}</option>`).join('');
+
+        itemEntries.forEach(([itemName, totalQty]) => {
+            const row = document.createElement('div');
+            row.className = 'ben-item-row mb-1';
+            row.innerHTML = `
+                <div class="d-flex gap-1 align-items-center">
+                    <select class="form-select form-select-sm ben-item" onchange="updateDistributedQtySummary()">
+                        <option value="">Select Item</option>
+                        ${itemOptions}
+                    </select>
+                    <input type="number" class="form-control form-control-sm ben-qty" style="width:80px" value="${totalQty}" min="1" oninput="updateDistributedQtySummary()">
+                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeBeneficiaryItem(this)"><i class="bi bi-x"></i></button>
+                </div>
+            `;
+            const select = row.querySelector('.ben-item');
+            const option = Array.from(select.options).find(opt =>
+                opt.value.toLowerCase() === (itemName || '').toLowerCase()
+            );
+            if (option) select.value = option.value;
+            itemsContainer.insertBefore(row, itemsContainer.querySelector('.btn-outline-primary'));
+        });
+    });
+
+    updateDistributedQtySummary();
+    showToast('success', `Added ${keys.length} beneficiary row(s) from dispatch(es)`);
+}
+
+async function importFromReliefRequest() {
+    const selectedIds = getSelectedDispatchIds();
+    if (selectedIds.length === 0) {
+        showToast('warning', 'Select dispatches first — relief request is auto-populated from them');
+        return;
+    }
+
+    // Collect all unique RR IDs from selected dispatches
+    const rrIds = [];
+    selectedIds.forEach(did => {
+        const dp = dispatchDetailsCache[did];
+        if (!dp) return;
+        const ids = dp.relief_request_ids || (dp.relief_request_id ? [dp.relief_request_id] : []);
+        ids.forEach(id => { if (id && !rrIds.includes(id)) rrIds.push(id); });
+    });
+
+    if (rrIds.length === 0) {
+        showToast('warning', 'Selected dispatches have no linked relief requests. Use "Add from Dispatch" instead.');
+        return;
+    }
+
+    if (rrIds.length > 1) {
+        showToast('info', 'Multiple relief requests linked — use "Add from Dispatch" to import all beneficiaries at once');
+        return;
+    }
+
+    await loadBeneficiaries();
+
+    const rr = reliefRequestCashMap[rrIds[0]];
+    if (!rr) { showToast('danger', 'Relief request not found'); return; }
+
+    // Auto-fill basic info from relief request
+    if (rr.organization && !document.getElementById('dist_location').value) {
+        document.getElementById('dist_location').value = rr.organization;
+    }
+    if (rr.requester_name && !document.getElementById('dist_officer').value) {
+        document.getElementById('dist_officer').value = rr.requester_name;
+    }
+    if (rr.remarks) {
+        const existing = document.getElementById('dist_remarks').value;
+        if (!existing) document.getElementById('dist_remarks').value = rr.remarks;
+    }
+
+    const benName = rr.requester_name || rr.organization || '';
+    if (!benName) {
+        showToast('info', 'Relief request has no requester or organization name. Add beneficiaries manually.');
+        return;
+    }
+
+    const match = beneficiaries.find(b => b.name && b.name.toLowerCase() === benName.toLowerCase());
+    const benData = match ? match : { name: benName };
+    addBeneficiaryRow(benData);
+
+    if (rr.items && rr.items.length > 0) {
+        const rows = document.querySelectorAll('#beneficiaryBody tr');
+        const lastRow = rows[rows.length - 1];
+        const itemsContainer = lastRow.querySelector('.ben-items-container');
+        const addBtn = itemsContainer.querySelector('button');
+        const itemRows = itemsContainer.querySelectorAll('.ben-item-row');
+
+        rr.items.forEach((item, idx) => {
+            const itemRow = idx < itemRows.length ? itemRows[idx] : null;
+            if (itemRow) {
+                const select = itemRow.querySelector('.ben-item');
+                const qty = itemRow.querySelector('.ben-qty');
+                const option = Array.from(select.options).find(opt =>
+                    opt.value.toLowerCase() === (item.item_name || '').toLowerCase()
+                );
+                if (option) select.value = option.value;
+                qty.value = item.quantity_requested || 1;
+            } else {
+                addBeneficiaryItem(addBtn);
+                const newRows = itemsContainer.querySelectorAll('.ben-item-row');
+                const newRow = newRows[newRows.length - 1];
+                const select = newRow.querySelector('.ben-item');
+                const qty = newRow.querySelector('.ben-qty');
+                const option = Array.from(select.options).find(opt =>
+                    opt.value.toLowerCase() === (item.item_name || '').toLowerCase()
+                );
+                if (option) select.value = option.value;
+                qty.value = item.quantity_requested || 1;
+            }
+        });
+        updateDistributedQtySummary();
+    }
+    openBeneficiaryPicker();
+}
+
+async function loadDistributions() {
+    try {
+        const r = await fetch('/api/distributions');
+        if (!r.ok) { showToast('danger', 'Failed to load distributions'); return; }
+        const d = await r.json();
+        if (!d.success) { showToast('danger', d.message); return; }
+        distributions = d.distributions || [];
+        renderDistributions(distributions);
+    } catch(e) {
+        showToast('danger', 'Error loading distributions: ' + e.message);
+    }
+}
+
+function renderDistributions(data) {
+    const tbody = document.getElementById('distributionTableBody');
+    if (data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-muted">No distributions found</td></tr>';
+        paginator.update(0);
+        return;
+    }
+    const pageData = paginator.getPageData(data);
+    tbody.innerHTML = pageData.map(dist => {
+        const allBens = dist.beneficiaries || [];
+        const uniqueFamilyNames = [...new Set(allBens.map(b => b.family_name).filter(Boolean))];
+        const benCount = uniqueFamilyNames.length;
+        const firstBenName = allBens.length > 0 ? allBens[0].family_name || '-' : '-';
+        const cashBadge = dist.cash_distribution
+            ? `<span class="badge bg-success ms-1" title="Cash: ${Number(dist.cash_distribution.total_amount).toLocaleString()}"><i class="bi bi-cash-stack me-1"></i>Cash</span>`
+            : '';
+        return `<tr>
+            <td><strong>${dist.distribution_no}${cashBadge}</strong></td>
+            <td>${firstBenName}</td>
+            <td>${dist.incident_name || '-'}</td>
+            <td>${dist.location || '-'}</td>
+            <td>${dist.distribution_date ? new Date(dist.distribution_date).toLocaleDateString() : '-'}</td>
+            <td>${dist.officer || '-'}</td>
+            <td><span class="badge bg-dark">${benCount} family${benCount !== 1 ? 's' : ''}</span></td>
+            <td class="text-end">
+                <button class="btn btn-sm btn-primary" onclick="viewDistribution(${dist.id})" title="View"><i class="bi bi-eye me-1"></i>View</button>
+                <button class="btn btn-sm btn-outline-secondary" onclick="window.open('/api/distributions/${dist.id}/print','_blank')" title="Print"><i class="bi bi-printer"></i></button>
+            </td>
+        </tr>`;
+    }).join('');
+    paginator.update(data.length);
+}
+
+function filterDistributions() {
+    const q = document.getElementById('distSearch').value.toLowerCase();
+    const filtered = distributions.filter(d =>
+        (d.distribution_no && d.distribution_no.toLowerCase().includes(q)) ||
+        (d.dispatch_number && d.dispatch_number.toLowerCase().includes(q)) ||
+        (d.incident_name && d.incident_name.toLowerCase().includes(q)) ||
+        (d.location && d.location.toLowerCase().includes(q))
+    );
+    if (paginator) paginator.currentPage = 1;
+    renderDistributions(filtered);
+}
+
+async function viewDistribution(id) {
+    const r = await fetch('/api/distributions/' + id);
+    const d = await r.json();
+    if (!d.success) { showToast('danger', d.message); return; }
+    const dist = d.distribution;
+    const inc = dist.incident || {};
+    const allBens = dist.beneficiaries || [];
+
+    // Build unit lookup from dispatch items
+    const unitMap = {};
+    (dist.dispatch_items || []).forEach(di => {
+        if (di.item_name) unitMap[di.item_name.toLowerCase()] = di.unit || '';
+    });
+
+    // Aggregate items across all beneficiaries for summary table
+    const itemTotals = {};
+    allBens.forEach(b => {
+        const key = b.item || 'Unknown';
+        if (!itemTotals[key]) itemTotals[key] = { item: key, qty: 0, unit: unitMap[key.toLowerCase()] || '' };
+        itemTotals[key].qty += b.quantity || 0;
+    });
+    const itemSummaryRows = Object.values(itemTotals).map(it =>
+        `<tr><td>${it.item}</td><td class="text-end">${it.unit}</td><td class="text-end fw-semibold">${it.qty}</td></tr>`
+    ).join('');
+
+    // Group beneficiaries by family for per-family cards
+    const grouped = {};
+    allBens.forEach(b => {
+        const key = b.family_name + '|' + (b.id_number || '');
+        if (!grouped[key]) {
+            grouped[key] = { ...b, items: [] };
+        } else {
+            // Merge photo/document from other records in the same family if missing
+            if (!grouped[key].photo && b.photo) {
+                grouped[key].photo = b.photo;
+                grouped[key].photo_url = b.photo_url;
+            }
+            if (!grouped[key].document && b.document) {
+                grouped[key].document = b.document;
+                grouped[key].document_url = b.document_url;
+            }
+        }
+        grouped[key].items.push({ item: b.item || '-', quantity: b.quantity || 0, unit: unitMap[(b.item || '').toLowerCase()] || '' });
+    });
+    const families = Object.values(grouped);
+
+    // Per-family items table rows
+    function familyItemsTable(items) {
+        if (!items || items.length === 0) return '<span class="text-muted small">No items</span>';
+        return `<table class="table table-sm table-bordered mb-0 small">
+            <thead class="table-light"><tr><th>Item</th><th class="text-center" style="width:60px">Unit</th><th class="text-end" style="width:80px">Qty</th></tr></thead>
+            <tbody>${items.map(it => `<tr><td>${it.item}</td><td class="text-center">${it.unit || '-'}</td><td class="text-end">${it.quantity}</td></tr>`).join('')}</tbody>
+        </table>`;
+    }
+
+    // File attachment HTML
+    function fileLink(b, type) {
+        const urlKey = type + '_url';
+        const nameKey = type;
+        const label = type === 'photo' ? 'Photo' : 'Document';
+        const icon = type === 'photo' ? 'bi-image' : 'bi-file-earmark-pdf';
+        const color = type === 'photo' ? 'primary' : 'secondary';
+        const url = b[urlKey];
+        const name = b[nameKey];
+        if (!url) return '';
+        return `<div class="btn-group btn-group-sm" role="group">
+            <a href="${url}" target="_blank" class="btn btn-${color}" title="Open ${label}">
+                <i class="bi ${icon} me-1"></i>${name || label}
+            </a>
+            <button type="button" class="btn btn-outline-${color} preview-file-btn" data-url="${url}" data-label="${label}" title="Preview ${label}">
+                <i class="bi bi-eye"></i>
+            </button>
+        </div>`;
+    }
+    const modal = document.createElement('div');
+    modal.className = 'modal fade';
+    modal.innerHTML = `<div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content">
+        <div class="modal-header bg-primary text-white">
+            <h5 class="modal-title"><i class="bi bi-people me-2"></i>${dist.distribution_no}</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+
+            <!-- Info Cards Row -->
+            <div class="row g-2 mb-3">
+                <div class="col-md-8">
+                    <div class="card border-0 bg-light h-100">
+                        <div class="card-body py-2">
+                            <div class="row g-1 small">
+                                <div class="col-md-4"><strong>Dispatch:</strong> ${dist.dispatch_number || '-'}</div>
+                                <div class="col-md-4"><strong>Date:</strong> ${dist.distribution_date || '-'}</div>
+                                <div class="col-md-4"><strong>Officer:</strong> ${dist.officer || '-'}</div>
+                                <div class="col-md-4"><strong>Location:</strong> ${dist.location || '-'}</div>
+                                <div class="col-md-4"><strong>Coordinates:</strong> ${dist.latitude != null && dist.longitude != null ? dist.latitude + ', ' + dist.longitude : '-'}</div>
+                                <div class="col-md-4"><strong>Status:</strong> <span class="badge bg-${dist.status === 'Completed' ? 'success' : 'warning'}">${dist.status}</span></div>
+                                <div class="col-12"><strong>Remarks:</strong> ${dist.remarks || '-'}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card border-0 bg-light h-100">
+                        <div class="card-body py-2">
+                            <div class="row g-1 small">
+                                <div class="col-6"><strong>Incident:</strong> ${inc.incident_name || '-'}</div>
+                                <div class="col-6"><strong>Type:</strong> ${inc.incident_type || '-'}</div>
+                                <div class="col-6"><strong>Ward:</strong> ${inc.ward_name || inc.ward || '-'}</div>
+                                <div class="col-6"><strong>Tole:</strong> ${inc.tole || '-'}</div>
+                                <div class="col-6"><strong>Fiscal Year:</strong> ${inc.fiscal_year || dist.fiscal_year || '-'}</div>
+                                <div class="col-6"><strong>Severity:</strong> ${inc.severity || '-'}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Beneficiaries -->
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="fw-semibold mb-0"><i class="bi bi-people me-1 text-primary"></i>Beneficiaries (${families.length})</h6>
+            </div>
+            ${families.length > 0 ? families.map((b, idx) => {
+                const ben = b.beneficiary || {};
+                const fs = b.family_stats || {};
+                const ss = b.social_security || {};
+                const fm = b.family_members || [];
+                const fmRows = fm.map(m => `<tr>
+                    <td>${m.name || ''}</td>
+                    <td>${m.gender || ''}</td>
+                    <td>${m.age || ''}</td>
+                    <td>${m.relation || ''}</td>
+                    <td>${m.is_disabled ? '<span class="badge bg-danger">Yes</span>' : 'No'}</td>
+                    <td>${m.is_pregnant ? '<span class="badge bg-warning">Yes</span>' : 'No'}</td>
+                    <td>${m.is_old_ssf ? '<span class="badge bg-info">Yes</span>' : 'No'}</td>
+                </tr>`).join('');
+                const hasFamilyMembers = fm.length > 0;
+                return `<div class="card mb-3 border-success shadow-sm">
+                    <div class="card-header bg-success bg-opacity-10 py-2 d-flex justify-content-between align-items-center">
+                        <span class="fw-semibold">${idx + 1}. ${b.family_name} ${b.id_number ? '(' + b.id_number + ')' : ''}</span>
+                        <span class="badge bg-${b.status === 'Received' ? 'success' : 'warning'} fs-6">${b.status}</span>
+                    </div>
+                    <div class="card-body py-2">
+                        <!-- Family Details -->
+                        <div class="bg-light bg-opacity-50 rounded p-2 mb-2">
+                            <div class="fw-semibold small text-secondary mb-1"><i class="bi bi-house-door me-1"></i>Family Details</div>
+                            <div class="row g-2">
+                                <div class="col-md-6">
+                                    <table class="table table-sm table-borderless mb-0 small">
+                                        <tr><td class="fw-medium text-secondary" style="width:130px">Family Name</td><td>${b.family_name}</td></tr>
+                                        <tr><td class="fw-medium text-secondary">Father's Name</td><td>${ben.father_name || '-'}</td></tr>
+                                        <tr><td class="fw-medium text-secondary">National ID</td><td>${ben.national_id || b.id_number || '-'}</td></tr>
+                                        <tr><td class="fw-medium text-secondary">Phone</td><td>${ben.phone || '-'}</td></tr>
+                                        <tr><td class="fw-medium text-secondary">Ward</td><td>${ben.ward_name || ben.ward || '-'}</td></tr>
+                                        <tr><td class="fw-medium text-secondary">Tole</td><td>${ben.tole || '-'}</td></tr>
+                                        <tr><td class="fw-medium text-secondary">Total Members</td><td>${b.members || fs.total_members || '-'}</td></tr>
+                                    </table>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="fw-semibold small text-secondary mb-1"><i class="bi bi-bar-chart me-1"></i>Household Demographics</div>
+                                    <table class="table table-sm table-borderless mb-0 small">
+                                        <tr><td class="fw-medium text-secondary" style="width:150px">Social Security</td><td>${ss.in_social_security_fund ? '<span class="badge bg-success">Yes</span>' : 'No'}</td></tr>
+                                        <tr><td class="fw-medium text-secondary">SSF Type</td><td>${ss.ssf_type || '-'}</td></tr>
+                                        <tr><td class="fw-medium text-secondary">Poverty Card</td><td>${ss.poverty_card_holder ? '<span class="badge bg-success">Yes</span>' : 'No'}</td></tr>
+                                    </table>
+                                    <hr class="my-1">
+                                    <table class="table table-sm table-borderless mb-0 small">
+                                        <tr><td class="fw-medium text-secondary">Male</td><td>${fs.male_count || 0}</td>
+                                            <td class="fw-medium text-secondary">Female</td><td>${fs.female_count || 0}</td></tr>
+                                        <tr><td class="fw-medium text-secondary">Children (<13)</td><td>${fs.child_count || 0}</td>
+                                            <td class="fw-medium text-secondary">Pregnant</td><td>${fs.pregnant_count || 0}</td></tr>
+                                        <tr><td class="fw-medium text-secondary">Disabled</td><td>${fs.disabled_count || 0}</td>
+                                            <td class="fw-medium text-secondary">SSF Age (60+)</td><td>${fs.old_ssf_count || 0}</td></tr>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Family Members Table -->
+                        ${hasFamilyMembers ? `<div class="bg-light bg-opacity-50 rounded p-2 mb-2">
+                            <div class="fw-semibold small text-secondary mb-1"><i class="bi bi-people me-1"></i>Family Members</div>
+                            <div class="table-responsive">
+                                <table class="table table-sm table-bordered mb-0 small">
+                                    <thead class="table-light"><tr><th>Name</th><th>Gender</th><th>Age</th><th>Relation</th><th>Disabled</th><th>Pregnant</th><th>SSF Beneficiary</th></tr></thead>
+                                    <tbody>${fmRows}</tbody>
+                                </table>
+                            </div>
+                        </div>` : ''}
+
+                        <!-- Files -->
+                        <div class="bg-light bg-opacity-50 rounded p-2 d-flex gap-2 flex-wrap align-items-center">
+                            <span class="fw-semibold small text-secondary me-1"><i class="bi bi-paperclip me-1"></i>Attachments:</span>
+                            ${!dist.files || (!dist.files.photos.length && !dist.files.documents.length) ? '<span class="text-muted small">None</span>' : ''}
+                            ${dist.files && dist.files.photos.map(f => `<a href="${f.url}" target="_blank" class="btn btn-sm btn-outline-primary" title="View Photo"><i class="bi bi-image me-1"></i>Photo</a>`).join('')}
+                            ${dist.files && dist.files.documents.map(f => `<a href="${f.url}" target="_blank" class="btn btn-sm btn-outline-secondary" title="View Document"><i class="bi bi-file-earmark-pdf me-1"></i>${f.filename.split('_').pop()}</a>`).join('')}
+                        </div>
+                    </div>
+                </div>`;
+            }).join('') : '<p class="text-muted small">No beneficiaries recorded</p>'}
+
+            <!-- Items Distributed Summary Table -->
+            <div class="card border-0 bg-light mt-3">
+                <div class="card-header bg-white py-2 d-flex justify-content-between align-items-center">
+                    <span class="fw-semibold"><i class="bi bi-box-seam me-1 text-primary"></i>Items Distributed Summary</span>
+                    <span class="badge bg-primary">${Object.keys(itemTotals).length} item(s)</span>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered mb-0 small">
+                            <thead class="table-light"><tr><th>Item Name</th><th class="text-center" style="width:80px">Unit</th><th class="text-end" style="width:100px">Total Qty</th></tr></thead>
+                            <tbody>${itemSummaryRows || '<tr><td colspan="3" class="text-center text-muted py-2">No items distributed</td></tr>'}</tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div id="distViewCashInfo_${dist.id}"></div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        </div>
+    </div></div>`;
+    // File preview modal (global)
+    if (typeof window.showFilePreview !== 'function') {
+        window.showFilePreview = function(url, label) {
+            const existing = document.getElementById('filePreviewModal');
+            if (existing) existing.remove();
+            const isPdf = url.toLowerCase().endsWith('.pdf');
+            const bodyContent = isPdf
+                ? `<iframe src="${url}" style="width:100%;height:80vh;border:none"></iframe>`
+                : `<img src="${url}" style="max-width:100%;max-height:80vh;display:block;margin:0 auto">`;
+            const wrapper = document.createElement('div');
+            wrapper.id = 'filePreviewModal';
+            wrapper.className = 'modal fade';
+            wrapper.innerHTML = `<div class="modal-dialog modal-lg modal-dialog-centered"><div class="modal-content">
+                <div class="modal-header"><h6 class="modal-title">${label}</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body text-center p-2 bg-dark">${bodyContent}</div>
+            </div></div>`;
+            document.body.appendChild(wrapper);
+            wrapper.addEventListener('hidden.bs.modal', () => wrapper.remove());
+            new bootstrap.Modal(wrapper).show();
+        };
+    }
+
+    document.body.appendChild(modal);
+    const bsModal = new bootstrap.Modal(modal);
+    modal.addEventListener('hidden.bs.modal', () => modal.remove());
+
+    // Attach preview button handlers
+    modal.addEventListener('click', function(e) {
+        const btn = e.target.closest('.preview-file-btn');
+        if (btn) {
+            window.showFilePreview(btn.dataset.url, btn.dataset.label);
+        }
+    });
+
+    bsModal.show();
+    // Show linked cash distributions
+    if (dist.dispatch_id) {
+        fetch('/api/dispatch/' + dist.dispatch_id)
+            .then(r => r.json())
+            .then(dpData => {
+                if (!dpData.success || !dpData.dispatch) return;
+                const rrId = dpData.dispatch.relief_request_id;
+                if (!rrId) return;
+                fetch('/api/cash-distributions?relief_request_id=' + rrId)
+                    .then(r => r.json())
+                    .then(cdData => {
+                        if (cdData.success && cdData.distributions && cdData.distributions.length > 0) {
+                            const cd = cdData.distributions[0];
+                            const div = document.getElementById('distViewCashInfo_' + dist.id);
+                            if (div) {
+                                div.innerHTML = `<hr><h6 class="text-success"><i class="bi bi-cash-stack me-1"></i>Cash Distribution</h6>
+                                    <div class="card border-0 bg-light mb-0">
+                                        <div class="card-body py-2">
+                                            <div class="row g-1 small">
+                                                <div class="col-md-3"><strong>Dist No:</strong> ${cd.distribution_no}</div>
+                                                <div class="col-md-3"><strong>Fund:</strong> ${cd.fund_name || '-'}</div>
+                                                <div class="col-md-3"><strong>Total Cash:</strong> <strong class="text-danger">${Number(cd.total_amount).toLocaleString()}</strong></div>
+                                                <div class="col-md-3"><strong>Beneficiaries:</strong> ${(cd.beneficiaries||[]).length}</div>
+                                            </div>
+                                        </div>
+                                    </div>`;
+                            }
+                        }
+                    }).catch(() => {});
+            }).catch(() => {});
+    }
+}
+
+function renderDistPhotoPreviews() {
+    const container = document.getElementById('distPhotoPreview');
+    container.innerHTML = '';
+    pendingPhotoFiles.forEach((f, i) => {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'position-relative';
+        wrapper.style.width = '80px';
+        const img = document.createElement('img');
+        img.className = 'img-thumbnail';
+        img.style.width = '80px';
+        img.style.height = '80px';
+        img.style.objectFit = 'cover';
+        const reader = new FileReader();
+        reader.onload = e => { img.src = e.target.result; };
+        reader.readAsDataURL(f);
+        wrapper.appendChild(img);
+        const rmBtn = document.createElement('button');
+        rmBtn.className = 'btn btn-sm btn-outline-danger p-0 position-absolute top-0 end-0';
+        rmBtn.style.fontSize = '0.6rem';
+        rmBtn.innerHTML = '<i class="bi bi-x"></i>';
+        rmBtn.onclick = () => { pendingPhotoFiles.splice(i, 1); renderDistPhotoPreviews(); };
+        wrapper.appendChild(rmBtn);
+        container.appendChild(wrapper);
+    });
+}
+
+function previewDistPhotos(input) {
+    pendingPhotoFiles = Array.from(input.files);
+    renderDistPhotoPreviews();
+}
+
+function previewDistDocs(input) {
+    pendingDocFiles = Array.from(input.files);
+    const container = document.getElementById('distDocPreview');
+    container.innerHTML = '';
+    pendingDocFiles.forEach((f, i) => {
+        const badge = document.createElement('span');
+        badge.className = 'badge bg-secondary d-inline-flex align-items-center gap-1';
+        badge.innerHTML = `<i class="bi bi-file-pdf"></i> ${f.name} <button class="btn btn-sm btn-outline-light p-0 ms-1" style="font-size:0.6rem;line-height:1" onclick="removeDistDoc(${i})"><i class="bi bi-x"></i></button>`;
+        container.appendChild(badge);
+    });
+}
+
+function removeDistDoc(index) {
+    pendingDocFiles.splice(index, 1);
+    const container = document.getElementById('distDocPreview');
+    const badges = container.querySelectorAll('.badge');
+    if (badges[index]) badges[index].remove();
+}
+
+function resetDistributionForm() {
+    document.getElementById('dist_id').value = '';
+    document.getElementById('distributionForm').reset();
+    document.getElementById('dist_distribution_no').value = 'DIST-' + String(Date.now()).slice(-4);
+    document.getElementById('dist_distribution_date').value = today_bs;
+    document.getElementById('dist_incident').value = '';
+    document.getElementById('beneficiaryBody').innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">Add beneficiaries to this distribution</td></tr>';
+    document.getElementById('dispatchItemsSummaryBody').innerHTML = '<tr><td colspan="4" class="text-center text-muted py-2">Select dispatches to view items</td></tr>';
+    document.getElementById('cashFundSection').style.display = 'none';
+    document.getElementById('cdTotal').value = '0';
+    document.getElementById('dist_dispatch_label').textContent = 'Select Dispatches';
+    document.querySelectorAll('#dist_dispatch_menu .dispatch-checkbox').forEach(cb => cb.checked = false);
+    document.getElementById('dist_import_rr').innerHTML = '<option value="">Auto — selects with dispatches</option>';
+    dispatchItemsCache = {};
+    dispatchDetailsCache = {};
+    document.getElementById('distPhotoFiles').value = '';
+    document.getElementById('distDocFiles').value = '';
+    document.getElementById('distPhotoPreview').innerHTML = '';
+    document.getElementById('distDocPreview').innerHTML = '';
+    pendingPhotoFiles = [];
+    pendingDocFiles = [];
+    isSaving = false;
+}
+
+async function saveDistribution() {
+    if (isSaving) return;
+
+    const dateVal = document.getElementById('dist_distribution_date').value;
+    if (!dateVal) { showToast('danger', 'Please select a distribution date'); return; }
+
+    let hasErrors = false;
+    const beneficiaries = [];
+    Array.from(document.querySelectorAll('#beneficiaryBody tr')).forEach(tr => {
+        const familyNameEl = tr.querySelector('.ben-family-name');
+        const familyName = familyNameEl ? familyNameEl.value.trim() : '';
+        if (!familyName) { hasErrors = true; if (familyNameEl) familyNameEl.classList.add('is-invalid'); } else { if (familyNameEl) familyNameEl.classList.remove('is-invalid'); }
+        const benId = parseInt(tr.querySelector('.ben-beneficiary-id').value) || null;
+        const idNumber = tr.querySelector('.ben-id-number').value;
+        const members = parseInt(tr.querySelector('.ben-members').value) || 1;
+        let rowHasItem = false;
+        tr.querySelectorAll('.ben-item-row').forEach(row => {
+            const itemEl = row.querySelector('.ben-item');
+            const qtyEl = row.querySelector('.ben-qty');
+            if (!itemEl || !qtyEl) return;
+            const item = itemEl.value;
+            const qty = parseInt(qtyEl.value) || 0;
+            if (item && qty > 0) {
+                rowHasItem = true;
+                beneficiaries.push({
+                    beneficiary_id: benId,
+                    family_name: familyName,
+                    id_number: idNumber,
+                    members: members,
+                    item: item,
+                    quantity: qty
+                });
+                itemEl.classList.remove('is-invalid');
+                qtyEl.classList.remove('is-invalid');
+            } else if (!item) {
+                itemEl.classList.add('is-invalid');
+                hasErrors = true;
+            } else {
+                qtyEl.classList.add('is-invalid');
+                hasErrors = true;
+            }
+        });
+        if (!rowHasItem) hasErrors = true;
+    });
+
+    const dispatch_ids = getSelectedDispatchIds();
+    if (dispatch_ids.length === 0) { showToast('danger', 'Please select at least one dispatch'); return; }
+
+    // Collect cash distribution data from main beneficiary table
+    const cashSection = document.getElementById('cashFundSection');
+    const hasCash = cashSection.style.display !== 'none';
+    let cashBeneficiaries = [];
+
+    if (beneficiaries.length === 0 && (hasCash ? document.querySelectorAll('#beneficiaryBody .ben-receive-cash:checked').length : 0) === 0) { showToast('danger', 'Please add at least one item or cash beneficiary'); return; }
+
+    // Validate item quantities don't exceed dispatched
+    if (beneficiaries.length > 0) {
+        // Aggregate items from all selected dispatches
+        const totalDispatchAgg = {};
+        dispatch_ids.forEach(did => {
+            (dispatchItemsCache[did] || []).forEach(item => {
+                if (!totalDispatchAgg[item.item_name]) totalDispatchAgg[item.item_name] = 0;
+                totalDispatchAgg[item.item_name] += item.quantity || 0;
+            });
+        });
+        const distTotals = {};
+        beneficiaries.forEach(b => {
+            if (b.item) distTotals[b.item] = (distTotals[b.item] || 0) + b.quantity;
+        });
+        for (const itemName in distTotals) {
+            const total = distTotals[itemName];
+            const dispatched = totalDispatchAgg[itemName] || 0;
+            if (total > dispatched) {
+                showToast('danger', `Distributed quantity for "${itemName}" (${total}) exceeds total dispatched quantity (${dispatched})`);
+                return;
+            }
+        }
+    }
+
+    if (hasCash) {
+        const fundId = parseInt(document.getElementById('cdFund').value);
+        if (!fundId) { showToast('danger', 'Please select a fund for cash distribution'); return; }
+        document.querySelectorAll('#beneficiaryBody tr').forEach(tr => {
+            const cb = tr.querySelector('.ben-receive-cash');
+            const amtInput = tr.querySelector('.ben-cash-amount');
+            const nameInput = tr.querySelector('.ben-family-name');
+            if (!cb || !cb.checked || !amtInput || !nameInput) return;
+            const name = nameInput.value.trim();
+            const amount = parseFloat(amtInput.value);
+            if (name && amount > 0) {
+                cashBeneficiaries.push({
+                    name: name,
+                    national_id: tr.querySelector('.ben-id-number').value,
+                    address: '',
+                    phone: '',
+                    amount: amount,
+                    beneficiary_id: parseInt(tr.querySelector('.ben-beneficiary-id').value) || null
+                });
+            }
+        });
+    }
+
+    if (hasErrors) { showToast('danger', 'Please fix highlighted fields'); return; }
+
+    isSaving = true;
+    const btn = document.querySelector('button[onclick="saveDistribution()"]');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving...'; }
+
+    try {
+        let itemsSaved = true;
+        let savedDistNo = null;
+        let lastErrorMsg = '';
+        // Save items distribution if there are item beneficiaries
+        if (beneficiaries.length > 0) {
+            const dispatch_ids = getSelectedDispatchIds();
+            if (dispatch_ids.length === 0) { showToast('danger', 'Please select at least one dispatch'); return; }
+
+            const coords = document.getElementById('dist_coordinates').value.trim();
+            let lat = null, lon = null;
+            if (coords) {
+                const parts = coords.split(',').map(s => parseFloat(s.trim()));
+                if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+                    lat = parts[0];
+                    lon = parts[1];
+                }
+            }
+            const body = {
+                distribution_no: document.getElementById('dist_distribution_no').value,
+                dispatch_ids: dispatch_ids,
+                location: document.getElementById('dist_location').value,
+                latitude: lat,
+                longitude: lon,
+                distribution_date: dateVal,
+                officer: document.getElementById('dist_officer').value,
+                status: document.getElementById('dist_status') ? document.getElementById('dist_status').value : 'Completed',
+                remarks: document.getElementById('dist_remarks').value,
+                beneficiaries: beneficiaries
+            };
+
+            const r = await fetch('/api/distributions', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrf},
+                body: JSON.stringify(body)
+            });
+            const d = await r.json();
+            itemsSaved = d.success;
+            if (d.success && d.data) {
+                savedDistNo = d.data.distribution_no;
+                const distId = d.data.id;
+                // Upload photo files at distribution level
+                if (pendingPhotoFiles.length > 0) {
+                    const fd = new FormData();
+                    fd.append('type', 'photo');
+                    pendingPhotoFiles.forEach(f => fd.append('files', f));
+                    try {
+                        const pr = await fetch(`/api/distributions/${distId}/upload-files`, {
+                            method: 'POST',
+                            headers: {'X-CSRFToken': csrf},
+                            body: fd
+                        });
+                        const pd = await pr.json();
+                        if (!pd.success) showToast('warning', 'Photo upload: ' + pd.message);
+                    } catch(e) { showToast('warning', 'Photo upload error: ' + e.message); }
+                }
+                // Upload document files at distribution level
+                if (pendingDocFiles.length > 0) {
+                    const fd = new FormData();
+                    fd.append('type', 'document');
+                    pendingDocFiles.forEach(f => fd.append('files', f));
+                    try {
+                        const dr = await fetch(`/api/distributions/${distId}/upload-files`, {
+                            method: 'POST',
+                            headers: {'X-CSRFToken': csrf},
+                            body: fd
+                        });
+                        const dd = await dr.json();
+                        if (!dd.success) showToast('warning', 'Document upload: ' + dd.message);
+                    } catch(e) { showToast('warning', 'Document upload error: ' + e.message); }
+                }
+            }
+            if (!d.success) {
+                lastErrorMsg = d.message;
+                showToast('danger', d.message);
+            }
+        }
+
+        if (itemsSaved) {
+            // Save cash distribution if applicable
+            if (hasCash && cashBeneficiaries.length > 0) {
+                const dispatchIds = getSelectedDispatchIds();
+                // Find incident_id and relief request IDs from all selected dispatches
+                let incidentId = null;
+                let rrIds = [];
+                for (const did of dispatchIds) {
+                    const dp = dispatchDetailsCache[did];
+                    if (dp) {
+                        if (!incidentId) incidentId = dp.incident_id;
+                        const ids = dp.relief_request_ids || (dp.relief_request_id ? [dp.relief_request_id] : []);
+                        ids.forEach(id => { if (id && !rrIds.includes(id)) rrIds.push(id); });
+                    }
+                }
+                const primaryRRId = rrIds[0] || null;
+
+                const cashRemarks = [
+                    document.getElementById('dist_remarks').value,
+                    savedDistNo ? 'Source Distribution: ' + savedDistNo : ''
+                ].filter(Boolean).join(' | ');
+
+                const cashBody = {
+                    distribution_date: dateVal,
+                    fund_id: parseInt(document.getElementById('cdFund').value),
+                    incident_id: incidentId,
+                    distribution_type: document.getElementById('cdType').value,
+                    relief_request_id: primaryRRId,
+                    officer: document.getElementById('dist_officer').value,
+                    remarks: cashRemarks,
+                    beneficiaries: cashBeneficiaries
+                };
+
+                const cr = await fetch('/api/cash-distributions', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrf},
+                    body: JSON.stringify(cashBody)
+                });
+                const cd = await cr.json();
+                if (!cd.success) {
+                    showToast('warning', 'Items distribution saved but cash distribution failed: ' + cd.message);
+                }
+            }
+
+            showToast('success', 'Distribution recorded successfully');
+            resetDistributionForm();
+            loadDistributions();
+        } else {
+            showToast('danger', lastErrorMsg || 'Failed to save distribution');
+        }
+    } catch(e) {
+        showToast('danger', 'Error saving distribution: ' + e.message);
+    } finally {
+        isSaving = false;
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-check-lg me-1"></i>Save Distribution'; }
+    }
+}
+
+function uploadViewBenFile(benId, type, btn) {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = type === 'photo' ? 'image/jpeg,image/png,image/gif' : 'application/pdf';
+    input.onchange = async function() {
+        const file = input.files[0];
+        if (!file) return;
+        const fd = new FormData();
+        fd.append('file', file);
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+        try {
+            const r = await fetch(`/api/distributions/beneficiary/${benId}/upload-${type}`, {
+                method: 'POST',
+                headers: {'X-CSRFToken': csrf},
+                body: fd
+            });
+            const d = await r.json();
+            if (d.success) {
+                showToast('success', `${type === 'photo' ? 'Photo' : 'Document'} uploaded`);
+                const modal = bootstrap.Modal.getInstance(btn.closest('.modal'));
+                if (modal) modal.hide();
+                loadDistributions();
+            } else {
+                showToast('danger', d.message || 'Upload failed');
+                btn.disabled = false;
+                btn.innerHTML = type === 'photo' ? '<i class="bi bi-camera"></i><br><small>Upload</small>' : '<i class="bi bi-file-earmark-pdf"></i><br><small>Upload</small>';
+            }
+        } catch(e) {
+            showToast('danger', 'Upload error: ' + e.message);
+            btn.disabled = false;
+            btn.innerHTML = type === 'photo' ? '<i class="bi bi-camera"></i><br><small>Upload</small>' : '<i class="bi bi-file-earmark-pdf"></i><br><small>Upload</small>';
+        }
+    };
+    input.click();
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadFormData();
+    loadBeneficiaries();
+    loadDistributions();
+});
+</script>
+{% endblock %}

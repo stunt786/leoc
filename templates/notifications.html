@@ -1,0 +1,330 @@
+{% extends "base.html" %}
+{% block title %}Notifications - LEOC{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('index') }}"><i class="bi bi-house-fill"></i></a></li>
+<li class="breadcrumb-item active">Notifications</li>
+{% endblock %}
+{% block content %}
+<div class="page-header d-flex flex-wrap justify-content-between align-items-start gap-3">
+    <div>
+        <h4><i class="bi bi-bell-fill me-2"></i>Notification Center</h4>
+        <p>Review alerts, open source records, and clear resolved items.</p>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+        <button class="btn btn-outline-secondary" type="button" onclick="reloadNotificationsPage()">
+            <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+        </button>
+        <button class="btn btn-danger" type="button" onclick="clearAllNotifications()">
+            <i class="bi bi-trash3 me-1"></i>Clear All
+        </button>
+    </div>
+</div>
+
+<div class="card notifications-shell mb-3">
+    <div class="card-body">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 notifications-toolbar">
+            <div class="btn-group flex-wrap" role="group" aria-label="Notification filters" id="notificationFilters">
+                <button type="button" class="btn btn-primary active" data-filter="All">All</button>
+                <button type="button" class="btn btn-outline-primary" data-filter="System">System</button>
+                <button type="button" class="btn btn-outline-primary" data-filter="Inventory">Inventory</button>
+                <button type="button" class="btn btn-outline-primary" data-filter="Finance">Finance</button>
+                <button type="button" class="btn btn-outline-primary" data-filter="Incidents">Incidents</button>
+            </div>
+            <div class="text-muted small">
+                <span class="me-3"><i class="bi bi-circle-fill text-success me-1"></i>Active</span>
+                <span><i class="bi bi-circle-fill text-secondary me-1"></i>Archived</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="notificationPageStatus" class="mb-3"></div>
+<div id="notificationPageGrid" class="row g-3">
+    <div class="col-12">
+        <div class="notification-empty card">
+            <i class="bi bi-hourglass-split"></i>
+            <div class="fw-semibold">Loading notifications</div>
+            <div class="small">Please wait while we fetch the latest alerts.</div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+    const CATEGORY_MAP = {
+        low_stock: 'Inventory',
+        expiry: 'Inventory',
+        stock_receipt: 'System',
+        stock_transfer: 'System',
+        adjustment: 'System',
+        dispatch: 'System',
+        distribution: 'System',
+        incident: 'Incidents',
+        relief_request: 'Incidents',
+        cash_receipt: 'Finance',
+        cash_request: 'Finance',
+        cash_distribution: 'Finance',
+    };
+
+    const ICON_MAP = {
+        stock_receipt: 'bi-clipboard-check-fill text-primary',
+        stock_transfer: 'bi-arrow-left-right text-info',
+        adjustment: 'bi-sliders text-warning',
+        low_stock: 'bi-exclamation-triangle-fill text-warning',
+        expiry: 'bi-calendar-exclamation-fill text-danger',
+        incident: 'bi-lightning-charge-fill text-danger',
+        relief_request: 'bi-send-fill text-primary',
+        dispatch: 'bi-truck-front-fill text-info',
+        distribution: 'bi-people-fill text-success',
+        cash_receipt: 'bi-cash-coin text-success',
+        cash_request: 'bi-send-exclamation-fill text-warning',
+        cash_distribution: 'bi-cash-stack text-danger',
+        default: 'bi-bell-fill text-secondary'
+    };
+
+    let allNotifications = [];
+    let activeFilter = 'All';
+
+    function escapeHtml(value) {
+        return String(value || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function formatNotificationTime(value) {
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return '';
+        try {
+            return new Intl.DateTimeFormat('en-GB', {
+                timeZone: 'Asia/Kathmandu',
+                dateStyle: 'medium',
+                timeStyle: 'short',
+            }).format(date);
+        } catch (e) {
+            return date.toLocaleString();
+        }
+    }
+
+    function getCategory(notification) {
+        return CATEGORY_MAP[notification.type] || 'System';
+    }
+
+    function getIcon(notification) {
+        return ICON_MAP[notification.type] || ICON_MAP.default;
+    }
+
+    function getCsrfToken() {
+        return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+    }
+
+    async function readJsonResponse(response) {
+        const contentType = response.headers.get('content-type') || '';
+        const text = await response.text();
+        if (!contentType.includes('application/json')) {
+            throw new Error(text.trim() || `Unexpected response (${response.status})`);
+        }
+        try {
+            return JSON.parse(text);
+        } catch (error) {
+            throw new Error('Invalid JSON response from server');
+        }
+    }
+
+    function setActiveFilter(filter) {
+        activeFilter = filter;
+        document.querySelectorAll('#notificationFilters [data-filter]').forEach(function(btn) {
+            const isActive = btn.getAttribute('data-filter') === filter;
+            btn.classList.toggle('btn-primary', isActive);
+            btn.classList.toggle('btn-outline-primary', !isActive);
+            btn.classList.toggle('active', isActive);
+        });
+        renderNotificationsPage();
+    }
+
+    function getFilteredNotifications() {
+        return allNotifications.filter(function(notification) {
+            if (activeFilter === 'All') return true;
+            return getCategory(notification) === activeFilter;
+        });
+    }
+
+    function renderNotificationsPage() {
+        const grid = document.getElementById('notificationPageGrid');
+        const status = document.getElementById('notificationPageStatus');
+        const filtered = getFilteredNotifications();
+        const activeCount = filtered.filter(function(notification) { return !notification.cleared; }).length;
+        const archivedCount = filtered.length - activeCount;
+
+        if (status) {
+            status.innerHTML = `
+                <div class="alert alert-light border d-flex flex-wrap justify-content-between align-items-center gap-2 mb-0">
+                    <div>
+                        <strong>${filtered.length}</strong> notification(s) in view
+                        <span class="text-muted ms-2">${activeCount} active, ${archivedCount} archived</span>
+                    </div>
+                    <div class="text-muted small">Showing ${escapeHtml(activeFilter)} alerts</div>
+                </div>
+            `;
+        }
+
+        if (!filtered.length) {
+            grid.innerHTML = `
+                <div class="col-12">
+                    <div class="notification-empty card">
+                        <i class="bi bi-bell-slash"></i>
+                        <div class="fw-semibold">No notifications found</div>
+                        <div class="small">Try another filter or create a new activity.</div>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+
+        grid.innerHTML = filtered.map(function(notification) {
+            const category = getCategory(notification);
+            const icon = getIcon(notification);
+            const timeLabel = notification.created_at_formatted || formatNotificationTime(notification.created_at);
+            const clearedLabel = notification.cleared ? (notification.cleared_at_formatted || formatNotificationTime(notification.cleared_at)) : '';
+            return `
+                <div class="col-12 col-lg-6">
+                    <div class="card notification-card ${notification.cleared ? 'is-cleared' : ''}">
+                        <div class="card-header d-flex justify-content-between align-items-start gap-3 py-3">
+                            <div class="d-flex align-items-start gap-3">
+                                <div class="notification-item-icon">
+                                    <i class="bi ${icon}"></i>
+                                </div>
+                                <div>
+                                    <div class="card-title mb-1 fw-bold">${escapeHtml(notification.title)}</div>
+                                    <div class="small text-muted">${escapeHtml(notification.message)}</div>
+                                </div>
+                            </div>
+                            <span class="notification-status-badge badge ${notification.cleared ? 'text-bg-secondary' : 'text-bg-success'}">
+                                ${notification.cleared ? 'Archived' : 'Active'}
+                            </span>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-flex flex-wrap gap-2 mb-3">
+                                <span class="badge text-bg-light border">${escapeHtml(category)}</span>
+                                <span class="badge text-bg-light border">${escapeHtml(notification.priority || 'Medium')}</span>
+                                <span class="badge text-bg-light border">${escapeHtml(notification.type || 'notification')}</span>
+                            </div>
+                            <div class="text-muted small mb-3">
+                                <div><i class="bi bi-clock me-1"></i>${escapeHtml(timeLabel)}</div>
+                                ${notification.cleared ? `<div class="mt-1"><i class="bi bi-archive me-1"></i>Cleared ${escapeHtml(clearedLabel)}</div>` : ''}
+                            </div>
+                            <div class="d-flex flex-wrap gap-2">
+                                ${notification.url ? `<a href="${notification.url}" class="btn btn-sm btn-outline-primary"><i class="bi bi-box-arrow-up-right me-1"></i>Open Source</a>` : ''}
+                                ${notification.cleared ? '' : `<button type="button" class="btn btn-sm btn-outline-danger" data-clear-id="${notification.id}"><i class="bi bi-trash3 me-1"></i>Clear</button>`}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        grid.querySelectorAll('[data-clear-id]').forEach(function(button) {
+            button.addEventListener('click', async function() {
+                const id = this.getAttribute('data-clear-id');
+                await clearNotificationById(id);
+            });
+        });
+    }
+
+    async function loadNotificationsPage() {
+        const grid = document.getElementById('notificationPageGrid');
+        if (grid) {
+            grid.innerHTML = `
+                <div class="col-12">
+                    <div class="notification-empty card">
+                        <i class="bi bi-arrow-repeat"></i>
+                        <div class="fw-semibold">Loading notifications</div>
+                        <div class="small">Please wait while we fetch the latest alerts.</div>
+                    </div>
+                </div>
+            `;
+        }
+        try {
+            const response = await fetch('/api/notifications?include_cleared=1', { cache: 'no-cache' });
+            const data = await readJsonResponse(response);
+            if (!data.success) {
+                throw new Error(data.message || 'Failed to load notifications');
+            }
+            allNotifications = Array.isArray(data.notifications) ? data.notifications : [];
+            renderNotificationsPage();
+        } catch (error) {
+            const status = document.getElementById('notificationPageStatus');
+            if (status) {
+                status.innerHTML = `<div class="alert alert-danger mb-0">Error loading notifications: ${escapeHtml(error.message)}</div>`;
+            }
+            if (grid) {
+                grid.innerHTML = `
+                    <div class="col-12">
+                        <div class="notification-empty card">
+                            <i class="bi bi-exclamation-triangle"></i>
+                            <div class="fw-semibold">Unable to load notifications</div>
+                            <div class="small">Please try refreshing the page.</div>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+    }
+
+    async function clearNotificationById(id) {
+        try {
+            const response = await fetch(`/api/notifications/${id}/clear`, {
+                method: 'POST',
+                headers: {'X-CSRFToken': getCsrfToken()},
+            });
+            const data = await readJsonResponse(response);
+            if (!data.success) {
+                throw new Error(data.message || 'Unable to clear notification');
+            }
+            await loadNotificationsPage();
+        } catch (error) {
+            if (window.showToast) {
+                window.showToast('danger', error.message);
+            }
+        }
+    }
+
+    async function clearAllNotifications() {
+        try {
+            const response = await fetch('/api/notifications/clear', {
+                method: 'POST',
+                headers: {'X-CSRFToken': getCsrfToken()},
+            });
+            const data = await readJsonResponse(response);
+            if (!data.success) {
+                throw new Error(data.message || 'Unable to clear notifications');
+            }
+            await loadNotificationsPage();
+        } catch (error) {
+            if (window.showToast) {
+                window.showToast('danger', error.message);
+            }
+        }
+    }
+
+    function reloadNotificationsPage() {
+        loadNotificationsPage();
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('#notificationFilters [data-filter]').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                setActiveFilter(this.getAttribute('data-filter'));
+            });
+        });
+        loadNotificationsPage();
+        window.clearAllNotifications = clearAllNotifications;
+        window.reloadNotificationsPage = reloadNotificationsPage;
+    });
+})();
+</script>
+{% endblock %}

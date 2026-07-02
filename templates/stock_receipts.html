@@ -1,0 +1,666 @@
+{% extends "base.html" %}
+{% block title %}Stock Receipts - LEOC{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('index') }}"><i class="bi bi-house-fill"></i></a></li>
+<li class="breadcrumb-item"><a href="#">Inventory</a></li>
+<li class="breadcrumb-item active">Stock Receipt</li>
+{% endblock %}
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center">
+    <div>
+        <h4><i class="bi bi-clipboard-check me-2"></i>Stock Receipt</h4>
+        <p>Record incoming stock receipts</p>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header">
+        <span><i class="bi bi-plus-circle me-2 text-primary"></i>New Stock Receipt</span>
+    </div>
+    <div class="card-body">
+        <form id="receiptForm">
+            <input type="hidden" id="receipt_id">
+            <div class="row g-3 mb-3">
+                <div class="col-md-3">
+                    <label class="form-label">Receipt No</label>
+                    <input type="text" class="form-control" id="receipt_no" readonly>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Date *</label>
+                    <input type="text" class="form-control nepali-date" placeholder="YYYY-MM-DD" id="receipt_date" required>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Warehouse *</label>
+                    <select class="form-select" id="receipt_warehouse_id" required>
+                        <option value="">Select Warehouse</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Source Type *</label>
+                    <select class="form-select" id="receipt_source_type" required>
+                        <option value="">Select Source</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Supplier</label>
+                    <select class="form-select" id="receipt_supplier_id" onchange="onSupplierChange()">
+                        <option value="">None (Manual Entry)</option>
+                    </select>
+                    <input type="hidden" id="receipt_supplier_name">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Source Name</label>
+                    <input type="text" class="form-control" id="receipt_source_name" placeholder="e.g. Organization name">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Remarks</label>
+                    <textarea class="form-control" id="receipt_remarks" rows="1"></textarea>
+                </div>
+            </div>
+
+            <div class="card bg-light mb-3">
+                <div class="card-body py-2">
+                    <h6 class="mb-2"><i class="bi bi-person-lines-fill me-2"></i>Source Details</h6>
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <label class="form-label">Contact Person</label>
+                            <input type="text" class="form-control" id="receipt_source_contact" placeholder="Contact person">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Phone</label>
+                            <input type="text" class="form-control" id="receipt_phone" placeholder="Phone number">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Email</label>
+                            <input type="email" class="form-control" id="receipt_email" placeholder="Email address">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Address</label>
+                            <textarea class="form-control" id="receipt_address" rows="1" placeholder="Address"></textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card bg-light mb-3">
+                <div class="card-body py-2">
+                    <h6 class="mb-2"><i class="bi bi-file-text me-2"></i>Document Info</h6>
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <label class="form-label">Reference No</label>
+                            <input type="text" class="form-control" id="receipt_ref_number" placeholder="Reference number">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Invoice No</label>
+                            <input type="text" class="form-control" id="receipt_invoice_no" placeholder="Invoice number">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Invoice Date</label>
+                            <input type="text" class="form-control nepali-date" placeholder="YYYY-MM-DD" id="receipt_invoice_date">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Delivery Note</label>
+                            <input type="text" class="form-control" id="receipt_delivery_note" placeholder="Delivery note">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Vehicle No</label>
+                            <input type="text" class="form-control" id="receipt_vehicle_no" placeholder="Vehicle number">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Received By</label>
+                            <input type="text" class="form-control" id="receipt_received_by" placeholder="Received by">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Verified By</label>
+                            <input type="text" class="form-control" id="receipt_verified_by" placeholder="Verified by">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <hr>
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                <h6 class="mb-0"><i class="bi bi-box me-2"></i>Received Items</h6>
+                <div class="d-flex gap-2 align-items-center">
+                    <select class="form-select form-select-sm" style="width:160px" id="itemCategoryFilter" onchange="applyItemFilters()">
+                        <option value="">All Categories</option>
+                    </select>
+                    <select class="form-select form-select-sm" style="width:160px" id="itemGroupFilter" onchange="applyItemFilters()">
+                        <option value="">All Groups</option>
+                    </select>
+                </div>
+            </div>
+            <div class="table-responsive mb-2">
+                <table class="table table-bordered" id="itemsTable">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="min-width:280px">Item *</th>
+                            <th style="min-width:60px">Unit</th>
+                            <th style="min-width:80px">Qty *</th>
+                            <th style="min-width:80px">Batch</th>
+                            <th style="min-width:80px">Serial</th>
+                            <th style="min-width:90px">Mfg</th>
+                            <th style="min-width:90px">Expiry</th>
+                            <th style="min-width:80px">Cost</th>
+                            <th style="min-width:80px">Total</th>
+                            <th style="width:40px"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="itemsBody"></tbody>
+                </table>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-primary mb-3" onclick="addItemRow()">
+                <i class="bi bi-plus-lg me-1"></i>Add Item
+            </button>
+
+            <div class="mt-4">
+                <button type="button" class="btn btn-primary" id="saveReceiptBtn" onclick="saveReceipt()"><i class="bi bi-check-lg me-1"></i>Save Receipt</button>
+                <button type="button" class="btn btn-secondary" onclick="resetReceiptForm()"><i class="bi bi-arrow-counterclockwise me-1"></i>Reset</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-list-check me-2 text-primary"></i>Recent Receipts</span>
+        <input type="text" class="form-control form-control-sm" style="width:200px" id="receiptSearch" placeholder="Search by receipt no..." oninput="filterReceipts()">
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Receipt No</th>
+                        <th>Date</th>
+                        <th>Warehouse</th>
+                        <th>Source</th>
+                        <th>Items</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="receiptTableBody">
+                    <tr><td colspan="6" class="text-center py-4"><div class="spinner-border text-primary"></div></td></tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="d-flex justify-content-between align-items-center mt-2 px-2">
+            <small class="text-muted" id="tableInfo">0 records</small>
+            <nav><ul class="pagination pagination-sm mb-0" id="pagination"></ul></nav>
+        </div>
+    </div>
+</div>
+
+<!-- Receipt Detail Modal -->
+<div class="modal fade" id="receiptDetailModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-receipt me-2"></i>Receipt Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="receiptDetailBody">
+                <div class="text-center py-4"><div class="spinner-border text-primary"></div></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap5.min.css" rel="stylesheet">
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
+<script>
+const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+let receipts = [];
+let warehouses = [];
+let itemsList = [];
+let suppliers = [];
+let categories = [];
+let groups = [];
+let paginator = new Paginator({perPage: 25, onPageChange: () => renderReceipts(receipts)});
+
+async function loadFormData() {
+    try {
+        const r = await fetch('/api/data', { cache: 'no-cache' });
+        if (!r.ok) { showToast('danger', 'API error: ' + r.status); return; }
+        const d = await r.json();
+        if (!d.success) { showToast('danger', d.message); return; }
+        warehouses = d.warehouses || [];
+        itemsList = d.items || [];
+        const whSelect = document.getElementById('receipt_warehouse_id');
+        if (whSelect) {
+            whSelect.innerHTML = '<option value="">Select Warehouse</option>' +
+                (warehouses.length ? warehouses.map(w => `<option value="${w.id}">${w.name} (${w.code})</option>`).join('') : '<option value="" disabled>No warehouses available</option>');
+        }
+        const stSelect = document.getElementById('receipt_source_type');
+        if (stSelect) {
+            stSelect.innerHTML = '<option value="">Select Source</option>' +
+                (d.source_types || []).map(s => `<option value="${s}">${s}</option>`).join('');
+        }
+        suppliers = d.suppliers || [];
+        const supSelect = document.getElementById('receipt_supplier_id');
+        if (supSelect) {
+            supSelect.innerHTML = '<option value="">None (Manual Entry)</option>' +
+                suppliers.map(s => `<option value="${s.id}">${s.name}${s.supplier_type ? ' (' + s.supplier_type + ')' : ''}</option>`).join('');
+        }
+        categories = d.categories || [];
+        const catFilter = document.getElementById('itemCategoryFilter');
+        if (catFilter) {
+            catFilter.innerHTML = '<option value="">All Categories</option>' +
+                categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+        }
+        groups = d.item_groups || [];
+        const grpFilter = document.getElementById('itemGroupFilter');
+        if (grpFilter) {
+            grpFilter.innerHTML = '<option value="">All Groups</option>' +
+                groups.map(g => `<option value="${g.id}">${g.name}</option>`).join('');
+        }
+        loadReceipts();
+    } catch(e) {
+        showToast('danger', 'Failed to load form data: ' + e.message);
+    }
+}
+
+function loadReceipts() {
+    fetch('/api/stock-receipts')
+        .then(r => r.json())
+        .then(d => {
+            if (!d.success) { showToast('danger', d.message); return; }
+            receipts = d.receipts;
+            renderReceipts(receipts);
+        })
+        .catch(e => showToast('danger', 'Error loading receipts: ' + e.message));
+}
+
+function renderReceipts(data) {
+    const tbody = document.getElementById('receiptTableBody');
+    if (data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-muted">No receipts found</td></tr>';
+        paginator.update(0);
+        return;
+    }
+    const pageData = paginator.getPageData(data);
+    tbody.innerHTML = pageData.map(r => {
+        const itemCount = r.items ? r.items.length : 0;
+        return `<tr>
+            <td><strong>${r.receipt_no}</strong></td>
+            <td>${r.date || '-'}</td>
+            <td>${r.warehouse_name || '-'}</td>
+            <td>${r.source_type}${r.supplier_name ? ' - ' + r.supplier_name : (r.source_name ? ' - ' + r.source_name : '')}</td>
+            <td><span class="badge bg-dark">${itemCount} item${itemCount !== 1 ? 's' : ''}</span></td>
+            <td class="text-end" onclick="event.stopPropagation()">
+                <button class="btn btn-sm btn-outline-info" onclick='viewReceipt(${r.id})' title="View"><i class="bi bi-eye"></i></button>
+                <button class="btn btn-sm btn-outline-primary" onclick='editReceipt(${r.id})' title="Edit"><i class="bi bi-pencil"></i></button>
+                <button class="btn btn-sm btn-outline-secondary" onclick='window.open("/api/stock-receipts/${r.id}/print","_blank")' title="Print"><i class="bi bi-printer"></i></button>
+            </td>
+        </tr>`;
+    }).join('');
+    paginator.update(data.length);
+}
+
+function filterReceipts() {
+    const q = document.getElementById('receiptSearch').value.toLowerCase();
+    const filtered = receipts.filter(r => r.receipt_no.toLowerCase().includes(q));
+    if (paginator) paginator.currentPage = 1;
+    renderReceipts(filtered);
+}
+
+function resetReceiptForm() {
+    document.getElementById('receipt_id').value = '';
+    document.getElementById('receiptForm').reset();
+    document.getElementById('receipt_no').value = 'RCPT-' + String(Date.now()).slice(-6);
+    document.getElementById('receipt_date').value = today_bs;
+    document.getElementById('itemsBody').innerHTML = '';
+    document.getElementById('itemCategoryFilter').value = '';
+    document.getElementById('itemGroupFilter').value = '';
+    document.getElementById('saveReceiptBtn').innerHTML = '<i class="bi bi-check-lg me-1"></i>Save Receipt';
+}
+
+function onSupplierChange() {
+    const supId = parseInt(document.getElementById('receipt_supplier_id').value);
+    const sup = suppliers.find(s => s.id === supId);
+    if (sup) {
+        if (!document.getElementById('receipt_source_name').value)
+            document.getElementById('receipt_source_name').value = sup.name || '';
+        if (!document.getElementById('receipt_source_contact').value)
+            document.getElementById('receipt_source_contact').value = sup.contact_person || '';
+        if (!document.getElementById('receipt_phone').value)
+            document.getElementById('receipt_phone').value = sup.phone || '';
+        if (!document.getElementById('receipt_email').value)
+            document.getElementById('receipt_email').value = sup.email || '';
+        if (!document.getElementById('receipt_address').value)
+            document.getElementById('receipt_address').value = sup.address || '';
+        const stSelect = document.getElementById('receipt_source_type');
+        if (stSelect && sup.supplier_type) stSelect.value = sup.supplier_type;
+    }
+}
+
+function lookupLastUnitCost(itemId) {
+    for (let i = receipts.length - 1; i >= 0; i--) {
+        const r = receipts[i];
+        if (r.items) {
+            for (let j = r.items.length - 1; j >= 0; j--) {
+                if (r.items[j].item_id == itemId && r.items[j].unit_cost) {
+                    return r.items[j].unit_cost;
+                }
+            }
+        }
+    }
+    return 0;
+}
+
+function calcRowTotal(row) {
+    const qty = parseFloat(row.querySelector('.receipt-qty').value) || 0;
+    const cost = parseFloat(row.querySelector('.receipt-unit-cost').value) || 0;
+    row.querySelector('.receipt-total-cost').value = (qty * cost).toFixed(2);
+}
+
+function checkDuplicateItem(select) {
+    const itemId = select.value;
+    if (!itemId) return;
+    const rows = document.querySelectorAll('#itemsBody tr');
+    for (const row of rows) {
+        const sel = row.querySelector('.receipt-item');
+        if (sel && sel !== select && sel.value === itemId) {
+            showToast('warning', 'Item already selected — edit the existing row instead');
+            select.value = '';
+            return;
+        }
+    }
+}
+
+function getFilteredItemOptions(currentItemId) {
+    const catId = document.getElementById('itemCategoryFilter').value;
+    const groupId = document.getElementById('itemGroupFilter').value;
+    const selectedIds = new Set();
+    document.querySelectorAll('#itemsBody tr .receipt-item').forEach(sel => {
+        if (sel.value && String(sel.value) !== String(currentItemId)) {
+            selectedIds.add(String(sel.value));
+        }
+    });
+    return itemsList
+        .filter(i => {
+            if (String(i.id) === String(currentItemId)) return true;
+            if (catId && String(i.category_id) !== catId) return false;
+            if (groupId && String(i.group_id || '') !== groupId) return false;
+            return true;
+        })
+        .map(i => {
+            const isSelected = selectedIds.has(String(i.id));
+            const disabled = isSelected ? 'disabled' : '';
+            const cls = isSelected ? ' class="text-muted"' : '';
+            return `<option value="${i.id}" data-unit="${i.unit || ''}" data-storage-life-days="${i.storage_life_days || ''}" data-expiry-tracking="${!!i.expiry_tracking}" ${String(i.id) === String(currentItemId) ? 'selected' : ''} ${disabled}${cls}>${i.item_code ? i.item_code + ' - ' : ''}${i.name}</option>`;
+        })
+        .join('');
+}
+
+function applyItemFilters() {
+    document.querySelectorAll('#itemsBody tr').forEach(row => {
+        const sel = row.querySelector('.receipt-item');
+        if (!sel) return;
+        const currentVal = sel.value;
+        if (sel.tomselect) sel.tomselect.destroy();
+        sel.innerHTML = '<option value="">Select Item</option>' + getFilteredItemOptions(currentVal);
+        sel.value = currentVal;
+        initItemSelect(sel);
+    });
+}
+
+function addItemRow(itemId = '', unit = '', qty = '', batchNo = '', serialNo = '', mfgDate = '', expiryDate = '', unitCost = '') {
+    const tr = document.createElement('tr');
+    const itemOpts = getFilteredItemOptions(itemId);
+    tr.innerHTML = `
+        <td>
+            <select class="form-select form-select-sm receipt-item">
+                <option value="">Select Item</option>
+                ${itemOpts}
+            </select>
+        </td>
+        <td><input type="text" class="form-control form-control-sm receipt-unit" value="${unit}" readonly></td>
+        <td><input type="number" class="form-control form-control-sm receipt-qty" value="${qty}" min="1" step="1" oninput="calcRowTotal(this.closest('tr'))"></td>
+        <td><input type="text" class="form-control form-control-sm receipt-batch-no" value="${batchNo}" placeholder="Batch"></td>
+        <td><input type="text" class="form-control form-control-sm receipt-serial-no" value="${serialNo}" placeholder="Serial"></td>
+        <td><input type="text" class="form-control form-control-sm receipt-mfg-date nepali-date" placeholder="YYYY-MM-DD" value="${mfgDate}"></td>
+        <td><input type="text" class="form-control form-control-sm receipt-expiry-date nepali-date" placeholder="YYYY-MM-DD" value="${expiryDate}"></td>
+        <td><input type="number" class="form-control form-control-sm receipt-unit-cost" value="${unitCost}" min="0" step="0.01" oninput="calcRowTotal(this.closest('tr'))"></td>
+        <td><input type="text" class="form-control form-control-sm receipt-total-cost" value="" readonly></td>
+        <td><button class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove()"><i class="bi bi-x"></i></button></td>
+    `;
+    document.getElementById('itemsBody').appendChild(tr);
+    initItemSelect(tr.querySelector('.receipt-item'));
+    calcRowTotal(tr);
+}
+
+function initItemSelect(selectEl) {
+    if (selectEl.tomselect) selectEl.tomselect.destroy();
+    new TomSelect(selectEl, {
+        maxOptions: null,
+        placeholder: 'Search or select item...',
+        dropdownParent: 'body',
+        onChange: function(value) {
+            if (!value) return;
+            checkDuplicateItem(selectEl);
+            updateItemUnit(selectEl);
+            autoFillUnitCost(selectEl);
+            autoFillDates(selectEl);
+        }
+    });
+}
+
+function updateItemUnit(select) {
+    const opt = select.options[select.selectedIndex];
+    const unit = opt ? opt.getAttribute('data-unit') : '';
+    select.closest('tr').querySelector('.receipt-unit').value = unit;
+}
+
+function autoFillUnitCost(select) {
+    const itemId = parseInt(select.value);
+    if (!itemId) return;
+    const cost = lookupLastUnitCost(itemId);
+    const tr = select.closest('tr');
+    tr.querySelector('.receipt-unit-cost').value = cost;
+    calcRowTotal(tr);
+}
+
+function autoFillDates(select) {
+    const opt = select.options[select.selectedIndex];
+    const tracking = opt?.getAttribute('data-expiry-tracking') === 'true';
+    const tr = select.closest('tr');
+    const mfgInput = tr.querySelector('.receipt-mfg-date');
+    const expInput = tr.querySelector('.receipt-expiry-date');
+    if (!tracking) {
+        [mfgInput, expInput].forEach(el => { if (el) { el.value = ''; el.disabled = true; el.readOnly = true; } });
+        return;
+    }
+    [mfgInput, expInput].forEach(el => { if (el) { el.disabled = false; el.readOnly = false; } });
+    const days = parseInt(opt?.getAttribute('data-storage-life-days'));
+    if (!days) return;
+    const today = new Date();
+    const todayBS = typeof window.adToBS === 'function' ? window.adToBS(today) : '';
+    const expiry = new Date(today.getTime() + days * 86400000);
+    const expiryBS = typeof window.adToBS === 'function' ? window.adToBS(expiry) : '';
+    if (mfgInput) mfgInput.value = todayBS;
+    if (expInput) expInput.value = expiryBS;
+}
+
+async function saveReceipt() {
+    const itemRows = document.querySelectorAll('#itemsBody tr');
+    const items = Array.from(itemRows).map(tr => ({
+        item_id: parseInt(tr.querySelector('.receipt-item').value),
+        quantity: parseInt(tr.querySelector('.receipt-qty').value) || 0,
+        unit: tr.querySelector('.receipt-unit').value,
+        batch_no: tr.querySelector('.receipt-batch-no').value,
+        serial_no: tr.querySelector('.receipt-serial-no').value,
+        mfg_date: tr.querySelector('.receipt-mfg-date').value,
+        expiry_date: tr.querySelector('.receipt-expiry-date').value,
+        unit_cost: parseFloat(tr.querySelector('.receipt-unit-cost').value) || 0
+    })).filter(i => i.item_id && i.quantity > 0);
+
+    if (items.length === 0) { showToast('danger', 'Add at least one item with quantity'); return; }
+
+    const phone = document.getElementById('receipt_phone').value.trim();
+    const email = document.getElementById('receipt_email').value.trim();
+    if (phone && !/^[\d\s\+\-\(\)]{7,20}$/.test(phone)) { showToast('danger', 'Phone number format is invalid'); return; }
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showToast('danger', 'Email format is invalid'); return; }
+
+    const body = {
+        receipt_no: document.getElementById('receipt_no').value,
+        date: document.getElementById('receipt_date').value,
+        warehouse_id: parseInt(document.getElementById('receipt_warehouse_id').value),
+        supplier_id: parseInt(document.getElementById('receipt_supplier_id').value) || null,
+        source_type: document.getElementById('receipt_source_type').value,
+        source_name: document.getElementById('receipt_source_name').value,
+        source_contact: document.getElementById('receipt_source_contact').value,
+        phone: phone,
+        email: email,
+        address: document.getElementById('receipt_address').value,
+        ref_number: document.getElementById('receipt_ref_number').value,
+        invoice_no: document.getElementById('receipt_invoice_no').value,
+        invoice_date: document.getElementById('receipt_invoice_date').value,
+        delivery_note: document.getElementById('receipt_delivery_note').value,
+        vehicle_no: document.getElementById('receipt_vehicle_no').value,
+        received_by: document.getElementById('receipt_received_by').value,
+        verified_by: document.getElementById('receipt_verified_by').value,
+        remarks: document.getElementById('receipt_remarks').value,
+        items: items
+    };
+
+    if (!body.warehouse_id) { showToast('danger', 'Warehouse is required'); return; }
+    if (!body.source_type) { showToast('danger', 'Source type is required'); return; }
+    if (!body.date) { showToast('danger', 'Date is required'); return; }
+
+    const receiptId = document.getElementById('receipt_id').value;
+    const method = receiptId ? 'PUT' : 'POST';
+    const url = receiptId ? `/api/stock-receipts/${receiptId}` : '/api/stock-receipts';
+
+    const r = await fetch(url, {
+        method: method,
+        headers: {'Content-Type':'application/json','X-CSRFToken':csrf},
+        body: JSON.stringify(body)
+    });
+    const d = await r.json();
+    if (d.success) {
+        showToast('success', receiptId ? 'Stock receipt updated' : 'Stock receipt recorded');
+        resetReceiptForm();
+        loadReceipts();
+    } else { showToast('danger', d.message); }
+}
+
+async function editReceipt(id) {
+    try {
+        const r = await fetch('/api/stock-receipts/' + id);
+        const d = await r.json();
+        if (!d.success) { showToast('danger', d.message); return; }
+        const rc = d.receipt;
+        document.getElementById('receipt_id').value = rc.id;
+        document.getElementById('receipt_no').value = rc.receipt_no;
+        document.getElementById('receipt_date').value = rc.date || '';
+        document.getElementById('receipt_warehouse_id').value = rc.warehouse_id || '';
+        document.getElementById('receipt_supplier_id').value = rc.supplier_id || '';
+        document.getElementById('receipt_source_type').value = rc.source_type || '';
+        document.getElementById('receipt_source_name').value = rc.source_name || '';
+        document.getElementById('receipt_source_contact').value = rc.source_contact || '';
+        document.getElementById('receipt_phone').value = rc.phone || '';
+        document.getElementById('receipt_email').value = rc.email || '';
+        document.getElementById('receipt_address').value = rc.address || '';
+        document.getElementById('receipt_ref_number').value = rc.ref_number || '';
+        document.getElementById('receipt_invoice_no').value = rc.invoice_no || '';
+        document.getElementById('receipt_invoice_date').value = rc.invoice_date || '';
+        document.getElementById('receipt_delivery_note').value = rc.delivery_note || '';
+        document.getElementById('receipt_vehicle_no').value = rc.vehicle_no || '';
+        document.getElementById('receipt_received_by').value = rc.received_by || '';
+        document.getElementById('receipt_verified_by').value = rc.verified_by || '';
+        document.getElementById('receipt_remarks').value = rc.remarks || '';
+
+        document.getElementById('itemsBody').innerHTML = '';
+        const rcpts = Array.isArray(rc.items) ? rc.items : [];
+        for (const item of rcpts) {
+            addItemRow(
+                item.item_id || '',
+                item.unit || '',
+                item.quantity || '',
+                item.batch_no || '',
+                item.serial_no || '',
+                item.mfg_date || '',
+                item.expiry_date || '',
+                item.unit_cost || ''
+            );
+        }
+        document.getElementById('saveReceiptBtn').innerHTML = '<i class="bi bi-check-lg me-1"></i>Update Receipt';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch(e) {
+        showToast('danger', 'Error loading receipt: ' + e.message);
+    }
+}
+
+async function viewReceipt(id) {
+    const modal = new bootstrap.Modal(document.getElementById('receiptDetailModal'));
+    document.getElementById('receiptDetailBody').innerHTML = '<div class="text-center py-4"><div class="spinner-border text-primary"></div></div>';
+    modal.show();
+
+    try {
+        const r = await fetch('/api/stock-receipts/'+id);
+        const d = await r.json();
+        if (!d.success) { document.getElementById('receiptDetailBody').innerHTML = '<p class="text-danger">Failed to load details</p>'; return; }
+        const rc = d.receipt;
+        const whName = warehouses.find(w => w.id === rc.warehouse_id)?.name || rc.warehouse_name || '-';
+        const itemsHtml = (rc.items || []).map(i => `<tr>
+            <td>${i.item_name || '-'}</td>
+            <td>${i.quantity || 0}</td>
+            <td>${i.unit || '-'}</td>
+            <td>${i.batch_no || '-'}</td>
+            <td>${i.serial_no || '-'}</td>
+            <td>${i.mfg_date || '-'}</td>
+            <td>${i.expiry_date || '-'}</td>
+            <td class="text-end">${i.unit_cost != null ? Number(i.unit_cost).toFixed(2) : '-'}</td>
+            <td class="text-end">${i.total_cost != null ? Number(i.total_cost).toFixed(2) : '-'}</td>
+        </tr>`).join('') || '<tr><td colspan="9" class="text-center text-muted">No items</td></tr>';
+
+        document.getElementById('receiptDetailBody').innerHTML = `
+            <div class="row g-3 mb-3">
+                <div class="col-md-4"><strong>Receipt No:</strong><br>${rc.receipt_no}</div>
+                <div class="col-md-4"><strong>Date:</strong><br>${rc.date || '-'}</div>
+                <div class="col-md-4"><strong>Warehouse:</strong><br>${whName}</div>
+                <div class="col-md-4"><strong>Supplier:</strong><br>${rc.supplier_name || '-'}</div>
+                <div class="col-md-4"><strong>Source Type:</strong><br>${rc.source_type || '-'}</div>
+                <div class="col-md-4"><strong>Source Name:</strong><br>${rc.source_name || '-'}</div>
+                <div class="col-md-4"><strong>Source Contact:</strong><br>${rc.source_contact || '-'}</div>
+                <div class="col-md-4"><strong>Phone:</strong><br>${rc.phone || '-'}</div>
+                <div class="col-md-4"><strong>Email:</strong><br>${rc.email || '-'}</div>
+                <div class="col-md-4"><strong>Address:</strong><br>${rc.address || '-'}</div>
+                <div class="col-md-4"><strong>Ref Number:</strong><br>${rc.ref_number || '-'}</div>
+                <div class="col-md-4"><strong>Invoice No:</strong><br>${rc.invoice_no || '-'}</div>
+                <div class="col-md-4"><strong>Invoice Date:</strong><br>${rc.invoice_date || '-'}</div>
+                <div class="col-md-4"><strong>Delivery Note:</strong><br>${rc.delivery_note || '-'}</div>
+                <div class="col-md-4"><strong>Vehicle No:</strong><br>${rc.vehicle_no || '-'}</div>
+                <div class="col-md-4"><strong>Received By:</strong><br>${rc.received_by || '-'}</div>
+                <div class="col-md-4"><strong>Verified By:</strong><br>${rc.verified_by || '-'}</div>
+                <div class="col-md-4"><strong>Remarks:</strong><br>${rc.remarks || '-'}</div>
+            </div>
+            <hr>
+            <h6>Items Received</h6>
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    <thead><tr><th>Item</th><th>Qty</th><th>Unit</th><th>Batch</th><th>Serial</th><th>Mfg</th><th>Expiry</th><th class="text-end">Unit Cost</th><th class="text-end">Total Cost</th></tr></thead>
+                    <tbody>${itemsHtml}</tbody>
+                </table>
+            </div>
+        `;
+    } catch(e) {
+        document.getElementById('receiptDetailBody').innerHTML = '<p class="text-danger">Error loading details</p>';
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    resetReceiptForm();
+    loadFormData();
+});
+</script>
+{% endblock %}

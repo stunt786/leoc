@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="ne">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stock Receipt - LEOC</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        @font-face {
+            font-family: 'Noto Sans';
+            src: url('/static/fonts/NotoSans-Regular.ttf') format('truetype');
+            font-weight: 400;
+            font-style: normal;
+            font-display: swap;
+        }
+        @font-face {
+            font-family: 'Noto Sans';
+            src: url('/static/fonts/NotoSans-Bold.ttf') format('truetype');
+            font-weight: 700;
+            font-style: normal;
+            font-display: swap;
+        }
+        @font-face {
+            font-family: 'Kokila';
+            src: url('/static/fonts/Kokila-Regular.ttf') format('truetype');
+            font-weight: 400;
+            font-style: normal;
+            font-display: swap;
+        }
+        @font-face {
+            font-family: 'Kokila';
+            src: url('/static/fonts/Kokila-Regular.ttf') format('truetype');
+            font-weight: 700;
+            font-style: normal;
+            font-display: swap;
+        }
+        body { font-family: 'Noto Sans', 'Kokila', 'Noto Sans Devanagari', 'Inter', sans-serif; padding: 20px; font-size: 12px; }
+        @media print { body { padding: 0; } .no-print { display: none !important; } }
+        .header { text-align: center; margin-bottom: 20px; }
+        .header h3 { margin-bottom: 2px; }
+        .header h5 { color: #2c5282; }
+        table { font-size: 11px; }
+        .footer { text-align: center; margin-top: 20px; font-size: 10px; color: #666; }
+        .field-label { font-weight: 600; color: #495057; }
+    </style>
+</head>
+<body>
+    <div class="no-print mb-3">
+        <button class="btn btn-primary btn-sm" onclick="window.print()"><i class="bi bi-printer"></i> Print</button>
+    </div>
+
+    <div class="header">
+        {% if report_header %}
+        {% for line in report_header.strip().split('\n') %}
+        {% set l = line.strip() %}
+        {% if l %}
+        {% if loop.first %}<h3>{{ l }}</h3>{% else %}<h5>{{ l }}</h5>{% endif %}
+        {% endif %}
+        {% endfor %}
+        {% else %}
+        <h3>{{ office or 'थलारा गाउँपालिका' }}</h3>
+        <h5>स्थानीय आपतकालिन कार्यसञ्चालन केन्द्र (LEOC)</h5>
+        {% endif %}
+        <h4>स्टक प्राप्ति (Stock Receipt)</h4>
+        <p class="text-muted">{{ address }}</p>
+    </div>
+
+    <div class="row mb-3">
+        <div class="col-6">
+            <table class="table table-sm table-borderless">
+                <tr><td class="field-label">Receipt No:</td><td>{{ receipt.receipt_no }}</td></tr>
+                <tr><td class="field-label">Date:</td><td>{{ receipt.date|nepali_date if receipt.date else '' }}</td></tr>
+                <tr><td class="field-label">Warehouse:</td><td>{{ receipt.warehouse.name }}</td></tr>
+                <tr><td class="field-label">Source Type:</td><td>{{ receipt.source_type }}</td></tr>
+                <tr><td class="field-label">Source Name:</td><td>{{ receipt.source_name or '' }}</td></tr>
+                <tr><td class="field-label">Source Contact:</td><td>{{ receipt.source_contact or '' }}</td></tr>
+            </table>
+        </div>
+        <div class="col-6">
+            <table class="table table-sm table-borderless">
+                <tr><td class="field-label">Phone:</td><td>{{ receipt.phone or '' }}</td></tr>
+                <tr><td class="field-label">Email:</td><td>{{ receipt.email or '' }}</td></tr>
+                <tr><td class="field-label">Address:</td><td>{{ receipt.address or '' }}</td></tr>
+                <tr><td class="field-label">Reference No:</td><td>{{ receipt.ref_number or '' }}</td></tr>
+                <tr><td class="field-label">Invoice No:</td><td>{{ receipt.invoice_no or '' }}</td></tr>
+                <tr><td class="field-label">Invoice Date:</td><td>{{ receipt.invoice_date|nepali_date if receipt.invoice_date else '' }}</td></tr>
+            </table>
+        </div>
+    </div>
+
+    <div class="row mb-3">
+        <div class="col-6">
+            <table class="table table-sm table-borderless">
+                <tr><td class="field-label">Delivery Note:</td><td>{{ receipt.delivery_note or '' }}</td></tr>
+                <tr><td class="field-label">Vehicle No:</td><td>{{ receipt.vehicle_no or '' }}</td></tr>
+            </table>
+        </div>
+        <div class="col-6">
+            <table class="table table-sm table-borderless">
+                <tr><td class="field-label">Received By:</td><td>{{ receipt.received_by or '' }}</td></tr>
+                <tr><td class="field-label">Verified By:</td><td>{{ receipt.verified_by or '' }}</td></tr>
+            </table>
+        </div>
+    </div>
+
+    <table class="table table-bordered table-sm">
+        <thead class="table-dark">
+            <tr>
+                <th>#</th>
+                <th>Item Name</th>
+                <th>Unit</th>
+                <th>Quantity</th>
+                <th>Batch No</th>
+                <th>Serial No</th>
+                <th>Mfg Date</th>
+                <th>Expiry Date</th>
+                <th>Unit Cost</th>
+                <th>Total Cost</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in receipt.items %}
+            <tr>
+                <td>{{ loop.index }}</td>
+                <td>{{ item.item.name }}</td>
+                <td>{{ item.unit or item.item.unit }}</td>
+                <td>{{ item.quantity }}</td>
+                <td>{{ item.batch_no or '' }}</td>
+                <td>{{ item.serial_no or '' }}</td>
+                <td>{% if item.item and item.item.expiry_tracking %}{{ item.mfg_date|nepali_date if item.mfg_date else '' }}{% else %}-{% endif %}</td>
+                <td>{% if item.item and item.item.expiry_tracking %}{{ item.expiry_date|nepali_date if item.expiry_date else '' }}{% else %}-{% endif %}</td>
+                <td>{{ "%.2f"|format(item.unit_cost) if item.unit_cost else '' }}</td>
+                <td>{{ "%.2f"|format(item.total_cost) if item.total_cost else '' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    {% if receipt.remarks %}
+    <div class="mb-3">
+        <strong>Remarks:</strong> {{ receipt.remarks }}
+    </div>
+    {% endif %}
+
+    <div class="row mt-4 mb-4">
+        <div class="col-6 text-center">
+            <div style="margin-top: 60px; border-top: 1px solid #000; display: inline-block; padding: 0 40px;">
+                <strong>{{ receipt.received_by or '______________' }}</strong>
+            </div>
+            <p class="mt-1 mb-0">Received By</p>
+        </div>
+        <div class="col-6 text-center">
+            <div style="margin-top: 60px; border-top: 1px solid #000; display: inline-block; padding: 0 40px;">
+                <strong>{{ receipt.verified_by or '______________' }}</strong>
+            </div>
+            <p class="mt-1 mb-0">Verified By</p>
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>Generated on {{ receipt.created_at|nepali_date if receipt.created_at else '' }} | {{ office or 'थलारा गाउँपालिका' }} - LEOC</p>
+    </div>
+</body>
+</html>

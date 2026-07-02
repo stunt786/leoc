@@ -1,0 +1,644 @@
+{% extends "base.html" %}
+{% block title %}Cash Distributions - LEOC{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('index') }}"><i class="bi bi-house-fill"></i></a></li>
+<li class="breadcrumb-item active">Cash Distributions</li>
+{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="mb-0"><i class="bi bi-cash-stack me-2"></i>Cash Distributions</h4>
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#cdModal" onclick="openCdModal()">
+        <i class="bi bi-plus-lg"></i> New Distribution
+    </button>
+</div>
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle" id="cdTable">
+                <thead class="table-light"><tr>
+                    <th>Dist No</th><th>Date</th><th>Beneficiary</th><th>Incident</th>
+                    <th>Source</th><th>Status</th><th>Type</th><th>Amount</th><th>Officer</th><th>Files</th><th>Actions</th>
+                </tr></thead>
+                <tbody id="cdBody"></tbody>
+            </table>
+        </div>
+        <div class="d-flex justify-content-between align-items-center mt-2 px-2">
+            <small class="text-muted" id="tableInfo">0 records</small>
+            <nav><ul class="pagination pagination-sm mb-0" id="pagination"></ul></nav>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="cdModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title">Cash Distribution</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <form id="cdForm">
+                <div class="modal-body">
+                    <div class="row g-2">
+                        <div class="col-md-6 mb-3"><label class="form-label">Distribution Date</label><input type="text" class="form-control nepali-date" placeholder="YYYY-MM-DD" name="distribution_date" id="cdDate" value="{{ today_bs }}"></div>
+                        <div class="col-md-6 mb-3"><label class="form-label">Distribution Type</label><select class="form-select" name="distribution_type" id="cdType"></select></div>
+                    </div>
+                    <div class="row g-2">
+                        <div class="col-md-4 mb-3"><label class="form-label">Fund <span class="text-danger">*</span></label><select class="form-select" name="fund_id" id="cdFund" required onchange="onFundChange()"></select></div>
+                        <div class="col-md-4 mb-3"><label class="form-label">Incident <span class="text-danger">*</span></label><select class="form-select" name="incident_id" id="cdIncident" required onchange="onIncidentChange()"></select></div>
+                        <div class="col-md-4 mb-3"><label class="form-label">Source Request <span class="text-danger">*</span></label>
+                            <div class="d-flex gap-2 mb-1">
+                                <div class="btn-group btn-group-sm w-100" role="group">
+                                    <input type="radio" class="btn-check" name="sourceType" id="srcCashReq" value="cash_request" checked onchange="toggleSourceType()">
+                                    <label class="btn btn-outline-primary" for="srcCashReq">Cash Request</label>
+                                    <input type="radio" class="btn-check" name="sourceType" id="srcReliefReq" value="relief_request" onchange="toggleSourceType()">
+                                    <label class="btn btn-outline-primary" for="srcReliefReq">Relief Request</label>
+                                </div>
+                            </div>
+                            <select class="form-select" name="cash_request_id" id="cdRequest"><option value="">Select Cash Request</option></select>
+                            <div class="d-flex flex-wrap gap-1 mt-1" id="cdSelectedRequests"></div>
+                            <button type="button" class="btn btn-sm btn-outline-primary mt-1" id="cdAddRequestBtn" onclick="addSelectedCashRequest()"><i class="bi bi-plus"></i> Add Request</button>
+                            <small class="text-muted d-block mt-1" id="cdRequestInfo">Select from dropdown and click "Add Request" to add more</small>
+                            <select class="form-select" name="relief_request_id" id="cdReliefRequest" style="display:none"></select>
+                        </div>
+                    </div>
+                    <div class="row g-2">
+                        <div class="col-md-4 mb-3"><label class="form-label">Officer</label><input class="form-control" name="officer" id="cdOfficer"></div>
+                        <div class="col-md-4 mb-3"><label class="form-label">Total Amount</label><input type="number" step="0.01" class="form-control" id="cdTotal" readonly></div>
+                        <div class="col-md-4 mb-3"><label class="form-label">Fund Balance</label><input type="text" class="form-control" id="cdFundBalance" readonly></div>
+                    </div>
+                    <div class="mb-3"><label class="form-label">Remarks</label><textarea class="form-control" name="remarks" id="cdRemarks" rows="2"></textarea></div>
+
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Photo</label>
+                            <input type="file" class="form-control" id="cdPhotoFile" accept="image/jpeg,image/png,image/gif" onchange="uploadCdFile(this, 'photo')">
+                            <input type="hidden" name="photo" id="cdPhoto">
+                            <div id="cdPhotoPreview" class="mt-1"></div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Document (PDF)</label>
+                            <input type="file" class="form-control" id="cdDocFile" accept="application/pdf" onchange="uploadCdFile(this, 'document')">
+                            <input type="hidden" name="document" id="cdDocument">
+                            <div id="cdDocPreview" class="mt-1"></div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <label class="form-label fw-bold mb-0">Beneficiaries</label>
+                        <div>
+                            <button type="button" class="btn btn-sm btn-outline-success" onclick="addBeneficiaryRow()"><i class="bi bi-person-plus"></i> Add Beneficiary</button>
+                            <button type="button" class="btn btn-sm btn-outline-info" onclick="addBeneficiaryFromRequest()"><i class="bi bi-person-plus"></i> Add from Request</button>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered" id="benTable">
+                            <thead class="table-light"><tr>
+                                <th style="min-width:120px">Name <span class="text-danger">*</span></th>
+                                <th style="min-width:100px">National ID</th>
+                                <th style="min-width:120px">Address</th>
+                                <th style="min-width:90px">Phone</th>
+                                <th style="min-width:80px">Amount <span class="text-danger">*</span></th>
+                                <th style="width:40px"></th>
+                            </tr></thead>
+                            <tbody id="benBody">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg"></i> Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="cancelModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title"><i class="bi bi-exclamation-triangle me-2"></i>Cancel Cash Distribution</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-3">Are you sure you want to cancel this cash distribution? The fund balance will be restored and the distribution record will be removed.</p>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Reason for Cancellation <span class="text-danger">*</span></label>
+                    <textarea class="form-control" id="cancelReason" rows="3" placeholder="Enter the reason for cancelling this distribution..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Keep</button>
+                <button type="button" class="btn btn-danger" id="confirmCancelBtn"><i class="bi bi-x-circle"></i> Cancel Distribution</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="viewCdModal" tabindex="-1">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="bi bi-cash-stack me-2"></i><span id="viewCdTitle"></span></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="viewCdBody"></div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+let _cashDistributions = [];
+let paginator = new Paginator({perPage: 25, onPageChange: () => renderCashDistributions(_cashDistributions)});
+
+function renderCashDistributions(data) {
+    const t = document.getElementById('cdBody');
+    if (data.length === 0) { t.innerHTML = '<tr><td colspan="10" class="text-center text-muted py-3">No distributions found</td></tr>'; paginator.update(0); return; }
+    const pageData = paginator.getPageData(data);
+    t.innerHTML = pageData.map(cd => {
+        const isCancelled = cd.status === 'Cancelled';
+        const srcMatch = (cd.remarks || '').match(/Source Distribution:\s*(\S+)/);
+        const srcHtml = srcMatch ? `<small class="text-muted" title="${cd.remarks}">${srcMatch[1]}</small>` : '-';
+        const photoHtml = cd.photo_url ? `<a href="${cd.photo_url}" target="_blank" title="Photo"><i class="bi bi-image text-primary"></i></a>` : '';
+        const docHtml = cd.document_url ? `<a href="${cd.document_url}" target="_blank" title="Document"><i class="bi bi-file-pdf text-danger ms-1"></i></a>` : '';
+        const filesHtml = (photoHtml || docHtml) ? `${photoHtml}${docHtml}` : '-';
+        const reqNums = (cd.request_numbers || []).length ? cd.request_numbers.join(', ') : (cd.request_number || '');
+        const statusBadge = isCancelled
+            ? `<span class="badge bg-danger bg-opacity-10 text-danger border border-danger">Cancelled</span>`
+            : `<span class="badge bg-success bg-opacity-10 text-success border border-success">Active</span>`;
+        const cancelBtn = isCancelled ? '' : `<button class="btn btn-sm btn-outline-danger ms-1" onclick="cancelCd(${cd.id})" title="Cancel"><i class="bi bi-x-circle"></i></button>`;
+        const rowClass = isCancelled ? ' class="text-decoration-line-through text-muted"' : '';
+        const benName = (cd.beneficiaries && cd.beneficiaries.length > 0) ? cd.beneficiaries[0].name : '-';
+        return `<tr${rowClass}>
+        <td>${cd.distribution_no}</td><td>${cd.distribution_date}</td>
+        <td>${benName}</td>
+        <td>${cd.incident_name || '-'}</td>
+        <td><small>${cd.relief_request_number ? 'Relief: '+cd.relief_request_number : reqNums ? 'Cash: '+reqNums : '-'}</small></td>
+        <td>${statusBadge}</td>
+        <td>${cd.distribution_type}</td>
+        <td class="fw-bold text-danger">${Number(cd.total_amount).toLocaleString()}</td>
+        <td>${cd.officer || '-'}</td>
+        <td>${filesHtml}</td>
+        <td><button class="btn btn-sm btn-outline-primary" onclick="viewCd(${cd.id})" title="View"><i class="bi bi-eye"></i></button>${cancelBtn}</td>
+    </tr>`}).join('');
+    paginator.update(data.length);
+}
+
+async function loadDistributions() {
+    const r = await fetch('/api/cash-distributions');
+    const d = await r.json();
+    if (!d.success) { showToast('danger', d.message); return; }
+    _cashDistributions = d.distributions;
+    renderCashDistributions(_cashDistributions);
+}
+
+function toggleSourceType() {
+    const isCashReq = document.getElementById('srcCashReq').checked;
+    document.getElementById('cdRequest').style.display = isCashReq ? '' : 'none';
+    document.getElementById('cdReliefRequest').style.display = isCashReq ? 'none' : '';
+    document.getElementById('cdSelectedRequests').style.display = isCashReq ? '' : 'none';
+    document.getElementById('cdAddRequestBtn').style.display = isCashReq ? '' : 'none';
+    document.getElementById('cdRequestInfo').style.display = isCashReq ? '' : 'none';
+    const sel = isCashReq ? 'cdRequest' : 'cdReliefRequest';
+    document.getElementById(sel).required = true;
+    document.getElementById(isCashReq ? 'cdReliefRequest' : 'cdRequest').required = false;
+    const otherSel = document.getElementById(isCashReq ? 'cdReliefRequest' : 'cdRequest');
+    if (otherSel.multiple) Array.from(otherSel.options).forEach(o => o.selected = false);
+    else otherSel.value = '';
+    selectedCashRequests = [];
+    renderSelectedRequests();
+    const tbody = document.getElementById('benBody');
+    tbody.innerHTML = '';
+    calcTotal();
+}
+
+let cashRequestsData = [];
+let beneficiariesData = [];
+let reliefRequestsData = [];
+let selectedCashRequests = [];
+
+function addSelectedCashRequest() {
+    const sel = document.getElementById('cdRequest');
+    const id = parseInt(sel.value);
+    if (!id) { showToast('warning', 'Please select a cash request'); return; }
+    if (selectedCashRequests.find(r => r.id === id)) return;
+    const cr = cashRequestsData.find(r => r.id === id);
+    if (!cr) return;
+    selectedCashRequests.push({ id: cr.id, request_number: cr.request_number, remaining: cr.remaining || 0 });
+    renderSelectedRequests();
+    sel.value = '';
+    calcTotal();
+}
+
+function removeSelectedCashRequest(id) {
+    selectedCashRequests = selectedCashRequests.filter(r => r.id !== id);
+    renderSelectedRequests();
+    calcTotal();
+}
+
+function renderSelectedRequests() {
+    document.getElementById('cdSelectedRequests').innerHTML = selectedCashRequests.map(r =>
+        `<span class="badge bg-primary fs-6 d-inline-flex align-items-center gap-1">${r.request_number} (${Number(r.remaining).toLocaleString()}) <i class="bi bi-x-circle-fill" style="cursor:pointer" onclick="removeSelectedCashRequest(${r.id})"></i></span>`
+    ).join('');
+}
+
+function getSelectedCashRequestIds() {
+    return selectedCashRequests.map(r => r.id);
+}
+
+async function loadData() {
+    const r = await fetch('/api/data');
+    const d = await r.json();
+    if (!d.success) return;
+    cashRequestsData = d.cash_requests || [];
+    beneficiariesData = d.beneficiaries || [];
+    reliefRequestsData = d.requests || [];
+    window._cashFundsData = d.cash_funds || [];
+    document.getElementById('cdFund').innerHTML = '<option value="">Select Fund</option>' + (d.cash_funds||[]).filter(f=>f.status==='Active').map(f => `<option value="${f.id}">${f.name} (Bal: ${Number(f.current_balance).toLocaleString()})</option>`).join('');
+    document.getElementById('cdIncident').innerHTML = '<option value="">Select Incident</option>' + (d.incidents||[]).filter(i=>i.status==='Active').map(i => `<option value="${i.id}">${i.incident_name}</option>`).join('');
+    onIncidentChange();
+    document.getElementById('cdType').innerHTML = (d.distribution_types||['Individual','Family','Community','Local Government','Organization']).map(t => `<option value="${t}">${t}</option>`).join('');
+}
+
+function onIncidentChange() {
+    const incidentId = parseInt(document.getElementById('cdIncident').value);
+    let filteredCash = cashRequestsData;
+    let filteredRelief = reliefRequestsData;
+    if (incidentId) {
+        filteredCash = cashRequestsData.filter(rq => rq.incident_id === incidentId);
+        filteredRelief = reliefRequestsData.filter(rr => rr.incident_id === incidentId);
+    }
+    document.getElementById('cdRequest').innerHTML = '<option value="">Select Cash Request</option>' + filteredCash.filter(rq=>['Pending','Approved','Partial'].includes(rq.status) && (rq.remaining || 0) > 0).map(rq => `<option value="${rq.id}">${rq.request_number} - Remaining: ${Number(rq.remaining).toLocaleString()}</option>`).join('');
+    selectedCashRequests = selectedCashRequests.filter(sr => filteredCash.some(rq => rq.id === sr.id));
+    renderSelectedRequests();
+    document.getElementById('cdReliefRequest').innerHTML = '<option value="">Select Relief Request</option>' + filteredRelief.filter(rr => rr.requested_cash_amount > 0 && rr.cash_remaining > 0 && ['Pending','Partial'].includes(rr.status)).map(rr => `<option value="${rr.id}">${rr.request_number} - ${rr.incident_name || ''} (Cash: ${Number(rr.cash_remaining).toLocaleString()})</option>`).join('');
+    document.getElementById('cdReliefRequest').value = '';
+    const tbody = document.getElementById('benBody');
+    tbody.innerHTML = '';
+    calcTotal();
+}
+
+function addBeneficiaryFromRequest() {
+    const isReliefSource = document.getElementById('srcReliefReq').checked;
+    if (isReliefSource) {
+        const sel = document.getElementById('cdReliefRequest');
+        if (!sel.value) { showToast('warning', 'Please select a relief request first'); return; }
+        const rr = reliefRequestsData.find(r => r.id === parseInt(sel.value));
+        if (!rr) { showToast('warning', 'Relief request not found'); return; }
+        const name = rr.requester_name || 'Unknown';
+        const existingNames = document.querySelectorAll('#benBody input[name="ben_name[]"]');
+        for (const inp of existingNames) {
+            if (inp.value.trim().toLowerCase() === name.trim().toLowerCase()) {
+                showToast('warning', 'Beneficiary "' + name + '" is already in the list');
+                return;
+            }
+        }
+        const tbody = document.getElementById('benBody');
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td><input class="form-control form-control-sm" name="ben_name[]" required value="${name.replace(/"/g, '&quot;')}"></td>
+            <td><input class="form-control form-control-sm" name="ben_nid[]"></td>
+            <td><input class="form-control form-control-sm" name="ben_addr[]"></td>
+            <td><input class="form-control form-control-sm" name="ben_phone[]" value="${(rr.phone||'').replace(/"/g, '&quot;')}"></td>
+            <td><input type="number" step="0.01" class="form-control form-control-sm ben-amount" name="ben_amount[]" required oninput="calcTotal()" value="${rr.cash_remaining > 0 ? rr.cash_remaining : (rr.requested_cash_amount || '')}"></td>
+            <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove();calcTotal()"><i class="bi bi-x"></i></button></td>
+        `;
+        tbody.appendChild(tr);
+        calcTotal();
+        return;
+    }
+    const sel = document.getElementById('cdRequest');
+    if (!selectedCashRequests.length) { showToast('warning', 'Please add at least one cash request first'); return; }
+    const existingNames = document.querySelectorAll('#benBody input[name="ben_name[]"]');
+    const existingSet = new Set(Array.from(existingNames).map(inp => inp.value.trim().toLowerCase()));
+    let selectedCr = null;
+    for (const sr of selectedCashRequests) {
+        const crCheck = cashRequestsData.find(r => r.id === sr.id);
+        if (crCheck && crCheck.beneficiary_id) {
+            const benCheck = beneficiariesData.find(b => b.id === crCheck.beneficiary_id);
+            if (benCheck && !existingSet.has(benCheck.name.trim().toLowerCase())) {
+                selectedCr = crCheck;
+                break;
+            }
+        }
+    }
+    if (!selectedCr) { showToast('warning', 'No more unprocessed cash requests available'); return; }
+    const ben = beneficiariesData.find(b => b.id === selectedCr.beneficiary_id);
+    if (!ben) { showToast('warning', 'Beneficiary not found'); return; }
+    const tbody = document.getElementById('benBody');
+    const tr = document.createElement('tr');
+    tr.setAttribute('data-cr-id', selectedCr.id);
+    tr.innerHTML = `
+        <td><input class="form-control form-control-sm" name="ben_name[]" required value="${ben.name.replace(/"/g, '&quot;')}" data-ben-id="${ben.id}"></td>
+        <td><input class="form-control form-control-sm" name="ben_nid[]" value="${(ben.national_id||'').replace(/"/g, '&quot;')}"></td>
+        <td><input class="form-control form-control-sm" name="ben_addr[]" value="${(ben.address||'').replace(/"/g, '&quot;')}"></td>
+        <td><input class="form-control form-control-sm" name="ben_phone[]" value="${(ben.phone||'').replace(/"/g, '&quot;')}"></td>
+            <td><input type="number" step="0.01" class="form-control form-control-sm ben-amount" name="ben_amount[]" required oninput="calcTotal()" value="${selectedCr.remaining > 0 ? selectedCr.remaining : (selectedCr.requested_amount || '')}"></td>
+        <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove();calcTotal()"><i class="bi bi-x"></i></button></td>
+    `;
+    tbody.appendChild(tr);
+    calcTotal();
+}
+
+async function uploadCdFile(input, type) {
+    const file = input.files[0];
+    if (!file) return;
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('type', type);
+    const r = await fetch('/api/upload/cash-distribution-file', {
+        method: 'POST',
+        headers: {'X-CSRFToken': csrf},
+        body: fd
+    });
+    const d = await r.json();
+    if (!d.success) { showToast('danger', d.message); input.value = ''; return; }
+    const hiddenId = type === 'photo' ? 'cdPhoto' : 'cdDocument';
+    const previewId = type === 'photo' ? 'cdPhotoPreview' : 'cdDocPreview';
+    document.getElementById(hiddenId).value = d.data.filename;
+    const preview = document.getElementById(previewId);
+    if (type === 'photo') {
+        preview.innerHTML = `<img src="${d.data.url}" class="img-thumbnail" style="max-height:100px">`;
+    } else {
+        preview.innerHTML = `<a href="${d.data.url}" target="_blank" class="btn btn-sm btn-outline-primary"><i class="bi bi-file-pdf"></i> View PDF</a>`;
+    }
+}
+
+function addBeneficiaryRow() {
+    const tbody = document.getElementById('benBody');
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+        <td><input class="form-control form-control-sm" name="ben_name[]" required></td>
+        <td><input class="form-control form-control-sm" name="ben_nid[]"></td>
+        <td><input class="form-control form-control-sm" name="ben_addr[]"></td>
+        <td><input class="form-control form-control-sm" name="ben_phone[]"></td>
+        <td><input type="number" step="0.01" class="form-control form-control-sm ben-amount" name="ben_amount[]" required oninput="calcTotal()"></td>
+        <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove();calcTotal()"><i class="bi bi-x"></i></button></td>
+    `;
+    tbody.appendChild(tr);
+    calcTotal();
+}
+
+function onFundChange() {
+    const fundId = parseInt(document.getElementById('cdFund').value);
+    const fund = (window._cashFundsData || []).find(f => f.id === fundId);
+    document.getElementById('cdFundBalance').value = fund ? Number(fund.current_balance).toLocaleString() : '';
+    calcTotal();
+}
+
+function calcTotal() {
+    let total = 0;
+    document.querySelectorAll('.ben-amount').forEach(el => { const v = parseFloat(el.value); if (!isNaN(v)) total += v; });
+    document.getElementById('cdTotal').value = total;
+    const fundBalanceEl = document.getElementById('cdFundBalance');
+    const fundBalance = parseFloat(fundBalanceEl.value.replace(/,/g, '')) || 0;
+    const useReliefReq = document.getElementById('srcReliefReq').checked;
+    const reliefReqId = parseInt(document.getElementById('cdReliefRequest').value);
+    let requestRemaining = 0;
+    if (useReliefReq && reliefReqId) {
+        const rr = reliefRequestsData.find(r => r.id === reliefReqId);
+        requestRemaining = rr ? (rr.cash_remaining || 0) : 0;
+    } else {
+        const ids = getSelectedCashRequestIds();
+        ids.forEach(function(id) {
+            const cr = cashRequestsData.find(r => r.id === id);
+            if (cr) requestRemaining += (cr.remaining || 0);
+        });
+    }
+    const exceedsFund = total > fundBalance && fundBalance > 0;
+    const exceedsRequest = total > requestRemaining && requestRemaining > 0;
+    if (total > 0 && (exceedsFund || exceedsRequest)) {
+        fundBalanceEl.className = 'form-control text-danger fw-bold';
+        document.getElementById('cdTotal').className = 'form-control text-danger fw-bold';
+    } else if (total > 0 && fundBalance > 0) {
+        fundBalanceEl.className = 'form-control text-success fw-bold';
+        document.getElementById('cdTotal').className = 'form-control';
+    } else {
+        fundBalanceEl.className = 'form-control';
+        document.getElementById('cdTotal').className = 'form-control';
+    }
+}
+
+document.getElementById('cdForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const rows = document.querySelectorAll('#benBody tr');
+    const beneficiaries = [];
+    rows.forEach(tr => {
+        const inputs = tr.querySelectorAll('input');
+        const name = inputs[0].value.trim();
+        const amount = parseFloat(inputs[4].value);
+        if (name && amount > 0) {
+            const benId = inputs[0].getAttribute('data-ben-id');
+            const crId = tr.getAttribute('data-cr-id');
+            beneficiaries.push({ name, national_id: inputs[1].value, address: inputs[2].value, phone: inputs[3].value, amount, beneficiary_id: benId ? parseInt(benId) : undefined, cash_request_id: crId ? parseInt(crId) : undefined });
+        }
+    });
+    if (beneficiaries.length === 0) { showToast('danger', 'At least one beneficiary required'); return; }
+    const fundBal = parseFloat(document.getElementById('cdFundBalance').value.replace(/,/g, '')) || 0;
+    const total = beneficiaries.reduce((s, b) => s + (b.amount || 0), 0);
+    if (fundBal > 0 && total > fundBal) {
+        showToast('danger', `Total amount (${Number(total).toLocaleString()}) exceeds available fund balance (${Number(fundBal).toLocaleString()})`);
+        return;
+    }
+    const useReliefReq = document.getElementById('srcReliefReq').checked;
+    const cashReqIds = getSelectedCashRequestIds();
+    const reliefReqId = parseInt(document.getElementById('cdReliefRequest').value);
+    let requestRemaining = 0;
+    if (useReliefReq && reliefReqId) {
+        const rr = reliefRequestsData.find(r => r.id === reliefReqId);
+        requestRemaining = rr ? (rr.cash_remaining || 0) : 0;
+    } else {
+        const allCrIds = [...new Set(beneficiaries.map(b => b.cash_request_id).filter(Boolean))];
+        const idsToCheck = allCrIds.length ? allCrIds : cashReqIds;
+        idsToCheck.forEach(function(id) {
+            const cr = cashRequestsData.find(r => r.id === id);
+            if (cr) requestRemaining += (cr.remaining || 0);
+        });
+    }
+    if (total > requestRemaining) {
+        showToast('danger', `Total amount (${Number(total).toLocaleString()}) exceeds available request amount (${Number(requestRemaining).toLocaleString()})`);
+        return;
+    }
+    if (!useReliefReq && cashReqIds.length === 0) { showToast('danger', 'Please select at least one cash request'); return; }
+    if (useReliefReq && !reliefReqId) { showToast('danger', 'Please select a relief request'); return; }
+    const body = {
+        distribution_date: document.getElementById('cdDate').value,
+        fund_id: parseInt(document.getElementById('cdFund').value),
+        incident_id: parseInt(document.getElementById('cdIncident').value),
+        distribution_type: document.getElementById('cdType').value,
+        officer: document.getElementById('cdOfficer').value,
+        remarks: document.getElementById('cdRemarks').value,
+        beneficiaries
+    };
+    body.photo = document.getElementById('cdPhoto').value || undefined;
+    body.document = document.getElementById('cdDocument').value || undefined;
+    if (useReliefReq) body.relief_request_id = reliefReqId;
+    else {
+        const allCrIds = [...new Set(beneficiaries.map(b => b.cash_request_id).filter(Boolean))];
+        body.cash_request_ids = allCrIds.length ? allCrIds : cashReqIds;
+    }
+    try {
+        const r = await fetch('/api/cash-distributions', {method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':csrf}, body: JSON.stringify(body)});
+        const d = await r.json();
+        if (d.success) { showToast('success', d.message); bootstrap.Modal.getInstance(document.getElementById('cdModal')).hide(); loadDistributions(); loadData(); document.getElementById('cdForm').reset(); }
+        else showToast('danger', d.message);
+    } catch(e) { showToast('danger', e.message); }
+});
+
+async function viewCd(id) {
+    const r = await fetch(`/api/cash-distributions/${id}`);
+    const d = await r.json();
+    if (!d.success) return;
+    const cd = d.distribution;
+    const bens = cd.beneficiaries || [];
+    document.getElementById('viewCdTitle').textContent = cd.distribution_no;
+
+    const benRows = bens.map((b, i) => `<tr>
+        <td>${i + 1}</td>
+        <td>${b.name}</td>
+        <td>${b.national_id || '-'}</td>
+        <td>${b.address || '-'}</td>
+        <td>${b.phone || '-'}</td>
+        <td class="text-end fw-semibold text-danger">${Number(b.amount).toLocaleString()}</td>
+    </tr>`).join('');
+
+    const totalAmount = bens.reduce((s, b) => s + (b.amount || 0), 0);
+
+    const photoHtml = cd.photo_url ? `<a href="${cd.photo_url}" target="_blank" class="btn btn-sm btn-outline-primary"><i class="bi bi-image me-1"></i>View Photo</a>` : '';
+    const docHtml = cd.document_url ? `<a href="${cd.document_url}" target="_blank" class="btn btn-sm btn-outline-secondary"><i class="bi bi-file-earmark-pdf me-1"></i>View Document</a>` : '';
+
+    document.getElementById('viewCdBody').innerHTML = `
+        <div class="row g-2 mb-3">
+            <div class="col-md-8">
+                <div class="card border-0 bg-light h-100">
+                    <div class="card-body py-2">
+                        <div class="row g-1 small">
+                            <div class="col-md-4"><strong>Dist No:</strong> ${cd.distribution_no}</div>
+                            <div class="col-md-4"><strong>Date:</strong> ${cd.distribution_date || '-'}</div>
+                            <div class="col-md-4"><strong>Type:</strong> ${cd.distribution_type || '-'}</div>
+                            <div class="col-md-4"><strong>Officer:</strong> ${cd.officer || '-'}</div>
+                            <div class="col-md-4"><strong>Fund:</strong> ${cd.fund_name || '-'}</div>
+                            <div class="col-md-4"><strong>Fiscal Year:</strong> ${cd.fiscal_year || '-'}</div>
+                            <div class="col-12"><strong>Remarks:</strong> ${cd.remarks || '-'}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card border-0 bg-light h-100">
+                    <div class="card-body py-2">
+                        <div class="row g-1 small">
+                            <div class="col-6"><strong>Incident:</strong> ${cd.incident_name || '-'}</div>
+                            <div class="col-6"><strong>Status:</strong> <span class="badge bg-${cd.status === 'Completed' ? 'success' : 'danger'}">${cd.status}</span></div>
+                            <div class="col-6"><strong>Total Amount:</strong> <strong class="text-danger">${Number(totalAmount).toLocaleString()}</strong></div>
+                            <div class="col-6"><strong>Beneficiaries:</strong> ${bens.length}</div>
+                            ${cd.cancel_reason ? `<div class="col-12"><strong>Cancel Reason:</strong> <span class="text-danger">${cd.cancel_reason}</span></div>` : ''}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card border-0 bg-light mb-3">
+            <div class="card-header bg-white py-2 d-flex justify-content-between align-items-center">
+                <span class="fw-semibold"><i class="bi bi-file-text me-1 text-primary"></i>Source Request</span>
+            </div>
+            <div class="card-body py-2">
+                <div class="row g-1 small">
+                    ${cd.request_numbers && cd.request_numbers.length ? `<div class="col-md-4"><strong>Cash Request(s):</strong> ${cd.request_numbers.join(', ')}</div>` : (cd.request_number ? `<div class="col-md-4"><strong>Cash Request:</strong> ${cd.request_number}</div>` : '')}
+                    ${cd.relief_request_number ? `<div class="col-md-4"><strong>Relief Request:</strong> ${cd.relief_request_number}</div>` : ''}
+                </div>
+            </div>
+        </div>
+
+        <div class="card border-0 bg-light mb-3">
+            <div class="card-header bg-white py-2 d-flex justify-content-between align-items-center">
+                <span class="fw-semibold"><i class="bi bi-paperclip me-1 text-primary"></i>Attachments</span>
+            </div>
+            <div class="card-body py-2">
+                ${photoHtml || docHtml ? `<div class="d-flex gap-2">${photoHtml}${docHtml}</div>` : '<span class="text-muted small">No attachments</span>'}
+            </div>
+        </div>
+
+        <div class="card border-0 bg-light">
+            <div class="card-header bg-white py-2 d-flex justify-content-between align-items-center">
+                <span class="fw-semibold"><i class="bi bi-people me-1 text-primary"></i>Beneficiaries (${bens.length})</span>
+                <span class="badge bg-primary">Total: ${Number(totalAmount).toLocaleString()}</span>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered mb-0 small">
+                        <thead class="table-light"><tr>
+                            <th style="width:40px">#</th>
+                            <th>Name</th>
+                            <th>National ID</th>
+                            <th>Address</th>
+                            <th>Phone</th>
+                            <th class="text-end" style="width:120px">Amount</th>
+                        </tr></thead>
+                        <tbody>${benRows || '<tr><td colspan="6" class="text-center text-muted py-2">No beneficiaries</td></tr>'}</tbody>
+                    </table>
+                </div>
+            </div>
+        </div>`;
+    new bootstrap.Modal(document.getElementById('viewCdModal')).show();
+}
+
+function openCdModal() {
+    document.getElementById('cdForm').reset();
+    document.getElementById('cdTotal').value = '0';
+    document.getElementById('cdFundBalance').value = '';
+    document.getElementById('cdFundBalance').className = 'form-control';
+    document.getElementById('cdTotal').className = 'form-control';
+    selectedCashRequests = [];
+    renderSelectedRequests();
+    const tbody = document.getElementById('benBody');
+    tbody.innerHTML = '';
+    document.getElementById('cdPhoto').value = '';
+    document.getElementById('cdDocument').value = '';
+    document.getElementById('cdPhotoPreview').innerHTML = '';
+    document.getElementById('cdDocPreview').innerHTML = '';
+}
+
+let cancelDistId = null;
+
+async function cancelCd(id) {
+    cancelDistId = id;
+    document.getElementById('cancelReason').value = '';
+    new bootstrap.Modal(document.getElementById('cancelModal')).show();
+}
+
+document.getElementById('confirmCancelBtn').addEventListener('click', async function() {
+    const reason = document.getElementById('cancelReason').value.trim();
+    if (!reason) { showToast('danger', 'Cancellation reason is required'); return; }
+    this.disabled = true;
+    try {
+        const r = await fetch(`/api/cash-distributions/${cancelDistId}/cancel`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrf},
+            body: JSON.stringify({ cancel_reason: reason })
+        });
+        const d = await r.json();
+        if (d.success) {
+            showToast('success', d.message);
+            bootstrap.Modal.getInstance(document.getElementById('cancelModal')).hide();
+            loadDistributions();
+            loadData();
+        } else {
+            showToast('danger', d.message);
+        }
+    } catch(e) {
+        showToast('danger', e.message);
+    } finally {
+        this.disabled = false;
+        cancelDistId = null;
+    }
+});
+
+loadDistributions();
+loadData();
+</script>
+{% endblock %}

@@ -1,0 +1,803 @@
+{% extends "base.html" %}
+{% block title %}Incidents - LEOC{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('index') }}"><i class="bi bi-house-fill"></i></a></li>
+<li class="breadcrumb-item"><a href="#">Operations</a></li>
+<li class="breadcrumb-item active">Incidents</li>
+{% endblock %}
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center">
+    <div>
+        <h4><i class="bi bi-lightning-charge-fill me-2"></i>Incident Management</h4>
+        <p>Track and manage disaster incidents</p>
+    </div>
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#incidentModal" onclick="resetIncidentForm()">
+        <i class="bi bi-plus-lg me-1"></i>Add Incident
+    </button>
+</div>
+
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-funnel me-2 text-primary"></i>Filter by Status</span>
+        <div>
+            <select class="form-select form-select-sm" style="width:160px" id="statusFilter" onchange="filterIncidents()">
+                <option value="">All Status</option>
+                <option value="Active">Active</option>
+                <option value="Closed">Closed</option>
+            </select>
+        </div>
+    </div>
+</div>
+
+<div class="card mt-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-list-check me-2 text-primary"></i>All Incidents</span>
+        <input type="text" class="form-control form-control-sm" style="width:200px" id="incidentSearch" placeholder="Search incidents..." oninput="filterIncidents()">
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Name</th>
+                        <th>Type</th>
+                        <th>Ward</th>
+                        <th>Start Date</th>
+                        <th>Status</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="incidentTableBody">
+                    <tr><td colspan="7" class="text-center py-4"><div class="spinner-border text-primary"></div></td></tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="d-flex justify-content-between align-items-center mt-2 px-2">
+            <small class="text-muted" id="tableInfo">0 records</small>
+            <nav><ul class="pagination pagination-sm mb-0" id="pagination"></ul></nav>
+        </div>
+    </div>
+</div>
+
+<!-- Incident Modal -->
+<div class="modal fade" id="incidentModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="incidentModalTitle"><i class="bi bi-lightning-charge-fill me-2"></i>Add Incident</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="incidentForm">
+                    <input type="hidden" id="inc_id">
+
+                    <!-- Section 1: Basic Incident Information -->
+                    <div class="card mb-3 border">
+                        <div class="card-header bg-light py-2">
+                            <h6 class="mb-0"><i class="bi bi-info-circle me-1"></i>Basic Incident Information</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-3">
+                                <div class="col-md-4">
+                                    <label class="form-label">Incident Name *</label>
+                                    <input type="text" class="form-control" id="inc_incident_name" required>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Incident Type *</label>
+                                    <select class="form-select" id="inc_incident_type" onchange="autoGenerateName()">
+                                        <option value="">Select Type</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Ward *</label>
+                                    <select class="form-select" id="inc_ward" onchange="autoGenerateName()">
+                                        <option value="">Select Ward</option>
+                                        {% for w in ward_list %}
+                                        <option value="{{ w.id }}">{{ w.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Date (BS) *</label>
+                                    <input type="text" class="form-control nepali-date" placeholder="YYYY-MM-DD" id="inc_disaster_date_bs" onchange="autoGenerateName()" required>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Time</label>
+                                    <input type="time" class="form-control" id="inc_incident_time">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Status</label>
+                                    <select class="form-select" id="inc_status">
+                                        <option value="Active">Active</option>
+                                        <option value="Closed">Closed</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Fiscal Year</label>
+                                    <input type="text" class="form-control" id="inc_fiscal_year" readonly>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Coordinates <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" id="inc_coordinates" placeholder="lat, lng" required>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Tole / Location</label>
+                                    <input type="text" class="form-control" id="inc_tole" placeholder="Specific location">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Severity</label>
+                                    <select class="form-select" id="inc_severity">
+                                        <option value="low">Low</option>
+                                        <option value="medium" selected>Medium</option>
+                                        <option value="high">High</option>
+                                        <option value="critical">Critical</option>
+                                    </select>
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label">Description</label>
+                                    <textarea class="form-control" id="inc_description" rows="2"></textarea>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Section 2: Human Impact -->
+                    <div class="card mb-3 border">
+                        <div class="card-header bg-light py-2">
+                            <h6 class="mb-0"><i class="bi bi-people me-1"></i>Human Impact</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-3">
+                                <div class="col-md-3">
+                                    <label class="form-label">Affected People</label>
+                                    <input type="number" class="form-control" id="inc_affected_people" min="0" value="0">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Affected Households</label>
+                                    <input type="number" class="form-control" id="inc_affected_households" min="0" value="0">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Male</label>
+                                    <input type="number" class="form-control" id="inc_affected_people_male" min="0" value="0">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Female</label>
+                                    <input type="number" class="form-control" id="inc_affected_people_female" min="0" value="0">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Death (Male)</label>
+                                    <input type="number" class="form-control" id="inc_death_male" min="0" value="0">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Death (Female)</label>
+                                    <input type="number" class="form-control" id="inc_death_female" min="0" value="0">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Injured (Male)</label>
+                                    <input type="number" class="form-control" id="inc_injured_male" min="0" value="0">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Injured (Female)</label>
+                                    <input type="number" class="form-control" id="inc_injured_female" min="0" value="0">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Missing (Male)</label>
+                                    <input type="number" class="form-control" id="inc_missing_male" min="0" value="0">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Missing (Female)</label>
+                                    <input type="number" class="form-control" id="inc_missing_female" min="0" value="0">
+                                </div>
+                            </div>
+                            <div class="row g-2 mt-1" id="humanImpactValidation">
+                                <div class="col-md-4"><small id="val_total_people" class="form-text"></small></div>
+                                <div class="col-md-4"><small id="val_male" class="form-text"></small></div>
+                                <div class="col-md-4"><small id="val_female" class="form-text"></small></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Section 3: Property Damage -->
+                    <div class="card mb-3 border">
+                        <div class="card-header bg-light py-2">
+                            <h6 class="mb-0"><i class="bi bi-house me-1"></i>Property Damage</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-3">
+                                <div class="col-md-3">
+                                    <label class="form-label">Houses Destroyed</label>
+                                    <input type="number" class="form-control" id="inc_house_destroyed" min="0" value="0">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Houses Damaged</label>
+                                    <input type="number" class="form-control" id="inc_house_damaged" min="0" value="0">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Public Bldg Destroyed</label>
+                                    <input type="number" class="form-control" id="inc_public_building_destroyed" min="0" value="0">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Public Bldg Damaged</label>
+                                    <input type="number" class="form-control" id="inc_public_building_damaged" min="0" value="0">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Estimated Loss (Rs.)</label>
+                                    <input type="number" class="form-control" id="inc_estimated_loss" min="0" value="0" step="0.01">
+                                </div>
+                                <div class="col-md-8">
+                                    <label class="form-label">Agriculture / Crop Damage</label>
+                                    <input type="text" class="form-control" id="inc_agriculture_crop_damage" placeholder="Brief description">
+                                </div>
+                            </div>
+                            <div class="row mt-1" id="propertyDamageValidation">
+                                <div class="col"><small id="val_houses" class="form-text"></small></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Section 4: Livestock Impact -->
+                    <div class="card mb-3 border">
+                        <div class="card-header bg-light py-2">
+                            <h6 class="mb-0"><i class="bi bi-cow me-1"></i>Livestock Impact</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-3">
+                                <div class="col-md-3">
+                                    <label class="form-label">Cattle Lost</label>
+                                    <input type="number" class="form-control" id="inc_cattle_lost" min="0" value="0">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Cattle Injured</label>
+                                    <input type="number" class="form-control" id="inc_cattle_injured" min="0" value="0">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Poultry Lost</label>
+                                    <input type="number" class="form-control" id="inc_poultry_lost" min="0" value="0">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Poultry Injured</label>
+                                    <input type="number" class="form-control" id="inc_poultry_injured" min="0" value="0">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Goats/Sheep Lost</label>
+                                    <input type="number" class="form-control" id="inc_goats_sheep_lost" min="0" value="0">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Goats/Sheep Injured</label>
+                                    <input type="number" class="form-control" id="inc_goats_sheep_injured" min="0" value="0">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Other Livestock Lost</label>
+                                    <input type="number" class="form-control" id="inc_other_livestock_lost" min="0" value="0">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Other Livestock Injured</label>
+                                    <input type="number" class="form-control" id="inc_other_livestock_injured" min="0" value="0">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Section 5: Infrastructure Impact -->
+                    <div class="card mb-3 border">
+                        <div class="card-header bg-light py-2">
+                            <h6 class="mb-0"><i class="bi bi-signpost-split me-1"></i>Infrastructure Impact</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-3">
+                                <div class="col-md-3">
+                                    <div class="form-check">
+                                        <input type="checkbox" class="form-check-input" id="inc_road_blocked">
+                                        <label class="form-check-label" for="inc_road_blocked">Road Blocked</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="form-check">
+                                        <input type="checkbox" class="form-check-input" id="inc_electricity_blocked">
+                                        <label class="form-check-label" for="inc_electricity_blocked">Electricity Blocked</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="form-check">
+                                        <input type="checkbox" class="form-check-input" id="inc_communication_blocked">
+                                        <label class="form-check-label" for="inc_communication_blocked">Communication Blocked</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="form-check">
+                                        <input type="checkbox" class="form-check-input" id="inc_drinking_water_disrupted">
+                                        <label class="form-check-label" for="inc_drinking_water_disrupted">Drinking Water Disrupted</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Section 6: Additional Information -->
+                    <div class="card mb-3 border">
+                        <div class="card-header bg-light py-2">
+                            <h6 class="mb-0"><i class="bi bi-clipboard me-1"></i>Additional Information</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label class="form-label">Rescue Operations</label>
+                                <textarea class="form-control" id="inc_rescue_operations" rows="2" placeholder="Details of rescue and relief operations conducted"></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveIncident()"><i class="bi bi-check-lg"></i> Save Incident</button>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- History Modal -->
+<div class="modal fade" id="historyModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-clock-history me-2"></i>Incident History</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="historyBody">
+                <div class="text-center py-5"><div class="spinner-border text-primary"></div></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+let incidents = [];
+let incidentTypes = [];
+let paginator = new Paginator({perPage: 25, onPageChange: () => renderIncidents(incidents)});
+
+async function loadIncidentTypes() {
+    try {
+        const r = await fetch('/api/settings/disaster_types');
+        const d = await r.json();
+        incidentTypes = Array.isArray(d.value) ? d.value : [];
+    } catch(e) {
+        incidentTypes = ['Flood', 'Earthquake', 'Landslide', 'Fire', 'Storm', 'Other'];
+    }
+    const sel = document.getElementById('inc_incident_type');
+    sel.innerHTML = '<option value="">Select Type</option>' +
+        incidentTypes.map(t => `<option value="${t}">${t}</option>`).join('');
+
+    try {
+        const r = await fetch('/api/settings/active_fiscal_year');
+        const d = await r.json();
+        document.getElementById('inc_fiscal_year').value = d.value || '2081/82';
+    } catch(e) {
+        document.getElementById('inc_fiscal_year').value = '2081/82';
+    }
+}
+
+function getTypeOptions(selected) {
+    return '<option value="">Select Type</option>' +
+        incidentTypes.map(t => `<option value="${t}" ${t === selected ? 'selected' : ''}>${t}</option>`).join('');
+}
+
+function autoGenerateName() {
+    const type = document.getElementById('inc_incident_type').value;
+    const ward = document.getElementById('inc_ward').value;
+    const date = document.getElementById('inc_disaster_date_bs').value;
+    const nameField = document.getElementById('inc_incident_name');
+    if (type && ward && date && !nameField.dataset.userEdited) {
+        nameField.value = `${type} - Ward ${ward} - ${date}`;
+    }
+}
+
+document.getElementById('inc_incident_name').addEventListener('input', function() {
+    this.dataset.userEdited = '1';
+});
+
+let _autoCalcFlag = false;
+
+function setValidity(id, ok) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.classList.toggle('is-valid', ok && parseFloat(el.value) > 0);
+    el.classList.toggle('is-invalid', !ok && parseFloat(el.value) > 0);
+}
+
+function validateIncidentFields() {
+    const $ = id => document.getElementById(id);
+    const v = id => parseFloat($(id)?.value) || 0;
+    const ap = v('inc_affected_people'), ap_m = v('inc_affected_people_male'), ap_f = v('inc_affected_people_female');
+    const d_m = v('inc_death_male'), d_f = v('inc_death_female');
+    const i_m = v('inc_injured_male'), i_f = v('inc_injured_female');
+    const m_m = v('inc_missing_male'), m_f = v('inc_missing_female');
+    const hh = v('inc_affected_households'), h_dest = v('inc_house_destroyed'), h_dam = v('inc_house_damaged');
+
+    // Rule 1: Total = Male + Female
+    const totalOk = ap === 0 || (ap_m + ap_f) === ap;
+    const totalMsg = totalOk
+        ? (ap > 0 ? `<span class="text-success"><i class="bi bi-check-circle me-1"></i>${ap} = ${ap_m} (M) + ${ap_f} (F)</span>` : '')
+        : `<span class="text-danger"><i class="bi bi-exclamation-triangle me-1"></i>${ap} ≠ ${ap_m} + ${ap_f} = ${ap_m + ap_f}</span>`;
+    setValidity('inc_affected_people', totalOk);
+    setValidity('inc_affected_people_male', totalOk);
+    setValidity('inc_affected_people_female', totalOk);
+    const te = $('val_total_people');
+    if (te) te.innerHTML = totalMsg;
+
+    // Rule 2: Male sub-categories = Male total
+    const maleSum = d_m + i_m + m_m;
+    const maleOk = ap_m === 0 || maleSum === ap_m;
+    const maleMsg = maleOk
+        ? (ap_m > 0 ? `<span class="text-success"><i class="bi bi-check-circle me-1"></i>${d_m}+${i_m}+${m_m} = ${ap_m} (M)</span>` : '')
+        : `<span class="text-danger"><i class="bi bi-exclamation-triangle me-1"></i>${d_m}+${i_m}+${m_m} = ${maleSum} ≠ ${ap_m}</span>`;
+    setValidity('inc_death_male', maleOk);
+    setValidity('inc_injured_male', maleOk);
+    setValidity('inc_missing_male', maleOk);
+    const me = $('val_male');
+    if (me) me.innerHTML = maleMsg;
+
+    // Rule 3: Female sub-categories = Female total
+    const femaleSum = d_f + i_f + m_f;
+    const femaleOk = ap_f === 0 || femaleSum === ap_f;
+    const femaleMsg = femaleOk
+        ? (ap_f > 0 ? `<span class="text-success"><i class="bi bi-check-circle me-1"></i>${d_f}+${i_f}+${m_f} = ${ap_f} (F)</span>` : '')
+        : `<span class="text-danger"><i class="bi bi-exclamation-triangle me-1"></i>${d_f}+${i_f}+${m_f} = ${femaleSum} ≠ ${ap_f}</span>`;
+    setValidity('inc_death_female', femaleOk);
+    setValidity('inc_injured_female', femaleOk);
+    setValidity('inc_missing_female', femaleOk);
+    const fe = $('val_female');
+    if (fe) fe.innerHTML = femaleMsg;
+
+    // Rule 4: Households = Destroyed + Damaged
+    const houseSum = h_dest + h_dam;
+    const houseOk = hh === 0 || houseSum === hh;
+    const houseMsg = houseOk
+        ? (hh > 0 ? `<span class="text-success"><i class="bi bi-check-circle me-1"></i>${hh} = ${h_dest} (D) + ${h_dam} (Dmg)</span>` : '')
+        : `<span class="text-danger"><i class="bi bi-exclamation-triangle me-1"></i>${hh} ≠ ${h_dest} + ${h_dam} = ${houseSum}</span>`;
+    setValidity('inc_affected_households', houseOk);
+    setValidity('inc_house_destroyed', houseOk);
+    setValidity('inc_house_damaged', houseOk);
+    const he = $('val_houses');
+    if (he) he.innerHTML = houseMsg;
+}
+
+function autoCalcIncidentFields(changedId) {
+    if (_autoCalcFlag) return;
+    _autoCalcFlag = true;
+    const $ = id => document.getElementById(id);
+    const v = id => parseFloat($(id)?.value) || 0;
+    const s = (id, val) => { const el = $(id); if (el) el.value = val; };
+    const ap = v('inc_affected_people'), ap_m = v('inc_affected_people_male'), ap_f = v('inc_affected_people_female');
+    const d_m = v('inc_death_male'), d_f = v('inc_death_female');
+    const i_m = v('inc_injured_male'), i_f = v('inc_injured_female');
+    const hh = v('inc_affected_households'), h_dest = v('inc_house_destroyed'), h_dam = v('inc_house_damaged');
+
+    // Rule 1: Affected People = Male + Female
+    if (changedId === 'inc_affected_people' && (ap_m > 0 || ap_f > 0)) {
+        if (ap_m > 0) s('inc_affected_people_female', Math.max(0, ap - ap_m));
+        else s('inc_affected_people_male', Math.max(0, ap - ap_f));
+    } else if (changedId === 'inc_affected_people_male') {
+        if (ap > 0) s('inc_affected_people_female', Math.max(0, ap - ap_m));
+        else if (ap_f > 0) s('inc_affected_people', ap_m + ap_f);
+    } else if (changedId === 'inc_affected_people_female') {
+        if (ap > 0) s('inc_affected_people_male', Math.max(0, ap - ap_f));
+        else if (ap_m > 0) s('inc_affected_people', ap_m + ap_f);
+    }
+
+    // Rule 2+3: Death + Injured + Missing = Gender total (auto-fill missing)
+    const ap_m2 = v('inc_affected_people_male'), ap_f2 = v('inc_affected_people_female');
+    if (ap_m2 > 0 && !['inc_missing_male'].includes(changedId))
+        s('inc_missing_male', Math.max(0, ap_m2 - d_m - i_m));
+    if (ap_f2 > 0 && !['inc_missing_female'].includes(changedId))
+        s('inc_missing_female', Math.max(0, ap_f2 - d_f - i_f));
+
+    // Rule 4: Affected Households = Destroyed + Damaged
+    if (changedId === 'inc_affected_households') {
+        if (h_dest > 0) s('inc_house_damaged', Math.max(0, hh - h_dest));
+        else if (h_dam > 0) s('inc_house_destroyed', Math.max(0, hh - h_dam));
+    } else if (changedId === 'inc_house_destroyed') {
+        if (hh > 0) s('inc_house_damaged', Math.max(0, hh - h_dest));
+        else if (h_dam > 0) s('inc_affected_households', h_dest + h_dam);
+    } else if (changedId === 'inc_house_damaged') {
+        if (hh > 0) s('inc_house_destroyed', Math.max(0, hh - h_dam));
+        else if (h_dest > 0) s('inc_affected_households', h_dest + h_dam);
+    }
+
+    _autoCalcFlag = false;
+    validateIncidentFields();
+}
+
+async function loadIncidents() {
+    const statusFilter = document.getElementById('statusFilter').value;
+    const url = '/api/incidents' + (statusFilter ? '?status=' + statusFilter : '');
+    const r = await fetch(url);
+    const d = await r.json();
+    if (!d.success) { showToast('danger', d.message); return; }
+    incidents = d.incidents;
+    renderIncidents(incidents);
+}
+
+function getVal(i, f) { return i[f] !== undefined && i[f] !== null && i[f] !== '' ? i[f] : 0; }
+function getText(i, f) { return i[f] || ''; }
+
+function renderIncidents(data) {
+    const tbody = document.getElementById('incidentTableBody');
+    if (data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-muted">No incidents found</td></tr>';
+        paginator.update(0);
+        return;
+    }
+    const pageData = paginator.getPageData(data);
+    tbody.innerHTML = pageData.map(i => {
+        const statusColor = i.status === 'Active' ? 'success' : 'secondary';
+        return `<tr>
+            <td>${i.id}</td>
+            <td><strong>${i.incident_name}</strong></td>
+            <td><span class="badge bg-info">${i.incident_type}</span></td>
+            <td>${i.ward_name || i.ward || '-'}</td>
+            <td>${i.start_date || '-'}</td>
+            <td><span class="badge bg-${statusColor}">${i.status}</span></td>
+            <td class="text-end">
+                <button class="btn btn-sm btn-outline-secondary" onclick="viewIncident(${i.id})" title="View"><i class="bi bi-eye"></i></button>
+                <button class="btn btn-sm btn-outline-info" onclick="showIncidentHistory(${i.id})" title="History"><i class="bi bi-clock-history"></i></button>
+                <button class="btn btn-sm btn-outline-primary" onclick="editIncident(${i.id})" title="Edit"><i class="bi bi-pencil"></i></button>
+                <button class="btn btn-sm btn-outline-danger" onclick="deleteIncident(${i.id})" title="Delete"><i class="bi bi-trash"></i></button>
+            </td>
+        </tr>`;
+    }).join('');
+    paginator.update(data.length);
+}
+
+function filterIncidents() {
+    const q = document.getElementById('incidentSearch').value.toLowerCase();
+    const filtered = incidents.filter(i =>
+        (i.incident_name && i.incident_name.toLowerCase().includes(q)) ||
+        (i.incident_type && i.incident_type.toLowerCase().includes(q))
+    );
+    if (paginator) paginator.currentPage = 1;
+    renderIncidents(filtered);
+}
+
+document.getElementById('statusFilter').addEventListener('change', loadIncidents);
+
+const FIELD_MAP = [
+    'incident_name', 'incident_type', 'ward', 'fiscal_year', 'status', 'description',
+    'disaster_date_bs', 'incident_time', 'coordinates', 'tole', 'severity',
+    'affected_people', 'injured', 'injured_male', 'injured_female', 'deaths', 'death_male', 'death_female', 'missing_persons', 'missing_male', 'missing_female', 'affected_people_male',
+    'affected_people_female', 'affected_households', 'house_damaged', 'house_destroyed',
+    'public_building_damaged', 'public_building_destroyed', 'estimated_loss',
+    'agriculture_crop_damage', 'road_blocked', 'electricity_blocked', 'communication_blocked',
+    'drinking_water_disrupted', 'cattle_lost', 'cattle_injured', 'poultry_lost', 'poultry_injured',
+    'goats_sheep_lost', 'goats_sheep_injured', 'other_livestock_lost', 'other_livestock_injured',
+    'rescue_operations',
+];
+
+function fieldId(f) { return 'inc_' + f; }
+
+function serializeForm() {
+    const body = {};
+    FIELD_MAP.forEach(f => {
+        const el = document.getElementById(fieldId(f));
+        if (!el) return;
+        if (el.type === 'checkbox') {
+            body[f] = el.checked;
+        } else if (el.type === 'number') {
+            body[f] = parseFloat(el.value) || 0;
+        } else {
+            body[f] = el.value;
+        }
+    });
+    body.ward = parseInt(document.getElementById('inc_ward').value) || null;
+    body.deaths = (body.death_male || 0) + (body.death_female || 0);
+    body.injured = (body.injured_male || 0) + (body.injured_female || 0);
+    body.missing_persons = (body.missing_male || 0) + (body.missing_female || 0);
+    return body;
+}
+
+function clearValidation() {
+    document.querySelectorAll('#incidentForm input.is-valid, #incidentForm input.is-invalid')
+        .forEach(el => { el.classList.remove('is-valid', 'is-invalid'); });
+    ['val_total_people', 'val_male', 'val_female', 'val_houses'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = '';
+    });
+}
+
+function deserializeForm(i) {
+    FIELD_MAP.forEach(f => {
+        const el = document.getElementById(fieldId(f));
+        if (!el) return;
+        if (el.type === 'checkbox') {
+            el.checked = !!i[f];
+        } else if (el.type === 'number') {
+            el.value = i[f] !== undefined && i[f] !== null ? i[f] : 0;
+        } else {
+            el.value = i[f] !== undefined && i[f] !== null ? i[f] : '';
+        }
+    });
+    document.getElementById('inc_ward').value = i.ward || '';
+    validateIncidentFields();
+}
+
+function resetIncidentForm() {
+    document.getElementById('incidentModalTitle').textContent = 'Add Incident';
+    document.getElementById('inc_id').value = '';
+    document.getElementById('incidentForm').reset();
+    document.getElementById('inc_status').value = 'Active';
+    document.getElementById('inc_severity').value = 'medium';
+    document.getElementById('inc_incident_type').innerHTML = getTypeOptions('');
+    delete document.getElementById('inc_incident_name').dataset.userEdited;
+    // Zero out all number fields
+    document.querySelectorAll('#incidentForm input[type="number"]').forEach(el => el.value = 0);
+    clearValidation();
+    loadIncidentTypes();
+}
+
+function viewIncident(id) {
+    window.open('/api/incidents/' + id + '/print', '_blank');
+}
+
+async function editIncident(id) {
+    const i = incidents.find(x => x.id === id);
+    if (!i) return;
+    document.getElementById('incidentModalTitle').textContent = 'Edit Incident';
+    document.getElementById('inc_id').value = i.id;
+    document.getElementById('inc_incident_type').innerHTML = getTypeOptions(i.incident_type);
+    deserializeForm(i);
+    document.getElementById('inc_incident_name').dataset.userEdited = '1';
+    new bootstrap.Modal(document.getElementById('incidentModal')).show();
+}
+
+async function saveIncident() {
+    const id = document.getElementById('inc_id').value;
+    const body = serializeForm();
+    if (!body.incident_name) { showToast('danger', 'Incident name is required'); return; }
+    if (!body.incident_type) { showToast('danger', 'Incident type is required'); return; }
+    if (!body.ward) { showToast('danger', 'Ward is required'); return; }
+    if (!body.coordinates || !body.coordinates.trim()) { showToast('danger', 'Coordinates are required'); return; }
+    // Reject inconsistent numeric fields
+    if (body.affected_people > 0 && (body.affected_people_male + body.affected_people_female) !== body.affected_people) {
+        showToast('danger', `Affected people (${body.affected_people}) must equal Male (${body.affected_people_male}) + Female (${body.affected_people_female})`);
+        return;
+    }
+    if (body.affected_people_male > 0 && (body.death_male + body.injured_male + body.missing_male) !== body.affected_people_male) {
+        showToast('danger', `Male death+injured+missing (${body.death_male + body.injured_male + body.missing_male}) must equal Male affected (${body.affected_people_male})`);
+        return;
+    }
+    if (body.affected_people_female > 0 && (body.death_female + body.injured_female + body.missing_female) !== body.affected_people_female) {
+        showToast('danger', `Female death+injured+missing (${body.death_female + body.injured_female + body.missing_female}) must equal Female affected (${body.affected_people_female})`);
+        return;
+    }
+    if (body.affected_households > 0 && (body.house_destroyed + body.house_damaged) !== body.affected_households) {
+        showToast('danger', `Affected households (${body.affected_households}) must equal Houses Destroyed (${body.house_destroyed}) + Houses Damaged (${body.house_damaged})`);
+        return;
+    }
+    const url = id ? '/api/incidents/' + id : '/api/incidents';
+    const method = id ? 'PUT' : 'POST';
+    const r = await fetch(url, {method, headers:{'Content-Type':'application/json','X-CSRFToken':csrf}, body: JSON.stringify(body)});
+    const d = await r.json();
+    if (d.success) {
+        showToast('success', id ? 'Incident updated' : 'Incident created');
+        bootstrap.Modal.getInstance(document.getElementById('incidentModal')).hide();
+        loadIncidents();
+    } else { showToast('danger', d.message); }
+}
+
+async function deleteIncident(id) {
+    if (!confirm('Delete this incident?')) return;
+    const r = await fetch('/api/incidents/' + id, {method:'DELETE', headers:{'X-CSRFToken':csrf}});
+    const d = await r.json();
+    if (d.success) { showToast('success', 'Incident deleted'); loadIncidents(); }
+    else showToast('danger', d.message);
+}
+
+function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+async function showIncidentHistory(id) {
+    const modal = new bootstrap.Modal(document.getElementById('historyModal'));
+    document.getElementById('historyBody').innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary"></div></div>';
+    modal.show();
+    try {
+        const r = await fetch(`/api/incidents/${id}/history`);
+        const d = await r.json();
+        if (!d.success) { document.getElementById('historyBody').innerHTML = `<div class="alert alert-danger m-3">${d.message}</div>`; return; }
+        const inc = d.incident;
+        const counts = d.counts;
+        const timeline = d.timeline;
+        let html = `<div class="card mb-3 border-primary">
+            <div class="card-header bg-primary text-white py-2">
+                <h6 class="mb-0"><i class="bi bi-info-circle me-1"></i> ${esc(inc.incident_name)}</h6>
+            </div>
+            <div class="card-body py-2">
+                <div class="row small">
+                    <div class="col-md-2"><strong>Type:</strong> ${esc(inc.incident_type)}</div>
+                    <div class="col-md-2"><strong>Ward:</strong> ${inc.ward_name || inc.ward || '-'}</div>
+                    <div class="col-md-2"><strong>Date:</strong> ${inc.disaster_date_bs || '-'}</div>
+                    <div class="col-md-2"><strong>Fiscal Year:</strong> ${inc.fiscal_year || '-'}</div>
+                    <div class="col-md-2"><strong>Severity:</strong> <span class="badge ${inc.severity === 'critical' ? 'bg-danger' : inc.severity === 'high' ? 'bg-warning text-dark' : 'bg-info'}">${esc(inc.severity)}</span></div>
+                    <div class="col-md-2"><strong>Status:</strong> <span class="badge bg-${inc.status === 'Active' ? 'success' : 'secondary'}">${esc(inc.status)}</span></div>
+                </div>
+            </div>
+        </div>`;
+        html += `<div class="row g-2 mb-3">
+            <div class="col"><div class="card text-center py-2 border-info"><div class="h5 mb-0 text-info">${counts.relief_requests}</div><small>Relief Requests</small></div></div>
+            <div class="col"><div class="card text-center py-2 border-primary"><div class="h5 mb-0 text-primary">${counts.dispatches}</div><small>Dispatches</small></div></div>
+            <div class="col"><div class="card text-center py-2 border-success"><div class="h5 mb-0 text-success">${counts.distributions}</div><small>Distributions</small></div></div>
+            <div class="col"><div class="card text-center py-2 border-warning"><div class="h5 mb-0 text-warning">${counts.cash_requests}</div><small>Cash Requests</small></div></div>
+            <div class="col"><div class="card text-center py-2 border-danger"><div class="h5 mb-0 text-danger">${counts.cash_distributions}</div><small>Cash Distributions</small></div></div>
+            <div class="col"><div class="card text-center py-2 border-secondary"><div class="h5 mb-0 text-secondary">${counts.assessments}</div><small>Assessments</small></div></div>
+        </div>`;
+        if (!timeline.length) {
+            html += '<div class="text-center text-muted py-4">No related records found for this incident.</div>';
+        } else {
+            const typeMeta = {
+                relief_request:   {icon:'bi-file-earmark-text', color:'info', label:'Relief Request'},
+                dispatch:         {icon:'bi-truck', color:'primary', label:'Dispatch'},
+                distribution:     {icon:'bi-box-seam', color:'success', label:'Distribution'},
+                cash_request:     {icon:'bi-cash-stack', color:'warning', label:'Cash Request'},
+                cash_distribution:{icon:'bi-wallet2', color:'danger', label:'Cash Distribution'},
+                assessment:       {icon:'bi-clipboard-data', color:'secondary', label:'Assessment'},
+            };
+            html += '<div class="list-group">';
+            timeline.forEach(item => {
+                const meta = typeMeta[item._type] || {icon:'bi-circle', color:'secondary', label:item._type};
+                html += `<a href="#" class="list-group-item list-group-item-action py-2" onclick="event.preventDefault()">
+                    <div class="d-flex w-100 justify-content-between align-items-center">
+                        <div>
+                            <span class="badge bg-${meta.color} me-2"><i class="${meta.icon} me-1"></i>${meta.label}</span>
+                            <strong>${esc(item._label)}</strong>`;
+                if (item._type === 'relief_request') {
+                    html += ` <small class="text-muted">${esc(item.organization || '')} - ${esc(item.requester_name || '')}</small>`;
+                    if (item.requested_cash_amount > 0) html += ` <span class="badge bg-light text-dark">Rs. ${item.requested_cash_amount}</span>`;
+                    html += ` <span class="badge bg-${item.status === 'Completed' ? 'success' : item.status === 'Partial' ? 'warning text-dark' : item.status === 'Cancelled' ? 'secondary' : 'secondary'}">${esc(item.status)}</span>`;
+                } else if (item._type === 'dispatch') {
+                    html += ` <small class="text-muted">→ ${esc(item.destination || '')}</small>`;
+                    if (item.items) html += ` <span class="badge bg-light text-dark">${item.items.length} item(s)</span>`;
+                } else if (item._type === 'distribution') {
+                    html += ` <small class="text-muted">${esc(item.location || '')}</small>`;
+                    html += ` <span class="badge bg-${item.status === 'Completed' ? 'success' : 'secondary'}">${esc(item.status)}</span>`;
+                } else if (item._type === 'cash_request') {
+                    html += ` <small class="text-muted">${esc(item.requesting_office || '')} - ${esc(item.requester_name || '')}</small>`;
+                    html += ` <span class="badge bg-light text-dark">Rs. ${item.requested_amount}</span>`;
+                    html += ` <span class="badge bg-${item.status === 'Approved' ? 'success' : item.status === 'Pending' ? 'warning text-dark' : 'secondary'}">${esc(item.status)}</span>`;
+                } else if (item._type === 'cash_distribution') {
+                    html += ` <small class="text-muted">${esc(item.fund_name || '')}</small>`;
+                    html += ` <span class="badge bg-light text-dark">Rs. ${item.total_amount}</span>`;
+                } else if (item._type === 'assessment') {
+                    html += ` <small class="text-muted">${item.deaths || 0} deaths · ${item.affected_people || 0} affected</small>`;
+                }
+                html += `</div>
+                        <small class="text-muted text-nowrap ms-2">${item._date || ''}</small>
+                    </div>
+                </a>`;
+            });
+            html += '</div>';
+        }
+        document.getElementById('historyBody').innerHTML = html;
+    } catch(e) {
+        document.getElementById('historyBody').innerHTML = `<div class="alert alert-danger m-3">Error: ${e.message}</div>`;
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    loadIncidentTypes();
+    loadIncidents();
+    const autoFields = [
+        'inc_affected_people', 'inc_affected_people_male', 'inc_affected_people_female',
+        'inc_death_male', 'inc_death_female', 'inc_injured_male', 'inc_injured_female',
+        'inc_missing_male', 'inc_missing_female',
+        'inc_house_destroyed', 'inc_house_damaged', 'inc_affected_households',
+    ];
+    autoFields.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('input', () => autoCalcIncidentFields(id));
+    });
+});
+</script>
+{% endblock %}

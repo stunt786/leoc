@@ -1,0 +1,530 @@
+{% extends "base.html" %}
+{% block title %}साप्ताहिक मौसम पूर्वानुमान - LEOC{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('index') }}"><i class="bi bi-house-fill"></i></a></li>
+<li class="breadcrumb-item active">साप्ताहिक मौसम पूर्वानुमान</li>
+{% endblock %}
+{% block content %}
+<style>
+  .forecast-form .card-header { font-weight: 600; }
+  .forecast-form .form-label { font-weight: 500; font-size: 0.85rem; }
+  .stat-mini { text-align: center; padding: 8px; border-radius: 6px; background: #f8f9fa; }
+  .stat-mini .number { font-size: 1.25rem; font-weight: 700; }
+  .stat-mini .label { font-size: 0.7rem; color: #6c757d; text-transform: uppercase; letter-spacing: 0.5px; }
+</style>
+
+<div class="page-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+  <div>
+    <h4 class="mb-0"><i class="bi bi-calendar-week-fill me-2"></i>साप्ताहिक मौसम पूर्वानुमान</h4>
+    <p class="text-muted mb-0 small">साताको मौसम पूर्वानुमान सिर्जना र व्यवस्थापन गर्नुहोस्</p>
+  </div>
+</div>
+
+<form id="forecastForm" class="forecast-form mt-3">
+  <input type="hidden" id="forecast_id" value="">
+  <div class="row g-3">
+    <!-- Main Form -->
+    <div class="col-lg-8">
+      <!-- Forecast Details -->
+      <div class="card mb-3">
+        <div class="card-header py-2">
+          <i class="bi bi-info-circle me-1 text-primary"></i> पूर्वानुमान विवरण
+        </div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-3">
+              <label class="form-label">मिति (बाट) <span class="text-danger">*</span></label>
+              <input type="text" class="form-control nepali-date" id="forecast_date_from" placeholder="२०८१-१२-२५" required>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">मिति (सम्म)</label>
+              <input type="text" class="form-control nepali-date" id="forecast_date_to" placeholder="२०८१-१२-३०">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">वर्षा / हिमपात</label>
+              <input type="text" class="form-control" id="rainfall_snowfall" placeholder="जस्तै: २५ मिमी वर्षा">
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">उच्च तापक्रम</label>
+              <input type="text" class="form-control" id="high_temperature" placeholder="३२°C">
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">न्यून तापक्रम</label>
+              <input type="text" class="form-control" id="low_temperature" placeholder="१८°C">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Forecast Status -->
+      <div class="card mb-3">
+        <div class="card-header py-2">
+          <i class="bi bi-cloud-sun me-1 text-warning"></i> मौसम स्थिति
+        </div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">मौसम अवस्था (weather_status)</label>
+              <select class="form-select" id="weather_status">
+                <option value="">मौसम चयन गर्नुहोस्</option>
+                <option value="मुख्यतया सफा रहने">मुख्यतया सफा रहने</option>
+                <option value="आंसिक बदली रहने">आंसिक बदली रहने</option>
+                <option value="साधारणतया बदली रहने">साधारणतया बदली रहने</option>
+                <option value="अधिकांस बदली रहने">अधिकांस बदली रहने</option>
+                <option value="पूर्ण बदली रहने">पूर्ण बदली रहने</option>
+                <option value="क्षणिक बर्षा हुने">क्षणिक बर्षा हुने</option>
+                <option value="लगातार बर्षा हुने">लगातार बर्षा हुने</option>
+                <option value="रोकिदै बर्षा हुने">रोकिदै बर्षा हुने</option>
+                <option value="ब्यापक बर्षा हुने">ब्यापक बर्षा हुने</option>
+                <option value="हल्का बर्षाको सम्भावना">हल्का बर्षाको सम्भावना</option>
+                <option value="मध्यम बर्षाको सम्भावना">मध्यम बर्षाको सम्भावना</option>
+                <option value="भारी बर्षाको सम्भावना">भारी बर्षाको सम्भावना</option>
+                <option value="धेरै भारी बर्षाको सम्भावना">धेरै भारी बर्षाको सम्भावना</option>
+                <option value="अति धेरै बर्षाको सम्भावना">अति धेरै बर्षाको सम्भावना</option>
+                <option value="हिमपात हुने सम्भावना">हिमपात हुने सम्भावना</option>
+                <option value="शितलहर हुने सम्भावना">शितलहर हुने सम्भावना</option>
+                <option value="लु-लहर चल्ने सम्भावना">लु-लहर चल्ने सम्भावना</option>
+                <option value="स्पष्ट नरहेको">स्पष्ट नरहेको</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">थप जानकारी</label>
+              <textarea class="form-control" id="forecast_info" rows="2" placeholder="मौसम सम्बन्धी थप जानकारी"></textarea>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">महत्त्वपूर्ण मौसम (important_weather)</label>
+              <textarea class="form-control" id="important_weather" rows="2" placeholder="महत्त्वपूर्ण मौसमी घटनाहरू"></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Per-Section Fields -->
+      <div class="card mb-3">
+        <div class="card-header py-2">
+          <i class="bi bi-lightbulb me-1 text-info"></i> खण्ड अनुसार विवरण
+        </div>
+        <div class="card-body">
+          <div class="row g-3">
+            <!-- साताको शुरुबात -->
+            <div class="col-12">
+              <h6 class="text-primary mb-2"><i class="bi bi-sunrise me-1"></i> साताको शुरुबात (शुक्रवार & शनिबार)</h6>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">मौसम स्थिति</label>
+              <select class="form-select" id="start_weather">
+                <option value="">चयन गर्नुहोस्</option>
+                <option value="मुख्यतया सफा रहने">मुख्यतया सफा रहने</option>
+                <option value="आंसिक बदली रहने">आंसिक बदली रहने</option>
+                <option value="साधारणतया बदली रहने">साधारणतया बदली रहने</option>
+                <option value="अधिकांस बदली रहने">अधिकांस बदली रहने</option>
+                <option value="पूर्ण बदली रहने">पूर्ण बदली रहने</option>
+                <option value="क्षणिक बर्षा हुने">क्षणिक बर्षा हुने</option>
+                <option value="लगातार बर्षा हुने">लगातार बर्षा हुने</option>
+                <option value="रोकिदै बर्षा हुने">रोकिदै बर्षा हुने</option>
+                <option value="ब्यापक बर्षा हुने">ब्यापक बर्षा हुने</option>
+                <option value="हल्का बर्षाको सम्भावना">हल्का बर्षाको सम्भावना</option>
+                <option value="मध्यम बर्षाको सम्भावना">मध्यम बर्षाको सम्भावना</option>
+                <option value="भारी बर्षाको सम्भावना">भारी बर्षाको सम्भावना</option>
+                <option value="धेरै भारी बर्षाको सम्भावना">धेरै भारी बर्षाको सम्भावना</option>
+                <option value="अति धेरै बर्षाको सम्भावना">अति धेरै बर्षाको सम्भावना</option>
+                <option value="हिमपात हुने सम्भावना">हिमपात हुने सम्भावना</option>
+                <option value="शितलहर हुने सम्भावना">शितलहर हुने सम्भावना</option>
+                <option value="लु-लहर चल्ने सम्भावना">लु-लहर चल्ने सम्भावना</option>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">विवरण</label>
+              <input type="text" class="form-control" id="start_weather_desc" placeholder="शुरुबातको मौसम विवरण">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">सुझाव</label>
+              <textarea class="form-control" id="start_suggestion" rows="2" placeholder="शुरुबारका लागि सुझाव"></textarea>
+            </div>
+
+            <!-- साताको मध्य -->
+            <div class="col-12 mt-3">
+              <h6 class="text-warning mb-2"><i class="bi bi-cloud-sun me-1"></i> साताको मध्य (आइतबार - बुधबार)</h6>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">मौसम स्थिति</label>
+              <select class="form-select" id="mid_weather">
+                <option value="">चयन गर्नुहोस्</option>
+                <option value="मुख्यतया सफा रहने">मुख्यतया सफा रहने</option>
+                <option value="आंसिक बदली रहने">आंसिक बदली रहने</option>
+                <option value="साधारणतया बदली रहने">साधारणतया बदली रहने</option>
+                <option value="अधिकांस बदली रहने">अधिकांस बदली रहने</option>
+                <option value="पूर्ण बदली रहने">पूर्ण बदली रहने</option>
+                <option value="क्षणिक बर्षा हुने">क्षणिक बर्षा हुने</option>
+                <option value="लगातार बर्षा हुने">लगातार बर्षा हुने</option>
+                <option value="रोकिदै बर्षा हुने">रोकिदै बर्षा हुने</option>
+                <option value="ब्यापक बर्षा हुने">ब्यापक बर्षा हुने</option>
+                <option value="हल्का बर्षाको सम्भावना">हल्का बर्षाको सम्भावना</option>
+                <option value="मध्यम बर्षाको सम्भावना">मध्यम बर्षाको सम्भावना</option>
+                <option value="भारी बर्षाको सम्भावना">भारी बर्षाको सम्भावना</option>
+                <option value="धेरै भारी बर्षाको सम्भावना">धेरै भारी बर्षाको सम्भावना</option>
+                <option value="अति धेरै बर्षाको सम्भावना">अति धेरै बर्षाको सम्भावना</option>
+                <option value="हिमपात हुने सम्भावना">हिमपात हुने सम्भावना</option>
+                <option value="शितलहर हुने सम्भावना">शितलहर हुने सम्भावना</option>
+                <option value="लु-लहर चल्ने सम्भावना">लु-लहर चल्ने सम्भावना</option>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">विवरण</label>
+              <input type="text" class="form-control" id="mid_weather_desc" placeholder="मध्यको मौसम विवरण">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">सुझाव</label>
+              <textarea class="form-control" id="mid_suggestion" rows="2" placeholder="मध्यका लागि सुझाव"></textarea>
+            </div>
+
+            <!-- साताको अन्त्य -->
+            <div class="col-12 mt-3">
+              <h6 class="text-danger mb-2"><i class="bi bi-sunset me-1"></i> साताको अन्त्य (बिहीबार)</h6>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">मौसम स्थिति</label>
+              <select class="form-select" id="end_weather">
+                <option value="">चयन गर्नुहोस्</option>
+                <option value="मुख्यतया सफा रहने">मुख्यतया सफा रहने</option>
+                <option value="आंसिक बदली रहने">आंसिक बदली रहने</option>
+                <option value="साधारणतया बदली रहने">साधारणतया बदली रहने</option>
+                <option value="अधिकांस बदली रहने">अधिकांस बदली रहने</option>
+                <option value="पूर्ण बदली रहने">पूर्ण बदली रहने</option>
+                <option value="क्षणिक बर्षा हुने">क्षणिक बर्षा हुने</option>
+                <option value="लगातार बर्षा हुने">लगातार बर्षा हुने</option>
+                <option value="रोकिदै बर्षा हुने">रोकिदै बर्षा हुने</option>
+                <option value="ब्यापक बर्षा हुने">ब्यापक बर्षा हुने</option>
+                <option value="हल्का बर्षाको सम्भावना">हल्का बर्षाको सम्भावना</option>
+                <option value="मध्यम बर्षाको सम्भावना">मध्यम बर्षाको सम्भावना</option>
+                <option value="भारी बर्षाको सम्भावना">भारी बर्षाको सम्भावना</option>
+                <option value="धेरै भारी बर्षाको सम्भावना">धेरै भारी बर्षाको सम्भावना</option>
+                <option value="अति धेरै बर्षाको सम्भावना">अति धेरै बर्षाको सम्भावना</option>
+                <option value="हिमपात हुने सम्भावना">हिमपात हुने सम्भावना</option>
+                <option value="शितलहर हुने सम्भावना">शितलहर हुने सम्भावना</option>
+                <option value="लु-लहर चल्ने सम्भावना">लु-लहर चल्ने सम्भावना</option>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">विवरण</label>
+              <input type="text" class="form-control" id="end_weather_desc" placeholder="अन्त्यको मौसम विवरण">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">सुझाव</label>
+              <textarea class="form-control" id="end_suggestion" rows="2" placeholder="अन्त्यका लागि सुझाव"></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Additional Fields -->
+      <div class="card mb-3">
+        <div class="card-header py-2">
+          <i class="bi bi-info-circle me-1 text-secondary"></i> थप जानकारी
+        </div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-12">
+              <label class="form-label">कैफियत (remarks)</label>
+              <textarea class="form-control" id="remarks" rows="2" placeholder="कुनै विशेष टिप्पणी वा कैफियत"></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="col-lg-4">
+      <!-- Quick Tips -->
+      <div class="card mb-3">
+        <div class="card-header py-2">
+          <i class="bi bi-info-circle me-1 text-info"></i> मार्गदर्शन
+        </div>
+        <div class="card-body py-2 small">
+          <div class="d-flex align-items-center mb-1"><span class="badge bg-success me-2">सफा</span> कुनै प्रतिकूल मौसम छैन</div>
+          <div class="d-flex align-items-center mb-1"><span class="badge bg-warning text-dark me-2">सतर्क</span> सामान्य सतर्कता आवश्यक</div>
+          <div class="d-flex align-items-center mb-1"><span class="badge bg-danger me-2">खतरा</span> प्रतिकूल मौसमको सम्भावना</div>
+          <div class="d-flex align-items-center"><span class="badge bg-dark me-2">गम्भीर</span> चरम मौसमी घटना</div>
+        </div>
+      </div>
+
+      <!-- Recent Forecasts -->
+      <div class="card mb-3">
+        <div class="card-header py-2">
+          <i class="bi bi-clock-history me-1 text-secondary"></i> हालका पूर्वानुमानहरू
+        </div>
+        <div class="card-body p-0">
+          <div id="recentForecastsList">
+            <div class="text-center text-muted py-3 small">No forecasts saved yet</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="d-flex justify-content-end mt-3">
+    <button class="btn btn-primary" onclick="saveForecast()" id="btnSave">
+      <i class="bi bi-save me-1"></i><span id="btnSaveText">पूर्वानुमान सुरक्षित गर्नुहोस्</span>
+    </button>
+  </div>
+</form>
+
+<!-- Saved Forecasts Table -->
+<div class="card mt-3">
+  <div class="card-header d-flex justify-content-between align-items-center py-2">
+    <span><i class="bi bi-list-table me-1 text-primary"></i> सुरक्षित पूर्वानुमानहरू</span>
+    <button class="btn btn-sm btn-outline-primary" onclick="resetForecastForm()">
+      <i class="bi bi-plus-lg"></i> नयाँ पूर्वानुमान
+    </button>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0 table-sm">
+        <thead class="table-light">
+          <tr>
+            <th>क्र.सं.</th>
+            <th>मिति (बाट)</th>
+            <th>मिति (सम्म)</th>
+            <th>वर्षा / हिमपात</th>
+            <th>उच्च तापक्रम</th>
+            <th>न्यून तापक्रम</th>
+            <th>स्थिति</th>
+            <th>सिर्जना मिति</th>
+            <th class="text-end">कार्यहरू</th>
+          </tr>
+        </thead>
+        <tbody id="forecastTableBody">
+          <tr><td colspan="9" class="text-center py-3"><div class="spinner-border spinner-border-sm text-primary"></div> लोड हुँदै...</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="d-flex justify-content-between align-items-center mt-2 px-2">
+      <small class="text-muted" id="tableInfo">0 records</small>
+      <nav><ul class="pagination pagination-sm mb-0" id="pagination"></ul></nav>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+let forecasts = [];
+let paginator = new Paginator({perPage: 25, onPageChange: () => renderForecastsTable(forecasts)});
+let editingForecastId = null;
+
+function toDev(n) {
+  return String(n).replace(/\d/g, d => '०१२३४५६७८९'[d]);
+}
+
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function showToast(type, msg) {
+  const container = document.getElementById('toastContainer') || (() => {
+    const c = document.createElement('div'); c.id = 'toastContainer';
+    c.style.cssText = 'position:fixed;top:15px;right:15px;z-index:9999';
+    document.body.appendChild(c); return c;
+  })();
+  const t = document.createElement('div');
+  t.className = `toast align-items-center text-white bg-${type} border-0 show`;
+  t.role = 'alert'; t.innerHTML = `<div class="d-flex"><div class="toast-body">${esc(msg)}</div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button></div>`;
+  container.appendChild(t);
+  setTimeout(() => t.remove(), 4000);
+}
+
+// --- Load Forecasts ---
+async function loadForecasts() {
+  try {
+    const r = await fetch('/api/weekly-forecasts');
+    const d = await r.json();
+    if (!d.success) throw new Error(d.message);
+    forecasts = d.forecasts;
+    renderForecastsTable(forecasts);
+    renderRecentForecasts();
+  } catch(e) {
+    document.getElementById('forecastTableBody').innerHTML = `<tr><td colspan="9" class="text-center text-danger py-3">Error: ${esc(e.message)}</td></tr>`;
+  }
+}
+
+function renderForecastsTable(data) {
+  const tbody = document.getElementById('forecastTableBody');
+  if (!data.length) {
+    tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-3"><i class="bi bi-inbox me-1"></i>कुनै पूर्वानुमान छैन</td></tr>';
+    paginator.update(0);
+    return;
+  }
+  const pageData = paginator.getPageData(data);
+  tbody.innerHTML = pageData.map((f, i) => {
+    const statusColor = f.weather_status?.includes('सफा') ? 'success' :
+      f.weather_status?.includes('खतरा') || f.weather_status?.includes('गम्भीर') ? 'danger' :
+      f.weather_status?.includes('सतर्क') || f.weather_status?.includes('भारी') ? 'warning' : 'secondary';
+    return `<tr>
+      <td>${toDev(i + 1)}</td>
+      <td>${esc(f.date_from)}</td>
+      <td>${esc(f.date_to) || '-'}</td>
+      <td>${esc(f.rainfall_snowfall) || '-'}</td>
+      <td>${esc(f.high_temperature) || '-'}</td>
+      <td>${esc(f.low_temperature) || '-'}</td>
+      <td>${f.weather_status ? `<span class="badge bg-${statusColor}">${esc(f.weather_status)}</span>` : '-'}</td>
+      <td>${esc(f.created_at) || '-'}</td>
+      <td class="text-end">
+        <button class="btn btn-sm btn-outline-info" onclick="printForecast(${f.id})" title="प्रिन्ट"><i class="bi bi-printer"></i></button>
+        <button class="btn btn-sm btn-outline-primary" onclick="editForecast(${f.id})" title="सम्पादन"><i class="bi bi-pencil"></i></button>
+        <button class="btn btn-sm btn-outline-danger" onclick="deleteForecast(${f.id})" title="मेट्नुहोस्"><i class="bi bi-trash"></i></button>
+      </td>
+    </tr>`;
+  }).join('');
+  paginator.update(data.length);
+}
+
+function renderRecentForecasts() {
+  const container = document.getElementById('recentForecastsList');
+  const recent = forecasts.slice(0, 5);
+  if (!recent.length) {
+    container.innerHTML = '<div class="text-center text-muted py-3 small">No forecasts saved yet</div>';
+    return;
+  }
+  container.innerHTML = recent.map(f => {
+    const statusColor = f.weather_status?.includes('सफा') ? 'success' :
+      f.weather_status?.includes('खतरा') || f.weather_status?.includes('गम्भीर') ? 'danger' :
+      f.weather_status?.includes('सतर्क') || f.weather_status?.includes('भारी') ? 'warning' : 'secondary';
+    return `<div class="border-bottom px-3 py-2" style="cursor:pointer" onclick="editForecast(${f.id})">
+      <div class="d-flex justify-content-between align-items-center">
+        <strong class="small">${esc(f.date_from)}${f.date_to ? ' - ' + esc(f.date_to) : ''}</strong>
+        ${f.weather_status ? `<span class="badge bg-${statusColor}" style="font-size:0.6rem">${esc(f.weather_status)}</span>` : ''}
+      </div>
+      <small class="text-muted">${esc(f.high_temperature || '-')} / ${esc(f.low_temperature || '-')} | ${esc(f.rainfall_snowfall) || '-'}</small>
+    </div>`;
+  }).join('');
+}
+
+// --- Reset / Edit ---
+function resetForecastForm() {
+  document.getElementById('forecast_id').value = '';
+  editingForecastId = null;
+  document.getElementById('forecastForm').reset();
+  document.getElementById('forecast_date_from').value = today_bs;
+  document.getElementById('forecast_date_to').value = '';
+  document.getElementById('start_weather').value = '';
+  document.getElementById('start_weather_desc').value = '';
+  document.getElementById('start_suggestion').value = '';
+  document.getElementById('mid_weather').value = '';
+  document.getElementById('mid_weather_desc').value = '';
+  document.getElementById('mid_suggestion').value = '';
+  document.getElementById('end_weather').value = '';
+  document.getElementById('end_weather_desc').value = '';
+  document.getElementById('end_suggestion').value = '';
+  document.getElementById('btnSaveText').textContent = 'पूर्वानुमान सुरक्षित गर्नुहोस्';
+}
+
+async function editForecast(id) {
+  try {
+    const r = await fetch('/api/weekly-forecasts/' + id);
+    const d = await r.json();
+    if (!d.success) { showToast('danger', d.message); return; }
+    const f = d.data;
+    editingForecastId = f.id;
+    document.getElementById('forecast_id').value = f.id;
+    document.getElementById('forecast_date_from').value = f.date_from || '';
+    document.getElementById('forecast_date_to').value = f.date_to || '';
+    document.getElementById('rainfall_snowfall').value = f.rainfall_snowfall || '';
+    document.getElementById('high_temperature').value = f.high_temperature || '';
+    document.getElementById('low_temperature').value = f.low_temperature || '';
+    document.getElementById('forecast_info').value = f.forecast_info || '';
+    document.getElementById('weather_status').value = f.weather_status || '';
+    document.getElementById('important_weather').value = f.important_weather || '';
+    document.getElementById('remarks').value = f.remarks || '';
+    document.getElementById('start_weather').value = f.start_weather || '';
+    document.getElementById('start_weather_desc').value = f.start_weather_desc || '';
+    document.getElementById('start_suggestion').value = f.start_suggestion || '';
+    document.getElementById('mid_weather').value = f.mid_weather || '';
+    document.getElementById('mid_weather_desc').value = f.mid_weather_desc || '';
+    document.getElementById('mid_suggestion').value = f.mid_suggestion || '';
+    document.getElementById('end_weather').value = f.end_weather || '';
+    document.getElementById('end_weather_desc').value = f.end_weather_desc || '';
+    document.getElementById('end_suggestion').value = f.end_suggestion || '';
+    document.getElementById('btnSaveText').textContent = 'पूर्वानुमान अद्यावधिक गर्नुहोस्';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    showToast('success', 'पूर्वानुमान सम्पादनको लागि लोड गरियो');
+  } catch(e) {
+    showToast('danger', 'Error: ' + e.message);
+  }
+}
+
+async function deleteForecast(id) {
+  if (!confirm('यो पूर्वानुमान मेटाउने हो?')) return;
+  try {
+    const r = await fetch('/api/weekly-forecasts/' + id, { method: 'DELETE', headers: { 'X-CSRFToken': csrf } });
+    const d = await r.json();
+    if (d.success) {
+      showToast('success', 'पूर्वानुमान मेटाइयो');
+      if (editingForecastId === id) resetForecastForm();
+      loadForecasts();
+    } else {
+      showToast('danger', d.message);
+    }
+  } catch(e) {
+    showToast('danger', 'Error: ' + e.message);
+  }
+}
+
+function printForecast(id) {
+  window.open('/weekly-forecast-preview/' + id, '_blank');
+}
+
+// --- Save Forecast ---
+async function saveForecast() {
+    const dateFrom = document.getElementById('forecast_date_from').value.trim();
+  if (!dateFrom) { showToast('danger', 'मिति (बाट) आवश्यक छ'); return; }
+
+  const payload = {
+    date_from: dateFrom,
+    date_to: document.getElementById('forecast_date_to').value.trim(),
+    rainfall_snowfall: document.getElementById('rainfall_snowfall').value.trim(),
+    high_temperature: document.getElementById('high_temperature').value.trim(),
+    low_temperature: document.getElementById('low_temperature').value.trim(),
+    forecast_info: document.getElementById('forecast_info').value.trim(),
+    weather_status: document.getElementById('weather_status').value,
+    important_weather: document.getElementById('important_weather').value.trim(),
+    remarks: document.getElementById('remarks').value.trim(),
+    start_weather: document.getElementById('start_weather').value,
+    start_weather_desc: document.getElementById('start_weather_desc').value.trim(),
+    start_suggestion: document.getElementById('start_suggestion').value.trim(),
+    mid_weather: document.getElementById('mid_weather').value,
+    mid_weather_desc: document.getElementById('mid_weather_desc').value.trim(),
+    mid_suggestion: document.getElementById('mid_suggestion').value.trim(),
+    end_weather: document.getElementById('end_weather').value,
+    end_weather_desc: document.getElementById('end_weather_desc').value.trim(),
+    end_suggestion: document.getElementById('end_suggestion').value.trim(),
+  };
+
+  try {
+    const isUpdate = !!editingForecastId;
+    const url = isUpdate ? '/api/weekly-forecasts/' + editingForecastId : '/api/weekly-forecasts';
+    const method = isUpdate ? 'PUT' : 'POST';
+    const r = await fetch(url, {
+      method: method,
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
+      body: JSON.stringify(payload),
+    });
+    const d = await r.json();
+    if (d.success) {
+      showToast('success', isUpdate ? 'पूर्वानुमान अद्यावधिक गरियो' : 'पूर्वानुमान सुरक्षित गरियो');
+      resetForecastForm();
+      loadForecasts();
+    } else {
+      showToast('danger', d.message || 'Failed to save forecast');
+    }
+  } catch(e) {
+    showToast('danger', 'Error: ' + e.message);
+  }
+}
+
+// --- Init ---
+document.addEventListener('DOMContentLoaded', () => {
+  loadForecasts();
+  document.getElementById('forecast_date_from').value = today_bs;
+});
+</script>
+{% endblock %}

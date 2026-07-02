@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="ne">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>साप्ताहिक मौसम पूर्वानुमान - {{ office_name }}</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    @font-face {
+      font-family: 'Kokila';
+      src: url('{{ url_for("static", filename="fonts/Kokila-Regular.ttf") }}') format('truetype');
+      font-weight: 400; font-style: normal; font-display: swap;
+    }
+    @font-face {
+      font-family: 'Noto Sans';
+      src: url('{{ url_for("static", filename="fonts/NotoSans-Regular.ttf") }}') format('truetype');
+      font-weight: 400; font-style: normal; font-display: swap;
+    }
+    @font-face {
+      font-family: 'Noto Sans';
+      src: url('{{ url_for("static", filename="fonts/NotoSans-Bold.ttf") }}') format('truetype');
+      font-weight: 700; font-style: normal; font-display: swap;
+    }
+    @font-face {
+      font-family: 'Noto Sans Devanagari';
+      src: url('{{ url_for("static", filename="fonts/NotoSansDevanagari-Regular.ttf") }}') format('truetype');
+      font-weight: 400; font-style: normal; font-display: swap;
+    }
+    @font-face {
+      font-family: 'Noto Sans Devanagari';
+      src: url('{{ url_for("static", filename="fonts/NotoSansDevanagari-Bold.ttf") }}') format('truetype');
+      font-weight: 700; font-style: normal; font-display: swap;
+    }
+
+    @page { size: A4 landscape; margin: 6mm; }
+
+    @media print {
+      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .no-print { display: none !important; }
+      .container { width: 100%; max-width: none; padding: 0; }
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      font-family: 'Noto Sans Devanagari', 'Noto Sans', 'Kokila', sans-serif;
+      font-size: 11pt;
+      background: #f0f4f8;
+      color: #1a1a2e;
+    }
+
+    /* ===== PRINT ACTIONS ===== */
+    .print-actions {
+      position: fixed; top: 15px; right: 15px; z-index: 1000;
+      display: flex; gap: 10px;
+    }
+    .btn-action {
+      padding: 8px 18px; border: none; border-radius: 6px;
+      cursor: pointer; font-size: 11pt; font-weight: 600;
+      display: flex; align-items: center; gap: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      text-decoration: none; transition: opacity 0.2s;
+    }
+    .btn-action:hover { opacity: 0.85; }
+    .btn-print { background: #1a3c6e; color: white; }
+    .btn-pdf   { background: #c0392b; color: white; }
+    .btn-img   { background: #27ae60; color: white; }
+    .btn-back  { background: #495057; color: white; }
+
+    /* ===== REPORT WRAPPER ===== */
+    .report-wrapper {
+      background: white;
+      max-width: 1050px;
+      margin: 20px auto;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    }
+
+    /* ===== HEADER ===== */
+    .report-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 18px 10px;
+      border-bottom: 3px solid #1a3c6e;
+      background: white;
+    }
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .header-logo {
+      width: 70px; height: 70px; object-fit: contain; flex-shrink: 0;
+    }
+    .header-text h1 {
+      color: #c0392b;
+      font-size: 22pt;
+      font-weight: 800;
+      margin: 0;
+      line-height: 1.1;
+    }
+    .header-text p {
+      color: #1a3c6e;
+      font-size: 11pt;
+      font-weight: 600;
+      margin: 0;
+    }
+    .header-text small {
+      color: #555;
+      font-size: 9.5pt;
+    }
+
+    .header-center {
+      text-align: center;
+      flex: 1;
+    }
+    .weather-icon-large {
+      font-size: 52pt;
+      line-height: 1;
+    }
+
+    .header-right {
+      text-align: center;
+      border: 2px solid #1a3c6e;
+      border-radius: 8px;
+      padding: 8px 16px;
+      min-width: 200px;
+    }
+    .header-right .report-title {
+      color: #1a3c6e;
+      font-size: 14pt;
+      font-weight: 800;
+      margin-bottom: 4px;
+    }
+    .header-right .date-range {
+      font-size: 10pt;
+      color: #333;
+      line-height: 1.4;
+    }
+
+    /* ===== MAIN TABLE ===== */
+    .forecast-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 10.5pt;
+    }
+
+    /* Header row groups */
+    .group-header {
+      text-align: center;
+      font-weight: 700;
+      font-size: 11pt;
+      padding: 5px 6px;
+      border: 1px solid #1a3c6e;
+    }
+    .gh-start  { background: #4a7ec7; color: white; }
+    .gh-mid    { background: #2196f3; color: white; }
+    .gh-end    { background: #1a3c6e; color: white; }
+
+    /* Day header row */
+    .day-col-header {
+      text-align: center;
+      padding: 5px 4px;
+      font-weight: 700;
+      font-size: 10pt;
+      border: 1px solid #90caf9;
+    }
+    .dc-start { background: #dce8f5; color: #1a3c6e; }
+    .dc-mid   { background: #bbdefb; color: #1a3c6e; }
+    .dc-end   { background: #90caf9; color: #1a3c6e; }
+
+    /* Row label column */
+    .row-label {
+      font-weight: 700;
+      font-size: 11pt;
+      padding: 8px 10px;
+      text-align: center;
+      vertical-align: middle;
+      border: 1px solid #90caf9;
+      background: #1a3c6e;
+      color: white;
+      white-space: nowrap;
+    }
+
+    /* Weather row - icon + text */
+    .weather-cell {
+      text-align: center;
+      padding: 6px 5px;
+      border: 1px solid #d0dff0;
+      vertical-align: middle;
+      line-height: 1.3;
+      background: #f9fbff;
+    }
+    .weather-icon { font-size: 26pt; display: block; margin-bottom: 2px; }
+    .weather-text {
+      font-size: 8.5pt;
+      max-width: 240px;
+      margin: 0 auto;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+      hyphens: auto;
+    }
+    .weather-desc {
+      font-size: 8pt;
+      color: #666;
+      max-width: 240px;
+      margin: 2px auto 0;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+    }
+
+    /* Suggestions row */
+    .suggestion-cell {
+      padding: 8px 10px;
+      border: 1px solid #d0dff0;
+      vertical-align: top;
+      font-size: 9.5pt;
+      line-height: 1.5;
+      background: white;
+    }
+    .suggestion-icon { font-size: 18pt; display: block; margin-bottom: 2px; color: #27ae60; }
+
+    /* Status/remarks combined cell (last col spanning) */
+    .status-span-cell {
+      padding: 8px 10px;
+      border: 1px solid #d0dff0;
+      vertical-align: top;
+      font-size: 9.5pt;
+      line-height: 1.5;
+      background: #f9fbff;
+    }
+    .status-span-cell .highlight { color: #c0392b; font-weight: 700; }
+
+    /* ===== FOOTER ===== */
+    .report-footer {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      padding: 10px 18px;
+      background: white;
+      border-top: 2px solid #1a3c6e;
+      gap: 16px;
+    }
+    .footer-note {
+      display: flex; align-items: flex-start; gap: 8px;
+      font-size: 9.5pt; color: #555; flex: 1.5;
+    }
+    .footer-note i { color: #e67e22; font-size: 14pt; flex-shrink: 0; margin-top: 1px; }
+    .footer-note span { color: #e67e22; font-weight: 700; }
+
+    .footer-source {
+      display: flex; align-items: center; gap: 10px;
+      font-size: 9.5pt; color: #333; flex: 1; justify-content: center;
+    }
+    .footer-source img { width: 36px; height: 36px; object-fit: contain; }
+
+    .footer-contact {
+      font-size: 9.5pt; color: #333; flex: 1; text-align: right;
+    }
+    .footer-contact p { margin: 1px 0; }
+
+    /* ===== DARK FOOTER BAR ===== */
+    .bottom-bar {
+      background: #1a3c6e;
+      color: white;
+      padding: 6px 18px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 9pt;
+    }
+
+    /* ===== FIELD DISPLAY ===== */
+    .field-label { font-weight: 600; color: #1a3c6e; font-size: 9pt; display: block; }
+    .field-value { font-size: 10pt; }
+
+    /* meta info bar */
+    .meta-bar {
+      background: #eef3fb;
+      padding: 6px 18px;
+      display: flex; gap: 24px; flex-wrap: wrap;
+      font-size: 9.5pt; border-bottom: 1px solid #d0dff0;
+    }
+    .meta-item { display: flex; gap: 6px; align-items: center; }
+    .meta-item strong { color: #1a3c6e; }
+  </style>
+</head>
+<body>
+
+<!-- Print Actions -->
+<div class="print-actions no-print">
+  <button class="btn-action btn-print" onclick="window.print()"><i class="bi bi-printer"></i> प्रिन्ट</button>
+  <button class="btn-action btn-img" id="btnImg" onclick="downloadImage()"><i class="bi bi-image"></i> तस्वीर</button>
+  <a class="btn-action btn-back" href="javascript:window.close()"><i class="bi bi-x-circle"></i> बन्द</a>
+</div>
+
+<div class="report-wrapper" id="reportContent">
+
+  <!-- === HEADER === -->
+  <div class="report-header">
+    <div class="header-left">
+      <img src="{{ url_for('static', filename='Emblem_of_Nepal.png') }}" alt="Logo" class="header-logo">
+      <div class="header-text">
+        {% if report_header %}
+          {% for line in report_header.strip().split('\n') %}
+            {% set l = line.strip() %}
+            {% if l %}
+              {% if loop.first %}<h1>{{ l }}</h1>{% else %}<p>{{ l }}</p>{% endif %}
+            {% endif %}
+          {% endfor %}
+        {% else %}
+          <h1>{{ office_name }}</h1>
+          <p>गाउँ कार्यपालिकाको कार्यालय</p>
+        {% endif %}
+        <small>{{ address }}</small>
+      </div>
+    </div>
+
+    <div class="header-center">
+      {% set ws = forecast.weather_status or '' %}
+      {% if 'हिमपात' in ws or 'हिम' in ws %}
+        <span class="weather-icon-large">🌨️</span>
+      {% elif 'भारी बर्षा' in ws or 'अति धेरै' in ws %}
+        <span class="weather-icon-large">⛈️</span>
+      {% elif 'बर्षा' in ws or 'वर्षा' in ws %}
+        <span class="weather-icon-large">🌧️</span>
+      {% elif 'बदली' in ws %}
+        <span class="weather-icon-large">⛅</span>
+      {% elif 'सफा' in ws %}
+        <span class="weather-icon-large">☀️</span>
+      {% elif 'शितलहर' in ws or 'लु-लहर' in ws %}
+        <span class="weather-icon-large">🌬️</span>
+      {% else %}
+        <span class="weather-icon-large">🌤️</span>
+      {% endif %}
+    </div>
+
+    <div class="header-right">
+      <div class="report-title">साप्ताहिक मौसम पूर्वानुमान</div>
+      <div class="date-range">
+        {% if forecast.date_from %}{{ forecast.date_from | to_nepali_num }}{% endif %}
+        {% if forecast.date_to %} - {{ forecast.date_to | to_nepali_num }}{% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- === META BAR === -->
+  <div class="meta-bar">
+    {% if forecast.rainfall_snowfall %}
+    <div class="meta-item"><strong>वर्षा/हिमपात:</strong> {{ forecast.rainfall_snowfall }}</div>
+    {% endif %}
+    {% if forecast.high_temperature %}
+    <div class="meta-item"><strong>उच्च तापक्रम:</strong> {{ forecast.high_temperature }}°C</div>
+    {% endif %}
+    {% if forecast.low_temperature %}
+    <div class="meta-item"><strong>न्यून तापक्रम:</strong> {{ forecast.low_temperature }}°C</div>
+    {% endif %}
+    {% if forecast.weather_status %}
+    <div class="meta-item"><strong>मौसम:</strong> {{ forecast.weather_status }}</div>
+    {% endif %}
+  </div>
+
+  <!-- === MAIN FORECAST TABLE === -->
+  <div style="padding: 0 0 0 0; overflow-x: auto;">
+    <table class="forecast-table">
+      <thead>
+        <!-- Group headers -->
+        <tr>
+          <th style="border:1px solid #1a3c6e; background:#1a3c6e; color:white; padding:5px 8px; width:70px; text-align:center; font-weight:700;">वार/दिन</th>
+          <th class="group-header gh-start" colspan="2">साताको शुरुबात</th>
+          <th class="group-header gh-mid" colspan="4">साताको मध्य</th>
+          <th class="group-header gh-end" colspan="1">साताको अन्त्य</th>
+        </tr>
+        <!-- Day headers -->
+        <tr>
+          <th style="border:1px solid #90caf9; background:#dce8f5; padding:5px; text-align:center; font-weight:700; font-size:10pt;">मौसम</th>
+          <th class="day-col-header dc-start">शुक्रबार</th>
+          <th class="day-col-header dc-start">शनिबार</th>
+          <th class="day-col-header dc-mid">आइतबार</th>
+          <th class="day-col-header dc-mid">सोमबार</th>
+          <th class="day-col-header dc-mid">मंगलबार</th>
+          <th class="day-col-header dc-mid">बुधबार</th>
+          <th class="day-col-header dc-end" style="background:#90caf9;">बिहीबार<br><small style="font-size:8.5pt;font-weight:500;">(मौसम प्रणाली)</small></th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Weather row: मौसम section (शुक्रवार & शनिबार merged) -->
+        <tr>
+          <td class="row-label">मौसम</td>
+          {% set ws_val = forecast.start_weather or forecast.weather_status or '' %}
+          <td class="weather-cell" colspan="2">
+            {% if 'हिमपात' in ws_val or 'हिम' in ws_val %}
+              <span class="weather-icon">🌨️</span>
+            {% elif 'भारी बर्षा' in ws_val or 'अति धेरै' in ws_val %}
+              <span class="weather-icon">⛈️</span>
+            {% elif 'बर्षा' in ws_val or 'वर्षा' in ws_val %}
+              <span class="weather-icon">🌧️</span>
+            {% elif 'बदली' in ws_val %}
+              <span class="weather-icon">⛅</span>
+            {% elif 'सफा' in ws_val %}
+              <span class="weather-icon">☀️</span>
+            {% elif 'शितलहर' in ws_val or 'लु-लहर' in ws_val %}
+              <span class="weather-icon">🌬️</span>
+            {% else %}
+              <span class="weather-icon">🌤️</span>
+            {% endif %}
+            <div class="weather-text">
+              {{ forecast.start_weather or forecast.weather_status or '-' }}
+            </div>
+            {% if forecast.start_weather_desc %}
+              <div class="weather-desc">{{ forecast.start_weather_desc }}</div>
+            {% endif %}
+          </td>
+
+          {% set ws_mid = forecast.mid_weather or forecast.weather_status or '' %}
+          <td class="weather-cell" colspan="4">
+            {% if 'हिमपात' in ws_mid or 'हिम' in ws_mid %}
+              <span class="weather-icon">🌨️</span>
+            {% elif 'भारी बर्षा' in ws_mid or 'अति धेरै' in ws_mid %}
+              <span class="weather-icon">⛈️</span>
+            {% elif 'बर्षा' in ws_mid or 'वर्षा' in ws_mid %}
+              <span class="weather-icon">🌧️</span>
+            {% elif 'बदली' in ws_mid %}
+              <span class="weather-icon">⛅</span>
+            {% elif 'सफा' in ws_mid %}
+              <span class="weather-icon">☀️</span>
+            {% elif 'शितलहर' in ws_mid or 'लु-लहर' in ws_mid %}
+              <span class="weather-icon">🌬️</span>
+            {% else %}
+              <span class="weather-icon">🌤️</span>
+            {% endif %}
+            <div class="weather-text">
+              {{ forecast.mid_weather or forecast.weather_status or '-' }}
+            </div>
+            {% if forecast.mid_weather_desc %}
+              <div class="weather-desc">{{ forecast.mid_weather_desc }}</div>
+            {% endif %}
+          </td>
+
+          {% set ws_end = forecast.end_weather or forecast.weather_status or '' %}
+          <td class="weather-cell">
+            {% if 'हिमपात' in ws_end or 'हिम' in ws_end %}
+              <span class="weather-icon">🌨️</span>
+            {% elif 'भारी बर्षा' in ws_end or 'अति धेरै' in ws_end %}
+              <span class="weather-icon">⛈️</span>
+            {% elif 'बर्षा' in ws_end or 'वर्षा' in ws_end %}
+              <span class="weather-icon">🌧️</span>
+            {% elif 'बदली' in ws_end %}
+              <span class="weather-icon">⛅</span>
+            {% elif 'सफा' in ws_end %}
+              <span class="weather-icon">☀️</span>
+            {% elif 'शितलहर' in ws_end or 'लु-लहर' in ws_end %}
+              <span class="weather-icon">🌬️</span>
+            {% else %}
+              <span class="weather-icon">🌤️</span>
+            {% endif %}
+            <div class="weather-text">
+              {{ forecast.end_weather or forecast.weather_status or '-' }}
+            </div>
+            {% if forecast.end_weather_desc %}
+              <div class="weather-desc">{{ forecast.end_weather_desc }}</div>
+            {% endif %}
+          </td>
+        </tr>
+
+        <!-- Suggestions row: merged into single cell, vertical stack -->
+        <tr>
+          <td class="row-label" style="background:#27ae60;">सुझाव</td>
+          <td class="suggestion-cell" colspan="7">
+            <div style="text-align:left;">
+              <div style="margin-bottom:6px; padding-bottom:6px; border-bottom:1px dashed #d0dff0;">
+                <span style="font-weight:700; color:#1a3c6e; font-size:9pt;">साताको शुरुबात (शुक्र-शनि):</span><br>
+                {% if forecast.start_suggestion %}
+                  {{ forecast.start_suggestion }}
+                {% elif forecast.forecast_info %}
+                  {{ forecast.forecast_info }}
+                {% elif forecast.remarks %}
+                  {{ forecast.remarks }}
+                {% else %}
+                  -
+                {% endif %}
+              </div>
+              <div style="margin-bottom:6px; padding-bottom:6px; border-bottom:1px dashed #d0dff0;">
+                <span style="font-weight:700; color:#1a3c6e; font-size:9pt;">साताको मध्य (आइत-बुध):</span><br>
+                {% if forecast.mid_suggestion %}
+                  {{ forecast.mid_suggestion }}
+                {% elif forecast.forecast_info %}
+                  {{ forecast.forecast_info }}
+                {% elif forecast.remarks %}
+                  {{ forecast.remarks }}
+                {% else %}
+                  -
+                {% endif %}
+              </div>
+              <div>
+                <span style="font-weight:700; color:#1a3c6e; font-size:9pt;">साताको अन्त्य (बिही):</span><br>
+                {% if forecast.end_suggestion %}
+                  {{ forecast.end_suggestion }}
+                {% elif forecast.forecast_info %}
+                  {{ forecast.forecast_info }}
+                {% elif forecast.remarks %}
+                  {{ forecast.remarks }}
+                {% else %}
+                  -
+                {% endif %}
+              </div>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- === EXTRA INFO SECTION === -->
+  {% if forecast.important_weather or forecast.remarks or forecast.forecast_info %}
+  <div style="padding: 8px 18px; background: #fff8e1; border-top: 1px solid #ffe082;">
+    <div style="display:flex; gap:20px; flex-wrap:wrap;">
+      {% if forecast.important_weather %}
+      <div style="flex:1; min-width:200px;">
+        <span class="field-label">⚠️ महत्त्वपूर्ण मौसम जानकारी</span>
+        <p style="margin:4px 0 0; font-size:10.5pt; color:#c0392b; font-weight:600;">{{ forecast.important_weather }}</p>
+      </div>
+      {% endif %}
+      {% if forecast.remarks %}
+      <div style="flex:1; min-width:200px;">
+        <span class="field-label">📝 कैफियत</span>
+        <p style="margin:4px 0 0; font-size:10pt;">{{ forecast.remarks }}</p>
+      </div>
+      {% endif %}
+      {% if forecast.forecast_info %}
+      <div style="flex:1; min-width:200px;">
+        <span class="field-label">ℹ️ थप जानकारी</span>
+        <p style="margin:4px 0 0; font-size:10pt;">{{ forecast.forecast_info }}</p>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- === FOOTER === -->
+  <div class="report-footer">
+    <div class="footer-note">
+      <i class="bi bi-exclamation-triangle-fill"></i>
+      <div>
+        {% if report_footer %}
+          {% for line in report_footer.strip().split('\n') %}
+            {% set l = line.strip() %}
+            {% if l %}{{ l }}{% if not loop.last %}<br>{% endif %}{% endif %}
+          {% endfor %}
+        {% else %}
+          <span>नोट:</span> यो पूर्वानुमान सामान्य अवस्थाको आकलन हो । मौसममा परिवर्तन हुन सक्ने हुँदा अद्यावधिक जानकारीका लागि नियमित अपडेट हेर्नुहोस् ।
+        {% endif %}
+      </div>
+    </div>
+    <div class="footer-source">
+      <img src="{{ url_for('static', filename='Emblem_of_Nepal.png') }}" alt="">
+      <div>
+        <div style="font-weight:700; font-size:9.5pt;">स्रोत:</div>
+        <div>मौसम पूर्वानुमान महाशाखा</div>
+        <div>जल तथा मौसम विज्ञान विभाग, नेपाल सरकार</div>
+      </div>
+    </div>
+    <div class="footer-contact">
+      {% if phone %}<p>📞 {{ phone }}</p>{% endif %}
+      {% if email %}<p>✉️ {{ email }}</p>{% endif %}
+      {% if website %}<p>🌐 {{ website }}</p>{% endif %}
+    </div>
+  </div>
+
+  <!-- === BOTTOM BAR === -->
+  <div class="bottom-bar">
+    <span>📍 {{ office_name }}, {{ address }}</span>
+    {% if phone or email or website %}
+    <span>
+      {% if phone %}📞 {{ phone }}{% endif %}
+      {% if phone and email %} | {% endif %}
+      {% if email %}✉️ {{ email }}{% endif %}
+      {% if (phone or email) and website %} | {% endif %}
+      {% if website %}🌐 {{ website }}{% endif %}
+    </span>
+    {% endif %}
+    <span>"सुरक्षित समुदाय, समृद्ध थलारा"</span>
+  </div>
+
+</div><!-- /report-wrapper -->
+
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script>
+function downloadImage() {
+  const btn = document.getElementById('btnImg');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="bi bi-hourglass-split"></i> तयार गर्दै...';
+  const el = document.getElementById('reportContent');
+  html2canvas(el, { scale: 2, useCORS: true, allowTaint: true }).then(canvas => {
+    const link = document.createElement('a');
+    link.download = 'weekly_forecast_{{ forecast.id }}.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-image"></i> तस्वीर';
+  }).catch(err => {
+    console.error(err);
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-image"></i> तस्वीर';
+  });
+}
+</script>
+</body>
+</html>

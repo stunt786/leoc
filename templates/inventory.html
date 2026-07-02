@@ -1,0 +1,365 @@
+{% extends "base.html" %}
+{% block title %}Inventory - LEOC{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('index') }}"><i class="bi bi-house-fill"></i></a></li>
+<li class="breadcrumb-item"><a href="{{ url_for('inventory_page') }}">Inventory</a></li>
+<li class="breadcrumb-item active">Current Stock</li>
+{% endblock %}
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center">
+    <div>
+        <h4><i class="bi bi-box-seam-fill me-2"></i>Current Stock</h4>
+        <p>System-generated inventory view — updates automatically from Stock Receipt, Dispatch, and Adjustments.</p>
+    </div>
+    <div class="d-flex gap-2 align-items-start">
+        <button class="btn btn-sm btn-outline-secondary" onclick="printBinCard()"><i class="bi bi-card-list me-1"></i>Bin Card</button>
+        <button class="btn btn-sm btn-outline-secondary" onclick="printStockBook()"><i class="bi bi-book me-1"></i>Stock Book</button>
+    </div>
+</div>
+
+<div class="row g-3 mb-4" id="summaryCards">
+    <div class="col-md-3 col-6">
+        <div class="stat-card stat-card-primary">
+            <div class="stat-icon"><i class="bi bi-boxes"></i></div>
+            <div class="stat-content">
+                <div class="stat-label">Total Items</div>
+                <div class="stat-value" id="totalItems">0</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6">
+        <div class="stat-card stat-card-success">
+            <div class="stat-icon"><i class="bi bi-cubes"></i></div>
+            <div class="stat-content">
+                <div class="stat-label">Total Stock Qty</div>
+                <div class="stat-value" id="totalStock">0</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6">
+        <div class="stat-card stat-card-warning">
+            <div class="stat-icon"><i class="bi bi-exclamation-triangle"></i></div>
+            <div class="stat-content">
+                <div class="stat-label">Low Stock Items</div>
+                <div class="stat-value" id="lowStockCount">0</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6">
+        <div class="stat-card stat-card-danger">
+            <div class="stat-icon"><i class="bi bi-x-circle"></i></div>
+            <div class="stat-content">
+                <div class="stat-label">Out of Stock Items</div>
+                <div class="stat-value" id="outOfStockCount">0</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6">
+        <div class="stat-card stat-card-orange">
+            <div class="stat-icon"><i class="bi bi-clock-history"></i></div>
+            <div class="stat-content">
+                <div class="stat-label">Expiring Soon</div>
+                <div class="stat-value" id="expiringCount">0</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="row g-2 align-items-end">
+            <div class="col-md-2">
+                <label class="form-label">Warehouse</label>
+                <select class="form-select" id="filterWarehouse" onchange="loadInventory()">
+                    <option value="">All Warehouses</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Category</label>
+                <select class="form-select" id="filterCategory" onchange="loadInventory()">
+                    <option value="">All Categories</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Status</label>
+                <select class="form-select" id="filterStatus" onchange="loadInventory()">
+                    <option value="">All Status</option>
+                    <option value="available">Available</option>
+                    <option value="low_stock">Low Stock</option>
+                    <option value="out_of_stock">Out of Stock</option>
+                    <option value="expired">Expired Items</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Supplier</label>
+                <select class="form-select" id="filterSupplier" onchange="loadInventory()">
+                    <option value="">All Suppliers</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">From Date (BS)</label>
+                <input type="text" class="form-control nepali-date" id="filterFromDate" placeholder="YYYY-MM-DD" onchange="loadInventory()">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">To Date (BS)</label>
+                <input type="text" class="form-control nepali-date" id="filterToDate" placeholder="YYYY-MM-DD" onchange="loadInventory()">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Search</label>
+                <input type="text" class="form-control" id="filterSearch" placeholder="Search item name..." oninput="debounceSearch()">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Item (for Bin Card)</label>
+                <select class="form-select" id="filterItem">
+                    <option value="">Select item...</option>
+                </select>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card mb-4 border-info">
+    <div class="card-header bg-info bg-opacity-10">
+        <i class="bi bi-printer me-2 text-info"></i>Print Options
+    </div>
+    <div class="card-body">
+        <div class="row g-2 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label">Warehouse <span class="text-danger">*</span></label>
+                <select class="form-select" id="printWarehouse">
+                    <option value="">Select warehouse...</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Item <span class="text-danger">*</span></label>
+                <select class="form-select" id="printItem">
+                    <option value="">Select item...</option>
+                </select>
+            </div>
+            <div class="col-md-2 d-grid">
+                <button class="btn btn-outline-primary" onclick="printBinCard()">
+                    <i class="bi bi-card-list me-1"></i>Print Bin Card
+                </button>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">From Date</label>
+                <input type="text" class="form-control nepali-date" placeholder="YYYY-MM-DD" id="stockBookFrom">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">To Date</label>
+                <input type="text" class="form-control nepali-date" placeholder="YYYY-MM-DD" id="stockBookTo">
+            </div>
+            <div class="col-md-2 d-grid">
+                <button class="btn btn-outline-success" onclick="printStockBook()">
+                    <i class="bi bi-book me-1"></i>Print Stock Book
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-list-check me-2 text-primary"></i>Inventory Records</span>
+        <span class="text-muted small"><i class="bi bi-info-circle me-1"></i>View-only — inventory is system-generated and updates automatically from Stock Receipt, Dispatch, and Adjustments.</span>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Item Code</th>
+                        <th>Barcode</th>
+                        <th>Item Name</th>
+                        <th>Category</th>
+                        <th>Warehouse(s)</th>
+                        <th class="text-end">Available Qty</th>
+                        <th class="text-end">Reserved</th>
+                        <th class="text-end">Total Qty</th>
+                        <th>Unit</th>
+                        <th class="text-end">Min Stock</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="inventoryTableBody">
+                    <tr><td colspan="11" class="text-center py-4"><div class="spinner-border text-primary"></div></td></tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="d-flex justify-content-between align-items-center mt-2 px-2">
+            <small class="text-muted" id="tableInfo">0 records</small>
+            <nav><ul class="pagination pagination-sm mb-0" id="pagination"></ul></nav>
+        </div>
+    </div>
+    <div class="card-footer d-flex justify-content-between align-items-center">
+        <small class="text-muted" id="inventoryCount">Loading...</small>
+        <small class="text-muted"><i class="bi bi-arrow-clockwise me-1"></i>Auto-refreshes every 30s</small>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+let refreshInterval;
+let items = [];
+let warehouses = [];
+let _inventory = [];
+let paginator = new Paginator({perPage: 25, onPageChange: () => renderInventory(_inventory)});
+
+function statusBadge(status) {
+    const map = {
+        'available': '<span class="badge bg-success">Available</span>',
+        'low_stock': '<span class="badge bg-warning text-dark">Low Stock</span>',
+        'out_of_stock': '<span class="badge bg-danger">Out of Stock</span>',
+        'expired': '<span class="badge bg-dark">Expired</span>'
+    };
+    return map[status] || `<span class="badge bg-secondary">${status}</span>`;
+}
+
+async function loadFormData() {
+    try {
+        const r = await fetch('/api/data');
+        const d = await r.json();
+        if (!d.success) return;
+        warehouses = d.warehouses || [];
+        items = d.items || [];
+
+        const warehouseSel = document.getElementById('filterWarehouse');
+        const printWarehouseSel = document.getElementById('printWarehouse');
+        warehouses.forEach(w => {
+            warehouseSel.innerHTML += `<option value="${w.id}">${w.name}</option>`;
+            printWarehouseSel.innerHTML += `<option value="${w.id}">${w.name}</option>`;
+        });
+
+        const catSel = document.getElementById('filterCategory');
+        (d.categories || []).forEach(c => {
+            catSel.innerHTML += `<option value="${c.id}">${c.name}</option>`;
+        });
+
+        const supSel = document.getElementById('filterSupplier');
+        (d.suppliers || []).forEach(s => {
+            supSel.innerHTML += `<option value="${s.id}">${s.name}</option>`;
+        });
+
+        const itemSel = document.getElementById('filterItem');
+        const printItemSel = document.getElementById('printItem');
+        items.forEach(i => {
+            const label = `${i.name} ${i.item_code ? '('+i.item_code+')' : ''}`;
+            itemSel.innerHTML += `<option value="${i.id}">${label}</option>`;
+            printItemSel.innerHTML += `<option value="${i.id}">${label}</option>`;
+        });
+    } catch (e) { showToast('danger', 'Error loading form data: ' + e.message); }
+}
+
+function renderInventory(data) {
+    const tbody = document.getElementById('inventoryTableBody');
+    if (data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="11" class="text-center py-4 text-muted">No inventory records found</td></tr>';
+        paginator.update(0);
+        return;
+    }
+    const pageData = paginator.getPageData(data);
+    tbody.innerHTML = pageData.map(item => {
+        const expiryIcon = item.expiry_tracking ? '<i class="bi bi-calendar-check text-warning ms-1" title="Expiry tracking enabled"></i>' : '';
+        return `<tr>
+            <td><span class="badge bg-light text-dark">${item.item_code || '-'}</span></td>
+            <td><span class="text-muted small">${item.barcode || '-'}</span></td>
+            <td class="fw-medium">${item.item_name}${expiryIcon}</td>
+            <td>${item.category_name || '-'}</td>
+            <td>${item.warehouse_name || '-'}</td>
+            <td class="text-end fw-bold">${item.available_quantity}</td>
+            <td class="text-end text-muted">${item.reserved_quantity || 0}</td>
+            <td class="text-end">${item.quantity}</td>
+            <td>${item.unit || '-'}</td>
+            <td class="text-end">${item.minimum_stock || 0}</td>
+            <td>${statusBadge(item.status)}</td>
+        </tr>`;
+    }).join('');
+    paginator.update(data.length);
+}
+
+async function loadInventory() {
+    try {
+        const warehouse = document.getElementById('filterWarehouse').value;
+        const category = document.getElementById('filterCategory').value;
+        const supplier = document.getElementById('filterSupplier').value;
+        const fromDate = document.getElementById('filterFromDate').value;
+        const toDate = document.getElementById('filterToDate').value;
+        const status = document.getElementById('filterStatus').value;
+        const search = document.getElementById('filterSearch').value;
+
+        const params = new URLSearchParams();
+        if (warehouse) params.append('warehouse_id', warehouse);
+        if (category) params.append('category_id', category);
+        if (supplier) params.append('supplier_id', supplier);
+        if (fromDate) params.append('from_date', fromDate);
+        if (toDate) params.append('to_date', toDate);
+        if (status) params.append('status', status);
+        if (search) params.append('search', search);
+
+        params.set('grouped', '1');
+        const r = await fetch(`/api/inventory?${params.toString()}`);
+        const d = await r.json();
+        if (!d.success) { showToast('danger', d.message); return; }
+
+        _inventory = d.inventory;
+        renderInventory(_inventory);
+        document.getElementById('inventoryCount').textContent = `Showing ${_inventory.length} record${_inventory.length !== 1 ? 's' : ''}`;
+    } catch (e) { showToast('danger', 'Error loading inventory: ' + e.message); }
+}
+
+async function loadSummary() {
+    try {
+        const r = await fetch('/api/inventory/summary');
+        const d = await r.json();
+        if (!d.success) return;
+        document.getElementById('totalItems').textContent = d.total_items;
+        document.getElementById('totalStock').textContent = d.total_stock;
+        document.getElementById('lowStockCount').textContent = d.low_stock;
+        document.getElementById('outOfStockCount').textContent = d.out_of_stock;
+        document.getElementById('expiringCount').textContent = d.expiring_count;
+    } catch (e) { showToast('danger', 'Error loading summary: ' + e.message); }
+}
+
+let searchTimeout;
+function debounceSearch() {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(loadInventory, 400);
+}
+
+function printBinCard() {
+    const itemId = document.getElementById('printItem').value;
+    const warehouseId = document.getElementById('printWarehouse').value;
+    if (!itemId || !warehouseId) {
+        showToast('warning', 'Please select both an item and a warehouse to print bin card');
+        return;
+    }
+    window.open(`/api/inventory/bin-card?item_id=${itemId}&warehouse_id=${warehouseId}`, '_blank');
+}
+
+function printStockBook() {
+    const warehouseId = document.getElementById('printWarehouse').value;
+    if (!warehouseId) {
+        showToast('warning', 'Please select a warehouse to print stock book');
+        return;
+    }
+    const fromDate = document.getElementById('stockBookFrom').value;
+    const toDate = document.getElementById('stockBookTo').value;
+    let url = `/api/inventory/stock-book?warehouse_id=${warehouseId}`;
+    if (fromDate) url += `&from_date=${fromDate}`;
+    if (toDate) url += `&to_date=${toDate}`;
+    window.open(url, '_blank');
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    loadFormData();
+    loadInventory();
+    loadSummary();
+    refreshInterval = setInterval(() => {
+        loadInventory();
+        loadSummary();
+    }, 30000);
+});
+</script>
+{% endblock %}

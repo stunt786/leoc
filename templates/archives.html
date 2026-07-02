@@ -1,0 +1,208 @@
+{% extends "base.html" %}
+{% block title %}Archives - LEOC{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('index') }}"><i class="bi bi-house-fill"></i></a></li>
+<li class="breadcrumb-item">Analytics</li>
+<li class="breadcrumb-item active">Archives</li>
+{% endblock %}
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center">
+    <div>
+        <h4><i class="bi bi-archive-fill me-2"></i>Document Archives</h4>
+        <p>Upload and manage important documents (PDFs, images, etc.)</p>
+    </div>
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#archiveModal" onclick="resetArchiveForm()">
+        <i class="bi bi-upload me-1"></i>Upload Document
+    </button>
+</div>
+
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-list-check me-2 text-primary"></i>All Documents</span>
+        <input type="text" class="form-control form-control-sm" style="width:200px" id="archiveSearch" placeholder="Search..." oninput="filterArchives()">
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Document Name</th>
+                        <th>Remarks</th>
+                        <th>File</th>
+                        <th>Uploaded At</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="archiveTableBody">
+                    <tr><td colspan="5" class="text-center py-4"><div class="spinner-border text-primary"></div></td></tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="d-flex justify-content-between align-items-center mt-2 px-2">
+            <small class="text-muted" id="tableInfo">0 records</small>
+            <nav><ul class="pagination pagination-sm mb-0" id="pagination"></ul></nav>
+        </div>
+    </div>
+</div>
+
+<!-- Archive Modal -->
+<div class="modal fade" id="archiveModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="archiveModalTitle"><i class="bi bi-archive-fill me-2"></i>Upload Document</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="archiveForm">
+                    <input type="hidden" id="arch_id">
+                    <div class="mb-3">
+                        <label class="form-label">Document Name *</label>
+                        <input type="text" class="form-control" id="arch_document_name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Remarks</label>
+                        <textarea class="form-control" id="arch_remarks" rows="3"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">File * (PDF, JPG, PNG, GIF, WEBP, BMP, TIFF)</label>
+                        <input type="file" class="form-control" id="arch_file" accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.bmp,.tiff,.tif">
+                        <div id="arch_current_file" class="mt-1 small text-muted"></div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveArchive()"><i class="bi bi-check-lg"></i> Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+let archives = [];
+let paginator = new Paginator({perPage: 25, onPageChange: () => renderArchives(archives)});
+
+async function loadArchives() {
+    const r = await fetch('/api/archives');
+    const d = await r.json();
+    if (!d.success) { showToast('danger', d.message); return; }
+    archives = d.documents;
+    renderArchives(archives);
+}
+
+function renderArchives(data) {
+    const tbody = document.getElementById('archiveTableBody');
+    if (data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-muted">No documents found</td></tr>';
+        paginator.update(0);
+        return;
+    }
+    const pageData = paginator.getPageData(data);
+    tbody.innerHTML = pageData.map(d => {
+        const ext = (d.file_type || '').toLowerCase();
+        const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'tiff', 'tif'].includes(ext);
+        const previewUrl = `/uploads/${d.filename}`;
+        const fileIcon = isImage ? '<i class="bi bi-file-image"></i>' : '<i class="bi bi-file-pdf"></i>';
+        const fileSize = d.file_size ? (d.file_size < 1024 * 1024 ? (d.file_size / 1024).toFixed(1) + ' KB' : (d.file_size / (1024 * 1024)).toFixed(1) + ' MB') : '-';
+        return `<tr>
+            <td><strong>${d.document_name}</strong></td>
+            <td>${d.remarks || '-'}</td>
+            <td><a href="${previewUrl}" target="_blank" class="btn btn-sm btn-outline-info">${fileIcon} ${fileSize}</a></td>
+            <td>${d.uploaded_at || '-'}</td>
+            <td class="text-end">
+                <button class="btn btn-sm btn-outline-success" onclick="viewArchive('${previewUrl}')" title="View"><i class="bi bi-eye"></i></button>
+                <button class="btn btn-sm btn-outline-primary" onclick="editArchive(${d.id})" title="Edit"><i class="bi bi-pencil"></i></button>
+                <button class="btn btn-sm btn-outline-danger" onclick="deleteArchive(${d.id})" title="Delete"><i class="bi bi-trash"></i></button>
+            </td>
+        </tr>`;
+    }).join('');
+    paginator.update(data.length);
+}
+
+function viewArchive(url) {
+    window.open(url, '_blank');
+}
+
+function filterArchives() {
+    const q = document.getElementById('archiveSearch').value.toLowerCase();
+    const filtered = archives.filter(d =>
+        d.document_name.toLowerCase().includes(q) ||
+        (d.remarks && d.remarks.toLowerCase().includes(q))
+    );
+    if (paginator) paginator.currentPage = 1;
+    renderArchives(filtered);
+}
+
+function resetArchiveForm() {
+    document.getElementById('archiveModalTitle').textContent = 'Upload Document';
+    document.getElementById('arch_id').value = '';
+    document.getElementById('archiveForm').reset();
+    document.getElementById('arch_current_file').textContent = '';
+    document.getElementById('arch_file').required = true;
+}
+
+async function editArchive(id) {
+    const d = archives.find(x => x.id === id);
+    if (!d) return;
+    document.getElementById('archiveModalTitle').textContent = 'Edit Document';
+    document.getElementById('arch_id').value = d.id;
+    document.getElementById('arch_document_name').value = d.document_name;
+    document.getElementById('arch_remarks').value = d.remarks || '';
+    document.getElementById('arch_file').required = false;
+    document.getElementById('arch_current_file').textContent = 'Current: ' + (d.original_name || d.filename);
+    new bootstrap.Modal(document.getElementById('archiveModal')).show();
+}
+
+async function saveArchive() {
+    const id = document.getElementById('arch_id').value;
+    const document_name = document.getElementById('arch_document_name').value.trim();
+    const remarks = document.getElementById('arch_remarks').value.trim();
+    const fileInput = document.getElementById('arch_file');
+
+    if (!document_name) { showToast('danger', 'Document name is required'); return; }
+    if (!id && !fileInput.files.length) { showToast('danger', 'Please select a file to upload'); return; }
+
+    const formData = new FormData();
+    formData.append('document_name', document_name);
+    formData.append('remarks', remarks);
+    if (fileInput.files.length) {
+        formData.append('file', fileInput.files[0]);
+    }
+
+    const url = id ? '/api/archives/' + id : '/api/archives';
+    const method = id ? 'PUT' : 'POST';
+
+    try {
+        const r = await fetch(url, { method, headers: { 'X-CSRFToken': csrf }, body: formData });
+        const d = await r.json();
+        if (d.success) {
+            showToast('success', id ? 'Document updated' : 'Document uploaded');
+            bootstrap.Modal.getInstance(document.getElementById('archiveModal')).hide();
+            loadArchives();
+        } else {
+            showToast('danger', d.message);
+        }
+    } catch (e) {
+        showToast('danger', 'An error occurred');
+    }
+}
+
+async function deleteArchive(id) {
+    if (!confirm('Delete this document? This action cannot be undone.')) return;
+    try {
+        const r = await fetch('/api/archives/' + id, { method: 'DELETE', headers: { 'X-CSRFToken': csrf } });
+        const d = await r.json();
+        if (d.success) { showToast('success', 'Document deleted'); loadArchives(); }
+        else showToast('danger', d.message);
+    } catch (e) {
+        showToast('danger', 'An error occurred');
+    }
+}
+
+document.addEventListener('DOMContentLoaded', loadArchives);
+</script>
+{% endblock %}

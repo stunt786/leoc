@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="ne">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Relief Request - LEOC</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        @font-face {
+            font-family: 'Noto Sans';
+            src: url('/static/fonts/NotoSans-Regular.ttf') format('truetype');
+            font-weight: 400;
+            font-style: normal;
+            font-display: swap;
+        }
+        @font-face {
+            font-family: 'Noto Sans';
+            src: url('/static/fonts/NotoSans-Bold.ttf') format('truetype');
+            font-weight: 700;
+            font-style: normal;
+            font-display: swap;
+        }
+        @font-face {
+            font-family: 'Kokila';
+            src: url('/static/fonts/Kokila-Regular.ttf') format('truetype');
+            font-weight: 400;
+            font-style: normal;
+            font-display: swap;
+        }
+        @font-face {
+            font-family: 'Kokila';
+            src: url('/static/fonts/Kokila-Regular.ttf') format('truetype');
+            font-weight: 700;
+            font-style: normal;
+            font-display: swap;
+        }
+        body { font-family: 'Noto Sans', 'Kokila', 'Noto Sans Devanagari', 'Inter', sans-serif; padding: 20px; font-size: 12px; }
+        @media print { body { padding: 0; } .no-print { display: none !important; } }
+        .header { text-align: center; margin-bottom: 20px; }
+        .header h3 { margin-bottom: 2px; }
+        .header h5 { color: #2c5282; }
+        table { font-size: 11px; }
+        .footer { text-align: center; margin-top: 20px; font-size: 10px; color: #666; }
+        .field-label { font-weight: 600; color: #495057; }
+    </style>
+</head>
+<body>
+    <div class="no-print mb-3">
+        <button class="btn btn-primary btn-sm" onclick="window.print()"><i class="bi bi-printer"></i> Print</button>
+    </div>
+
+    <div class="header">
+        {% if report_header %}
+        {% for line in report_header.strip().split('\n') %}
+        {% set l = line.strip() %}
+        {% if l %}
+        {% if loop.first %}<h3>{{ l }}</h3>{% else %}<h5>{{ l }}</h5>{% endif %}
+        {% endif %}
+        {% endfor %}
+        {% else %}
+        <h3>{{ office or 'थलारा गाउँपालिका' }}</h3>
+        <h5>स्थानीय आपतकालिन कार्यसञ्चालन केन्द्र (LEOC)</h5>
+        {% endif %}
+        <h4>राहत अनुरोध (Relief Request)</h4>
+        <p class="text-muted">{{ address }}</p>
+    </div>
+
+    <div class="row mb-3">
+        <div class="col-6">
+            <table class="table table-sm table-borderless">
+                <tr><td class="field-label">Request Number:</td><td>{{ req.request_number }}</td></tr>
+                <tr><td class="field-label">Date:</td><td>{{ req.request_date|nepali_date if req.request_date else '' }}</td></tr>
+                <tr><td class="field-label">Incident:</td><td>{{ req.incident.incident_name if req.incident else '' }}</td></tr>
+                <tr><td class="field-label">Organization:</td><td>{{ req.organization or '' }}</td></tr>
+            </table>
+        </div>
+        <div class="col-6">
+            <table class="table table-sm table-borderless">
+                <tr><td class="field-label">Requester Name:</td><td>{{ req.requester_name or '' }}</td></tr>
+                <tr><td class="field-label">Phone:</td><td>{{ req.phone or '' }}</td></tr>
+                <tr><td class="field-label">Priority:</td><td>{{ req.priority }}</td></tr>
+                <tr><td class="field-label">Status:</td><td>{{ req.status }}</td></tr>
+            </table>
+        </div>
+    </div>
+
+    <div class="row mb-3">
+        <div class="col-6">
+            <table class="table table-sm table-borderless">
+                <tr><td class="field-label">Cash Amount:</td><td>{{ "%.2f"|format(req.requested_cash_amount) if req.requested_cash_amount else '0.00' }}</td></tr>
+            </table>
+        </div>
+        <div class="col-6">
+            <table class="table table-sm table-borderless">
+                <tr><td class="field-label">Cash Purpose:</td><td>{{ req.cash_purpose or '' }}</td></tr>
+            </table>
+        </div>
+    </div>
+
+    <table class="table table-bordered table-sm">
+        <thead class="table-dark">
+            <tr>
+                <th>#</th>
+                <th>Item</th>
+                <th>Quantity Requested</th>
+                <th>Quantity Dispatched</th>
+                <th>Unit</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in req.items %}
+            <tr>
+                <td>{{ loop.index }}</td>
+                <td>{{ item.item.name }}</td>
+                <td>{{ item.quantity_requested }}</td>
+                <td>{{ item.quantity_dispatched }}</td>
+                <td>{{ item.unit or item.item.unit }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    {% if req.remarks %}
+    <div class="mb-3">
+        <strong>Remarks:</strong> {{ req.remarks }}
+    </div>
+    {% endif %}
+
+    <div class="footer">
+        <p>Generated on {{ req.created_at|nepali_date if req.created_at else '' }} | {{ office or 'थलारा गाउँपालिका' }} - LEOC</p>
+    </div>
+</body>
+</html>

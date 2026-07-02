@@ -1,4 +1,22 @@
 services:
+  leoc-db:
+    image: postgres:16-alpine
+    container_name: leoc-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: leoc
+      POSTGRES_USER: leoc
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - leoc_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U leoc"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   leoc-app:
     build: .
     image: leoc-app:latest
@@ -7,18 +25,33 @@ services:
     ports:
       - "5002:5002"
     volumes:
-      - ./instance:/app/instance
-      - ./static/uploads:/app/static/uploads
-      - ./:/app  # Mount the entire app directory
+      - upload_data:/app/static/uploads
+      - backup_data:/app/backups
     environment:
       - FLASK_ENV=production
-      - SECRET_KEY=${SECRET_KEY:-your-default-secret-key}
-      - SQLALCHEMY_DATABASE_URI=sqlite:////app/instance/leoc.db
-      - UPLOAD_FOLDER=/app/static/uploads
-      - CACHE_TIMEOUT=300
+      - FLASK_DEBUG=False
+      - SQLALCHEMY_DATABASE_URI=postgresql://leoc:${DB_PASSWORD}@leoc-db:5432/leoc
+    depends_on:
+      leoc-db:
+        condition: service_healthy
     env_file:
       - .env
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5002/login"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
 
 volumes:
-  instance:
-  uploads:
+  leoc_db_data:
+  upload_data:
+    driver_opts:
+      type: none
+      device: ${APP_DIR:-/home/thalaramun/leoc}/static/uploads
+      o: bind
+  backup_data:
+    driver_opts:
+      type: none
+      device: ${APP_DIR:-/home/thalaramun/leoc}/backups
+      o: bind

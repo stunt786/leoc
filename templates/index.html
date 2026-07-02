@@ -1,303 +1,1725 @@
 {% extends "base.html" %}
-
-{% block title %}ड्यासबोर्ड - LEOC{% endblock %}
-
+{% block title %}Dashboard - LEOC{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('index') }}"><i class="bi bi-house-fill"></i></a></li>
+<li class="breadcrumb-item active">Dashboard</li>
+{% endblock %}
 {% block content %}
-<div class="container-fluid py-4">
-    <!-- Header -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <h1 class="display-6 fw-bold mb-2">
-                <i class="bi bi-graph-up"></i> राहात वितरण ड्यासबोर्ड
-            </h1>
-            <p class="text-muted">आपतकालीन राहत वितरणको अनुगमन र व्यवस्थापन</p>
-        </div>
+<div class="page-header d-flex justify-content-between align-items-center">
+    <div>
+        <h4><i class="bi bi-grid-1x2-fill me-2"></i>Dashboard</h4>
+        <p>Real-time overview of operations</p>
     </div>
+    <div class="d-flex align-items-center gap-2">
+        <label class="form-label mb-0 text-muted small">View:</label>
+        <select class="form-select form-select-sm" style="width:auto" id="dashboardView" onchange="switchDashboardView()">
+            <option value="overview">General Overview</option>
+            <option value="relief">Relief Dashboard</option>
+            <option value="incident">Incident Dashboard</option>
+            <option value="gis">GIS</option>
+        </select>
+    </div>
+</div>
 
-    <!-- Statistics Cards -->
-    <div class="row mb-4 g-3">
-        <div class="col-md-6 col-lg-3 mb-3">
-            <div class="card stat-card shadow-sm h-100"
-                style="background: linear-gradient(135deg, #00d2ff 0%, #3a7bd5 100%); color: white;">
-                <div class="card-body text-center py-4">
-                    <i class="bi bi-box-seam mb-2" style="font-size: 2rem;"></i>
-                    <h2 class="display-6 fw-bold mb-0" id="total-distributions">0</h2>
-                    <p class="mb-0 opacity-75">जम्मा वितरण (Total)</p>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-6 col-lg-3 mb-3">
-            <div class="card stat-card shadow-sm h-100"
-                style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); color: #004d40;">
-                <div class="card-body text-center py-4">
-                    <i class="bi bi-bag-check mb-2" style="font-size: 2rem;"></i>
-                    <h2 class="display-6 fw-bold mb-0" id="total-items">0</h2>
-                    <p class="mb-0 opacity-75">जम्मा वस्तु (Items)</p>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-6 col-lg-3 mb-3">
-            <div class="card stat-card shadow-sm h-100"
-                style="background: linear-gradient(135deg, #f6d365 0%, #fda085 100%); color: #4a5568;">
-                <div class="card-body text-center py-4">
-                    <i class="bi bi-cash-coin mb-2" style="font-size: 2rem;"></i>
-                    <h2 class="display-6 fw-bold mb-0" id="total-cash">₹0</h2>
-                    <p class="mb-0 opacity-75">जम्मा रकम (Cash)</p>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-6 col-lg-3 mb-3">
-            <div class="card stat-card shadow-sm h-100"
-                style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white;">
-                <div class="card-body text-center py-4">
-                    <i class="bi bi-people mb-2" style="font-size: 2rem;"></i>
-                    <h2 class="display-6 fw-bold mb-0" id="total-beneficiaries">0</h2>
-                    <p class="mb-0 opacity-75">लाभग्राहि (Users)</p>
-                </div>
+<div id="overviewDashboard">
+<div class="row g-3 mb-4" id="statCards">
+    <div class="col-md-3 col-6">
+        <div class="stat-card stat-card-primary">
+            <div class="stat-icon"><i class="bi bi-box-seam"></i></div>
+            <div class="stat-content">
+                <div class="stat-label">Total Items</div>
+                <div class="stat-value" id="totalItems">0</div>
             </div>
         </div>
     </div>
-
-    <!-- Charts Row -->
-    <div class="row mb-4">
-        <div class="col-lg-4 mb-4">
-            <div class="card chart-card">
-                <div class="card-header bg-primary text-white">
-                    <h5 class="mb-0"><i class="bi bi-pie-chart"></i> सामाग्री वितरण</h5>
-                </div>
-                <div class="card-body">
-                    <canvas id="itemsChart"></canvas>
-                </div>
-            </div>
-        </div>
-        <div class="col-lg-4 mb-4">
-            <div class="card chart-card">
-                <div class="card-header bg-success text-white">
-                    <h5 class="mb-0"><i class="bi bi-bar-chart"></i> वडा अनुसार विवरण</h5>
-                </div>
-                <div class="card-body">
-                    <canvas id="wardsChart"></canvas>
-                </div>
-            </div>
-        </div>
-        <div class="col-lg-4 mb-4">
-            <div class="card chart-card">
-                <div class="card-header bg-warning text-white">
-                    <h5 class="mb-0"><i class="bi bi-calendar"></i> आ.ब अनुसार विवरण</h5>
-                </div>
-                <div class="card-body">
-                    <canvas id="fiscalYearChart"></canvas>
-                </div>
+    <div class="col-md-3 col-6">
+        <div class="stat-card stat-card-success">
+            <div class="stat-icon"><i class="bi bi-cubes"></i></div>
+            <div class="stat-content">
+                <div class="stat-label">Current Stock</div>
+                <div class="stat-value" id="totalStock">0</div>
             </div>
         </div>
     </div>
+    <div class="col-md-3 col-6">
+        <div class="stat-card stat-card-warning">
+            <div class="stat-icon"><i class="bi bi-exclamation-triangle"></i></div>
+            <div class="stat-content">
+                <div class="stat-label">Low Stock</div>
+                <div class="stat-value" id="lowStock">0</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6">
+        <div class="stat-card stat-card-danger">
+            <div class="stat-icon"><i class="bi bi-x-circle"></i></div>
+            <div class="stat-content">
+                <div class="stat-label">Out of Stock</div>
+                <div class="stat-value" id="outOfStock">0</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6">
+        <div class="stat-card stat-card-warning">
+            <div class="stat-icon"><i class="bi bi-calendar-exclamation"></i></div>
+            <div class="stat-content">
+                <div class="stat-label">Expiring Soon</div>
+                <div class="stat-value" id="expiringCount">0</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6">
+        <div class="stat-card stat-card-danger">
+            <div class="stat-icon"><i class="bi bi-lightning-charge"></i></div>
+            <div class="stat-content">
+                <div class="stat-label">Active Incidents</div>
+                <div class="stat-value" id="activeIncidents">0</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6">
+        <div class="stat-card stat-card-warning">
+            <div class="stat-icon"><i class="bi bi-send"></i></div>
+            <div class="stat-content">
+                <div class="stat-label">Pending Requests</div>
+                <div class="stat-value" id="pendingRequests">0</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6">
+        <div class="stat-card stat-card-info">
+            <div class="stat-icon"><i class="bi bi-truck"></i></div>
+            <div class="stat-content">
+                <div class="stat-label">Today's Dispatch</div>
+                <div class="stat-value" id="todaysDispatch">0</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6">
+        <div class="stat-card stat-card-success">
+            <div class="stat-icon"><i class="bi bi-people"></i></div>
+            <div class="stat-content">
+                <div class="stat-label">Today's Distribution</div>
+                <div class="stat-value" id="todaysDistribution">0</div>
+            </div>
+        </div>
+    </div>
+</div>
 
-    <!-- GIS Map Row -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="card shadow-sm">
-                <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0"><i class="bi bi-geo-alt"></i> विपद् र राहात GIS नक्सा</h5>
-                    <div class="btn-group">
-                        <button class="btn btn-sm btn-outline-light"
-                            onclick="document.getElementById('map-iframe').src = '/map'">
-                            <i class="bi bi-arrow-clockwise"></i> रिफ्रेस
-                        </button>
-                        <a href="/map" target="_blank" class="btn btn-sm btn-outline-info">
-                            <i class="bi bi-arrows-fullscreen"></i> नक्सा ठूलो पार्नुहोस्
-                        </a>
+<div class="row g-3 mb-4">
+    <div class="col-md-3 col-6">
+        <div class="stat-card stat-card-info">
+            <div class="stat-icon"><i class="bi bi-wallet2"></i></div>
+            <div class="stat-content">
+                <div class="stat-label">Cash Balance</div>
+                <div class="stat-value" id="cashBalance">0</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6">
+        <div class="stat-card stat-card-success">
+            <div class="stat-icon"><i class="bi bi-cash-stack"></i></div>
+            <div class="stat-content">
+                <div class="stat-label">Total Cash Distributed</div>
+                <div class="stat-value" id="totalCashDistributed">0</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6">
+        <div class="stat-card stat-card-warning">
+            <div class="stat-icon"><i class="bi bi-send-exclamation"></i></div>
+            <div class="stat-content">
+                <div class="stat-label">Pending Cash Req.</div>
+                <div class="stat-value" id="pendingCashRequests">0</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6">
+        <div class="stat-card stat-card-primary">
+            <div class="stat-icon"><i class="bi bi-calendar-check"></i></div>
+            <div class="stat-content">
+                <div class="stat-label">Cash This Month</div>
+                <div class="stat-value" id="cashThisMonth">0</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header">
+                <span><i class="bi bi-pie-chart-fill me-2 text-primary"></i>Stock by Category</span>
+            </div>
+            <div class="card-body">
+                <div class="row g-2 align-items-start">
+                    <div class="col-6">
+                        <div class="chart-container"><canvas id="categoryChart"></canvas></div>
                     </div>
+                    <div class="col-6">
+                        <ul id="categoryLabels" class="list-unstyled mb-0 category-labels"></ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header">
+                <span><i class="bi bi-bar-chart-fill me-2 text-warning"></i>Low Stock Items</span>
+            </div>
+            <div class="card-body">
+                <div class="chart-container"><canvas id="lowStockChart"></canvas></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-header">
+                <span><i class="bi bi-clipboard-check me-2 text-success"></i>Latest Receipts</span>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr><th>Receipt No</th><th>Date</th><th>Source</th><th>Items</th></tr>
+                        </thead>
+                        <tbody id="recentReceiptsBody">
+                            <tr><td colspan="4" class="text-center py-3"><span class="spinner-border spinner-border-sm"></span> Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-header">
+                <span><i class="bi bi-truck me-2 text-info"></i>Latest Dispatches</span>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr><th>Dispatch No</th><th>Date</th><th>Destination</th></tr>
+                        </thead>
+                        <tbody id="recentDispatchesBody">
+                            <tr><td colspan="3" class="text-center py-3"><span class="spinner-border spinner-border-sm"></span> Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-header">
+                <span><i class="bi bi-send me-2 text-warning"></i>Latest Requests</span>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr><th>Request No</th><th>Incident</th><th>Priority</th><th>Status</th></tr>
+                        </thead>
+                        <tbody id="recentRequestsBody">
+                            <tr><td colspan="4" class="text-center py-3"><span class="spinner-border spinner-border-sm"></span> Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+
+<div id="reliefDashboard" style="display:none">
+    <div class="relief-filters mb-4">
+        <div class="row g-2 align-items-end">
+            <div class="col-md-3 col-6">
+                <label class="form-label mb-1 small text-muted">Fiscal Year</label>
+                <select class="form-select form-select-sm" id="reliefFiscalYear" onchange="loadReliefDashboard()">
+                    <option value="">All Fiscal Years</option>
+                </select>
+            </div>
+            <div class="col-md-3 col-6">
+                <label class="form-label mb-1 small text-muted">Ward</label>
+                <select class="form-select form-select-sm" id="reliefWard" onchange="loadReliefDashboard()">
+                    <option value="">All Wards</option>
+                </select>
+            </div>
+            <div class="col-md-3 col-6">
+                <label class="form-label mb-1 small text-muted">Incident Type</label>
+                <select class="form-select form-select-sm" id="reliefIncidentType" onchange="loadReliefDashboard()">
+                    <option value="">All Types</option>
+                </select>
+            </div>
+            <div class="col-md-3 col-6 d-flex align-items-end gap-2">
+                <button class="btn btn-outline-primary btn-sm flex-grow-1" onclick="loadReliefDashboard()"><i class="bi bi-funnel me-1"></i>Apply Filters</button>
+                <button class="btn btn-outline-secondary btn-sm" onclick="resetReliefFilters()"><i class="bi bi-arrow-counterclockwise"></i></button>
+            </div>
+        </div>
+    </div>
+    <div class="row g-3 mb-4" id="reliefStatCards">
+        <div class="col-md-3 col-6">
+            <div class="stat-card stat-card-primary">
+                <div class="stat-icon"><i class="bi bi-box-seam"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">Total Distributions</div>
+                    <div class="stat-value" id="reliefTotalDistributions">0</div>
+                    <div class="stat-sub small text-muted mt-1">Material: 0 | Cash: 0</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="stat-card stat-card-success">
+                <div class="stat-icon"><i class="bi bi-cubes"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">Total Items Distributed</div>
+                    <div class="stat-value" id="reliefTotalItems">0</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="stat-card stat-card-info">
+                <div class="stat-icon"><i class="bi bi-people"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">Total Beneficiaries</div>
+                    <div class="stat-value" id="reliefTotalBeneficiaries">0</div>
+                    <div class="stat-sub small text-muted mt-1">Material: 0 | Cash: 0</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="stat-card stat-card-warning">
+                <div class="stat-icon"><i class="bi bi-cash-stack"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">Total Cash Distributed</div>
+                    <div class="stat-value" id="reliefTotalCash">0</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="stat-card" style="border-left:4px solid #06b6d4">
+                <div class="stat-icon"><i class="bi bi-cash-coin text-cyan"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">Total Cash Received</div>
+                    <div class="stat-value" id="reliefTotalCashReceived">0</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header">
+                    <span><i class="bi bi-bar-chart-fill me-2 text-primary"></i>Distributed Items</span>
+                </div>
+                <div class="card-body">
+                    <div class="row g-2 align-items-start">
+                        <div class="col-6">
+                            <div class="chart-container"><canvas id="reliefItemsChart"></canvas></div>
+                        </div>
+                        <div class="col-6">
+                            <ul id="reliefItemsLabels" class="list-unstyled mb-0 category-labels"></ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header">
+                    <span><i class="bi bi-bar-chart-fill me-2 text-success"></i>Distributions by Ward</span>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container"><canvas id="reliefWardChart"></canvas></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-12">
+            <div class="card h-100">
+                <div class="card-header">
+                    <span><i class="bi bi-bar-chart-fill me-2 text-info"></i>Distributions by Fiscal Year</span>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container"><canvas id="reliefFiscalYearChart"></canvas></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-map me-2 text-danger"></i>GIS Map - Incidents & Relief Distribution</span>
+            <button class="btn btn-sm btn-outline-secondary" onclick="toggleMapFullscreen()" id="fullscreenBtn" title="Full Screen">
+                <i class="bi bi-arrows-fullscreen"></i>
+            </button>
+        </div>
+        <div class="card-body p-0" id="mapContainer">
+            <div id="reliefMap" style="height:500px;width:100%;border-radius:0 0 var(--bs-card-border-radius) var(--bs-card-border-radius)"></div>
+        </div>
+    </div>
+</div>
+
+<div id="incidentDashboard" style="display:none">
+    <div class="incident-filters mb-4">
+        <div class="row g-2 align-items-end">
+            <div class="col-md-3 col-6">
+                <label class="form-label mb-1 small text-muted">Fiscal Year</label>
+                <select class="form-select form-select-sm" id="incidentFiscalYear" onchange="loadIncidentDashboard()">
+                    <option value="">All Fiscal Years</option>
+                </select>
+            </div>
+            <div class="col-md-3 col-6">
+                <label class="form-label mb-1 small text-muted">Ward</label>
+                <select class="form-select form-select-sm" id="incidentWard" onchange="loadIncidentDashboard()">
+                    <option value="">All Wards</option>
+                </select>
+            </div>
+            <div class="col-md-3 col-6">
+                <label class="form-label mb-1 small text-muted">Disaster Type</label>
+                <select class="form-select form-select-sm" id="incidentType" onchange="loadIncidentDashboard()">
+                    <option value="">All Types</option>
+                </select>
+            </div>
+            <div class="col-md-3 col-6 d-flex align-items-end gap-2">
+                <button class="btn btn-outline-primary btn-sm flex-grow-1" onclick="loadIncidentDashboard()"><i class="bi bi-funnel me-1"></i>Apply Filters</button>
+                <button class="btn btn-outline-secondary btn-sm" onclick="resetIncidentFilters()"><i class="bi bi-arrow-counterclockwise"></i></button>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-12">
+            <h6 class="section-label"><i class="bi bi-clipboard-data me-2"></i>Overview</h6>
+        </div>
+        <div class="col-md-2 col-4 col-6">
+            <div class="stat-card stat-card-primary">
+                <div class="stat-icon"><i class="bi bi-lightning-charge"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">Total Incidents</div>
+                    <div class="stat-value" id="incTotalIncidents">0</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2 col-4 col-6">
+            <div class="stat-card stat-card-danger">
+                <div class="stat-icon"><i class="bi bi-exclamation-triangle"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">Active</div>
+                    <div class="stat-value" id="incActiveIncidents">0</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2 col-4 col-6">
+            <div class="stat-card stat-card-info">
+                <div class="stat-icon"><i class="bi bi-geo-alt"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">Affected Wards</div>
+                    <div class="stat-value" id="incAffectedWards">0</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="stat-card stat-card-warning">
+                <div class="stat-icon"><i class="bi bi-people"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">Affected People</div>
+                    <div class="stat-value" id="incAffectedPeople">0</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="stat-card" style="border-left:4px solid #8b5cf6">
+                <div class="stat-icon" style="background:rgba(139,92,246,0.1);color:#8b5cf6"><i class="bi bi-house-door"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">Households</div>
+                    <div class="stat-value" id="incHouseholds">0</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-12">
+            <h6 class="section-label"><i class="bi bi-heart-pulse me-2"></i>Human Impact</h6>
+        </div>
+        <div class="col-md-4 col-6">
+            <div class="stat-card stat-card-danger">
+                <div class="stat-icon"><i class="bi bi-x-circle"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">Deaths</div>
+                    <div class="stat-value" id="incDeaths">0</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 col-6">
+            <div class="stat-card stat-card-warning">
+                <div class="stat-icon"><i class="bi bi-bandage"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">Injured</div>
+                    <div class="stat-value" id="incInjured">0</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 col-6">
+            <div class="stat-card stat-card-info">
+                <div class="stat-icon"><i class="bi bi-person-x"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">Missing</div>
+                    <div class="stat-value" id="incMissing">0</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-12">
+            <h6 class="section-label"><i class="bi bi-building me-2"></i>Houses &amp; Buildings</h6>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="stat-card stat-card-danger">
+                <div class="stat-icon"><i class="bi bi-house-x"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">Houses Destroyed</div>
+                    <div class="stat-value" id="incHousesDestroyed">0</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="stat-card stat-card-warning">
+                <div class="stat-icon"><i class="bi bi-house-damage"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">Houses Damaged</div>
+                    <div class="stat-value" id="incHousesDamaged">0</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="stat-card stat-card-danger">
+                <div class="stat-icon"><i class="bi bi-bank"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">Pub. Bldgs Destroyed</div>
+                    <div class="stat-value" id="incPubBldgDestroyed">0</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="stat-card stat-card-warning">
+                <div class="stat-icon"><i class="bi bi-bank"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">Pub. Bldgs Damaged</div>
+                    <div class="stat-value" id="incPubBldgDamaged">0</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-12">
+            <h6 class="section-label"><i class="bi bi-piggy-bank me-2"></i>Fund &amp; Estimated Loss</h6>
+        </div>
+        <div class="col-md-6">
+            <div class="stat-card stat-card-info">
+                <div class="stat-icon"><i class="bi bi-currency-rupee"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">Estimated Loss (NPR)</div>
+                    <div class="stat-value" id="incEstimatedLoss">0</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="stat-card stat-card-warning">
+                <div class="stat-icon"><i class="bi bi-tree"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">Crop Damage</div>
+                    <div class="stat-value" id="incCropDamage">0</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="stat-card" style="border-left:4px solid #14b8a6">
+                <div class="stat-icon" style="background:rgba(20,184,166,0.1);color:#14b8a6"><i class="bi bi-water"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">Agriculture Impact</div>
+                    <div class="stat-value" id="incAgricultureImpact">0</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-12">
+            <h6 class="section-label"><i class="bi bi-github me-2"></i>Livestock Impact</h6>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="stat-card stat-card-warning">
+                <div class="stat-icon"><i class="bi bi-github"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">Cattle</div>
+                    <div class="stat-value" id="incCattleTotal">0</div>
+                    <div class="stat-sub small text-muted mt-1">Lost: <span id="incCattleLost">0</span> | Injured: <span id="incCattleInjured">0</span></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="stat-card" style="border-left:4px solid #f97316">
+                <div class="stat-icon" style="background:rgba(249,115,22,0.1);color:#f97316"><i class="bi bi-egg"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">Poultry</div>
+                    <div class="stat-value" id="incPoultryTotal">0</div>
+                    <div class="stat-sub small text-muted mt-1">Lost: <span id="incPoultryLost">0</span> | Injured: <span id="incPoultryInjured">0</span></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="stat-card" style="border-left:4px solid #14b8a6">
+                <div class="stat-icon" style="background:rgba(20,184,166,0.1);color:#14b8a6"><i class="bi bi-gitlab"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">Goats/Sheep</div>
+                    <div class="stat-value" id="incGoatsTotal">0</div>
+                    <div class="stat-sub small text-muted mt-1">Lost: <span id="incGoatsLost">0</span> | Injured: <span id="incGoatsInjured">0</span></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="stat-card" style="border-left:4px solid #8b5cf6">
+                <div class="stat-icon" style="background:rgba(139,92,246,0.1);color:#8b5cf6"><i class="bi bi-archive"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">Other Livestock</div>
+                    <div class="stat-value" id="incOtherTotal">0</div>
+                    <div class="stat-sub small text-muted mt-1">Lost: <span id="incOtherLost">0</span> | Injured: <span id="incOtherInjured">0</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-12">
+            <h6 class="section-label"><i class="bi bi-diagram-3 me-2"></i>Infrastructure Impact</h6>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="stat-card stat-card-danger">
+                <div class="stat-icon"><i class="bi bi-signpost-2"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">Road Blocked</div>
+                    <div class="stat-value" id="incRoadBlocked">0</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="stat-card stat-card-warning">
+                <div class="stat-icon"><i class="bi bi-lightbulb"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">Electricity Blocked</div>
+                    <div class="stat-value" id="incElectricity">0</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="stat-card stat-card-info">
+                <div class="stat-icon"><i class="bi bi-wifi"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">Communication Blocked</div>
+                    <div class="stat-value" id="incCommunication">0</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="stat-card" style="border-left:4px solid #06b6d4">
+                <div class="stat-icon" style="background:rgba(6,182,212,0.1);color:#06b6d4"><i class="bi bi-droplet"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">Water Disrupted</div>
+                    <div class="stat-value" id="incWater">0</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header">
+                    <span><i class="bi bi-pie-chart-fill me-2 text-primary"></i>Incidents by Type</span>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container"><canvas id="incTypeChart"></canvas></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header">
+                    <span><i class="bi bi-bar-chart-fill me-2 text-success"></i>Incidents by Ward</span>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container"><canvas id="incWardChart"></canvas></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header">
+                    <span><i class="bi bi-bar-chart-fill me-2 text-warning"></i>Incidents by Fiscal Year</span>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container"><canvas id="incFiscalYearChart"></canvas></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header">
+                    <span><i class="bi bi-bar-chart-fill me-2 text-danger"></i>Human Impact by Type</span>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container"><canvas id="incHumanImpactChart"></canvas></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header">
+                    <span><i class="bi bi-bar-chart-fill me-2 text-info"></i>Property Damage by Ward</span>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container"><canvas id="incPropertyChart"></canvas></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header">
+                    <span><i class="bi bi-bar-chart-fill me-2" style="color:#f97316"></i>Livestock Impact</span>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container"><canvas id="incLivestockChart"></canvas></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-md-8">
+            <div class="card h-100">
+                <div class="card-header">
+                    <span><i class="bi bi-bar-chart-fill me-2" style="color:#06b6d4"></i>Infrastructure Impact</span>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container"><canvas id="incInfraChart"></canvas></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <span><i class="bi bi-list-check me-2 text-primary"></i>Recent Incidents</span>
                 </div>
                 <div class="card-body p-0">
-                    <div class="map-container">
-                        <iframe id="map-iframe" src="/map" width="100%" height="600px" frameborder="0"></iframe>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Recent Distributions Table -->
-
-    <div class="row">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0"><i class="bi bi-list-check"></i> वितरण विवरण</h5>
-                    <div class="d-flex gap-2">
-                        <div class="dropdown">
-                            <button class="btn btn-sm btn-success dropdown-toggle" type="button" id="exportDropdown"
-                                data-bs-toggle="dropdown" aria-expanded="false">
-                                <i class="bi bi-download"></i> निर्यात गर्नुहोस्
-                            </button>
-                            <ul class="dropdown-menu" aria-labelledby="exportDropdown">
-                                <li><a class="dropdown-item" href="#" onclick="exportFilteredData('xlsx')"><i
-                                            class="bi bi-file-spreadsheet"></i> Excel (XLSX) मा</a></li>
-                                <li><a class="dropdown-item" href="#" onclick="exportFilteredData('pdf')"><i
-                                            class="bi bi-file-pdf"></i> PDF मा</a></li>
-                            </ul>
-                        </div>
-                        <a href="/form" class="btn btn-sm btn-light">
-                            <i class="bi bi-plus-circle"></i> नयाँ थप्नुहोस्
-                        </a>
-                    </div>
-                </div>
-
-                <!-- Filter Controls -->
-                <div class="card-header bg-light py-2">
-                    <div class="row g-2">
-                        <div class="col-md-4">
-                            <label class="form-label text-muted small mb-1">आर्थिक वर्ष</label>
-                            <select id="fiscalYearFilter" class="form-select form-select-sm">
-                                <option value="">सबै आर्थिक वर्ष</option>
-                            </select>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label text-muted small mb-1">विपद्को प्रकार</label>
-                            <select id="disasterTypeFilter" class="form-select form-select-sm">
-                                <option value="">सबै प्रकार</option>
-                            </select>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label text-muted small mb-1">वडा</label>
-                            <select id="wardFilter" class="form-select form-select-sm">
-                                <option value="">सबै वडाहरू</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="row mt-2">
-                        <div class="col-md-12">
-                            <button id="applyFiltersBtn" class="btn btn-sm btn-primary me-2">
-                                <i class="bi bi-funnel"></i> फिल्टर लागू गर्नुहोस्
-                            </button>
-                            <button id="resetFiltersBtn" class="btn btn-sm btn-outline-secondary">
-                                <i class="bi bi-x-circle"></i> रिसेट
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <div class="d-flex align-items-center gap-2">
-                            <label class="form-label text-muted small mb-0">देखाउनुहोस्</label>
-                            <select id="perPageSelector" class="form-select form-select-sm" style="width: auto;">
-                                <option value="10" selected>10</option>
-                                <option value="25">25</option>
-                                <option value="50">50</option>
-                            </select>
-                            <label class="form-label text-muted small mb-0">रेकर्डहरू</label>
-                        </div>
-                        <div id="tableInfo" class="text-muted small">
-                            देखाउँदै: ० - ० को जम्मा ० रेकर्डहरू
-                        </div>
-                    </div>
                     <div class="table-responsive">
-                        <table class="table table-hover" id="distributionsTable">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>लाभग्राहिको नाम थर</th>
-                                    <th>ना.प्र.प्र.नं</th>
-                                    <th>ठेगाना</th>
-                                    <th>राहात सामाग्री</th>
-                                    <th>रकम रु</th>
-                                    <th>मिति</th>
-                                    <th>स्थिति</th>
-                                    <th>कार्य</th>
-                                </tr>
+                        <table class="table table-hover mb-0">
+                            <thead>
+                                <tr><th>Incident</th><th>Type</th><th>Status</th></tr>
                             </thead>
-                            <tbody id="tableBody">
-                                <tr class="text-center" id="emptyRow">
-                                    <td colspan="8" class="py-4">
-                                        <p class="text-muted mb-0">हालसम्म कुनै रेकर्ड फेला परेन। <a href="/form">नयाँ
-                                                थप्नुहोस्</a></p>
-                                    </td>
-                                </tr>
+                            <tbody id="incRecentIncidents">
+                                <tr><td colspan="3" class="text-center py-3"><span class="spinner-border spinner-border-sm"></span> Loading...</td></tr>
                             </tbody>
                         </table>
-
-                        <!-- Pagination Controls -->
-                        <nav aria-label="Table pagination" class="mt-3">
-                            <ul class="pagination justify-content-center" id="paginationControls">
-                                <!-- Pagination will be generated by JavaScript -->
-                            </ul>
-                        </nav>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
-
-<!-- Edit Distribution Modal -->
-<div class="modal fade" id="editModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title"><i class="bi bi-pencil-square"></i> विवरण सम्पादन गर्नुहोस्</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <form id="editForm" enctype="multipart/form-data">
-                    <input type="hidden" id="edit_id" name="edit_id">
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label"><i class="bi bi-person"></i> लाभग्राहिको नाम थर</label>
-                            <input type="text" class="form-control" id="edit_beneficiary_name"
-                                placeholder="लाभग्राहिको नाम लेख्नुहोस्" required>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label"><i class="bi bi-telephone"></i> फोन नम्बर</label>
-                            <input type="tel" class="form-control" id="edit_phone">
-                        </div>
-                    </div>
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label"><i class="bi bi-geo-alt"></i> ठेगाना/स्थान</label>
-                            <input type="text" class="form-control" id="edit_location" placeholder="स्थान लेख्नुहोस्"
-                                required>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label"><i class="bi bi-cash-coin"></i> प्राप्त नगद रकम</label>
-                            <input type="number" class="form-control" id="edit_cash_received" step="0.01">
-                        </div>
-                    </div>
-                    <div class="card border-info mb-3">
-                        <div class="card-header bg-info text-white">
-                            <h6 class="mb-0"><i class="bi bi-bag"></i> राहात सामाग्री विवरण</h6>
-                        </div>
-                        <div class="card-body">
-                            <div id="editItemsContainer"></div>
-                            <button type="button" class="btn btn-sm btn-success mt-2" onclick="addEditItemRow()">
-                                <i class="bi bi-plus-circle"></i> सामाग्री थप्नुहोस्
-                            </button>
-                        </div>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label"><i class="bi bi-check-circle"></i> स्थिति (Status)</label>
-                        <select class="form-control" id="edit_status">
-                            <option value="Distributed">वितरण गरियो</option>
-                            <option value="Pending">बाँकी</option>
-                            <option value="In Progress">प्रक्रियामा</option>
-                            <option value="Delivered">पुर्याइयो</option>
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label"><i class="bi bi-pencil-square"></i> थप टिप्पणी (Notes)</label>
-                        <textarea class="form-control" id="edit_notes" rows="3"></textarea>
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">रद्द गर्नुहोस्</button>
-                <button type="button" class="btn btn-primary" onclick="saveEdit()">परिवर्तन सुरक्षित गर्नुहोस्</button>
-            </div>
-        </div>
-    </div>
-</div>
-
 {% endblock %}
 
+{% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+.incident-marker {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    color: #fff;
+    border-radius: 50%;
+    border: 3px solid #fff;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    background: #dc3545;
+}
+.relief-marker {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    color: #fff;
+    border-radius: 4px 50% 50% 50%;
+    border: 3px solid #fff;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    transform: rotate(45deg);
+    background: #15803d;
+}
+.relief-marker i {
+    transform: rotate(-45deg);
+}
+.ward-label {
+    font-size: 12px;
+    font-weight: 700;
+    color: #1e293b;
+    background: rgba(255,255,255,0.92);
+    padding: 4px 10px;
+    border-radius: 4px;
+    border: 1.5px solid #94a3b8;
+    white-space: nowrap;
+    pointer-events: none;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+    text-align: center;
+}
+.ward-label-marker {
+    background: none !important;
+    border: none !important;
+}
+.leaflet-tooltip.ward-label {
+    background: rgba(255,255,255,0.92);
+    border: 1.5px solid #94a3b8;
+    border-radius: 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+    font-size: 12px;
+    font-weight: 700;
+    color: #1e293b;
+    padding: 4px 10px;
+}
+
+#mapContainer:-webkit-full-screen { width:100vw !important; height:100vh !important; background:#fff; padding:0; }
+#mapContainer:-moz-full-screen { width:100vw !important; height:100vh !important; background:#fff; padding:0; }
+#mapContainer:-ms-fullscreen { width:100vw !important; height:100vh !important; background:#fff; padding:0; }
+#mapContainer:fullscreen { width:100vw !important; height:100vh !important; background:#fff; padding:0; }
+#mapContainer:fullscreen #reliefMap { height:100vh !important; border-radius:0 !important; }
+
+.incident-tip {
+    font-size: 12px; line-height: 1.5; min-width: 260px;
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+.incident-tip-header {
+    color: #fff; font-weight: 700; font-size: 13px;
+    padding: 6px 10px; white-space: nowrap;
+}
+.incident-tip-body {
+    background: #1e293b; color: #f1f5f9;
+    padding: 8px 10px; display: flex; flex-direction: column; gap: 3px;
+}
+.incident-tip-body strong { color: #94a3b8; }
+
+.relief-tip { font-size:12px; line-height:1.5; min-width:260px; border-radius:6px; box-shadow:0 4px 12px rgba(0,0,0,0.3); }
+.relief-tip-header { color:#fff; font-weight:700; font-size:13px; padding:6px 10px; white-space:nowrap; background:#15803d; }
+.relief-tip-body { background:#1e293b; color:#f1f5f9; padding:8px 10px; display:flex; flex-direction:column; gap:3px; }
+.incident-tip-row { display: flex; gap: 12px; font-size: 11px; }
+.incident-tip-row span { white-space: nowrap; flex-shrink: 0; }
+.incident-tip-desc { font-size: 11px; color: #cbd5e1; padding: 2px 0; line-height: 1.4; }
+.incident-tip-divider { border-top: 1px solid #334155; margin: 3px 0; }
+.leaflet-tooltip.incident-tip-container {
+    background: none !important; border: none !important;
+    box-shadow: none !important; padding: 0 !important;
+    max-width: none !important;
+}
+
+.leaflet-control-layers {
+    background: rgba(30,41,59,0.92) !important;
+    color: #f1f5f9 !important;
+    border: 1px solid #475569 !important;
+    border-radius: 8px !important;
+    padding: 6px 10px !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3) !important;
+}
+.leaflet-control-layers label { font-size:13px; color:#f1f5f9 !important; }
+.leaflet-control-layers-selector { margin-top:2px; accent-color:#3b82f6; }
+.leaflet-control-layers-base label, .leaflet-control-layers-overlays label { color:#f1f5f9 !important; }
+.leaflet-control-layers-separator { border-color:#475569 !important; }
+</style>
+{% endblock %}
 {% block extra_js %}
-<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+let categoryChartInstance = null;
+let lowStockChartInstance = null;
+let reliefItemsChartInstance = null;
+let reliefWardChartInstance = null;
+let reliefFiscalYearChartInstance = null;
+let refreshInterval = null;
+let reliefMapInstance = null;
+let incTypeChartInstance = null;
+let incWardChartInstance = null;
+let incFiscalYearChartInstance = null;
+let incHumanImpactChartInstance = null;
+let incPropertyChartInstance = null;
+let incLivestockChartInstance = null;
+let incInfraChartInstance = null;
+
+function getPriorityBadge(priority) {
+    const map = { 'Urgent': 'danger', 'High': 'warning', 'Medium': 'info', 'Low': 'secondary' };
+    return `<span class="badge bg-${map[priority] || 'secondary'}">${priority}</span>`;
+}
+
+function getStatusBadge(status) {
+    const map = { 'Pending': 'warning', 'Approved': 'info', 'In Progress': 'primary', 'Completed': 'success', 'Cancelled': 'secondary' };
+    return `<span class="badge bg-${map[status] || 'secondary'}">${status}</span>`;
+}
+
+function switchDashboardView() {
+    const view = document.getElementById('dashboardView').value;
+    if (view === 'gis') { window.location.href = '/gis-map'; return; }
+    document.getElementById('overviewDashboard').style.display = view === 'overview' ? '' : 'none';
+    document.getElementById('reliefDashboard').style.display = view === 'relief' ? '' : 'none';
+    document.getElementById('incidentDashboard').style.display = view === 'incident' ? '' : 'none';
+    if (view === 'relief') {
+        loadReliefDashboard();
+        setTimeout(() => { if (reliefMapInstance) reliefMapInstance.invalidateSize(); }, 300);
+    }
+    if (view === 'incident') {
+        loadIncidentDashboard();
+    }
+}
+
+async function loadDashboard() {
+    try {
+        const resp = await fetch('/api/dashboard');
+        const data = await resp.json();
+        if (!data) return;
+
+        document.getElementById('totalItems').textContent = data.total_items ?? 0;
+        document.getElementById('totalStock').textContent = data.total_stock ?? 0;
+        document.getElementById('lowStock').textContent = data.low_stock ?? 0;
+        document.getElementById('outOfStock').textContent = data.out_of_stock ?? 0;
+        document.getElementById('expiringCount').textContent = data.expiring_count ?? 0;
+        document.getElementById('activeIncidents').textContent = data.active_incidents ?? 0;
+        document.getElementById('pendingRequests').textContent = data.pending_requests ?? 0;
+        document.getElementById('todaysDispatch').textContent = data.todays_dispatch ?? 0;
+        document.getElementById('todaysDistribution').textContent = data.todays_distribution ?? 0;
+
+        document.getElementById('cashBalance').textContent = (data.cash_balance ?? 0).toLocaleString();
+        document.getElementById('totalCashDistributed').textContent = (data.total_cash_distributed ?? 0).toLocaleString();
+        document.getElementById('pendingCashRequests').textContent = data.pending_cash_requests ?? 0;
+        document.getElementById('cashThisMonth').textContent = (data.cash_distributed_this_month ?? 0).toLocaleString();
+
+        if (data.stock_by_category && data.stock_by_category.length) {
+            const labels = data.stock_by_category.map(c => c.category);
+            const values = data.stock_by_category.map(c => c.total);
+            const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#f97316'];
+            if (categoryChartInstance) categoryChartInstance.destroy();
+            categoryChartInstance = new Chart(document.getElementById('categoryChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: values,
+                        backgroundColor: colors
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
+            document.getElementById('categoryLabels').innerHTML = labels.map((label, i) =>
+                `<li><span class="color-dot" style="background:${colors[i % colors.length]}"></span><span class="label-text">${label}</span><span class="label-value">${values[i].toLocaleString()}</span></li>`
+            ).join('');
+        }
+
+        if (data.low_stock_items && data.low_stock_items.length) {
+            const labels = data.low_stock_items.map(i => i.item_name + (i.warehouse_name ? ' (' + i.warehouse_name + ')' : ''));
+            const quantities = data.low_stock_items.map(i => i.quantity);
+            if (lowStockChartInstance) lowStockChartInstance.destroy();
+            lowStockChartInstance = new Chart(document.getElementById('lowStockChart'), {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Current Quantity',
+                        data: quantities,
+                        backgroundColor: quantities.map(q => q === 0 ? '#ef4444' : '#f59e0b'),
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    indexAxis: 'y',
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        x: { beginAtZero: true, grid: { display: false } },
+                        y: { grid: { display: false } }
+                    }
+                }
+            });
+        }
+
+        if (data.recent_receipts && data.recent_receipts.length) {
+            document.getElementById('recentReceiptsBody').innerHTML = data.recent_receipts.map(r =>
+                `<tr><td>${r.receipt_no}</td><td>${r.date}</td><td>${r.source}</td><td>${r.items ?? '-'}</td></tr>`
+            ).join('');
+        } else {
+            document.getElementById('recentReceiptsBody').innerHTML = '<tr><td colspan="4" class="text-center text-muted py-3">No recent receipts</td></tr>';
+        }
+
+        if (data.recent_dispatches && data.recent_dispatches.length) {
+            document.getElementById('recentDispatchesBody').innerHTML = data.recent_dispatches.map(d =>
+                `<tr><td>${d.dispatch_no}</td><td>${d.date}</td><td>${d.destination}</td></tr>`
+            ).join('');
+        } else {
+            document.getElementById('recentDispatchesBody').innerHTML = '<tr><td colspan="3" class="text-center text-muted py-3">No recent dispatches</td></tr>';
+        }
+
+        if (data.recent_requests && data.recent_requests.length) {
+            document.getElementById('recentRequestsBody').innerHTML = data.recent_requests.map(r =>
+                `<tr><td>${r.request_no}</td><td>${r.incident}</td><td>${getPriorityBadge(r.priority)}</td><td>${getStatusBadge(r.status)}</td></tr>`
+            ).join('');
+        } else {
+            document.getElementById('recentRequestsBody').innerHTML = '<tr><td colspan="4" class="text-center text-muted py-3">No recent requests</td></tr>';
+        }
+    } catch (e) {
+        console.error('Dashboard load error:', e);
+    }
+}
+
+async function loadReliefDashboard() {
+    try {
+        const fy = document.getElementById('reliefFiscalYear').value;
+        const ward = document.getElementById('reliefWard').value;
+        const it = document.getElementById('reliefIncidentType').value;
+        const params = new URLSearchParams();
+        if (fy) params.set('fiscal_year', fy);
+        if (ward) params.set('ward', ward);
+        if (it) params.set('incident_type', it);
+        const qs = params.toString();
+        const resp = await fetch('/api/dashboard/relief' + (qs ? '?' + qs : ''));
+        const data = await resp.json();
+        if (!data || !data.success) return;
+
+        document.getElementById('reliefTotalDistributions').textContent = data.total_distributions ?? 0;
+        const matDist = data.material_distributions ?? 0;
+        const cashDist = data.cash_distributions ?? 0;
+        const distSub = document.getElementById('reliefTotalDistributions').closest('.stat-content').querySelector('.stat-sub');
+        if (distSub) distSub.textContent = `Material: ${matDist} | Cash: ${cashDist}`;
+
+        document.getElementById('reliefTotalItems').textContent = (data.total_items_distributed ?? 0).toLocaleString();
+
+        document.getElementById('reliefTotalBeneficiaries').textContent = (data.total_beneficiaries ?? 0).toLocaleString();
+        const matBens = data.material_beneficiaries ?? 0;
+        const cashBens = data.cash_beneficiaries ?? 0;
+        const benSub = document.getElementById('reliefTotalBeneficiaries').closest('.stat-content').querySelector('.stat-sub');
+        if (benSub) benSub.textContent = `Material: ${matBens} | Cash: ${cashBens}`;
+
+        document.getElementById('reliefTotalCash').textContent = (data.total_cash_distributed ?? 0).toLocaleString();
+        document.getElementById('reliefTotalCashReceived').textContent = (data.total_cash_received ?? 0).toLocaleString();
+
+        const itemsLabels = data.items_distributed && data.items_distributed.length ? data.items_distributed.map(i => i.item) : ['No data'];
+        const itemsValues = data.items_distributed && data.items_distributed.length ? data.items_distributed.map(i => i.total) : [0];
+        const reliefColors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#f97316', '#14b8a6', '#f43f5e', '#6366f1'];
+        if (reliefItemsChartInstance) reliefItemsChartInstance.destroy();
+        reliefItemsChartInstance = new Chart(document.getElementById('reliefItemsChart'), {
+            type: 'doughnut',
+            data: {
+                labels: itemsLabels,
+                datasets: [{
+                    data: itemsValues,
+                    backgroundColor: itemsLabels.length === 1 && itemsLabels[0] === 'No data' ? ['#e5e7eb'] : reliefColors,
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: { display: false }
+                }
+            }
+        });
+        if (data.items_distributed && data.items_distributed.length) {
+            document.getElementById('reliefItemsLabels').innerHTML = data.items_distributed.map((i, idx) =>
+                `<li><span class="color-dot" style="background:${reliefColors[idx % reliefColors.length]}"></span><span class="label-text">${i.item}</span><span class="label-value">${i.total.toLocaleString()}</span></li>`
+            ).join('');
+        }
+
+        const wardLabels = data.dist_by_ward && data.dist_by_ward.labels.length ? data.dist_by_ward.labels : ['No data'];
+        const wardCounts = data.dist_by_ward && data.dist_by_ward.labels.length ? data.dist_by_ward.counts : [0];
+        if (reliefWardChartInstance) reliefWardChartInstance.destroy();
+        const reliefWardColors = [
+            '#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6',
+            '#06b6d4', '#f97316', '#14b8a6', '#f43f5e', '#6366f1',
+            '#84cc16', '#e11d48', '#0ea5e9', '#d946ef', '#22c55e',
+            '#eab308', '#a855f7', '#ec4899', '#14b8a6', '#f97316'
+        ];
+        reliefWardChartInstance = new Chart(document.getElementById('reliefWardChart'), {
+            type: 'bar',
+            data: {
+                labels: wardLabels,
+                datasets: [{
+                    label: 'Distributions',
+                    data: wardCounts,
+                    backgroundColor: wardLabels.length === 1 && wardLabels[0] === 'No data' ? ['#e5e7eb'] : wardLabels.map((_, i) => reliefWardColors[i % reliefWardColors.length]),
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    y: { beginAtZero: true, grid: { display: false } },
+                    x: { grid: { display: false } }
+                }
+            }
+        });
+
+        const fyLabels = data.fiscal_year_distributions && data.fiscal_year_distributions.labels.length ? data.fiscal_year_distributions.labels : ['No data'];
+        const fyCounts = data.fiscal_year_distributions && data.fiscal_year_distributions.labels.length ? data.fiscal_year_distributions.counts : [0];
+        if (reliefFiscalYearChartInstance) reliefFiscalYearChartInstance.destroy();
+        reliefFiscalYearChartInstance = new Chart(document.getElementById('reliefFiscalYearChart'), {
+            type: 'bar',
+            data: {
+                labels: fyLabels,
+                datasets: [{
+                    label: 'Distributions',
+                    data: fyCounts,
+                    backgroundColor: fyLabels.length === 1 && fyLabels[0] === 'No data' ? ['#e5e7eb'] : ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#f97316', '#14b8a6', '#f43f5e', '#6366f1'],
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    y: { beginAtZero: true, grid: { display: false } },
+                    x: { grid: { display: false } }
+                }
+            }
+        });
+
+        loadMapData();
+        populateReliefFilters(data);
+    } catch (e) {
+        console.error('Relief dashboard load error:', e);
+    }
+}
+
+function populateReliefFilters(data) {
+    const fySel = document.getElementById('reliefFiscalYear');
+    const wardSel = document.getElementById('reliefWard');
+    const typeSel = document.getElementById('reliefIncidentType');
+    if (!fySel || !wardSel || !typeSel) return;
+    if (data.filter_options && fySel.options.length <= 1) {
+        if (data.filter_options.fiscal_years && data.filter_options.fiscal_years.length) {
+            data.filter_options.fiscal_years.forEach(fy => {
+                const opt = document.createElement('option');
+                opt.value = fy;
+                opt.textContent = fy;
+                fySel.appendChild(opt);
+            });
+        }
+        if (data.filter_options.wards && data.filter_options.wards.length) {
+            data.filter_options.wards.forEach(w => {
+                const opt = document.createElement('option');
+                opt.value = w.id;
+                opt.textContent = w.name;
+                wardSel.appendChild(opt);
+            });
+        }
+        if (data.filter_options.incident_types && data.filter_options.incident_types.length) {
+            data.filter_options.incident_types.forEach(t => {
+                const opt = document.createElement('option');
+                opt.value = t;
+                opt.textContent = t;
+                typeSel.appendChild(opt);
+            });
+        }
+    }
+}
+
+function resetReliefFilters() {
+    document.getElementById('reliefFiscalYear').value = '';
+    document.getElementById('reliefWard').value = '';
+    document.getElementById('reliefIncidentType').value = '';
+    loadReliefDashboard();
+}
+
+async function loadMapData() {
+    try {
+        const resp = await fetch('/api/map/data');
+        const data = await resp.json();
+        if (!data || !data.success) return;
+
+        const mapEl = document.getElementById('reliefMap');
+        if (!mapEl) return;
+
+        if (reliefMapInstance) {
+            reliefMapInstance.remove();
+            reliefMapInstance = null;
+        }
+
+        let boundaryBounds = null;
+        if (data.boundary && data.boundary.features) {
+            const tmpLayer = L.geoJSON(data.boundary);
+            tmpLayer.eachLayer(function(layer) {
+                if (layer.getBounds) {
+                    boundaryBounds = layer.getBounds();
+                }
+            });
+        }
+
+        if (!boundaryBounds) return;
+
+        function fmt(v) { return (v ?? 0).toLocaleString(); }
+        function trunc(v, n) { return v && v.length > n ? v.slice(0, n) + '...' : v || ''; }
+
+        reliefMapInstance = L.map('reliefMap', {
+            zoomControl: true,
+            scrollWheelZoom: true,
+            dragging: true,
+            maxBounds: boundaryBounds,
+            maxBoundsViscosity: 1.0,
+            zoomSnap: 0.5,
+            zoomDelta: 0.5
+        });
+
+        var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 18, minZoom: 11,
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+        });
+
+        var satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            maxZoom: 18, minZoom: 11,
+            attribution: '&copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+        });
+
+        osm.addTo(reliefMapInstance);
+
+        var boundaryGroup = L.layerGroup();
+        var wardsGroup = L.layerGroup();
+        var incidentsGroup = L.layerGroup();
+        var reliefGroup = L.layerGroup();
+
+        if (data.boundary && data.boundary.features) {
+            L.geoJSON(data.boundary, {
+                style: { color: '#b91c1c', weight: 3, fillColor: '#fef2f2', fillOpacity: 0.15 }
+            }).addTo(boundaryGroup);
+        }
+
+        if (data.wards && data.wards.features) {
+            const wardColors = [
+                '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
+                '#06b6d4', '#f97316', '#14b8a6', '#6366f1'
+            ];
+            L.geoJSON(data.wards, {
+                style: function(feature) {
+                    const idx = data.wards.features.indexOf(feature) % wardColors.length;
+                    return { color: '#ca8a04', weight: 2, fillColor: wardColors[idx], fillOpacity: 0.08 };
+                },
+                onEachFeature: function(feature, layer) {
+                    if (feature.properties && feature.properties.name) {
+                        layer.bindTooltip(feature.properties.name, {
+                            sticky: true,
+                            direction: 'center',
+                            className: 'ward-label'
+                        });
+                        const centroid = layer.getBounds().getCenter();
+                        L.marker(centroid, {
+                            icon: L.divIcon({
+                                className: 'ward-label-marker',
+                                html: `<div class="ward-label">${feature.properties.name}</div>`,
+                                iconSize: [0, 0]
+                            }),
+                            interactive: false
+                        }).addTo(wardsGroup);
+                    }
+                }
+            }).addTo(wardsGroup);
+        }
+        wardsGroup.addTo(reliefMapInstance);
+
+        if (data.incident_markers && data.incident_markers.length) {
+            data.incident_markers.forEach(function(m) {
+                const color = m.severity === 'high' ? '#dc3545' : m.severity === 'medium' ? '#ffc107' : '#0d6efd';
+                const marker = L.marker([m.lat, m.lng], {
+                    icon: L.divIcon({
+                        className: 'incident-marker',
+                        html: `<i class="bi bi-lightning-charge-fill" style="font-size:14px;color:white"></i>`,
+                        iconSize: [32, 32],
+                        iconAnchor: [16, 16],
+                        popupAnchor: [0, -18]
+                    })
+                }).addTo(incidentsGroup);
+                const sevColor = m.severity === 'high' ? '#dc3545' : m.severity === 'medium' ? '#f59e0b' : '#0d6efd';
+                marker.bindTooltip(`
+                    <div class="incident-tip">
+                        <div class="incident-tip-header" style="background:${sevColor}">${m.name}</div>
+                        <div class="incident-tip-body">
+                            <div class="incident-tip-row"><span><strong>Type:</strong> ${m.type}</span><span><strong>Ward:</strong> ${m.ward_name || m.ward || 'N/A'}</span></div>
+                            <div class="incident-tip-row"><span><strong>Status:</strong> ${m.status}</span><span><strong>Severity:</strong> ${m.severity}</span></div>
+                            <div class="incident-tip-desc">${trunc(m.description, 54)}</div>
+                            <div class="incident-tip-divider"></div>
+                            <div class="incident-tip-row"><span><strong>Deaths:</strong> ${fmt(m.deaths)}</span><span><strong>Injured:</strong> ${fmt(m.injured)}</span></div>
+                            <div class="incident-tip-row"><span><strong>Missing:</strong> ${fmt(m.missing)}</span><span><strong>Affected:</strong> ${fmt(m.affected_people)}</span></div>
+                            <div class="incident-tip-row"><span><strong>House Destroyed:</strong> ${fmt(m.house_destroyed)}</span><span><strong>House Damaged:</strong> ${fmt(m.house_damaged)}</span></div>
+                            <div class="incident-tip-divider"></div>
+                            <div class="incident-tip-row"><span><strong>Cattle Lost:</strong> ${fmt(m.cattle_lost)}</span><span><strong>Poultry Lost:</strong> ${fmt(m.poultry_lost)}</span></div>
+                            <div class="incident-tip-row"><span><strong>Est. Loss:</strong> NPR ${fmt(m.estimated_loss)}</span></div>
+                        </div>
+                    </div>
+                `, { sticky: true, offset: [0, -8], className: 'incident-tip-container' });
+                marker.bindPopup(`
+                    <div style="min-width:200px">
+                        <h6 style="margin:0 0 6px 0;color:${color};font-weight:700"><i class="bi bi-lightning-charge-fill me-1"></i>${m.name}</h6>
+                        <table style="font-size:12px;width:100%;border-collapse:collapse">
+                            <tr><td style="padding:3px 6px;color:#6c757d;border-bottom:1px solid #f0f0f0">Type</td><td style="padding:3px 6px;font-weight:600;border-bottom:1px solid #f0f0f0">${m.type}</td></tr>
+                            <tr><td style="padding:3px 6px;color:#6c757d;border-bottom:1px solid #f0f0f0">Ward</td><td style="padding:3px 6px;font-weight:600;border-bottom:1px solid #f0f0f0">${m.ward_name || m.ward || 'N/A'}</td></tr>
+                            <tr><td style="padding:3px 6px;color:#6c757d;border-bottom:1px solid #f0f0f0">Severity</td><td style="padding:3px 6px;border-bottom:1px solid #f0f0f0"><span class="badge bg-${m.severity === 'high' ? 'danger' : m.severity === 'medium' ? 'warning' : 'info'}">${m.severity}</span></td></tr>
+                            <tr><td style="padding:3px 6px;color:#6c757d">Status</td><td style="padding:3px 6px;font-weight:600">${m.status}</td></tr>
+                        </table>
+                    </div>
+                `);
+            });
+        }
+        incidentsGroup.addTo(reliefMapInstance);
+
+        if (data.relief_markers && data.relief_markers.length) {
+            data.relief_markers.forEach(function(m) {
+                const marker = L.marker([m.lat, m.lng], {
+                    icon: L.divIcon({
+                        className: 'relief-marker',
+                        html: `<i class="bi bi-box-seam-fill" style="font-size:14px;color:white;transform:rotate(-45deg)"></i>`,
+                        iconSize: [32, 32],
+                        iconAnchor: [16, 16],
+                        popupAnchor: [0, -18]
+                    })
+                }).addTo(reliefGroup);
+                var names = m.sample_names && m.sample_names.length ? m.sample_names.join(', ') : 'N/A';
+                marker.bindTooltip(`
+                    <div class="relief-tip">
+                        <div class="relief-tip-header">${m.distribution_no}</div>
+                        <div class="relief-tip-body">
+                            <div class="incident-tip-row"><span><strong>Location:</strong> ${m.location || 'N/A'}</span><span><strong>Date:</strong> ${m.date || 'N/A'}</span></div>
+                            <div class="incident-tip-row"><span><strong>Beneficiaries:</strong> ${fmt(m.beneficiary_count)}</span><span><strong>Total Items:</strong> ${fmt(m.total_quantity)}</span></div>
+                            <div class="incident-tip-desc"><strong>Items:</strong> ${m.top_items || 'N/A'}</div>
+                            <div class="incident-tip-desc"><strong>Families:</strong> ${names}</div>
+                        </div>
+                    </div>
+                `, { sticky: true, offset: [0, -8], className: 'incident-tip-container' });
+                marker.bindPopup(`
+                    <div style="min-width:220px">
+                        <h6 style="margin:0 0 6px 0;color:#15803d;font-weight:700"><i class="bi bi-box-seam-fill me-1"></i>${m.distribution_no}</h6>
+                        <table style="font-size:12px;width:100%;border-collapse:collapse">
+                            <tr><td style="padding:3px 6px;color:#6c757d;border-bottom:1px solid #f0f0f0">Location</td><td style="padding:3px 6px;font-weight:600;border-bottom:1px solid #f0f0f0">${m.location || 'N/A'}</td></tr>
+                            <tr><td style="padding:3px 6px;color:#6c757d;border-bottom:1px solid #f0f0f0">Date</td><td style="padding:3px 6px;font-weight:600;border-bottom:1px solid #f0f0f0">${m.date || 'N/A'}</td></tr>
+                            <tr><td style="padding:3px 6px;color:#6c757d;border-bottom:1px solid #f0f0f0">Incident</td><td style="padding:3px 6px;font-weight:600;border-bottom:1px solid #f0f0f0">${m.incident_name || 'N/A'}</td></tr>
+                            <tr><td style="padding:3px 6px;color:#6c757d;border-bottom:1px solid #f0f0f0">Beneficiaries</td><td style="padding:3px 6px;font-weight:600;border-bottom:1px solid #f0f0f0">${fmt(m.beneficiary_count)}</td></tr>
+                            <tr><td style="padding:3px 6px;color:#6c757d;border-bottom:1px solid #f0f0f0">Items Distributed</td><td style="padding:3px 6px;font-weight:600;border-bottom:1px solid #f0f0f0">${fmt(m.total_quantity)}</td></tr>
+                            <tr><td style="padding:3px 6px;color:#6c757d;border-bottom:1px solid #f0f0f0">Top Items</td><td style="padding:3px 6px;font-weight:600;border-bottom:1px solid #f0f0f0">${m.top_items || 'N/A'}</td></tr>
+                        </table>
+                    </div>
+                `);
+            });
+        }
+        reliefGroup.addTo(reliefMapInstance);
+
+        L.control.layers({
+            'OpenStreetMap': osm,
+            'Satellite': satellite
+        }, {
+            'Thalara Boundary': boundaryGroup,
+            'Ward Boundaries': wardsGroup,
+            'Incident Markers': incidentsGroup,
+            'Relief Distribution': reliefGroup
+        }, { position: 'topright' }).addTo(reliefMapInstance);
+
+        reliefMapInstance.fitBounds(boundaryBounds, { padding: [15, 15] });
+        const currentZoom = reliefMapInstance.getZoom();
+        if (currentZoom > 14) {
+            reliefMapInstance.setZoom(14);
+        }
+        reliefMapInstance.setMinZoom(reliefMapInstance.getZoom());
+
+        reliefMapInstance.on('moveend', function() {
+            const center = reliefMapInstance.getCenter();
+            if (!boundaryBounds.contains(center)) {
+                reliefMapInstance.panInsideBounds(boundaryBounds, { animate: true });
+            }
+        });
+    } catch (e) {
+        console.error('Map load error:', e);
+    }
+}
+
+function toggleMapFullscreen() {
+    var container = document.getElementById('mapContainer');
+    var btn = document.getElementById('fullscreenBtn');
+    if (!document.fullscreenElement && !document.webkitFullscreenElement && !document.msFullscreenElement) {
+        if (container.requestFullscreen) {
+            container.requestFullscreen();
+        } else if (container.webkitRequestFullscreen) {
+            container.webkitRequestFullscreen();
+        } else if (container.msRequestFullscreen) {
+            container.msRequestFullscreen();
+        }
+        btn.innerHTML = '<i class="bi bi-fullscreen-exit"></i>';
+        btn.title = 'Exit Full Screen';
+    } else {
+        if (document.exitFullscreen) {
+            document.exitFullscreen();
+        } else if (document.webkitExitFullscreen) {
+            document.webkitExitFullscreen();
+        } else if (document.msExitFullscreen) {
+            document.msExitFullscreen();
+        }
+        btn.innerHTML = '<i class="bi bi-arrows-fullscreen"></i>';
+        btn.title = 'Full Screen';
+    }
+}
+
+document.addEventListener('fullscreenchange', function() {
+    var btn = document.getElementById('fullscreenBtn');
+    if (!btn) return;
+    if (document.fullscreenElement) {
+        btn.innerHTML = '<i class="bi bi-fullscreen-exit"></i>';
+        btn.title = 'Exit Full Screen';
+    } else {
+        btn.innerHTML = '<i class="bi bi-arrows-fullscreen"></i>';
+        btn.title = 'Full Screen';
+    }
+});
+document.addEventListener('webkitfullscreenchange', function() {
+    var btn = document.getElementById('fullscreenBtn');
+    if (!btn) return;
+    if (document.webkitFullscreenElement) {
+        btn.innerHTML = '<i class="bi bi-fullscreen-exit"></i>';
+        btn.title = 'Exit Full Screen';
+    } else {
+        btn.innerHTML = '<i class="bi bi-arrows-fullscreen"></i>';
+        btn.title = 'Full Screen';
+    }
+});
+
+async function loadIncidentDashboard() {
+    try {
+        const fy = document.getElementById('incidentFiscalYear').value;
+        const ward = document.getElementById('incidentWard').value;
+        const type = document.getElementById('incidentType').value;
+        const params = new URLSearchParams();
+        if (fy) params.set('fiscal_year', fy);
+        if (ward) params.set('ward', ward);
+        if (type) params.set('incident_type', type);
+        const qs = params.toString();
+        const resp = await fetch('/api/dashboard/incident' + (qs ? '?' + qs : ''));
+        const data = await resp.json();
+        if (!data || !data.success) return;
+
+        document.getElementById('incTotalIncidents').textContent = data.total_incidents ?? 0;
+        document.getElementById('incActiveIncidents').textContent = data.active_incidents ?? 0;
+        document.getElementById('incAffectedWards').textContent = data.affected_wards ?? 0;
+        document.getElementById('incAffectedPeople').textContent = (data.total_affected_people ?? 0).toLocaleString();
+        document.getElementById('incHouseholds').textContent = (data.total_households ?? 0).toLocaleString();
+        document.getElementById('incDeaths').textContent = data.total_deaths ?? 0;
+        document.getElementById('incInjured').textContent = data.total_injured ?? 0;
+        document.getElementById('incMissing').textContent = data.total_missing ?? 0;
+        document.getElementById('incHousesDestroyed').textContent = data.houses_destroyed ?? 0;
+        document.getElementById('incHousesDamaged').textContent = data.houses_damaged ?? 0;
+        document.getElementById('incPubBldgDestroyed').textContent = data.public_buildings_destroyed ?? 0;
+        document.getElementById('incPubBldgDamaged').textContent = data.public_buildings_damaged ?? 0;
+        document.getElementById('incEstimatedLoss').textContent = (data.estimated_loss ?? 0).toLocaleString();
+
+        const agCount = data.agriculture_crop_damage ?? 0;
+        document.getElementById('incCropDamage').textContent = agCount;
+        document.getElementById('incAgricultureImpact').textContent = agCount > 0 ? agCount + ' affected' : 'None';
+
+        document.getElementById('incCattleLost').textContent = data.cattle_lost ?? 0;
+        document.getElementById('incCattleInjured').textContent = data.cattle_injured ?? 0;
+        document.getElementById('incCattleTotal').textContent = (data.cattle_lost ?? 0) + (data.cattle_injured ?? 0);
+
+        document.getElementById('incPoultryLost').textContent = data.poultry_lost ?? 0;
+        document.getElementById('incPoultryInjured').textContent = data.poultry_injured ?? 0;
+        document.getElementById('incPoultryTotal').textContent = (data.poultry_lost ?? 0) + (data.poultry_injured ?? 0);
+
+        document.getElementById('incGoatsLost').textContent = data.goats_sheep_lost ?? 0;
+        document.getElementById('incGoatsInjured').textContent = data.goats_sheep_injured ?? 0;
+        document.getElementById('incGoatsTotal').textContent = (data.goats_sheep_lost ?? 0) + (data.goats_sheep_injured ?? 0);
+
+        document.getElementById('incOtherLost').textContent = data.other_livestock_lost ?? 0;
+        document.getElementById('incOtherInjured').textContent = data.other_livestock_injured ?? 0;
+        document.getElementById('incOtherTotal').textContent = (data.other_livestock_lost ?? 0) + (data.other_livestock_injured ?? 0);
+
+        document.getElementById('incRoadBlocked').textContent = data.road_blocked ?? 0;
+        document.getElementById('incElectricity').textContent = data.electricity_blocked ?? 0;
+        document.getElementById('incCommunication').textContent = data.communication_blocked ?? 0;
+        document.getElementById('incWater').textContent = data.drinking_water_disrupted ?? 0;
+
+        // Charts
+        const ict = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#f97316', '#14b8a6', '#f43f5e', '#6366f1'];
+
+        // Incidents by Type (doughnut)
+        if (data.by_type && data.by_type.labels && data.by_type.labels.length) {
+            if (incTypeChartInstance) incTypeChartInstance.destroy();
+            incTypeChartInstance = new Chart(document.getElementById('incTypeChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: data.by_type.labels,
+                    datasets: [{
+                        data: data.by_type.counts,
+                        backgroundColor: ict.slice(0, data.by_type.labels.length)
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: true,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { padding: 12, boxWidth: 12 } }
+                    }
+                }
+            });
+        }
+
+        // Incidents by Ward (bar)
+        if (data.by_ward && data.by_ward.labels && data.by_ward.labels.length) {
+            if (incWardChartInstance) incWardChartInstance.destroy();
+            const wardColors = [
+                '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
+                '#06b6d4', '#f97316', '#14b8a6', '#f43f5e', '#6366f1',
+                '#84cc16', '#e11d48', '#0ea5e9', '#d946ef', '#22c55e',
+                '#eab308', '#a855f7', '#ec4899', '#14b8a6', '#f97316'
+            ];
+            incWardChartInstance = new Chart(document.getElementById('incWardChart'), {
+                type: 'bar',
+                data: {
+                    labels: data.by_ward.labels,
+                    datasets: [{
+                        label: 'Incidents',
+                        data: data.by_ward.counts,
+                        backgroundColor: data.by_ward.labels.map((_, i) => wardColors[i % wardColors.length]),
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: true,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { beginAtZero: true, grid: { display: false } },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+        }
+
+        // Incidents by Fiscal Year (bar)
+        if (data.by_fiscal_year && data.by_fiscal_year.labels && data.by_fiscal_year.labels.length) {
+            if (incFiscalYearChartInstance) incFiscalYearChartInstance.destroy();
+            const fyColors = [
+                '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
+                '#06b6d4', '#f97316', '#14b8a6', '#f43f5e', '#6366f1'
+            ];
+            incFiscalYearChartInstance = new Chart(document.getElementById('incFiscalYearChart'), {
+                type: 'bar',
+                data: {
+                    labels: data.by_fiscal_year.labels,
+                    datasets: [{
+                        label: 'Incidents',
+                        data: data.by_fiscal_year.counts,
+                        backgroundColor: data.by_fiscal_year.labels.map((_, i) => fyColors[i % fyColors.length]),
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: true,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { beginAtZero: true, grid: { display: false } },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+        }
+
+        // Human Impact by Type (grouped bar)
+        if (data.human_impact_by_type && data.human_impact_by_type.types && data.human_impact_by_type.types.length) {
+            if (incHumanImpactChartInstance) incHumanImpactChartInstance.destroy();
+            incHumanImpactChartInstance = new Chart(document.getElementById('incHumanImpactChart'), {
+                type: 'bar',
+                data: {
+                    labels: data.human_impact_by_type.types,
+                    datasets: [
+                        { label: 'Deaths', data: data.human_impact_by_type.deaths, backgroundColor: '#ef4444', borderRadius: 4 },
+                        { label: 'Injured', data: data.human_impact_by_type.injured, backgroundColor: '#f59e0b', borderRadius: 4 },
+                        { label: 'Missing', data: data.human_impact_by_type.missing, backgroundColor: '#3b82f6', borderRadius: 4 }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: true,
+                    plugins: { legend: { position: 'bottom', labels: { padding: 10, boxWidth: 12 } } },
+                    scales: {
+                        y: { beginAtZero: true, grid: { display: false } },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+        }
+
+        // Property Damage by Ward (grouped bar)
+        if (data.property_by_ward && data.property_by_ward.wards && data.property_by_ward.wards.length) {
+            if (incPropertyChartInstance) incPropertyChartInstance.destroy();
+            incPropertyChartInstance = new Chart(document.getElementById('incPropertyChart'), {
+                type: 'bar',
+                data: {
+                    labels: data.property_by_ward.wards,
+                    datasets: [
+                        { label: 'Destroyed', data: data.property_by_ward.destroyed, backgroundColor: '#ef4444', borderRadius: 4 },
+                        { label: 'Damaged', data: data.property_by_ward.damaged, backgroundColor: '#f59e0b', borderRadius: 4 }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: true,
+                    plugins: { legend: { position: 'bottom', labels: { padding: 10, boxWidth: 12 } } },
+                    scales: {
+                        y: { beginAtZero: true, grid: { display: false } },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+        }
+
+        // Livestock Impact (bar)
+        if (data.livestock_totals) {
+            const lLabels = Object.keys(data.livestock_totals);
+            const lValues = Object.values(data.livestock_totals);
+            if (incLivestockChartInstance) incLivestockChartInstance.destroy();
+            incLivestockChartInstance = new Chart(document.getElementById('incLivestockChart'), {
+                type: 'bar',
+                data: {
+                    labels: lLabels,
+                    datasets: [{
+                        label: 'Total Affected',
+                        data: lValues,
+                        backgroundColor: ['#f59e0b', '#f97316', '#14b8a6', '#8b5cf6'],
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: true,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { beginAtZero: true, grid: { display: false } },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+        }
+
+        // Infrastructure Impact (bar)
+        if (data.infrastructure && data.infrastructure.labels && data.infrastructure.labels.length) {
+            if (incInfraChartInstance) incInfraChartInstance.destroy();
+            incInfraChartInstance = new Chart(document.getElementById('incInfraChart'), {
+                type: 'bar',
+                data: {
+                    labels: data.infrastructure.labels,
+                    datasets: [{
+                        label: 'Incidents',
+                        data: data.infrastructure.counts,
+                        backgroundColor: ['#ef4444', '#f59e0b', '#3b82f6', '#06b6d4'],
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: true,
+                    indexAxis: 'y',
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { beginAtZero: true, grid: { display: false } },
+                        y: { grid: { display: false } }
+                    }
+                }
+            });
+        }
+
+        // Recent incidents table
+        if (data.recent_incidents && data.recent_incidents.length) {
+            document.getElementById('incRecentIncidents').innerHTML = data.recent_incidents.slice(0, 8).map(i =>
+                `<tr><td class="fw-medium">${i.incident_name}</td><td>${i.incident_type}</td><td>${getStatusBadge(i.status)}</td></tr>`
+            ).join('');
+        } else {
+            document.getElementById('incRecentIncidents').innerHTML = '<tr><td colspan="3" class="text-center text-muted py-3">No incidents found</td></tr>';
+        }
+
+        // Populate filters on first load
+        populateIncidentFilters(data);
+    } catch (e) {
+        console.error('Incident dashboard load error:', e);
+    }
+}
+
+function populateIncidentFilters(data) {
+    const fySel = document.getElementById('incidentFiscalYear');
+    const wardSel = document.getElementById('incidentWard');
+    const typeSel = document.getElementById('incidentType');
+
+    if (data.filter_options && fySel.options.length <= 1) {
+        if (data.filter_options.fiscal_years && data.filter_options.fiscal_years.length) {
+            data.filter_options.fiscal_years.forEach(fy => {
+                const opt = document.createElement('option');
+                opt.value = fy;
+                opt.textContent = fy;
+                fySel.appendChild(opt);
+            });
+        }
+        if (data.filter_options.wards && data.filter_options.wards.length) {
+            data.filter_options.wards.forEach(w => {
+                const opt = document.createElement('option');
+                opt.value = w.id;
+                opt.textContent = w.name;
+                wardSel.appendChild(opt);
+            });
+        }
+        if (data.filter_options.disaster_types && data.filter_options.disaster_types.length) {
+            data.filter_options.disaster_types.forEach(t => {
+                const opt = document.createElement('option');
+                opt.value = t;
+                opt.textContent = t;
+                typeSel.appendChild(opt);
+            });
+        }
+    }
+}
+
+function resetIncidentFilters() {
+    document.getElementById('incidentFiscalYear').value = '';
+    document.getElementById('incidentWard').value = '';
+    document.getElementById('incidentType').value = '';
+    loadIncidentDashboard();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    switchDashboardView();
+    loadDashboard();
+    refreshInterval = setInterval(loadDashboard, 60000);
+});
+</script>
 {% endblock %}

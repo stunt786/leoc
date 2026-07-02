@@ -1,0 +1,369 @@
+{% extends "base.html" %}
+{% block title %}Critical Infrastructure - {{ office_name }}{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('index') }}"><i class="bi bi-house-fill"></i></a></li>
+<li class="breadcrumb-item active">Critical Infrastructure</li>
+{% endblock %}
+{% block content %}
+<div class="container-fluid">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="mb-0"><i class="bi bi-building me-2"></i>Critical Infrastructure Registry</h4>
+    <div>
+      <button class="btn btn-outline-primary btn-sm me-1" onclick="showMap()"><i class="bi bi-map"></i> Map View</button>
+      <button class="btn btn-outline-success btn-sm me-1" onclick="printData('Critical Infrastructure Registry')"><i class="bi bi-printer"></i> Print</button>
+      <button class="btn btn-primary btn-sm" onclick="openForm()"><i class="bi bi-plus-lg"></i> Add Infrastructure</button>
+    </div>
+  </div>
+
+  <div class="row mb-3">
+    <div class="col-md-3">
+      <select class="form-select form-select-sm" id="filterWard" onchange="loadData()">
+        <option value="">All Wards</option>
+        {% for w in ward_list %}
+        <option value="{{ w.id }}">{{ w.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-3">
+      <select class="form-select form-select-sm" id="filterType" onchange="loadData()">
+        <option value="">All Types</option>
+      </select>
+    </div>
+    <div class="col-md-3">
+      <input type="text" class="form-control form-control-sm" id="filterSearch" placeholder="Search..." onkeyup="loadData()">
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover mb-0" id="dataTable">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Name</th>
+              <th>Type</th>
+              <th>Ward</th>
+              <th>Status</th>
+              <th>Contact</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="formModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-building me-2"></i><span id="formTitle">Add Infrastructure</span></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form id="dataForm">
+          <input type="hidden" id="recordId">
+          <ul class="nav nav-tabs mb-3">
+            <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#tabBasic">Basic Info</a></li>
+            <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tabGIS">GIS</a></li>
+            <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tabOperational">Operational</a></li>
+          </ul>
+          <div class="tab-content">
+            <div class="tab-pane fade show active" id="tabBasic">
+              <div class="row">
+                <div class="col-md-6 mb-2">
+                  <label class="form-label">Infrastructure Name</label>
+                  <input type="text" class="form-control form-control-sm" id="name" required>
+                </div>
+                <div class="col-md-6 mb-2">
+                  <label class="form-label">Infrastructure Type</label>
+                  <select class="form-select form-select-sm" id="infrastructure_type" required></select>
+                </div>
+                <div class="col-12 mb-2">
+                  <label class="form-label">Description</label>
+                  <textarea class="form-control form-control-sm" id="description" rows="2"></textarea>
+                </div>
+                <div class="col-md-4 mb-2">
+                  <label class="form-label">Ward</label>
+                  <select class="form-select form-select-sm" id="ward_id">
+                    <option value="">Select Ward</option>
+                    {% for w in ward_list %}
+                    <option value="{{ w.id }}">{{ w.name }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="col-md-4 mb-2">
+                  <label class="form-label">Settlement/Tole</label>
+                  <input type="text" class="form-control form-control-sm" id="settlement">
+                </div>
+                <div class="col-md-4 mb-2">
+                  <label class="form-label">Infrastructure ID</label>
+                  <input type="text" class="form-control form-control-sm" id="infrastructure_id" placeholder="Auto-generated">
+                </div>
+              </div>
+            </div>
+            <div class="tab-pane fade" id="tabGIS">
+              <div class="row">
+                <div class="col-md-4 mb-2">
+                  <label class="form-label">Coordinates (Lat, Lng)</label>
+                  <input type="text" class="form-control form-control-sm" id="coordinates" placeholder="e.g. 27.7172, 85.3240">
+                </div>
+                <div class="col-md-4 mb-2">
+                  <label class="form-label">Elevation (m)</label>
+                  <input type="number" step="any" class="form-control form-control-sm" id="elevation">
+                </div>
+              </div>
+            </div>
+            <div class="tab-pane fade" id="tabOperational">
+              <div class="row">
+                <div class="col-md-4 mb-2">
+                  <label class="form-label">Capacity</label>
+                  <input type="text" class="form-control form-control-sm" id="capacity">
+                </div>
+                <div class="col-md-4 mb-2">
+                  <label class="form-label">Current Status</label>
+                  <select class="form-select form-select-sm" id="current_status">
+                    <option value="Operational">Operational</option>
+                    <option value="Partially Operational">Partially Operational</option>
+                    <option value="Non-Operational">Non-Operational</option>
+                    <option value="Under Construction">Under Construction</option>
+                  </select>
+                </div>
+                <div class="col-md-4 mb-2">
+                  <label class="form-label">Accessibility Status</label>
+                  <select class="form-select form-select-sm" id="accessibility_status">
+                    <option value="Accessible">Accessible</option>
+                    <option value="Partially Accessible">Partially Accessible</option>
+                    <option value="Inaccessible">Inaccessible</option>
+                  </select>
+                </div>
+                <div class="col-md-4 mb-2">
+                  <label class="form-label">Contact Person</label>
+                  <input type="text" class="form-control form-control-sm" id="contact_person">
+                </div>
+                <div class="col-md-4 mb-2">
+                  <label class="form-label">Contact Number</label>
+                  <input type="text" class="form-control form-control-sm" id="contact_number">
+                </div>
+                <div class="col-12 mb-2">
+                  <label class="form-label">Available Facilities</label>
+                  <textarea class="form-control form-control-sm" id="available_facilities" rows="2"></textarea>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary btn-sm" onclick="saveRecord()"><i class="bi bi-check-lg"></i> Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+const INFRASTRUCTURE_TYPES = [
+  'Municipality Office','Ward Office','Hospital','Health Post',
+  'Primary Health Centre','School','Police Office','Armed Police Office',
+  'Army Barrack','Fire Station','Communication Tower','Power Substation',
+  'Water Supply Facility','Irrigation Facility','Bridge','Government Building',
+  'Community Building','Market Centre','Fuel Station','Bank','Other Critical Infrastructure'
+];
+const wardMap = {};
+
+function initWardMap() {
+  {% for w in ward_list %}
+  wardMap[{{ w.id }}] = '{{ w.name }}';
+  {% endfor %}
+}
+
+function loadTypes() {
+  const types = INFRASTRUCTURE_TYPES;
+  ['filterType','infrastructure_type'].forEach(id=>{
+    const sel = document.getElementById(id);
+    if(id==='infrastructure_type') sel.innerHTML = '';
+    types.forEach(t=>{ sel.innerHTML+=`<option value="${t}">${t}</option>`; });
+  });
+}
+
+async function loadData() {
+  const params = new URLSearchParams();
+  const ward = document.getElementById('filterWard').value;
+  const type = document.getElementById('filterType').value;
+  if(ward) params.set('ward_id', ward);
+  if(type) params.set('type', type);
+  const search = document.getElementById('filterSearch').value;
+  if(search) params.set('search', search);
+  const resp = await fetch(`/api/critical-infrastructure?${params}`);
+  const d = await resp.json();
+  const tbody = document.querySelector('#dataTable tbody');
+  if(!d.success) { tbody.innerHTML = '<tr><td colspan="7" class="text-center text-danger">' + (d.message || 'Error loading data') + '</td></tr>'; return; }
+  const items = d.data || [];
+  if(items.length === 0) { tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4">No infrastructure records found</td></tr>'; return; }
+  tbody.innerHTML = items.map(item => `<tr>
+    <td>${item.infrastructure_id}</td>
+    <td>${item.name}</td>
+    <td>${item.infrastructure_type}</td>
+    <td>${wardMap[item.ward_id] || '-'}</td>
+    <td><span class="badge bg-${item.current_status==='Operational'?'success':item.current_status==='Non-Operational'?'danger':'warning'}">${item.current_status}</span></td>
+    <td>${item.contact_person || '-'}<br><small>${item.contact_number || ''}</small></td>
+    <td>
+      <button class="btn btn-sm btn-primary" onclick="viewRecord(${item.id})" title="View"><i class="bi bi-eye me-1"></i>View</button>
+      <button class="btn btn-sm btn-outline-primary" onclick="editRecord(${item.id})" title="Edit"><i class="bi bi-pencil"></i></button>
+      <button class="btn btn-sm btn-outline-danger" onclick="deleteRecord(${item.id})" title="Delete"><i class="bi bi-trash"></i></button>
+    </td>
+  </tr>`).join('');
+}
+
+function openForm() {
+  document.getElementById('formTitle').textContent = 'Add Infrastructure';
+  document.getElementById('recordId').value = '';
+  document.getElementById('dataForm').reset();
+  new bootstrap.Modal(document.getElementById('formModal')).show();
+}
+
+function parseFacilities(facilities) {
+  if (!facilities || !facilities.trim()) return [];
+  var iconMap = {
+    water:'bi-droplet', electricity:'bi-lightning-fill', toilet:'bi-door-open',
+    kitchen:'bi-cup-straw', internet:'bi-wifi', access:'bi-wheelchair',
+    disabled:'bi-wheelchair',     parking:'bi-car-front', security:'bi-shield-check',
+    lighting:'bi-lightbulb', gas:'bi-fire', drainage:'bi-trash3',
+    road:'bi-signpost-fill', solar:'bi-sun-fill', generator:'bi-battery-charging'
+  };
+  return facilities.split(',').map(function(f){return f.trim()}).filter(Boolean).map(function(f){
+    var key = f.toLowerCase(), matched = 'bi-check-circle-fill';
+    for (var ik in iconMap) { if (key.includes(ik)) { matched = iconMap[ik]; break; } }
+    return {icon:matched, text:f};
+  });
+}
+
+async function viewRecord(id) {
+  const resp = await fetch(`/api/critical-infrastructure/${id}`);
+  const d = await resp.json();
+  if(!d.success) return;
+  const item = d.data;
+  var badgeCls = item.current_status==='Operational'?'view-badge-success':item.current_status==='Non-Operational'?'view-badge-danger':'view-badge-warning';
+  var facs = parseFacilities(item.available_facilities);
+  showDetailedViewModal({
+    logo:'bi-building',
+    title:item.name,
+    hero:{
+      icon:'bi-building',
+      name:item.name,
+      subtitle:(item.infrastructure_type||'') + (item.settlement ? ' \u2022 ' + item.settlement : ''),
+      status:item.current_status,
+      badgeClass:badgeCls
+    },
+    sections:[
+      {icon:'bi-info-circle', title:'Basic Information', columns:3, items:[
+        {label:'Infrastructure ID', value:item.infrastructure_id},
+        {label:'Name', value:item.name},
+        {label:'Type', value:item.infrastructure_type},
+        {label:'Ward', value:wardMap[item.ward_id] || '-'},
+        {label:'Description', value:item.description, fullWidth:true},
+        {label:'Settlement', value:item.settlement}
+      ]},
+      {icon:'bi-geo-alt-fill', title:'Location & Capacity', columns:3, items:[
+        {label:'Coordinates', value:item.coordinates || '-'},
+        {label:'Elevation', value:item.elevation ? item.elevation + ' m' : '-'},
+        {label:'Capacity', value:item.capacity || '-'}
+      ]},
+      {icon:'bi-telephone', title:'Contact Information', columns:3, items:[
+        {label:'Contact Person', value:item.contact_person},
+        {label:'Contact Number', value:item.contact_number},
+        {label:'Accessibility', value:item.accessibility_status}
+      ]}
+    ],
+    tags:facs,
+    footer:[
+      {icon:'bi-calendar', label:'Created On', value:item.created_at ? new Date(item.created_at).toLocaleDateString() : '-'},
+      {icon:'bi-pencil', label:'Last Updated', value:item.updated_at ? new Date(item.updated_at).toLocaleDateString() : '-'}
+    ]
+  });
+}
+
+async function editRecord(id) {
+  const resp = await fetch(`/api/critical-infrastructure/${id}`);
+  const d = await resp.json();
+  if(!d.success) return;
+  const item = d.data;
+  document.getElementById('formTitle').textContent = 'Edit Infrastructure';
+  document.getElementById('recordId').value = item.id;
+  document.getElementById('infrastructure_id').value = item.infrastructure_id;
+  document.getElementById('name').value = item.name;
+  document.getElementById('infrastructure_type').value = item.infrastructure_type;
+  document.getElementById('description').value = item.description || '';
+  document.getElementById('ward_id').value = item.ward_id || '';
+  document.getElementById('settlement').value = item.settlement || '';
+  document.getElementById('coordinates').value = item.coordinates || '';
+  document.getElementById('elevation').value = item.elevation || '';
+  document.getElementById('capacity').value = item.capacity || '';
+  document.getElementById('current_status').value = item.current_status || 'Operational';
+  document.getElementById('accessibility_status').value = item.accessibility_status || 'Accessible';
+  document.getElementById('contact_person').value = item.contact_person || '';
+  document.getElementById('contact_number').value = item.contact_number || '';
+  document.getElementById('available_facilities').value = item.available_facilities || '';
+  new bootstrap.Modal(document.getElementById('formModal')).show();
+}
+
+async function saveRecord() {
+  const id = document.getElementById('recordId').value;
+  const coords = document.getElementById('coordinates').value;
+  if (!validateFormFields([
+    {id:'name', label:'Infrastructure Name', required:true},
+    {id:'infrastructure_type', label:'Infrastructure Type', required:true},
+    {id:'contact_number', label:'Contact Number', phone:true},
+    {id:'coordinates', label:'Coordinates', coordinates:true},
+  ])) return;
+  const data = {
+    infrastructure_id: document.getElementById('infrastructure_id').value || undefined,
+    name: document.getElementById('name').value,
+    infrastructure_type: document.getElementById('infrastructure_type').value,
+    description: document.getElementById('description').value,
+    ward_id: document.getElementById('ward_id').value || null,
+    settlement: document.getElementById('settlement').value,
+    coordinates: document.getElementById('coordinates').value || null,
+    elevation: document.getElementById('elevation').value || null,
+    capacity: document.getElementById('capacity').value,
+    current_status: document.getElementById('current_status').value,
+    contact_person: document.getElementById('contact_person').value,
+    contact_number: document.getElementById('contact_number').value,
+    accessibility_status: document.getElementById('accessibility_status').value,
+    available_facilities: document.getElementById('available_facilities').value,
+  };
+  const dupErr = await checkDuplicateRecords('/api/critical-infrastructure', {name: data.name, contact_number: data.contact_number}, id, 'Infrastructure');
+  if (dupErr) { showToast('danger', dupErr); return; }
+  const url = id ? `/api/critical-infrastructure/${id}` : '/api/critical-infrastructure';
+  const method = id ? 'PUT' : 'POST';
+  const resp = await fetch(url, { method, headers: {'Content-Type':'application/json','X-CSRFToken':document.querySelector('meta[name="csrf-token"]').getAttribute('content')}, body: JSON.stringify(data) });
+  const result = await resp.json();
+  if(result.success) {
+    bootstrap.Modal.getInstance(document.getElementById('formModal')).hide();
+    loadData();
+    showToast('success', id ? 'Updated successfully' : 'Created successfully');
+  } else showToast('danger', result.message || 'Error saving');
+}
+
+async function deleteRecord(id) {
+  if(!confirm('Are you sure?')) return;
+  const resp = await fetch(`/api/critical-infrastructure/${id}`, { method:'DELETE', headers:{'X-CSRFToken':document.querySelector('meta[name="csrf-token"]').getAttribute('content')} });
+  const result = await resp.json();
+  if(result.success) { loadData(); showToast('success','Deleted successfully'); }
+  else showToast('danger', result.message || 'Error deleting');
+}
+
+function showMap() { window.location.href = '/gis-map'; }
+
+initWardMap();
+loadTypes();
+loadData();
+</script>
+{% include "_module_shared.html" %}
+{% endblock %}

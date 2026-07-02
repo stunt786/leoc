@@ -1,0 +1,314 @@
+{% extends "base.html" %}
+{% block title %}Adjustments - LEOC{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('index') }}"><i class="bi bi-house-fill"></i></a></li>
+<li class="breadcrumb-item"><a href="{{ url_for('inventory_page') }}">Inventory</a></li>
+<li class="breadcrumb-item active">Adjustments</li>
+{% endblock %}
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center">
+    <div>
+        <h4><i class="bi bi-sliders me-2"></i>Manual Stock Adjustment</h4>
+        <p>Record stock adjustments for Damage, Loss, Physical Count, Correction, or Expired items.</p>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-5">
+        <div class="card">
+            <div class="card-header">
+                <span><i class="bi bi-pencil-square me-2 text-primary"></i>New Adjustment</span>
+            </div>
+            <div class="card-body">
+                <form id="adjustmentForm">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Adjustment No.</label>
+                            <input type="text" class="form-control" id="adjNo" readonly>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Date</label>
+                            <input type="text" class="form-control nepali-date" placeholder="YYYY-MM-DD" id="adjDate">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Warehouse <span class="text-danger">*</span></label>
+                            <select class="form-select" id="adjWarehouse" required>
+                                <option value="">Select Warehouse</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Item <span class="text-danger">*</span></label>
+                            <select class="form-select" id="adjItem" required>
+                                <option value="">Select Item</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Current Quantity</label>
+                            <input type="text" class="form-control" id="adjCurrentQty" readonly value="0">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Adjustment Type <span class="text-danger">*</span></label>
+                            <select class="form-select" id="adjType" required>
+                                <option value="">Select Type</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Reason <span class="text-danger">*</span></label>
+                            <select class="form-select" id="adjReason" required>
+                                <option value="">Select Reason</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Adjusted Quantity <span class="text-danger">*</span></label>
+                            <input type="number" class="form-control" id="adjQty" min="1" required>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Remarks</label>
+                            <textarea class="form-control" id="adjRemarks" rows="2"></textarea>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Approval User</label>
+                            <input type="text" class="form-control" id="adjApprovalUser" placeholder="Name of person who approved">
+                        </div>
+                        <div class="col-12">
+                            <button type="button" class="btn btn-primary w-100" onclick="saveAdjustment()">
+                                <i class="bi bi-check-lg me-1"></i>Record Adjustment
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-7">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-clock-history me-2 text-primary"></i>Recent Adjustments</span>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Adj. No.</th>
+                                <th>Date</th>
+                                <th>Warehouse</th>
+                                <th>Item</th>
+                                <th>Type</th>
+                                <th>Reason</th>
+                                <th class="text-end">Qty</th>
+                                <th>Remarks</th>
+                                <th>Approval</th>
+                            </tr>
+                        </thead>
+                        <tbody id="adjustmentTableBody">
+                            <tr><td colspan="9" class="text-center py-4"><div class="spinner-border text-primary"></div></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="d-flex justify-content-between align-items-center mt-2 px-2">
+                    <small class="text-muted" id="tableInfo">0 records</small>
+                    <nav><ul class="pagination pagination-sm mb-0" id="pagination"></ul></nav>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+let _adjustments = [];
+let paginator = new Paginator({
+    perPage: 25,
+    onPageChange: () => renderAdjustments(_adjustments)
+});
+
+function setDefaultDate() {
+    document.getElementById('adjDate').value = today_bs;
+}
+
+function generateAdjNo() {
+    document.getElementById('adjNo').value = 'ADJ-' + String(Date.now()).slice(-6);
+}
+
+let allItems = [];
+
+function populateItemDropdown(items) {
+    const itemSel = document.getElementById('adjItem');
+    itemSel.innerHTML = '<option value="">Select Item</option>';
+    items.forEach(i => {
+        itemSel.innerHTML += `<option value="${i.id}" data-unit="${i.unit}">${i.name} (${i.item_code || 'No Code'})</option>`;
+    });
+}
+
+async function loadItemsForWarehouse() {
+    const warehouseId = document.getElementById('adjWarehouse').value;
+    if (!warehouseId) {
+        populateItemDropdown(allItems);
+        document.getElementById('adjCurrentQty').value = '0';
+        return;
+    }
+    try {
+        const r = await fetch(`/api/inventory?warehouse_id=${warehouseId}`);
+        const d = await r.json();
+        if (!d.success) { populateItemDropdown(allItems); return; }
+        const inventoryItemIds = new Set(d.inventory.map(inv => inv.item_id));
+        const filtered = allItems.filter(i => inventoryItemIds.has(i.id));
+        populateItemDropdown(filtered.length > 0 ? filtered : allItems);
+        document.getElementById('adjCurrentQty').value = '0';
+    } catch (e) { populateItemDropdown(allItems); }
+}
+
+async function loadFormData() {
+    try {
+        const r = await fetch('/api/data');
+        const d = await r.json();
+        if (!d.success) { showToast('danger', d.message); return; }
+        const warehouseSel = document.getElementById('adjWarehouse');
+        d.warehouses.forEach(w => {
+            warehouseSel.innerHTML += `<option value="${w.id}">${w.name}</option>`;
+        });
+        allItems = d.items;
+        populateItemDropdown(allItems);
+        const typeSel = document.getElementById('adjType');
+        d.adjustment_types.forEach(t => {
+            typeSel.innerHTML += `<option value="${t}">${t}</option>`;
+        });
+        const reasonSel = document.getElementById('adjReason');
+        d.adjustment_reasons.forEach(r => {
+            reasonSel.innerHTML += `<option value="${r}">${r}</option>`;
+        });
+    } catch (e) { showToast('danger', 'Error loading form data: ' + e.message); }
+}
+
+function typeBadge(type) {
+    const map = {
+        'Increase': 'bg-success',
+        'Decrease': 'bg-danger',
+        'Damage': 'bg-warning text-dark',
+        'Expired': 'bg-secondary',
+        'Lost': 'bg-dark',
+        'Correction': 'bg-info text-dark',
+        'Correction_Increase': 'bg-info text-dark'
+    };
+    return `<span class="badge ${map[type] || 'bg-secondary'}">${type}</span>`;
+}
+
+async function loadCurrentQty() {
+    const warehouseId = document.getElementById('adjWarehouse').value;
+    const itemId = document.getElementById('adjItem').value;
+    if (!warehouseId || !itemId) {
+        document.getElementById('adjCurrentQty').value = '0';
+        return;
+    }
+    try {
+        const r = await fetch(`/api/inventory?warehouse_id=${warehouseId}`);
+        const d = await r.json();
+        const match = d.success ? d.inventory.find(inv => inv.item_id == itemId) : null;
+        document.getElementById('adjCurrentQty').value = match ? match.quantity : '0';
+    } catch (e) {
+        document.getElementById('adjCurrentQty').value = '0';
+    }
+}
+
+function renderAdjustments(data) {
+    const tbody = document.getElementById('adjustmentTableBody');
+    if (data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" class="text-center py-4 text-muted">No adjustments recorded yet</td></tr>';
+        paginator.update(0);
+        return;
+    }
+    const pageData = paginator.getPageData(data);
+    tbody.innerHTML = pageData.map(a => {
+        return `<tr>
+            <td><strong>${a.adjustment_no}</strong></td>
+            <td>${a.date}</td>
+            <td>${a.warehouse_name || a.warehouse_id}</td>
+            <td>${a.item_name || a.item_id}</td>
+            <td>${typeBadge(a.adjustment_type)}</td>
+            <td>${a.reason || '-'}</td>
+            <td class="text-end fw-bold">${a.adjusted_quantity}</td>
+            <td><small>${a.remarks || '-'}</small></td>
+            <td>${a.approval_user || '-'}</td>
+        </tr>`;
+    }).join('');
+    paginator.update(data.length);
+}
+
+async function loadAdjustments() {
+    try {
+        const r = await fetch('/api/adjustments');
+        const d = await r.json();
+        if (!d.success) { showToast('danger', d.message); return; }
+        _adjustments = d.adjustments;
+        renderAdjustments(_adjustments);
+    } catch (e) { showToast('danger', 'Error loading adjustments: ' + e.message); }
+}
+
+async function saveAdjustment() {
+    const warehouseId = document.getElementById('adjWarehouse').value;
+    const itemId = document.getElementById('adjItem').value;
+    const date = document.getElementById('adjDate').value;
+    const adjType = document.getElementById('adjType').value;
+    const reason = document.getElementById('adjReason').value;
+    const adjQty = parseInt(document.getElementById('adjQty').value);
+    const remarks = document.getElementById('adjRemarks').value;
+    const approvalUser = document.getElementById('adjApprovalUser').value;
+
+    if (!warehouseId) { showToast('danger', 'Please select a warehouse'); return; }
+    if (!itemId) { showToast('danger', 'Please select an item'); return; }
+    if (!date) { showToast('danger', 'Please select a date'); return; }
+    if (!adjType) { showToast('danger', 'Please select an adjustment type'); return; }
+    if (!reason) { showToast('danger', 'Please select a reason'); return; }
+    if (!adjQty || adjQty <= 0) { showToast('danger', 'Adjusted quantity must be greater than 0'); return; }
+
+    const body = {
+        adjustment_no: document.getElementById('adjNo').value,
+        date: date,
+        warehouse_id: parseInt(warehouseId),
+        item_id: parseInt(itemId),
+        adjustment_type: adjType,
+        reason: reason,
+        adjusted_quantity: adjQty,
+        remarks: remarks,
+        approval_user: approvalUser
+    };
+
+    try {
+        const r = await fetch('/api/adjustments', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrf},
+            body: JSON.stringify(body)
+        });
+        const d = await r.json();
+        if (d.success) {
+            showToast('success', 'Adjustment recorded successfully');
+            document.getElementById('adjQty').value = '';
+            document.getElementById('adjRemarks').value = '';
+            document.getElementById('adjApprovalUser').value = '';
+            generateAdjNo();
+            loadAdjustments();
+            loadCurrentQty();
+        } else {
+            showToast('danger', d.message);
+        }
+    } catch (e) { showToast('danger', 'Error: ' + e.message); }
+}
+
+document.getElementById('adjItem').addEventListener('change', loadCurrentQty);
+document.getElementById('adjWarehouse').addEventListener('change', () => {
+    loadItemsForWarehouse();
+    loadCurrentQty();
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+    setDefaultDate();
+    generateAdjNo();
+    loadFormData();
+    loadAdjustments();
+});
+</script>
+{% endblock %}

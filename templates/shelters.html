@@ -1,0 +1,423 @@
+{% extends "base.html" %}
+{% block title %}Shelters - {{ office_name }}{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('index') }}"><i class="bi bi-house-fill"></i></a></li>
+<li class="breadcrumb-item active">Shelter Management</li>
+{% endblock %}
+{% block content %}
+<div class="container-fluid">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="mb-0"><i class="bi bi-building me-2"></i>Shelter & Evacuation Management</h4>
+      <button class="btn btn-outline-primary btn-sm me-1" onclick="window.location.href='/gis-map'"><i class="bi bi-map"></i> Map View</button>
+      <button class="btn btn-outline-success btn-sm me-1" onclick="printData('Shelter Management')"><i class="bi bi-printer"></i> Print</button>
+      <button class="btn btn-primary btn-sm" onclick="openForm()"><i class="bi bi-plus-lg"></i> Add Shelter</button>
+  </div>
+
+  <div class="row mb-3">
+    <div class="col-md-3">
+      <select class="form-select form-select-sm" id="filterWard" onchange="loadData()">
+        <option value="">All Wards</option>
+        {% for w in ward_list %}
+        <option value="{{ w.id }}">{{ w.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-3">
+      <select class="form-select form-select-sm" id="filterType" onchange="loadData()">
+        <option value="">All Types</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover mb-0" id="dataTable">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Type</th>
+              <th>Ward</th>
+              <th>Location</th>
+              <th>Capacity</th>
+              <th>Occupancy</th>
+              <th>Manager</th>
+              <th>Contact</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="formModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-building me-2"></i><span id="formTitle">Add Shelter</span></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form id="dataForm">
+          <input type="hidden" id="recordId">
+          <ul class="nav nav-tabs mb-3">
+            <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#tabBasic">Basic</a></li>
+            <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tabGIS">GIS</a></li>
+            <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tabCapacity">Capacity</a></li>
+            <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tabFacilities">Facilities</a></li>
+            <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tabManagement">Management</a></li>
+            <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tabEvacuation">Evacuation</a></li>
+          </ul>
+          <div class="tab-content">
+            <div class="tab-pane fade show active" id="tabBasic">
+              <div class="row">
+                <div class="col-md-6 mb-2">
+                  <label class="form-label">Shelter Name</label>
+                  <input type="text" class="form-control form-control-sm" id="shelter_name" required>
+                </div>
+                <div class="col-md-6 mb-2">
+                  <label class="form-label">Shelter Type</label>
+                  <select class="form-select form-select-sm" id="shelter_type" required></select>
+                </div>
+                <div class="col-md-6 mb-2">
+                  <label class="form-label">Ward</label>
+                  <select class="form-select form-select-sm" id="ward_id">
+                    <option value="">Select Ward</option>
+                    {% for w in ward_list %}
+                    <option value="{{ w.id }}">{{ w.name }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="col-12 mb-2">
+                  <label class="form-label">Location</label>
+                  <textarea class="form-control form-control-sm" id="location" rows="2"></textarea>
+                </div>
+              </div>
+            </div>
+            <div class="tab-pane fade" id="tabGIS">
+              <div class="row">
+                <div class="col-md-6 mb-2">
+                  <label class="form-label">Coordinates (Lat, Lng)</label>
+                  <input type="text" class="form-control form-control-sm" id="coordinates" placeholder="e.g. 27.7172, 85.3240">
+                </div>
+                <div class="col-12 mb-2">
+                  <label class="form-label">Boundary Polygon (GeoJSON)</label>
+                  <textarea class="form-control form-control-sm" id="boundary_polygon" rows="3"></textarea>
+                </div>
+              </div>
+            </div>
+            <div class="tab-pane fade" id="tabCapacity">
+              <div class="row">
+                <div class="col-md-4 mb-2">
+                  <label class="form-label">Total Capacity</label>
+                  <input type="number" class="form-control form-control-sm" id="total_capacity" min="0">
+                </div>
+                <div class="col-md-4 mb-2">
+                  <label class="form-label">Male Capacity</label>
+                  <input type="number" class="form-control form-control-sm" id="male_capacity" min="0">
+                </div>
+                <div class="col-md-4 mb-2">
+                  <label class="form-label">Female Capacity</label>
+                  <input type="number" class="form-control form-control-sm" id="female_capacity" min="0">
+                </div>
+                <div class="col-md-4 mb-2">
+                  <label class="form-label">Children Capacity</label>
+                  <input type="number" class="form-control form-control-sm" id="children_capacity" min="0">
+                </div>
+                <div class="col-md-4 mb-2">
+                  <label class="form-label">Current Occupancy</label>
+                  <input type="number" class="form-control form-control-sm" id="current_occupancy" min="0">
+                </div>
+                <div class="col-md-4 mb-2">
+                  <label class="form-label">Available Space</label>
+                  <input type="number" class="form-control form-control-sm" id="available_space" min="0">
+                </div>
+              </div>
+            </div>
+            <div class="tab-pane fade" id="tabFacilities">
+              <div class="row">
+                <div class="col-md-4 mb-1">
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="water_available">
+                    <label class="form-check-label" for="water_available">Water Available</label>
+                  </div>
+                </div>
+                <div class="col-md-4 mb-1">
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="toilet_available">
+                    <label class="form-check-label" for="toilet_available">Toilet Available</label>
+                  </div>
+                </div>
+                <div class="col-md-4 mb-1">
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="electricity_available">
+                    <label class="form-check-label" for="electricity_available">Electricity Available</label>
+                  </div>
+                </div>
+                <div class="col-md-4 mb-1">
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="kitchen_available">
+                    <label class="form-check-label" for="kitchen_available">Kitchen Available</label>
+                  </div>
+                </div>
+                <div class="col-md-4 mb-1">
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="medical_support">
+                    <label class="form-check-label" for="medical_support">Medical Support</label>
+                  </div>
+                </div>
+                <div class="col-md-4 mb-1">
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="accessibility_support">
+                    <label class="form-check-label" for="accessibility_support">Accessibility Support</label>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="tab-pane fade" id="tabManagement">
+              <div class="row">
+                <div class="col-md-6 mb-2">
+                  <label class="form-label">Shelter Manager</label>
+                  <input type="text" class="form-control form-control-sm" id="shelter_manager">
+                </div>
+                <div class="col-md-6 mb-2">
+                  <label class="form-label">Contact Number</label>
+                  <input type="text" class="form-control form-control-sm" id="contact_number">
+                </div>
+              </div>
+            </div>
+            <div class="tab-pane fade" id="tabEvacuation">
+              <div class="row">
+                <div class="col-12 mb-2">
+                  <label class="form-label">Evacuation Routes</label>
+                  <textarea class="form-control form-control-sm" id="evacuation_routes" rows="2"></textarea>
+                </div>
+                <div class="col-12 mb-2">
+                  <label class="form-label">Assembly Points</label>
+                  <textarea class="form-control form-control-sm" id="assembly_points" rows="2"></textarea>
+                </div>
+                <div class="col-12 mb-2">
+                  <label class="form-label">Linked Risk Zones</label>
+                  <textarea class="form-control form-control-sm" id="linked_risk_zones" rows="2"></textarea>
+                </div>
+                <div class="col-12 mb-2">
+                  <label class="form-label">Linked Vulnerable Households</label>
+                  <textarea class="form-control form-control-sm" id="linked_vulnerable_households" rows="2"></textarea>
+                </div>
+              </div>
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary btn-sm" onclick="saveRecord()"><i class="bi bi-check-lg"></i> Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% include "_module_shared.html" %}
+{% endblock %}
+{% block extra_js %}
+<script>
+const SHELTER_TYPES = ['Temporary Shelter', 'Permanent Shelter', 'Community Building', 'School', 'Relief Centre', 'Open Area/Open Space'];
+const wardMap = {};
+
+function initWardMap() {
+  {% for w in ward_list %}
+  wardMap[{{ w.id }}] = '{{ w.name }}';
+  {% endfor %}
+}
+
+function loadTypes() {
+  ['filterType','shelter_type'].forEach(id=>{
+    const sel = document.getElementById(id);
+    if(id==='filterType') sel.innerHTML = '<option value="">All Types</option>';
+    else sel.innerHTML = '';
+    SHELTER_TYPES.forEach(t=>{ sel.innerHTML+=`<option value="${t}">${t}</option>`; });
+  });
+}
+
+async function loadData() {
+  const params = new URLSearchParams();
+  const ward = document.getElementById('filterWard').value;
+  const type = document.getElementById('filterType').value;
+  if(ward) params.set('ward_id', ward);
+  if(type) params.set('shelter_type', type);
+  const resp = await fetch(`/api/shelters?${params}`);
+  const d = await resp.json();
+  const tbody = document.querySelector('#dataTable tbody');
+  if(!d.success) { tbody.innerHTML = '<tr><td colspan="9" class="text-center text-danger">' + (d.message || 'Error loading data') + '</td></tr>'; return; }
+  const items = d.data || [];
+  if(items.length === 0) { tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-4">No shelters found</td></tr>'; return; }
+  tbody.innerHTML = items.map(item => `<tr>
+    <td>${item.shelter_name}</td>
+    <td>${item.shelter_type || '-'}</td>
+    <td>${wardMap[item.ward_id] || '-'}</td>
+    <td>${item.location || '-'}</td>
+    <td>${item.total_capacity || '-'}</td>
+    <td>${item.current_occupancy || '0'}</td>
+    <td>${item.shelter_manager || '-'}</td>
+    <td>${item.contact_number || '-'}</td>
+    <td>
+      <button class="btn btn-sm btn-primary" onclick="viewRecord(${item.id})" title="View"><i class="bi bi-eye me-1"></i>View</button>
+      <button class="btn btn-sm btn-outline-primary" onclick="editRecord(${item.id})" title="Edit"><i class="bi bi-pencil"></i></button>
+      <button class="btn btn-sm btn-outline-danger" onclick="deleteRecord(${item.id})" title="Delete"><i class="bi bi-trash"></i></button>
+    </td>
+  </tr>`).join('');
+}
+
+function openForm() {
+  document.getElementById('formTitle').textContent = 'Add Shelter';
+  document.getElementById('recordId').value = '';
+  document.getElementById('dataForm').reset();
+  new bootstrap.Modal(document.getElementById('formModal')).show();
+}
+
+async function viewRecord(id) {
+  const resp = await fetch(`/api/shelters/${id}`);
+  const d = await resp.json();
+  if(!d.success) return;
+  const item = d.data;
+  var amenityTags = [];
+  var amap = {water_available:{icon:'bi-droplet',label:'Water'}, toilet_available:{icon:'bi-door-open',label:'Toilet'}, electricity_available:{icon:'bi-lightning-fill',label:'Electricity'}, kitchen_available:{icon:'bi-cup-straw',label:'Kitchen'}, medical_support:{icon:'bi-heart-pulse',label:'Medical'}, accessibility_support:{icon:'bi-wheelchair',label:'Accessible'}};
+  for (var k in amap) { if (item[k]) amenityTags.push({icon:amap[k].icon,text:amap[k].label}); }
+  showDetailedViewModal({
+    logo:'bi-building',
+    title:item.shelter_name,
+    hero:{
+      icon:'bi-building',
+      name:item.shelter_name,
+      subtitle:item.shelter_type || '',
+      status:'Active',
+      badgeClass:'view-badge-success'
+    },
+    sections:[
+      {icon:'bi-info-circle', title:'Basic Information', columns:3, items:[
+        {label:'Shelter Name', value:item.shelter_name},
+        {label:'Shelter Type', value:item.shelter_type || '-'},
+        {label:'Ward', value:wardMap[item.ward_id] || '-'},
+        {label:'Location', value:item.location, fullWidth:true}
+      ]},
+      {icon:'bi-geo-alt-fill', title:'Location Details', columns:3, items:[
+        {label:'Coordinates', value:item.coordinates || '-'},
+        {label:'Evacuation Routes', value:item.evacuation_routes, fullWidth:true},
+        {label:'Assembly Points', value:item.assembly_points, fullWidth:true}
+      ]},
+      {icon:'bi-people', title:'Capacity', columns:3, items:[
+        {label:'Total Capacity', value:item.total_capacity != null ? item.total_capacity : '-'},
+        {label:'Male', value:item.male_capacity != null ? item.male_capacity : '-'},
+        {label:'Female', value:item.female_capacity != null ? item.female_capacity : '-'},
+        {label:'Children', value:item.children_capacity != null ? item.children_capacity : '-'},
+        {label:'Current Occupancy', value:item.current_occupancy != null ? item.current_occupancy : '-'},
+        {label:'Available Space', value:item.available_space != null ? item.available_space : '-'}
+      ]},
+      {icon:'bi-telephone', title:'Management', columns:3, items:[
+        {label:'Shelter Manager', value:item.shelter_manager || '-'},
+        {label:'Contact Number', value:item.contact_number || '-'}
+      ]}
+    ],
+    tags:amenityTags,
+    footer:[
+      {icon:'bi-calendar', label:'Created On', value:item.created_at ? new Date(item.created_at).toLocaleDateString() : '-'}
+    ]
+  });
+}
+
+async function editRecord(id) {
+  const resp = await fetch(`/api/shelters/${id}`);
+  const d = await resp.json();
+  if(!d.success) return;
+  const item = d.data;
+  document.getElementById('formTitle').textContent = 'Edit Shelter';
+  document.getElementById('recordId').value = item.id;
+  document.getElementById('shelter_name').value = item.shelter_name;
+  document.getElementById('shelter_type').value = item.shelter_type;
+  document.getElementById('ward_id').value = item.ward_id || '';
+  document.getElementById('location').value = item.location || '';
+  document.getElementById('coordinates').value = item.coordinates || '';
+  document.getElementById('boundary_polygon').value = item.boundary_polygon || '';
+  document.getElementById('total_capacity').value = item.total_capacity || '';
+  document.getElementById('male_capacity').value = item.male_capacity || '';
+  document.getElementById('female_capacity').value = item.female_capacity || '';
+  document.getElementById('children_capacity').value = item.children_capacity || '';
+  document.getElementById('current_occupancy').value = item.current_occupancy || '';
+  document.getElementById('available_space').value = item.available_space || '';
+  document.getElementById('water_available').checked = !!item.water_available;
+  document.getElementById('toilet_available').checked = !!item.toilet_available;
+  document.getElementById('electricity_available').checked = !!item.electricity_available;
+  document.getElementById('kitchen_available').checked = !!item.kitchen_available;
+  document.getElementById('medical_support').checked = !!item.medical_support;
+  document.getElementById('accessibility_support').checked = !!item.accessibility_support;
+  document.getElementById('shelter_manager').value = item.shelter_manager || '';
+  document.getElementById('contact_number').value = item.contact_number || '';
+  document.getElementById('evacuation_routes').value = item.evacuation_routes || '';
+  document.getElementById('assembly_points').value = item.assembly_points || '';
+  document.getElementById('linked_risk_zones').value = item.linked_risk_zones || '';
+  document.getElementById('linked_vulnerable_households').value = item.linked_vulnerable_households || '';
+  new bootstrap.Modal(document.getElementById('formModal')).show();
+}
+
+async function saveRecord() {
+  const id = document.getElementById('recordId').value;
+  if (!validateFormFields([
+    {id:'shelter_name', label:'Shelter Name', required:true},
+    {id:'shelter_type', label:'Shelter Type', required:true},
+    {id:'contact_number', label:'Contact Number', phone:true},
+    {id:'coordinates', label:'Coordinates', coordinates:true},
+  ])) return;
+  const data = {
+    shelter_name: document.getElementById('shelter_name').value,
+    shelter_type: document.getElementById('shelter_type').value,
+    ward_id: document.getElementById('ward_id').value || null,
+    location: document.getElementById('location').value,
+    coordinates: document.getElementById('coordinates').value || null,
+    boundary_polygon: document.getElementById('boundary_polygon').value || null,
+    total_capacity: document.getElementById('total_capacity').value || null,
+    male_capacity: document.getElementById('male_capacity').value || null,
+    female_capacity: document.getElementById('female_capacity').value || null,
+    children_capacity: document.getElementById('children_capacity').value || null,
+    current_occupancy: document.getElementById('current_occupancy').value || 0,
+    available_space: document.getElementById('available_space').value || null,
+    water_available: document.getElementById('water_available').checked,
+    toilet_available: document.getElementById('toilet_available').checked,
+    electricity_available: document.getElementById('electricity_available').checked,
+    kitchen_available: document.getElementById('kitchen_available').checked,
+    medical_support: document.getElementById('medical_support').checked,
+    accessibility_support: document.getElementById('accessibility_support').checked,
+    shelter_manager: document.getElementById('shelter_manager').value,
+    contact_number: document.getElementById('contact_number').value,
+    evacuation_routes: document.getElementById('evacuation_routes').value,
+    assembly_points: document.getElementById('assembly_points').value,
+    linked_risk_zones: document.getElementById('linked_risk_zones').value,
+    linked_vulnerable_households: document.getElementById('linked_vulnerable_households').value,
+  };
+  const dupErr = await checkDuplicateRecords('/api/shelters', {shelter_name: data.shelter_name, contact_number: data.contact_number}, id, 'Shelter');
+  if (dupErr) { showToast('danger', dupErr); return; }
+  const url = id ? `/api/shelters/${id}` : '/api/shelters';
+  const method = id ? 'PUT' : 'POST';
+  const resp = await fetch(url, { method, headers: {'Content-Type':'application/json','X-CSRFToken':document.querySelector('meta[name="csrf-token"]').getAttribute('content')}, body: JSON.stringify(data) });
+  const result = await resp.json();
+  if(result.success) {
+    bootstrap.Modal.getInstance(document.getElementById('formModal')).hide();
+    loadData();
+    showToast('success', id ? 'Updated successfully' : 'Created successfully');
+  } else showToast('danger', result.message || 'Error saving');
+}
+
+async function deleteRecord(id) {
+  if(!confirm('Are you sure?')) return;
+  const resp = await fetch(`/api/shelters/${id}`, { method:'DELETE', headers:{'X-CSRFToken':document.querySelector('meta[name="csrf-token"]').getAttribute('content')} });
+  const result = await resp.json();
+  if(result.success) { loadData(); showToast('success','Deleted successfully'); }
+  else showToast('danger', result.message || 'Error deleting');
+}
+
+initWardMap();
+loadTypes();
+loadData();
+</script>
+{% endblock %}

@@ -1,528 +1,528 @@
 {% extends "base.html" %}
-
-{% block title %}सेटिङ्हरू - LEOC{% endblock %}
-
+{% block title %}Settings - LEOC{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('index') }}"><i class="bi bi-house-fill"></i></a></li>
+<li class="breadcrumb-item active">Settings</li>
+{% endblock %}
 {% block content %}
-<div class="container py-4">
-    <div class="row">
-        <div class="col-lg-10">
-            <!-- Header with Unlock Button -->
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <h3 class="mb-0"><i class="bi bi-gear"></i> सेटिङ्हरू व्यवस्थापन</h3>
-                <button class="btn btn-warning" id="unlockSettingsBtn" onclick="unlockSettings()">
-                    <i class="bi bi-unlock-fill"></i> परिवर्तन गर्न अनलक गर्नुहोस्
-                </button>
-            </div>
+<div class="page-header d-flex justify-content-between align-items-center mb-3">
+    <h4><i class="bi bi-gear-fill me-2"></i>Organization Settings</h4>
+</div>
 
-            <!-- Relief Items Settings -->
-            <div class="card shadow-lg mb-4">
-                <div class="card-header bg-gradient" style="background: linear-gradient(135deg, #007bff, #0062cc);">
-                    <h4 class="mb-0 text-dark">
-                        <i class="bi bi-bag text-dark"></i> राहात वितरण सामाग्री
-                    </h4>
-                </div>
-                <div class="card-body">
-                    <p class="text-muted">वितरण फारममा प्रयोग हुने सामाग्रीहरू व्यवस्थापन गर्नुहोस्</p>
-                    <div id="reliefItemsContainer" class="mb-3"></div>
-                    <button type="button" class="btn btn-success btn-sm" onclick="addReliefItem()">
-                        <i class="bi bi-plus-circle"></i> नयाँ थप्नुहोस्
-                    </button>
-                    <button type="button" class="btn btn-primary btn-sm" onclick="saveReliefItems()">
-                        <i class="bi bi-save"></i> सुरक्षित गर्नुहोस्
-                    </button>
-                </div>
-            </div>
+<ul class="nav nav-tabs mb-3" id="settingsTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="org-tab" data-bs-toggle="tab" data-bs-target="#org" type="button" role="tab">
+            <i class="bi bi-building me-1"></i>Organization
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="lists-tab" data-bs-toggle="tab" data-bs-target="#lists" type="button" role="tab">
+            <i class="bi bi-list-check me-1"></i>Dropdown Lists
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="fiscal-tab" data-bs-toggle="tab" data-bs-target="#fiscal" type="button" role="tab">
+            <i class="bi bi-calendar me-1"></i>Fiscal Year
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="system-tab" data-bs-toggle="tab" data-bs-target="#system" type="button" role="tab">
+            <i class="bi bi-database me-1"></i>System
+        </button>
+    </li>
+</ul>
 
-            <!-- Fiscal Years Settings -->
-            <div class="card shadow-lg mb-4">
-                <div class="card-header bg-gradient" style="background: linear-gradient(135deg, #17a2b8, #117a8b);">
-                    <h4 class="mb-0 text-dark">
-                        <i class="bi bi-calendar2 text-dark"></i> आर्थिक वर्षहरू
-                    </h4>
-                </div>
-                <div class="card-body">
-                    <p class="text-muted">विपद् वर्गीकरणका लागि प्रयोग हुने आर्थिक वर्षहरू व्यवस्थापन गर्नुहोस्</p>
-                    <div id="fiscalYearsContainer" class="mb-3"></div>
-                    <button type="button" class="btn btn-success btn-sm" onclick="addFiscalYear()">
-                        <i class="bi bi-plus-circle"></i> नयाँ थप्नुहोस्
-                    </button>
-                    <button type="button" class="btn btn-primary btn-sm" onclick="saveFiscalYears()">
-                        <i class="bi bi-save"></i> सुरक्षित गर्नुहोस्
-                    </button>
-                </div>
-            </div>
+<div class="tab-content" id="settingsTabsContent">
 
-            <!-- SSF Types Settings -->
-            <div class="card shadow-lg mb-4">
-                <div class="card-header bg-gradient" style="background: linear-gradient(135deg, #ffc107, #e0a800);">
-                    <h4 class="mb-0 text-dark">
-                        <i class="bi bi-shield-check text-dark"></i> सामाजिक सुरक्षा भत्ता (SSF) प्रकारहरू
-                    </h4>
-                </div>
-                <div class="card-body">
-                    <p class="text-muted">सिस्टममा उपलब्ध सामाजिक सुरक्षा भत्ताका प्रकारहरू व्यवस्थापन गर्नुहोस्</p>
-                    <div id="ssfTypesContainer" class="mb-3"></div>
-                    <button type="button" class="btn btn-success btn-sm" onclick="addSSFType()">
-                        <i class="bi bi-plus-circle"></i> नयाँ थप्नुहोस्
-                    </button>
-                    <button type="button" class="btn btn-primary btn-sm" onclick="saveSSFTypes()">
-                        <i class="bi bi-save"></i> सुरक्षित गर्नुहोस्
-                    </button>
-                </div>
+    <!-- ============ ORGANIZATION TAB ============ -->
+    <div class="tab-pane fade show active" id="org" role="tabpanel">
+        <div class="card">
+            <div class="card-header"><span><i class="bi bi-building me-2"></i>Organization Information</span></div>
+            <div class="card-body">
+                <form id="settingsForm">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Office Name</label>
+                            <input type="text" class="form-control" id="office_name" data-key="office_name">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Phone</label>
+                            <input type="text" class="form-control" id="phone" data-key="phone">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Email</label>
+                            <input type="email" class="form-control" id="email" data-key="email">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Address</label>
+                            <input type="text" class="form-control" id="address" data-key="address">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Default Language</label>
+                            <select class="form-select" id="default_language" data-key="default_language">
+                                <option value="Nepali">Nepali</option>
+                                <option value="English">English</option>
+                                <option value="Both">Both</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Logo</label>
+                            <input type="file" class="form-control" id="logo" accept="image/*">
+                            <div id="logoPreview" class="mt-2"></div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Report Header</label>
+                            <textarea class="form-control" id="report_header" data-key="report_header" rows="2"></textarea>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Report Footer</label>
+                            <textarea class="form-control" id="report_footer" data-key="report_footer" rows="2"></textarea>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Save Settings</button>
+                    </div>
+                </form>
             </div>
-
-            <!-- Disaster Types Settings -->
-            <div class="card shadow-lg mb-4">
-                <div class="card-header bg-gradient" style="background: linear-gradient(135deg, #dc3545, #bd2130);">
-                    <h4 class="mb-0 text-dark">
-                        <i class="bi bi-exclamation-triangle text-dark"></i> विपद् प्रकारहरू
-                    </h4>
-                </div>
-                <div class="card-body">
-                    <p class="text-muted">सिस्टममा प्रयोग हुने विपद्का प्रकारहरू व्यवस्थापन गर्नुहोस्</p>
-                    <div id="disasterTypesContainer" class="mb-3"></div>
-                    <button type="button" class="btn btn-success btn-sm" onclick="addDisasterType()">
-                        <i class="bi bi-plus-circle"></i> नयाँ थप्नुहोस्
-                    </button>
-                    <button type="button" class="btn btn-primary btn-sm" onclick="saveDisasterTypes()">
-                        <i class="bi bi-save"></i> सुरक्षित गर्नुहोस्
-                    </button>
-                </div>
-            </div>
-
-            <!-- Alert Box -->
-            <div id="alertBox" style="display: none;"></div>
         </div>
     </div>
+
+    <!-- ============ DROPDOWN LISTS TAB ============ -->
+    <div class="tab-pane fade" id="lists" role="tabpanel">
+        <div class="row g-3">
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-header"><span><i class="bi bi-exclamation-triangle me-2"></i>Disaster Types</span></div>
+                    <div class="card-body">
+                        <p class="small text-muted">Used in incidents, assessments, and reports.</p>
+                        <div id="disaster_types_list" class="mb-2"></div>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="new_disaster_type" placeholder="e.g. Drought">
+                            <button class="btn btn-outline-primary" onclick="addListItem('disaster_types', 'new_disaster_type', 'disaster_types_list')"><i class="bi bi-plus-lg"></i></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-header"><span><i class="bi bi-diagram-3 me-2"></i>Cluster Types</span></div>
+                    <div class="card-body">
+                        <p class="small text-muted">Used in cluster management and coordination.</p>
+                        <div id="cluster_types_list" class="mb-2"></div>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="new_cluster_type" placeholder="e.g. Search and Rescue">
+                            <button class="btn btn-outline-primary" onclick="addListItem('cluster_types', 'new_cluster_type', 'cluster_types_list')"><i class="bi bi-plus-lg"></i></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-header"><span><i class="bi bi-people me-2"></i>SSF Types</span></div>
+                    <div class="card-body">
+                        <p class="small text-muted">Used in beneficiary registration for social security categories.</p>
+                        <div id="ssf_types_list" class="mb-2"></div>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="new_ssf_type" placeholder="e.g. Old Age">
+                            <button class="btn btn-outline-primary" onclick="addListItem('ssf_types', 'new_ssf_type', 'ssf_types_list')"><i class="bi bi-plus-lg"></i></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-header"><span><i class="bi bi-map me-2"></i>Wards</span></div>
+                    <div class="card-body">
+                        <p class="small text-muted">Customize ward names shown in all dropdowns across the system.</p>
+                        <div id="wards_list" class="mb-2"></div>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="new_ward_name" placeholder="e.g. Ward 1 or Ward Name">
+                            <button class="btn btn-outline-primary" onclick="addWard()"><i class="bi bi-plus-lg"></i></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============ FISCAL YEAR TAB ============ -->
+    <div class="tab-pane fade" id="fiscal" role="tabpanel">
+        <div class="card">
+            <div class="card-header"><span><i class="bi bi-calendar me-2"></i>Fiscal Year Management</span></div>
+            <div class="card-body">
+                <div class="row g-4">
+                    <div class="col-md-6">
+                        <label class="form-label fw-medium">Active Fiscal Year</label>
+                        <p class="small text-muted">The currently active fiscal year used for filtering and reports.</p>
+                        <select class="form-select" id="active_fiscal_year" data-key="active_fiscal_year"></select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-medium">Fiscal Years</label>
+                        <p class="small text-muted">Add or remove fiscal years available across the system.</p>
+                        <div id="fiscal_years_list" class="mb-2"></div>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="new_fiscal_year" placeholder="e.g. 2085/86">
+                            <button class="btn btn-outline-primary" onclick="addListItem('fiscal_years', 'new_fiscal_year', 'fiscal_years_list')"><i class="bi bi-plus-lg"></i></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============ SYSTEM TAB ============ -->
+    <div class="tab-pane fade" id="system" role="tabpanel">
+        <div class="row g-3">
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-header"><span><i class="bi bi-database me-2"></i>Backup & Restore</span></div>
+                    <div class="card-body">
+                        <div id="dbInfo" class="small text-muted mb-3"></div>
+                        <div class="d-grid gap-2">
+                            <a href="/api/backup" class="btn btn-outline-primary"><i class="bi bi-download me-1"></i>Download Backup</a>
+                            <hr class="my-1">
+                            <label class="form-label small mb-1">Restore from SQL Backup</label>
+                            <div class="input-group">
+                                <input type="file" class="form-control" id="restoreFile" accept=".sql">
+                                <button class="btn btn-outline-warning" onclick="restoreBackup()"><i class="bi bi-upload me-1"></i>Restore</button>
+                            </div>
+                            <small class="text-muted">Upload a .sql backup file. Current data will be replaced.</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-header"><span><i class="bi bi-upload me-2"></i>Import SQL Data</span></div>
+                    <div class="card-body">
+                        <label class="form-label small mb-1">Import rows from SQL file</label>
+                        <p class="small text-muted">Upload a .sql file with INSERT statements. Rows with IDs that already exist will be skipped.</p>
+                        <div class="input-group">
+                            <input type="file" class="form-control" id="importSqlFile" accept=".sql">
+                            <button class="btn btn-outline-primary" onclick="importSqlData()"><i class="bi bi-upload me-1"></i>Import</button>
+                        </div>
+                        <div id="importSqlResult" class="mt-2 small"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                {% if config.get('ENABLE_DANGER_ZONE', True) %}
+                <div class="card h-100 border-danger">
+                    <div class="card-header text-danger"><span><i class="bi bi-exclamation-triangle-fill me-2"></i>Danger Zone</span></div>
+                    <div class="card-body d-flex flex-column">
+                        <label class="form-label fw-medium">Reset Database</label>
+                        <p class="small text-muted flex-grow-1">Deletes all data and re-seeds defaults (admin user, wards, settings). A backup will be created automatically.</p>
+                        <button class="btn btn-outline-danger" onclick="resetDatabase()"><i class="bi bi-arrow-counterclockwise me-1"></i>Reset & Re-seed</button>
+                    </div>
+                </div>
+                {% else %}
+                <div class="card h-100 border-secondary">
+                    <div class="card-header text-secondary"><span><i class="bi bi-shield-lock me-2"></i>Production Safety</span></div>
+                    <div class="card-body d-flex flex-column justify-content-center">
+                        <p class="small text-muted mb-0">The destructive reset action is disabled in this environment.</p>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
 </div>
 {% endblock %}
-
 {% block extra_js %}
 <script>
-    // ============ RELIEF ITEMS ============
-    async function loadReliefItems() {
-        try {
-            const response = await fetch('/api/settings/relief_items');
-            const data = await response.json();
-            console.log('Loaded relief items:', data);
-
-            let items = [];
-            if (data.value && Array.isArray(data.value)) {
-                items = data.value;
-            } else if (data.value && typeof data.value === 'string') {
-                // Handle case where it might be stringified
-                try {
-                    items = JSON.parse(data.value);
-                } catch (e) {
-                    items = [data.value];
-                }
-            } else {
-                items = ['खाद्य सामग्री', 'पानीका बोतल', 'औषधि', 'कम्बल', 'कपडा', 'सरसफाइ किट', 'आश्रय सामग्री', 'शिशु हेरचाह', 'अन्य'];
-            }
-
-            console.log('Relief items to display:', items);
-            displayItems('reliefItemsContainer', items, 'relief-item');
-        } catch (error) {
-            console.error('Error loading relief items:', error);
-            showAlert('danger', '<i class="bi bi-exclamation-circle"></i> राहत सामग्री लोड गर्न त्रुटि');
-        }
-    }
-
-    function addReliefItem() {
-        const container = document.getElementById('reliefItemsContainer');
-        const item = document.createElement('div');
-        item.className = 'input-group mb-2 relief-item';
-        item.innerHTML = `
-            <input type="text" class="form-control" placeholder="राहत सामग्रीको नाम" value="">
-            <button type="button" class="btn btn-outline-danger" onclick="removeItemFromUI(this, 'relief-item')">
-                <i class="bi bi-trash"></i> हटाउनुहोस्
-            </button>
-        `;
-        container.appendChild(item);
-        showAlert('info', '<i class="bi bi-info-circle"></i> वस्तुको पङ्क्ति थपियो। नाम भर्नुहोस् र सुरक्षित गर्नुहोस् क्लिक गर्नुहोस्');
-    }
-
-    async function saveReliefItems() {
-        const items = [];
-        document.querySelectorAll('.relief-item input').forEach(input => {
-            const value = input.value.trim();
-            if (value && !items.includes(value)) {
-                items.push(value);
-            }
-        });
-
-        if (items.length === 0) {
-            showAlert('warning', '<i class="bi bi-exclamation-triangle"></i> कृपया कम्तिमा एउटा राहत सामग्री थप्नुहोस्');
-            return;
-        }
-
-        try {
-            const response = await fetch('/api/settings/relief_items', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-                },
-                body: JSON.stringify({ value: items })
+async function loadSettings() {
+    try {
+        const resp = await fetch('/api/settings');
+        const data = await resp.json();
+        if (data.success) {
+            data.data.forEach(s => {
+                const el = document.querySelector(`[data-key="${s.setting_key}"]`);
+                if (el) el.value = Array.isArray(s.setting_value) ? '' : (s.setting_value || '');
             });
-            const data = await response.json();
-            console.log('Save response:', data);
-
-            if (data.success) {
-                showAlert('success', '<i class="bi bi-check-circle"></i> राहत सामग्री सफलतापूर्वक सुरक्षित गरियो');
-                // Reload to show all saved items from database
-                setTimeout(() => loadReliefItems(), 800);
-            } else {
-                showAlert('danger', '<i class="bi bi-exclamation-circle"></i> त्रुटि: ' + data.message);
-            }
-        } catch (error) {
-            console.error('Save error:', error);
-            showAlert('danger', '<i class="bi bi-exclamation-circle"></i> त्रुटि: ' + error.message);
+            renderList('fiscal_years', 'fiscal_years_list');
+            renderList('disaster_types', 'disaster_types_list');
+            renderList('ssf_types', 'ssf_types_list');
+            renderList('cluster_types', 'cluster_types_list');
+            renderActiveFiscalYear();
         }
-    }
+    } catch(e) { console.error('Failed to load settings:', e); }
+}
 
-    // ============ FISCAL YEARS ============
-    async function loadFiscalYears() {
-        try {
-            const response = await fetch('/api/settings/fiscal_years');
-            const data = await response.json();
-            console.log('Loaded fiscal years:', data);
+async function getSetting(key) {
+    try {
+        const resp = await fetch(`/api/settings/${key}`);
+        const data = await resp.json();
+        return data.value;
+    } catch(e) { return null; }
+}
 
-            let years = [];
-            if (data.value && Array.isArray(data.value)) {
-                years = data.value;
-            } else if (data.value && typeof data.value === 'string') {
-                try {
-                    years = JSON.parse(data.value);
-                } catch (e) {
-                    years = [data.value];
-                }
-            } else {
-                years = ['2080/81', '2081/82', '2082/83'];
-            }
+async function renderList(key, containerId) {
+    const container = document.getElementById(containerId);
+    const items = await getSetting(key);
+    if (!Array.isArray(items)) return;
+    container.innerHTML = items.map((item, i) =>
+        `<div class="d-flex justify-content-between align-items-center mb-1 p-1 border rounded">
+            <span>${item}</span>
+            <button class="btn btn-sm btn-outline-danger" onclick="removeListItem('${key}', ${i}, '${containerId}')"><i class="bi bi-x"></i></button>
+        </div>`
+    ).join('');
+}
 
-            console.log('Fiscal years to display:', years);
-            displayItems('fiscalYearsContainer', years, 'fiscal-year');
-        } catch (error) {
-            console.error('Error loading fiscal years:', error);
-            showAlert('danger', '<i class="bi bi-exclamation-circle"></i> आर्थिक वर्षहरू लोड गर्न त्रुटि');
-        }
-    }
-
-    function addFiscalYear() {
-        const container = document.getElementById('fiscalYearsContainer');
-        const item = document.createElement('div');
-        item.className = 'input-group mb-2 fiscal-year';
-        item.innerHTML = `
-            <input type="text" class="form-control" placeholder="e.g., 2080/81" value="">
-            <button type="button" class="btn btn-outline-danger" onclick="removeItemFromUI(this, 'fiscal-year')">
-                <i class="bi bi-trash"></i> Remove
-            </button>
-        `;
-        container.appendChild(item);
-        showAlert('info', '<i class="bi bi-info-circle"></i> Fiscal year row added. Fill in and click Save');
-    }
-
-    async function saveFiscalYears() {
-        const years = [];
-        document.querySelectorAll('.fiscal-year input').forEach(input => {
-            const value = input.value.trim();
-            if (value && !years.includes(value)) {
-                years.push(value);
-            }
+async function renderActiveFiscalYear() {
+    const years = await getSetting('fiscal_years');
+    const active = await getSetting('active_fiscal_year');
+    const sel = document.getElementById('active_fiscal_year');
+    if (!Array.isArray(years)) return;
+    sel.innerHTML = years.map(y => `<option value="${y}" ${y === active ? 'selected' : ''}>${y}</option>`).join('');
+    sel.addEventListener('change', async function() {
+        await fetch(`/api/settings/active_fiscal_year`, {
+            method: 'POST',
+            headers: {'Content-Type':'application/json','X-CSRFToken':document.querySelector('meta[name="csrf-token"]').getAttribute('content')},
+            body: JSON.stringify({value: this.value})
         });
-
-        if (years.length === 0) {
-            showAlert('warning', '<i class="bi bi-exclamation-triangle"></i> Please add at least one fiscal year');
-            return;
-        }
-
-        try {
-            const response = await fetch('/api/settings/fiscal_years', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-                },
-                body: JSON.stringify({ value: years })
-            });
-            const data = await response.json();
-            console.log('Save response:', data);
-
-            if (data.success) {
-                showAlert('success', '<i class="bi bi-check-circle"></i> Fiscal years saved successfully');
-                // Reload to show all saved items from database
-                setTimeout(() => loadFiscalYears(), 800);
-            } else {
-                showAlert('danger', '<i class="bi bi-exclamation-circle"></i> Error: ' + data.message);
-            }
-        } catch (error) {
-            console.error('Save error:', error);
-            showAlert('danger', '<i class="bi bi-exclamation-circle"></i> Error: ' + error.message);
-        }
-    }
-
-    // ============ SSF TYPES ============
-    async function loadSSFTypes() {
-        try {
-            const response = await fetch('/api/settings/ssf_types');
-            const data = await response.json();
-            console.log('Loaded SSF types:', data);
-
-            let types = [];
-            if (data.value && Array.isArray(data.value)) {
-                types = data.value;
-            } else if (data.value && typeof data.value === 'string') {
-                try {
-                    types = JSON.parse(data.value);
-                } catch (e) {
-                    types = [data.value];
-                }
-            } else {
-                types = ['OAS', 'Widow', 'Disabled', 'Child'];
-            }
-
-            console.log('SSF types to display:', types);
-            displayItems('ssfTypesContainer', types, 'ssf-type');
-        } catch (error) {
-            console.error('Error loading SSF types:', error);
-            showAlert('danger', '<i class="bi bi-exclamation-circle"></i> Error loading SSF types');
-        }
-    }
-
-    function addSSFType() {
-        const container = document.getElementById('ssfTypesContainer');
-        const item = document.createElement('div');
-        item.className = 'input-group mb-2 ssf-type';
-        item.innerHTML = `
-            <input type="text" class="form-control" placeholder="SSF type (e.g., OAS, Widow)" value="">
-            <button type="button" class="btn btn-outline-danger" onclick="removeItemFromUI(this, 'ssf-type')">
-                <i class="bi bi-trash"></i> Remove
-            </button>
-        `;
-        container.appendChild(item);
-        showAlert('info', '<i class="bi bi-info-circle"></i> SSF type row added. Fill in and click Save');
-    }
-
-    async function saveSSFTypes() {
-        const types = [];
-        document.querySelectorAll('.ssf-type input').forEach(input => {
-            const value = input.value.trim();
-            if (value && !types.includes(value)) {
-                types.push(value);
-            }
-        });
-
-        if (types.length === 0) {
-            showAlert('warning', '<i class="bi bi-exclamation-triangle"></i> Please add at least one SSF type');
-            return;
-        }
-
-        try {
-            const response = await fetch('/api/settings/ssf_types', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-                },
-                body: JSON.stringify({ value: types })
-            });
-            const data = await response.json();
-            console.log('Save response:', data);
-
-            if (data.success) {
-                showAlert('success', '<i class="bi bi-check-circle"></i> SSF types saved successfully');
-                // Reload to show all saved items from database
-                setTimeout(() => loadSSFTypes(), 800);
-            } else {
-                showAlert('danger', '<i class="bi bi-exclamation-circle"></i> Error: ' + data.message);
-            }
-        } catch (error) {
-            console.error('Save error:', error);
-            showAlert('danger', '<i class="bi bi-exclamation-circle"></i> Error: ' + error.message);
-        }
-    }
-
-    // ============ DISASTER TYPES ============
-    async function loadDisasterTypes() {
-        try {
-            const response = await fetch('/api/settings/disaster_types');
-            const data = await response.json();
-            console.log('Loaded disaster types:', data);
-
-            let types = [];
-            if (data.value && Array.isArray(data.value)) {
-                types = data.value;
-            } else if (data.value && typeof data.value === 'string') {
-                try {
-                    types = JSON.parse(data.value);
-                } catch (e) {
-                    types = [data.value];
-                }
-            } else {
-                types = ['Earthquake', 'Flood', 'Landslide', 'Fire', 'Storm'];
-            }
-
-            console.log('Disaster types to display:', types);
-            displayItems('disasterTypesContainer', types, 'disaster-type');
-        } catch (error) {
-            console.error('Error loading disaster types:', error);
-            showAlert('danger', '<i class="bi bi-exclamation-circle"></i> Error loading disaster types');
-        }
-    }
-
-    function addDisasterType() {
-        const container = document.getElementById('disasterTypesContainer');
-        const item = document.createElement('div');
-        item.className = 'input-group mb-2 disaster-type';
-        item.innerHTML = `
-            <input type="text" class="form-control" placeholder="Disaster type" value="">
-            <button type="button" class="btn btn-outline-danger" onclick="removeItemFromUI(this, 'disaster-type')">
-                <i class="bi bi-trash"></i> Remove
-            </button>
-        `;
-        container.appendChild(item);
-        showAlert('info', '<i class="bi bi-info-circle"></i> Disaster type row added. Fill in and click Save');
-    }
-
-    async function saveDisasterTypes() {
-        const types = [];
-        document.querySelectorAll('.disaster-type input').forEach(input => {
-            const value = input.value.trim();
-            if (value && !types.includes(value)) {
-                types.push(value);
-            }
-        });
-
-        if (types.length === 0) {
-            showAlert('warning', '<i class="bi bi-exclamation-triangle"></i> Please add at least one disaster type');
-            return;
-        }
-
-        try {
-            const response = await fetch('/api/settings/disaster_types', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-                },
-                body: JSON.stringify({ value: types })
-            });
-            const data = await response.json();
-            console.log('Save response:', data);
-
-            if (data.success) {
-                showAlert('success', '<i class="bi bi-check-circle"></i> Disaster types saved successfully');
-                // Reload to show all saved items from database
-                setTimeout(() => loadDisasterTypes(), 800);
-            } else {
-                showAlert('danger', '<i class="bi bi-exclamation-circle"></i> Error: ' + data.message);
-            }
-        } catch (error) {
-            console.error('Save error:', error);
-            showAlert('danger', '<i class="bi bi-exclamation-circle"></i> Error: ' + error.message);
-        }
-    }
-
-    // ============ UTILITY FUNCTIONS ============
-    function displayItems(containerId, items, className) {
-        const container = document.getElementById(containerId);
-        container.innerHTML = '';
-        items.forEach(item => {
-            const div = document.createElement('div');
-            div.className = `input-group mb-2 ${className}`;
-            div.innerHTML = `
-                <input type="text" class="form-control" value="${item}">
-                <button type="button" class="btn btn-outline-danger" onclick="removeItemFromUI(this, '${className}')">
-                    <i class="bi bi-trash"></i> हटाउनुहोस्
-                </button>
-            `;
-            container.appendChild(div);
-        });
-
-        // Check if we should lock these new items (if the unlock button is still visible)
-        const unlockBtn = document.getElementById('unlockSettingsBtn');
-        if (unlockBtn && unlockBtn.style.display !== 'none') {
-            const inputs = container.querySelectorAll('input, button');
-            inputs.forEach(el => el.disabled = true);
-        }
-    }
-
-    function removeItemFromUI(button, className) {
-        button.parentElement.remove();
-        showAlert('info', '<i class="bi bi-info-circle"></i> Item removed from list. Click Save to update');
-    }
-
-    function showAlert(type, message) {
-        const alertBox = document.getElementById('alertBox');
-        alertBox.innerHTML = `<div class="alert alert-${type} alert-dismissible fade show">${message}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>`;
-        alertBox.style.display = 'block';
-        setTimeout(() => {
-            alertBox.style.display = 'none';
-        }, 5000);
-    }
-
-    // Lock settings initially
-    function lockSettings() {
-        // Disable all inputs and buttons in the main container
-        const container = document.querySelector('.col-lg-10');
-        const elements = container.querySelectorAll('input, button');
-
-        elements.forEach(el => {
-            // Keep the unlock button enabled
-            if (el.id !== 'unlockSettingsBtn') {
-                el.disabled = true;
-            }
-        });
-
-        showAlert('info', '<i class="bi bi-lock-fill"></i> सेटिङ्हरू लक गरिएको छ। परिवर्तन गर्न अनलक गर्नुहोस्।');
-    }
-
-    // Unlock settings
-    function unlockSettings() {
-        const password = prompt("Enter unlock key to enable editing:");
-        if (!password) return;
-
-        if (password === 'admin123') { // Simple default check
-            const container = document.querySelector('.col-lg-10');
-            const elements = container.querySelectorAll('input, button');
-
-            elements.forEach(el => el.disabled = false);
-
-            const btn = document.getElementById('unlockSettingsBtn');
-            if (btn) btn.style.display = 'none';
-
-            showAlert('success', '<i class="bi bi-unlock-fill"></i> सेटिङ्हरू अनलक गरियो।');
-        } else {
-            alert('Invalid unlock key');
-        }
-    }
-
-    // Load all settings on page load
-    document.addEventListener('DOMContentLoaded', () => {
-        loadReliefItems();
-        loadFiscalYears();
-        loadSSFTypes();
-        loadDisasterTypes();
-
-        // Lock forms after a slight delay to ensure dynamic elements might be caught
-        // but load functions are async.
-        // Actually, we should override the displayItems to lock new items too, 
-        // OR just lock the container inputs which catches future additions if we use a MutationObserver 
-        // or just re-lock on rendering.
-        // For simplicity, we lock what's there and the "Add" buttons are disabled so no new items appear.
-        // However, the `load*` functions are async and populate data. 
-        // We should wait for them? 
-        // Better strategy: The container inputs are created dynamically. 
-        // We need to ensure `displayItems` respects the lock state? 
-        // OR just run lockSettings immediately since the "Add" buttons (which are static) will be disabled,
-        // preventing new inputs. Existing inputs from load will be added into the container.
-        // Since `displayItems` creates new inputs, they will be enabled by default.
-        // We need to update `displayItems` to respect lock state OR re-run lock logic.
-        // Let's modify `displayItems` slightly or just rely on a broader check.
-
-        // Let's execute lockSettings immediately to disable the static buttons ("Add", "Save").
-        lockSettings();
+        showToast('success', 'Active fiscal year updated');
     });
+}
+
+async function addListItem(key, inputId, containerId) {
+    const input = document.getElementById(inputId);
+    const value = input.value.trim();
+    if (!value) return;
+    const items = await getSetting(key) || [];
+    items.push(value);
+    await fetch(`/api/settings/${key}`, {
+        method: 'POST',
+        headers: {'Content-Type':'application/json','X-CSRFToken':document.querySelector('meta[name="csrf-token"]').getAttribute('content')},
+        body: JSON.stringify({value: items})
+    });
+    input.value = '';
+    renderList(key, containerId);
+    if (key === 'fiscal_years') renderActiveFiscalYear();
+    showToast('success', `${key} updated`);
+}
+
+async function removeListItem(key, index, containerId) {
+    const items = await getSetting(key) || [];
+    const removedItem = items[index];
+    items.splice(index, 1);
+    const resp = await fetch(`/api/settings/${key}`, {
+        method: 'POST',
+        headers: {'Content-Type':'application/json','X-CSRFToken':document.querySelector('meta[name="csrf-token"]').getAttribute('content')},
+        body: JSON.stringify({value: items})
+    });
+    const data = await resp.json();
+    if (!data.success) { showToast('danger', data.message); return; }
+    renderList(key, containerId);
+    if (key === 'fiscal_years') renderActiveFiscalYear();
+    showToast('success', `"${removedItem}" deleted`);
+}
+
+document.getElementById('settingsForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const inputs = this.querySelectorAll('[data-key]');
+    let success = true;
+    for (const input of inputs) {
+        const key = input.dataset.key;
+        const value = input.value.trim();
+        try {
+            const resp = await fetch(`/api/settings/${key}`, {
+                method: 'POST',
+                headers: {'Content-Type':'application/json','X-CSRFToken':document.querySelector('meta[name="csrf-token"]').getAttribute('content')},
+                body: JSON.stringify({value})
+            });
+            const data = await resp.json();
+            if (!data.success) { success = false; showToast('danger', `Failed to save ${key}`); }
+        } catch(e) { success = false; showToast('danger', `Error saving ${key}: ${e.message}`); }
+    }
+    if (success) showToast('success', 'Settings saved successfully');
+});
+
+async function loadWards() {
+    try {
+        const resp = await fetch('/api/wards');
+        const d = await resp.json();
+        if (!d.success) return;
+        const container = document.getElementById('wards_list');
+        container.innerHTML = d.wards.map((w, i) =>
+            `<div class="d-flex justify-content-between align-items-center mb-1 p-1 border rounded">
+                <div class="d-flex align-items-center gap-2 flex-grow-1">
+                    <span class="text-muted small">${w.sort_order}.</span>
+                    <input type="text" class="form-control form-control-sm ward-name-input" value="${w.name}" data-id="${w.id}" style="max-width:250px">
+                </div>
+                <div class="d-flex gap-1">
+                    <button class="btn btn-sm btn-outline-secondary" onclick="moveWard(${w.id}, -1)" ${i === 0 ? 'disabled' : ''}><i class="bi bi-chevron-up"></i></button>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="moveWard(${w.id}, 1)" ${i === d.wards.length - 1 ? 'disabled' : ''}><i class="bi bi-chevron-down"></i></button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="deleteWard(${w.id}, '${w.name}')"><i class="bi bi-x"></i></button>
+                </div>
+            </div>`
+        ).join('');
+        document.querySelectorAll('.ward-name-input').forEach(inp => {
+            inp.addEventListener('change', async function() {
+                const id = this.dataset.id;
+                const name = this.value.trim();
+                if (!name) return;
+                await fetch(`/api/wards/${id}`, {
+                    method: 'PUT',
+                    headers: {'Content-Type':'application/json','X-CSRFToken':document.querySelector('meta[name="csrf-token"]').getAttribute('content')},
+                    body: JSON.stringify({name})
+                });
+                showToast('success', 'Ward renamed');
+            });
+        });
+    } catch(e) { console.error('Failed to load wards:', e); }
+}
+
+async function addWard() {
+    const input = document.getElementById('new_ward_name');
+    const name = input.value.trim();
+    if (!name) return;
+    const resp = await fetch('/api/wards', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json','X-CSRFToken':document.querySelector('meta[name="csrf-token"]').getAttribute('content')},
+        body: JSON.stringify({name})
+    });
+    const d = await resp.json();
+    if (!d.success) { showToast('danger', d.message); return; }
+    input.value = '';
+    await loadWards();
+    showToast('success', 'Ward added');
+}
+
+async function deleteWard(id, name) {
+    if (!confirm(`Delete "${name}"? This cannot be undone if no records reference it.`)) return;
+    const resp = await fetch(`/api/wards/${id}`, {
+        method: 'DELETE',
+        headers: {'X-CSRFToken':document.querySelector('meta[name="csrf-token"]').getAttribute('content')}
+    });
+    const d = await resp.json();
+    if (!d.success) { showToast('danger', d.message); return; }
+    await loadWards();
+    showToast('success', 'Ward deleted');
+}
+
+async function moveWard(id, direction) {
+    const items = document.querySelectorAll('#wards_list .ward-name-input');
+    let currentIdx = -1;
+    items.forEach((inp, i) => { if (parseInt(inp.dataset.id) === id) currentIdx = i; });
+    if (currentIdx < 0) return;
+    const targetIdx = currentIdx + direction;
+    if (targetIdx < 0 || targetIdx >= items.length) return;
+    const targetId = parseInt(items[targetIdx].dataset.id);
+    const resp = await fetch(`/api/wards/${id}`, {
+        method: 'PUT',
+        headers: {'Content-Type':'application/json','X-CSRFToken':document.querySelector('meta[name="csrf-token"]').getAttribute('content')},
+        body: JSON.stringify({sort_order: targetIdx + 1})
+    });
+    const d = await resp.json();
+    if (!d.success) { showToast('danger', d.message); return; }
+    await loadWards();
+}
+
+document.getElementById('logo').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(ev) {
+            document.getElementById('logoPreview').innerHTML = `<img src="${ev.target.result}" style="max-height:80px" class="border rounded p-1">`;
+        };
+        reader.readAsDataURL(file);
+    }
+});
+
+async function loadDbInfo() {
+    try {
+        const resp = await fetch('/api/backup/info');
+        const d = await resp.json();
+        if (d.success) {
+            document.getElementById('dbInfo').textContent = `DB: ${d.size_str}, last modified: ${d.modified}`;
+        }
+    } catch(e) {}
+}
+
+async function resetDatabase() {
+    if (!confirm('This will DELETE ALL DATA and re-seed defaults. A backup will be created automatically.')) return;
+    if (!confirm('ARE YOU SURE? All incidents, beneficiaries, distributions, receipts, and other records will be permanently deleted.')) return;
+    if (!confirm('Final confirmation: This cannot be undone. Proceed?')) return;
+    try {
+        const resp = await fetch('/api/reset-db', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json','X-CSRFToken':document.querySelector('meta[name="csrf-token"]').getAttribute('content')},
+            body: '{}'
+        });
+        const d = await resp.json();
+        if (d.success) {
+            showToast('success', d.message);
+            setTimeout(() => location.reload(), 2000);
+        } else {
+            showToast('danger', d.message);
+        }
+    } catch(e) {
+        showToast('danger', 'Reset failed: ' + e.message);
+    }
+}
+
+async function restoreBackup() {
+    const input = document.getElementById('restoreFile');
+    if (!input.files.length) { showToast('warning', 'Please select a backup file'); return; }
+    if (!confirm('Restore will REPLACE all current data with the backup. This cannot be undone. Continue?')) return;
+    if (!confirm('Are you absolutely sure? A pre-restore backup will be created automatically.')) return;
+    const formData = new FormData();
+    formData.append('file', input.files[0]);
+    try {
+        const resp = await fetch('/api/restore', {
+            method: 'POST',
+            headers: {'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')},
+            body: formData
+        });
+        const d = await resp.json();
+        if (d.success) {
+            showToast('success', d.message);
+            loadDbInfo();
+        } else {
+            showToast('danger', d.message);
+        }
+    } catch(e) {
+        showToast('danger', 'Restore failed: ' + e.message);
+    }
+}
+
+async function importSqlData() {
+    const input = document.getElementById('importSqlFile');
+    const resultDiv = document.getElementById('importSqlResult');
+    if (!input.files.length) { showToast('warning', 'Please select a .sql file'); return; }
+    if (!confirm('Import INSERT statements from this SQL file? Records with existing IDs will be skipped.')) return;
+    const formData = new FormData();
+    formData.append('file', input.files[0]);
+    resultDiv.innerHTML = '<span class="text-primary">Importing...</span>';
+    try {
+        const resp = await fetch('/api/import-sql', {
+            method: 'POST',
+            headers: {'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')},
+            body: formData
+        });
+        const d = await resp.json();
+        if (d.success) {
+            resultDiv.innerHTML = `<span class="text-success"><i class="bi bi-check-circle me-1"></i>${d.message}</span>`;
+            if (d.errors && d.errors.length) {
+                resultDiv.innerHTML += `<div class="text-warning mt-1 small">${d.errors.length} error(s). Check server logs.</div>`;
+            }
+            showToast('success', d.message);
+            loadDbInfo();
+        } else {
+            resultDiv.innerHTML = `<span class="text-danger">${d.message}</span>`;
+            showToast('danger', d.message);
+        }
+    } catch(e) {
+        resultDiv.innerHTML = `<span class="text-danger">Import failed: ${e.message}</span>`;
+        showToast('danger', 'Import failed: ' + e.message);
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadSettings();
+    loadWards();
+    loadDbInfo();
+});
 </script>
 {% endblock %}

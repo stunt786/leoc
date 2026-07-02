@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+{% block title %}Warehouses - LEOC{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('index') }}"><i class="bi bi-house-fill"></i></a></li>
+<li class="breadcrumb-item">Master Data</li>
+<li class="breadcrumb-item active">Warehouses</li>
+{% endblock %}
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center">
+    <h4><i class="bi bi-warehouse me-2"></i>Warehouses</h4>
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#warehouseModal"><i class="bi bi-plus-circle me-1"></i>Add Warehouse</button>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover" id="warehouseTable">
+                <thead><tr><th>Code</th><th>Name</th><th>Address</th><th>Contact Person</th><th>Phone</th><th>Capacity</th><th>Total Items</th><th class="text-end">Actions</th></tr></thead>
+                <tbody id="tableBody"><tr class="text-center"><td colspan="8"><div class="spinner-border text-primary"></div></td></tr></tbody>
+            </table>
+        </div>
+        <div class="d-flex justify-content-between align-items-center mt-2 px-2">
+            <small class="text-muted" id="tableInfo">0 records</small>
+            <nav><ul class="pagination pagination-sm mb-0" id="pagination"></ul></nav>
+        </div>
+    </div>
+</div>
+
+<!-- Modal -->
+<div class="modal fade" id="warehouseModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title" id="modalTitle">Add Warehouse</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <form id="warehouseForm">
+                    <input type="hidden" id="edit_id">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Warehouse Code</label>
+                            <input type="text" class="form-control" id="code" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Warehouse Name</label>
+                            <input type="text" class="form-control" id="name" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Address</label>
+                            <input type="text" class="form-control" id="address">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Contact Person</label>
+                            <input type="text" class="form-control" id="contact_person">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Phone</label>
+                            <input type="text" class="form-control" id="phone">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Capacity</label>
+                            <input type="number" class="form-control" id="capacity" step="0.01">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Coordinates (Lat, Lng)</label>
+                            <input type="text" class="form-control" id="coordinates" placeholder="e.g. 28.1234, 82.5678">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Remarks</label>
+                            <textarea class="form-control" id="remarks" rows="2"></textarea>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveWarehouse()"><i class="bi bi-check-lg"></i> Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+let editId = null;
+let _warehouses = [];
+let paginator = new Paginator({perPage: 25, onPageChange: () => renderWarehouses(_warehouses)});
+
+function renderWarehouses(data) {
+    const tbody = document.getElementById('tableBody');
+    if (data.length === 0) {
+        tbody.innerHTML = '<tr class="text-center"><td colspan="8" class="py-4 text-muted">No warehouses found</td></tr>';
+        paginator.update(0);
+        return;
+    }
+    const pageData = paginator.getPageData(data);
+    tbody.innerHTML = pageData.map(w => `<tr>
+        <td>${w.code || ''}</td><td>${w.name}</td><td>${w.address || ''}</td>
+        <td>${w.contact_person || ''}</td><td>${w.phone || ''}</td>
+        <td>${w.capacity || 0}</td><td>${w.total_items}</td>
+        <td class="text-end">
+            <button class="btn btn-sm btn-outline-primary" onclick="editWarehouse(${w.id})"><i class="bi bi-pencil"></i></button>
+            <button class="btn btn-sm btn-outline-danger" onclick="deleteWarehouse(${w.id})"><i class="bi bi-trash"></i></button>
+        </td></tr>`).join('');
+    paginator.update(data.length);
+}
+
+async function loadWarehouses() {
+    try {
+        const resp = await fetch('/api/warehouses');
+        const data = await resp.json();
+        if (!data.success) { showToast('danger', data.message); return; }
+        _warehouses = data.warehouses;
+        renderWarehouses(_warehouses);
+    } catch(e) { showToast('danger', 'Error: ' + e.message); }
+}
+
+function editWarehouse(id) {
+    fetch(`/api/warehouses/${id}`).then(r => r.json()).then(resp => {
+        if (!resp.success) { showToast('danger', resp.message); return; }
+        const w = resp.warehouse;
+        editId = id;
+        document.getElementById('modalTitle').textContent = 'Edit Warehouse';
+        document.getElementById('code').value = w.code || '';
+        document.getElementById('name').value = w.name || '';
+        document.getElementById('address').value = w.address || '';
+        document.getElementById('contact_person').value = w.contact_person || '';
+        document.getElementById('phone').value = w.phone || '';
+        document.getElementById('capacity').value = w.capacity || '';
+        document.getElementById('coordinates').value = (w.latitude && w.longitude) ? w.latitude + ', ' + w.longitude : '';
+        document.getElementById('remarks').value = w.remarks || '';
+        new bootstrap.Modal(document.getElementById('warehouseModal')).show();
+    }).catch(e => showToast('danger', 'Error: ' + e.message));
+}
+
+function validatePhone(phone) {
+    return !phone || /^[\d\s\+\-\(\)]{7,20}$/.test(phone);
+}
+
+function parseCoordinates(val) {
+    if (!val) return { latitude: null, longitude: null };
+    const parts = val.split(',').map(s => s.trim());
+    if (parts.length === 2) {
+        const lat = parseFloat(parts[0]), lng = parseFloat(parts[1]);
+        if (!isNaN(lat) && !isNaN(lng)) return { latitude: lat, longitude: lng };
+    }
+    return { latitude: null, longitude: null };
+}
+
+function saveWarehouse() {
+    const phone = document.getElementById('phone').value;
+    if (phone && !validatePhone(phone)) { showToast('danger', 'Phone number format is invalid'); return; }
+    const coords = parseCoordinates(document.getElementById('coordinates').value);
+    const data = {
+        code: document.getElementById('code').value,
+        name: document.getElementById('name').value,
+        address: document.getElementById('address').value,
+        contact_person: document.getElementById('contact_person').value,
+        phone: phone,
+        capacity: parseFloat(document.getElementById('capacity').value) || 0,
+        latitude: coords.latitude,
+        longitude: coords.longitude,
+        remarks: document.getElementById('remarks').value
+    };
+    const url = editId ? `/api/warehouses/${editId}` : '/api/warehouses';
+    const method = editId ? 'PUT' : 'POST';
+    fetch(url, {
+        method, headers: {'Content-Type':'application/json','X-CSRFToken':document.querySelector('meta[name="csrf-token"]').getAttribute('content')},
+        body: JSON.stringify(data)
+    }).then(r => r.json()).then(resp => {
+        if (resp.success) { showToast('success', resp.message); bootstrap.Modal.getInstance(document.getElementById('warehouseModal')).hide(); loadWarehouses(); }
+        else showToast('danger', resp.message);
+    }).catch(e => showToast('danger', 'Error: ' + e.message));
+}
+
+function deleteWarehouse(id) {
+    if (!confirm('Delete this warehouse?')) return;
+    fetch(`/api/warehouses/${id}`, {
+        method: 'DELETE', headers: {'X-CSRFToken':document.querySelector('meta[name="csrf-token"]').getAttribute('content')}
+    }).then(r => r.json()).then(resp => {
+        if (resp.success) { showToast('success', resp.message); loadWarehouses(); }
+        else showToast('danger', resp.message);
+    });
+}
+
+document.getElementById('warehouseModal').addEventListener('hidden.bs.modal', function() {
+    editId = null; document.getElementById('modalTitle').textContent = 'Add Warehouse'; document.getElementById('warehouseForm').reset();
+});
+
+document.addEventListener('DOMContentLoaded', loadWarehouses);
+</script>
+{% endblock %}

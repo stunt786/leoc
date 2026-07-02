@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+{% block title %}Categories - LEOC{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('index') }}"><i class="bi bi-house-fill"></i></a></li>
+<li class="breadcrumb-item">Master Data</li>
+<li class="breadcrumb-item active">Categories</li>
+{% endblock %}
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center">
+    <div>
+        <h4><i class="bi bi-tags-fill me-2"></i>Category Management</h4>
+        <p>Manage item categories and classifications</p>
+    </div>
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#categoryModal" onclick="resetCategoryForm()">
+        <i class="bi bi-plus-lg me-1"></i>Add Category
+    </button>
+</div>
+
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-list-check me-2 text-primary"></i>All Categories</span>
+        <input type="text" class="form-control form-control-sm" style="width:200px" id="categorySearch" placeholder="Search..." oninput="filterCategories()">
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>नेपाली नाम</th>
+                        <th>Description</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="categoryTableBody">
+                    <tr><td colspan="4" class="text-center py-4"><div class="spinner-border text-primary"></div></td></tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="d-flex justify-content-between align-items-center mt-2 px-2">
+            <small class="text-muted" id="tableInfo">0 records</small>
+            <nav><ul class="pagination pagination-sm mb-0" id="pagination"></ul></nav>
+        </div>
+    </div>
+</div>
+
+<!-- Category Modal -->
+<div class="modal fade" id="categoryModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="categoryModalTitle"><i class="bi bi-tags-fill me-2"></i>Add Category</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="categoryForm">
+                    <input type="hidden" id="cat_id">
+                    <div class="mb-3">
+                        <label class="form-label">Name *</label>
+                        <input type="text" class="form-control" id="cat_name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">नेपाली नाम</label>
+                        <input type="text" class="form-control" id="cat_name_np">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea class="form-control" id="cat_description" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveCategory()"><i class="bi bi-check-lg"></i> Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+let categories = [];
+let paginator = new Paginator({perPage: 25, onPageChange: () => renderCategories(categories)});
+
+async function loadCategories() {
+    const r = await fetch('/api/categories');
+    const d = await r.json();
+    if (!d.success) { showToast('danger', d.message); return; }
+    categories = d.categories;
+    renderCategories(categories);
+}
+
+function renderCategories(data) {
+    const tbody = document.getElementById('categoryTableBody');
+    if (data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-muted">No categories found</td></tr>';
+        paginator.update(0);
+        return;
+    }
+    const pageData = paginator.getPageData(data);
+    tbody.innerHTML = pageData.map(c => `<tr>
+        <td><strong>${c.name}</strong></td>
+        <td>${c.name_np || '-'}</td>
+        <td>${c.description || '-'}</td>
+        <td class="text-end">
+            <button class="btn btn-sm btn-outline-primary" onclick="editCategory(${c.id})"><i class="bi bi-pencil"></i></button>
+            <button class="btn btn-sm btn-outline-danger" onclick="deleteCategory(${c.id})"><i class="bi bi-trash"></i></button>
+        </td>
+    </tr>`).join('');
+    paginator.update(data.length);
+}
+
+function filterCategories() {
+    const q = document.getElementById('categorySearch').value.toLowerCase();
+    const filtered = categories.filter(c =>
+        c.name.toLowerCase().includes(q) ||
+        (c.description && c.description.toLowerCase().includes(q)) ||
+        (c.name_np && c.name_np.includes(q))
+    );
+    if (paginator) paginator.currentPage = 1;
+    renderCategories(filtered);
+}
+
+function resetCategoryForm() {
+    document.getElementById('categoryModalTitle').textContent = 'Add Category';
+    document.getElementById('cat_id').value = '';
+    document.getElementById('categoryForm').reset();
+}
+
+async function editCategory(id) {
+    const c = categories.find(x => x.id === id);
+    if (!c) return;
+    document.getElementById('categoryModalTitle').textContent = 'Edit Category';
+    document.getElementById('cat_id').value = c.id;
+    document.getElementById('cat_name').value = c.name;
+    document.getElementById('cat_name_np').value = c.name_np || '';
+    document.getElementById('cat_description').value = c.description || '';
+    new bootstrap.Modal(document.getElementById('categoryModal')).show();
+}
+
+async function saveCategory() {
+    const id = document.getElementById('cat_id').value;
+    const body = {
+        name: document.getElementById('cat_name').value,
+        name_np: document.getElementById('cat_name_np').value,
+        description: document.getElementById('cat_description').value
+    };
+    if (!body.name) { showToast('danger', 'Category name is required'); return; }
+    const url = id ? '/api/categories/'+id : '/api/categories';
+    const method = id ? 'PUT' : 'POST';
+    const r = await fetch(url, {method, headers:{'Content-Type':'application/json','X-CSRFToken':csrf}, body: JSON.stringify(body)});
+    const d = await r.json();
+    if (d.success) {
+        showToast('success', id ? 'Category updated' : 'Category created');
+        bootstrap.Modal.getInstance(document.getElementById('categoryModal')).hide();
+        loadCategories();
+    } else { showToast('danger', d.message); }
+}
+
+async function deleteCategory(id) {
+    if (!confirm('Delete this category?')) return;
+    const r = await fetch('/api/categories/'+id, {method:'DELETE', headers:{'X-CSRFToken':csrf}});
+    const d = await r.json();
+    if (d.success) { showToast('success', 'Category deleted'); loadCategories(); }
+    else showToast('danger', d.message);
+}
+
+document.addEventListener('DOMContentLoaded', loadCategories);
+</script>
+{% endblock %}

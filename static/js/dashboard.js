@@ -10,6 +10,25 @@ const reliefItemOptions = [
     'Clothing', 'Hygiene Kits', 'Shelter Materials', 'Baby Care', 'Other'
 ];
 
+const NEPALI_TO_ENGLISH = {
+    '०': '0', '१': '1', '२': '2', '३': '3', '४': '4',
+    '५': '5', '६': '6', '७': '7', '८': '8', '९': '9'
+};
+const ENGLISH_TO_NEPALI = {
+    '0': '०', '1': '१', '2': '२', '3': '३', '4': '४',
+    '5': '५', '6': '६', '7': '७', '8': '८', '9': '९'
+};
+
+function toEnglishDigits(value) {
+    if (!value) return '';
+    return value.toString().replace(/[०-९]/g, ch => NEPALI_TO_ENGLISH[ch] || ch);
+}
+
+function toNepaliDigits(value) {
+    if (!value) return '';
+    return value.toString().replace(/[0-9]/g, ch => ENGLISH_TO_NEPALI[ch] || ch);
+}
+
 // Global variables for filtering and pagination
 let currentDistributions = [];
 let filteredDistributions = [];
@@ -118,7 +137,7 @@ function populateFilterDropdowns(distributions) {
     wardSelect.innerHTML = '<option value="">All Wards</option>';
 
     // Extract unique values
-    const fiscalYears = [...new Set(distributions.map(d => d.fiscal_year).filter(year => year))];
+    const fiscalYears = [...new Set(distributions.map(d => toEnglishDigits(d.fiscal_year)).filter(year => year))];
     const disasterTypes = [...new Set(distributions.map(d => d.disaster_type).filter(type => type))];
     const wards = [...new Set(distributions.map(d => d.ward).filter(ward => ward))];
 
@@ -126,7 +145,7 @@ function populateFilterDropdowns(distributions) {
     fiscalYears.forEach(year => {
         const option = document.createElement('option');
         option.value = year;
-        option.textContent = year;
+        option.textContent = toNepaliDigits(year);
         fiscalYearSelect.appendChild(option);
     });
 
@@ -215,18 +234,19 @@ function renderTablePage() {
                                 <button class="btn btn-outline-info" onclick="viewDistribution(${dist.id})" title="View Details">
                                     <i class="bi bi-eye"></i>
                                 </button>
-                                <button class="btn btn-outline-primary" onclick="openEditModal(${dist.id})" title="Edit" ${dist.is_locked ? 'disabled title="Record is locked"' : ''}>
+                                ${window.currentUserRole && window.currentUserRole !== 'guest' && window.currentUserRole !== 'viewer' ? `
+                                <button class="btn btn-outline-primary" onclick="openEditModal(${dist.id})" title="Edit" ${dist.is_locked ? 'disabled' : ''}>
                                     <i class="bi bi-pencil"></i>
                                 </button>
                                 ${dist.image_filename ? `<a href="/static/uploads/${escapeHtml(dist.image_filename)}" class="btn btn-outline-info" target="_blank" title="View Image">
                                     <i class="bi bi-image"></i>
                                 </a>` : ''}
-                                <button class="btn btn-outline-danger" onclick="deleteDistribution(${dist.id})" title="Delete" ${dist.is_locked ? 'disabled title="Record is locked"' : ''}>
+                                <button class="btn btn-outline-danger" onclick="deleteDistribution(${dist.id})" title="Delete" ${dist.is_locked ? 'disabled' : ''}>
                                     <i class="bi bi-trash"></i>
                                 </button>
                                 <button class="btn ${dist.is_locked ? 'btn-warning' : 'btn-secondary'}" onclick="toggleLock(${dist.id}, ${dist.is_locked})" title="${dist.is_locked ? 'Unlock record' : 'Lock record'}">
                                     <i class="bi bi-${dist.is_locked ? 'unlock-fill' : 'lock'}"></i>
-                                </button>
+                                </button>` : ''}
                             </div>
                         </td>
                     </tr>
@@ -563,7 +583,7 @@ function updateFiscalYearChart(fiscalData) {
     const ctx = document.getElementById('fiscalYearChart');
     if (!ctx) return;
 
-    const labels = fiscalData.map(d => d.fiscal_year);
+    const labels = fiscalData.map(d => toNepaliDigits(toEnglishDigits(d.fiscal_year)));
     const data = fiscalData.map(d => d.count);
     const colors = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40'];
 
@@ -1158,28 +1178,19 @@ function viewDistribution(id) {
 
 // Toggle lock status for a distribution record
 async function toggleLock(id, isCurrentlyLocked) {
-    // Prompt for unlock key
-    const unlockKey = prompt(`Enter unlock key to ${isCurrentlyLocked ? 'unlock' : 'lock'} this record:`);
-
-    if (!unlockKey) {
-        return; // User cancelled
-    }
-
     try {
         const response = await fetch(`/api/distributions/${id}/lock`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-            },
-            body: JSON.stringify({ unlock_key: unlockKey })
+            }
         });
 
         const data = await response.json();
 
         if (data.success) {
             showNotification('success', `Record ${data.is_locked ? 'locked' : 'unlocked'} successfully`);
-            // Reload the table to reflect the new lock status
             loadDistributions();
             loadStatistics();
         } else {
@@ -1189,4 +1200,3 @@ async function toggleLock(id, isCurrentlyLocked) {
         showNotification('danger', 'Error: ' + error.message);
     }
 }
-

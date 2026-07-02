@@ -1,0 +1,845 @@
+{% extends "base.html" %}
+{% block title %}Dispatch - LEOC{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('index') }}"><i class="bi bi-house-fill"></i></a></li>
+<li class="breadcrumb-item">Operations</li>
+<li class="breadcrumb-item active">Dispatch</li>
+{% endblock %}
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center">
+    <div>
+        <h4><i class="bi bi-truck me-2"></i>Dispatch Management</h4>
+        <p>Approve and dispatch relief supplies to affected areas</p>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header">
+        <span><i class="bi bi-plus-circle me-2 text-primary"></i>Create Dispatch Order</span>
+    </div>
+    <div class="card-body">
+        <form id="dispatchForm">
+            <input type="hidden" id="dp_id">
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">Dispatch Number</label>
+                    <input type="text" class="form-control" id="dp_dispatch_number" readonly>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Date</label>
+                    <input type="text" class="form-control nepali-date" placeholder="YYYY-MM-DD" id="dp_date">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Warehouse <span class="text-muted small">(optional — per-item below)</span></label>
+                    <select class="form-select" id="dp_warehouse_id">
+                        <option value="">All Warehouses — pick per item</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Incident *</label>
+                    <select class="form-select" id="dp_incident_id" required>
+                        <option value="">Select Incident</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Relief Requests <span class="text-muted small">(select multiple)</span></label>
+                    <div class="dropdown">
+                        <button class="form-select text-start" type="button" data-bs-toggle="dropdown" id="dp_rr_btn" aria-expanded="false">
+                            <i class="bi bi-chevron-down float-end"></i>
+                            <span id="dp_rr_label">Select Relief Requests</span>
+                        </button>
+                        <ul class="dropdown-menu p-2 w-100" id="dp_rr_menu" style="max-height:250px;overflow-y:auto">
+                        </ul>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Destination</label>
+                    <input type="text" class="form-control" id="dp_destination">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Receiver</label>
+                    <input type="text" class="form-control" id="dp_receiver">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Phone</label>
+                    <input type="text" class="form-control" id="dp_phone">
+                </div>
+                <div class="col-12">
+                    <label class="form-label">Remarks</label>
+                    <textarea class="form-control" id="dp_remarks" rows="2"></textarea>
+                </div>
+            </div>
+
+            <hr>
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <label class="form-label mb-0 fw-bold"><i class="bi bi-box-seam me-1"></i>Dispatch Items</label>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm table-bordered mb-0" id="dispatchItemsTable">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width:210px">Item</th>
+                            <th style="width:110px">Requested Qty</th>
+                            <th style="width:110px">Available Qty</th>
+                            <th style="width:110px">Dispatch Qty</th>
+                            <th style="width:90px">Unit</th>
+                            <th style="width:170px">Warehouse</th>
+                            <th style="width:140px">Batch No</th>
+                            <th style="width:140px">Expiry Date</th>
+                        </tr>
+                    </thead>
+                    <tbody id="dispatchItemsBody">
+                        <tr><td colspan="8" class="text-center text-muted py-3">Select relief requests to load items</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="mt-3">
+                <button type="button" class="btn btn-primary" onclick="saveDispatch()"><i class="bi bi-check-lg me-1"></i>Create Dispatch</button>
+                <button type="button" class="btn btn-secondary" onclick="resetDispatchForm()"><i class="bi bi-arrow-counterclockwise me-1"></i>Reset</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-list-check me-2 text-primary"></i>Recent Dispatches</span>
+        <input type="text" class="form-control form-control-sm" style="width:200px" id="dispatchSearch" placeholder="Search..." oninput="filterDispatches()">
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Dispatch #</th>
+                        <th>Date</th>
+                        <th>Warehouse</th>
+                        <th>Incident</th>
+                        <th>Request</th>
+                        <th>Destination</th>
+                        <th>Items</th>
+                        <th>Status</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="dispatchTableBody">
+                    <tr><td colspan="9" class="text-center py-4"><div class="spinner-border text-primary"></div></td></tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="d-flex justify-content-between align-items-center mt-2 px-2">
+            <small class="text-muted" id="tableInfo">0 records</small>
+            <nav><ul class="pagination pagination-sm mb-0" id="pagination"></ul></nav>
+        </div>
+    </div>
+</div>
+<!-- Cancel Dispatch Modal -->
+<div class="modal fade" id="cancelDispatchModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title"><i class="bi bi-x-circle-fill me-2"></i>Cancel Dispatch</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted small mb-3">This will reverse inventory quantities for all items and mark this dispatch as cancelled.</p>
+                <input type="hidden" id="cancelDispatchId">
+                <div class="mb-3">
+                    <label class="form-label">Reason for Cancellation <span class="text-danger">*</span></label>
+                    <textarea class="form-control" id="cancelReason" rows="3" placeholder="Enter the reason for cancelling this dispatch..." required></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-danger" onclick="confirmCancelDispatch()"><i class="bi bi-check-lg me-1"></i>Confirm Cancel</button>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- Proceed Anyway Confirmation Modal -->
+<div class="modal fade" id="proceedDispatchModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title"><i class="bi bi-exclamation-triangle me-2"></i>Prior Distributions Found</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-2" id="proceedDispatchMsg"></p>
+                <div id="proceedDispatchList" class="small mb-2"></div>
+                <p class="text-muted small mb-0">Are you sure you want to proceed with creating this dispatch?</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-warning" id="proceedDispatchBtn" onclick="proceedDispatchSave()"><i class="bi bi-check-lg me-1"></i>Proceed Anyway</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+let dispatches = [];
+let allRequests = [];
+let inventoryMap = {};
+let isSaving = false;
+let pendingDispatchBody = null;
+let pendingDispatchIsEdit = false;
+let paginator = new Paginator({perPage: 25, onPageChange: () => renderDispatches(dispatches)});
+
+let warehouseList = [];
+
+function statusBadge(status) {
+    if (status === 'Cancelled') return '<span class="badge bg-danger">Cancelled</span>';
+    if (status === 'Active') return '<span class="badge bg-success">Active</span>';
+    return `<span class="badge bg-secondary">${status || 'Active'}</span>`;
+}
+
+async function loadFormData() {
+    try {
+        const r = await fetch('/api/data');
+        if (!r.ok) { showToast('danger', 'Failed to load form data'); return; }
+        const d = await r.json();
+        if (!d.success) { showToast('danger', d.message); return; }
+
+        const whSel = document.getElementById('dp_warehouse_id');
+        whSel.innerHTML = '<option value="">Select Warehouse</option>' + d.warehouses.map(w =>
+            `<option value="${w.id}">${w.name} (${w.code})</option>`
+        ).join('');
+        warehouseList = d.warehouses || [];
+
+        const incSel = document.getElementById('dp_incident_id');
+        const activeIncidents = (d.incidents || []).filter(i => i.status === 'Active');
+        incSel.innerHTML = '<option value="">Select Incident</option>' + activeIncidents.map(i =>
+            `<option value="${i.id}">${i.incident_name} (${i.incident_type})</option>`
+        ).join('');
+
+        allRequests = d.requests || [];
+
+        const distItems = (d.items || []).filter(i => i.is_distributable !== false);
+        window.distributableItemIds = new Set(distItems.map(i => i.id));
+        window.itemTrackingMap = {};
+        (d.items || []).forEach(i => { window.itemTrackingMap[i.id] = !!i.expiry_tracking; });
+
+        document.getElementById('dp_date').value = today_bs;
+        document.getElementById('dp_dispatch_number').value = 'DSP-' + String(Date.now()).slice(-4);
+    } catch(e) {
+        showToast('danger', 'Error loading form data: ' + e.message);
+    }
+}
+
+document.getElementById('dp_incident_id').addEventListener('change', function() {
+    const incidentId = parseInt(this.value);
+    const menu = document.getElementById('dp_rr_menu');
+    menu.innerHTML = '';
+    document.getElementById('dp_rr_label').textContent = 'Select Relief Requests';
+    if (!incidentId) return;
+    const filtered = allRequests.filter(r => r.incident_id === incidentId && r.status !== 'Completed' && r.status !== 'Cancelled');
+    filtered.forEach(r => {
+        const li = document.createElement('li');
+        li.style.padding = '2px 0';
+        const label = document.createElement('label');
+        label.className = 'dropdown-item d-flex align-items-center gap-2 py-1';
+        label.style.cursor = 'pointer';
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.className = 'form-check-input m-0 rr-checkbox';
+        cb.value = r.id;
+        cb.addEventListener('change', updateRRLabel);
+        label.appendChild(cb);
+        label.appendChild(document.createTextNode(` ${r.request_number} - ${r.requester_name || r.organization || ''} (${r.status})`));
+        li.appendChild(label);
+        menu.appendChild(li);
+    });
+    document.getElementById('dispatchItemsBody').innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">Select relief requests to load items</td></tr>';
+});
+
+function updateRRLabel() {
+    const checked = document.querySelectorAll('#dp_rr_menu .rr-checkbox:checked');
+    const btn = document.getElementById('dp_rr_label');
+    if (checked.length === 0) {
+        btn.textContent = 'Select Relief Requests';
+    } else {
+        btn.textContent = `${checked.length} request(s) selected`;
+    }
+    populateItems();
+}
+
+document.getElementById('dp_warehouse_id').addEventListener('change', function() {
+    const whId = parseInt(this.value);
+    if (!whId) { inventoryMap = {}; populateItems(); return; }
+    fetch('/api/inventory?warehouse_id=' + whId)
+        .then(r => r.json())
+        .then(d => {
+            if (d.success) {
+                inventoryMap = {};
+                d.inventory.forEach(inv => { inventoryMap[inv.item_id] = inv.available_quantity; });
+                populateItems();
+            }
+        });
+});
+
+async function addItemRow(item, availQty) {
+    const tbody = document.getElementById('dispatchItemsBody');
+    const tr = document.createElement('tr');
+    const tracking = window.itemTrackingMap && window.itemTrackingMap[item.item_id];
+
+    let whOptions = '<option value="">-- Select Warehouse --</option>';
+    warehouseList.forEach(w => {
+        whOptions += `<option value="${w.id}">${w.name}</option>`;
+    });
+
+    tr.innerHTML = `<td style="width:180px"><input type="text" class="form-control form-control-sm" value="${item.item_name}" readonly style="max-width:170px">
+        <input type="hidden" class="dp-item-id" value="${item.item_id}"></td>
+        <td style="width:120px"><input type="number" class="form-control form-control-sm" value="${item.quantity_requested || 0}" readonly></td>
+        <td style="width:120px"><input type="number" class="form-control form-control-sm dp-avail-qty" value="${availQty}" readonly></td>
+        <td style="width:120px"><input type="number" class="form-control form-control-sm dp-dispatch-qty" value="0" min="0" max="${availQty}" oninput="validateQty(this)"></td>
+        <td style="width:90px"><input type="text" class="form-control form-control-sm dp-unit" value="${item.unit || 'pcs'}" readonly></td>
+        <td style="width:170px">
+            <select class="form-select form-select-sm dp-warehouse-id" onchange="onItemWarehouseChange(this)">
+                ${whOptions}
+            </select>
+        </td>
+        <td style="width:140px"><input type="text" class="form-control form-control-sm dp-batch-no" placeholder="Batch" ${tracking ? '' : 'disabled'}></td>
+        <td style="width:140px"><input type="text" class="form-control form-control-sm dp-expiry-date${tracking ? ' nepali-date' : ''}" placeholder="${tracking ? 'YYYY-MM-DD' : 'N/A'}" ${tracking ? '' : 'disabled'}></td>`;
+    tbody.appendChild(tr);
+
+    if (!tracking) return;
+    try {
+        const res = await fetch(`/api/items/${item.item_id}/history`);
+        const data = await res.json();
+        if (data.success && data.history && data.history.length > 0) {
+            const receipt = data.history.find(h => h.batch_no || h.expiry_date);
+            if (receipt) {
+                if (receipt.batch_no) tr.querySelector('.dp-batch-no').value = receipt.batch_no;
+                if (receipt.expiry_date) tr.querySelector('.dp-expiry-date').value = receipt.expiry_date;
+            }
+        }
+    } catch (e) {}
+}
+
+async function onItemWarehouseChange(selectEl) {
+    const whId = parseInt(selectEl.value);
+    const tr = selectEl.closest('tr');
+    const itemId = parseInt(tr.querySelector('.dp-item-id').value);
+    const qtyInput = tr.querySelector('.dp-dispatch-qty');
+
+    if (!whId) {
+        tr.querySelector('.dp-avail-qty').value = '0';
+        qtyInput.max = 0;
+        qtyInput.value = 0;
+        return;
+    }
+
+    try {
+        const r = await fetch('/api/inventory?warehouse_id=' + whId);
+        const d = await r.json();
+        if (d.success) {
+            const inv = d.inventory.find(i => i.item_id === itemId);
+            const avail = inv ? inv.available_quantity : 0;
+            tr.querySelector('.dp-avail-qty').value = avail;
+            qtyInput.max = avail;
+            if (parseInt(qtyInput.value) > avail) qtyInput.value = avail;
+        }
+    } catch(e) {
+        showToast('danger', 'Failed to check inventory');
+    }
+}
+
+async function populateItems() {
+    const checkboxes = document.querySelectorAll('#dp_rr_menu .rr-checkbox:checked');
+    const selectedIds = Array.from(checkboxes).map(cb => parseInt(cb.value));
+    if (selectedIds.length === 0) {
+        document.getElementById('dispatchItemsBody').innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">Select relief requests to load items</td></tr>';
+        return;
+    }
+    const whId = parseInt(document.getElementById('dp_warehouse_id').value);
+
+    // Aggregate items from all selected requests
+    const itemMap = {};
+    for (const rrId of selectedIds) {
+        const req = allRequests.find(r => r.id === rrId);
+        if (req && req.items) {
+            for (const item of req.items) {
+                if (!itemMap[item.item_id]) {
+                    itemMap[item.item_id] = { ...item, quantity_requested: 0, request_ids: [] };
+                }
+                itemMap[item.item_id].quantity_requested += item.quantity_requested || 0;
+                itemMap[item.item_id].request_ids.push(rrId);
+            }
+        }
+    }
+
+    const tbody = document.getElementById('dispatchItemsBody');
+    tbody.innerHTML = '';
+    const distributableItems = window.distributableItemIds || new Set();
+    let hasItems = false;
+
+    for (const itemId in itemMap) {
+        if (!distributableItems.has(parseInt(itemId))) continue;
+        hasItems = true;
+        const item = itemMap[itemId];
+        const avail = whId ? (inventoryMap[item.item_id] || 0) : 0;
+        await addItemRow(item, avail);
+
+        // Set warehouse default on new rows if primary warehouse is selected
+        if (whId) {
+            const rows = tbody.querySelectorAll('tr');
+            const lastRow = rows[rows.length - 1];
+            const whSelect = lastRow.querySelector('.dp-warehouse-id');
+            if (whSelect) whSelect.value = whId;
+        }
+    }
+    if (!hasItems) {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">No distributable items in selected requests</td></tr>';
+    }
+}
+
+function validateQty(input) {
+    const max = parseInt(input.max) || 0;
+    const val = parseInt(input.value) || 0;
+    if (val > max) {
+        showToast('warning', 'Dispatch quantity cannot exceed available quantity (' + max + ')');
+        input.value = max;
+    }
+    if (val < 0) input.value = 0;
+    input.classList.toggle('is-invalid', val <= 0);
+}
+
+function validatePhone(phone) {
+    return !phone || /^[\d\s\+\-\(\)]{7,20}$/.test(phone);
+}
+
+async function loadDispatches() {
+    try {
+        const r = await fetch('/api/dispatch');
+        if (!r.ok) { showToast('danger', 'Failed to load dispatches'); return; }
+        const d = await r.json();
+        if (!d.success) { showToast('danger', d.message); return; }
+        dispatches = d.dispatches || [];
+        renderDispatches(dispatches);
+    } catch(e) {
+        showToast('danger', 'Error loading dispatches: ' + e.message);
+    }
+}
+
+function renderDispatches(data) {
+    const tbody = document.getElementById('dispatchTableBody');
+    if (data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" class="text-center py-4 text-muted">No dispatches found</td></tr>';
+        paginator.update(0);
+        return;
+    }
+    const pageData = paginator.getPageData(data);
+    tbody.innerHTML = pageData.map(dp => {
+        const itemsCount = dp.items ? dp.items.length : 0;
+        const isCancelled = dp.status === 'Cancelled';
+        const canEdit = !dp.has_distribution && !isCancelled;
+        const canCancel = !dp.has_distribution && !isCancelled;
+        return `<tr class="${isCancelled ? 'table-danger' : ''}">
+            <td><strong>${dp.dispatch_number}</strong></td>
+            <td>${dp.date ? new Date(dp.date).toLocaleDateString() : '-'}</td>
+            <td>${dp.warehouse_name || '-'}</td>
+            <td>${dp.incident_name || '-'}</td>
+            <td>${dp.request_number || '-'}</td>
+            <td>${dp.destination || '-'}</td>
+            <td><span class="badge bg-dark">${itemsCount} item${itemsCount !== 1 ? 's' : ''}</span></td>
+            <td>${statusBadge(dp.status)}</td>
+            <td class="text-end">
+                <button class="btn btn-sm btn-outline-primary" onclick="viewDispatch(${dp.id})"><i class="bi bi-eye"></i></button>
+                ${canEdit
+                    ? '<button class="btn btn-sm btn-outline-warning" onclick="editDispatch(' + dp.id + ')" title="Edit"><i class="bi bi-pencil"></i></button>'
+                    : '<button class="btn btn-sm btn-outline-secondary" disabled title="' + (isCancelled ? 'Cancelled — cannot edit' : 'Already distributed — cannot edit') + '"><i class="bi bi-pencil"></i></button>'}
+                ${canCancel
+                    ? '<button class="btn btn-sm btn-outline-danger" onclick="showCancelModal(' + dp.id + ')" title="Cancel Dispatch"><i class="bi bi-x-circle"></i></button>'
+                    : ''}
+                <button class="btn btn-sm btn-outline-secondary" onclick="window.open('/api/dispatch/${dp.id}/print','_blank')" title="Print"><i class="bi bi-printer"></i></button>
+            </td>
+        </tr>`;
+    }).join('');
+    paginator.update(data.length);
+}
+
+function filterDispatches() {
+    const q = document.getElementById('dispatchSearch').value.toLowerCase();
+    const filtered = dispatches.filter(d =>
+        (d.dispatch_number && d.dispatch_number.toLowerCase().includes(q)) ||
+        (d.destination && d.destination.toLowerCase().includes(q)) ||
+        (d.incident_name && d.incident_name.toLowerCase().includes(q))
+    );
+    if (paginator) paginator.currentPage = 1;
+    renderDispatches(filtered);
+}
+
+let cancelModal = null;
+
+function showCancelModal(id) {
+    document.getElementById('cancelDispatchId').value = id;
+    document.getElementById('cancelReason').value = '';
+    if (!cancelModal) {
+        cancelModal = new bootstrap.Modal(document.getElementById('cancelDispatchModal'));
+    }
+    cancelModal.show();
+}
+
+async function confirmCancelDispatch() {
+    const id = document.getElementById('cancelDispatchId').value;
+    const reason = document.getElementById('cancelReason').value.trim();
+    if (!reason) { showToast('warning', 'Please enter a reason for cancellation'); return; }
+
+    const btn = document.querySelector('#cancelDispatchModal .btn-danger');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Cancelling...';
+
+    try {
+        const r = await fetch('/api/dispatch/' + id + '/cancel', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrf},
+            body: JSON.stringify({ cancel_reason: reason })
+        });
+        const d = await r.json();
+        if (d.success) {
+            showToast('success', 'Dispatch cancelled successfully');
+            cancelModal.hide();
+            loadDispatches();
+        } else {
+            showToast('danger', d.message);
+        }
+    } catch(e) {
+        showToast('danger', 'Error cancelling dispatch: ' + e.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-check-lg me-1"></i>Confirm Cancel';
+    }
+}
+
+async function viewDispatch(id) {
+    const r = await fetch('/api/dispatch/' + id);
+    const d = await r.json();
+    if (!d.success) { showToast('danger', d.message); return; }
+    const dp = d.dispatch;
+    let itemsHtml = '<table class="table table-sm mb-0"><thead><tr><th>Item</th><th>Qty</th><th>Unit</th><th>Warehouse</th><th>Batch No</th><th>Expiry Date</th></tr></thead><tbody>';
+    if (dp.items && dp.items.length > 0) {
+        dp.items.forEach(item => {
+            const expiry = item.expiry_date ? new Date(item.expiry_date).toLocaleDateString() : '-';
+            itemsHtml += `<tr><td>${item.item_name}</td><td>${item.quantity}</td><td>${item.unit || '-'}</td><td>${item.warehouse_name || dp.warehouse_name || '-'}</td><td>${item.batch_no || '-'}</td><td>${expiry}</td></tr>`;
+        });
+    }
+    itemsHtml += '</tbody></table>';
+    const modal = document.createElement('div');
+    modal.className = 'modal fade';
+    modal.innerHTML = `<div class="modal-dialog modal-lg"><div class="modal-content">
+        <div class="modal-header"><h5 class="modal-title"><i class="bi bi-truck me-2"></i>${dp.dispatch_number} ${statusBadge(dp.status)}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+            <div class="row g-3 mb-3">
+                <div class="col-md-4"><strong>Date:</strong> ${dp.date || '-'}</div>
+                <div class="col-md-4"><strong>Warehouse:</strong> ${dp.warehouse_name || '-'}</div>
+                <div class="col-md-4"><strong>Incident:</strong> ${dp.incident_name || '-'}</div>
+                <div class="col-md-4"><strong>Relief Request:</strong> ${dp.request_number || '-'}</div>
+                <div class="col-12" id="cashInfo_${dp.id}"></div>
+                <div class="col-md-4"><strong>Destination:</strong> ${dp.destination || '-'}</div>
+                <div class="col-md-4"><strong>Receiver:</strong> ${dp.receiver || '-'}</div>
+                <div class="col-md-4"><strong>Phone:</strong> ${dp.phone || '-'}</div>
+                <div class="col-12"><strong>Remarks:</strong> ${dp.remarks || '-'}</div>
+                ${dp.status === 'Cancelled' ? `
+                <div class="col-12">
+                    <div class="alert alert-danger mb-0 py-2">
+                        <strong><i class="bi bi-x-circle-fill me-1"></i>Cancelled</strong>
+                        ${dp.cancel_reason ? '<br><span class="small">Reason: ' + dp.cancel_reason + '</span>' : ''}
+                        ${dp.cancelled_at ? '<br><span class="small">At: ' + new Date(dp.cancelled_at).toLocaleString() + '</span>' : ''}
+                    </div>
+                </div>` : ''}
+            </div>
+            <hr><h6>Dispatched Items</h6>${itemsHtml}
+        </div>
+        <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div>
+    </div></div>`;
+    document.body.appendChild(modal);
+    const bsModal = new bootstrap.Modal(modal);
+    modal.addEventListener('hidden.bs.modal', () => modal.remove());
+    bsModal.show();
+    if (dp.relief_request_id) {
+        fetch('/api/relief-requests/' + dp.relief_request_id).then(r => r.json()).then(d => {
+            if (d.success && d.relief_request && d.relief_request.requested_cash_amount > 0) {
+                const rr = d.relief_request;
+                const pct = Math.min(100, (rr.distributed_cash_amount / rr.requested_cash_amount) * 100);
+                document.getElementById('cashInfo_' + dp.id).innerHTML = `<hr><h6>Cash Assistance</h6>
+                <div class="row g-2">
+                    <div class="col-md-4"><strong>Cash Requested:</strong> ${Number(rr.requested_cash_amount).toLocaleString()}</div>
+                    <div class="col-md-4"><strong>Cash Distributed:</strong> ${Number(rr.distributed_cash_amount).toLocaleString()}</div>
+                    <div class="col-md-4"><strong>Purpose:</strong> ${rr.cash_purpose || '-'}</div>
+                    <div class="col-12"><div class="progress" style="height:6px"><div class="progress-bar bg-success" style="width:${pct}%"></div></div></div>
+                </div>`;
+            }
+        }).catch(() => {});
+    }
+}
+
+async function editDispatch(id) {
+    try {
+        const r = await fetch('/api/dispatch/' + id);
+        const d = await r.json();
+        if (!d.success) { showToast('danger', d.message); return; }
+        const dp = d.dispatch;
+        if (dp.has_distribution) {
+            showToast('warning', 'Cannot edit dispatch — it has already been distributed to relief beneficiaries');
+            return;
+        }
+        if (dp.status === 'Cancelled') {
+            showToast('warning', 'Cannot edit dispatch — it has been cancelled');
+            return;
+        }
+        document.getElementById('dp_id').value = dp.id;
+        document.getElementById('dp_dispatch_number').value = dp.dispatch_number;
+        document.getElementById('dp_date').value = dp.date || '';
+        document.getElementById('dp_warehouse_id').value = dp.warehouse_id || '';
+        document.getElementById('dp_incident_id').value = dp.incident_id || '';
+
+        // Trigger incident change to reload relief request list
+        const event = new Event('change');
+        document.getElementById('dp_incident_id').dispatchEvent(event);
+        await new Promise(r => setTimeout(r, 100));
+
+        // Select the linked relief requests in checkbox dropdown
+        const rrId = dp.relief_request_id;
+        if (rrId) {
+            document.querySelectorAll('#dp_rr_menu .rr-checkbox').forEach(cb => {
+                if (parseInt(cb.value) === rrId) cb.checked = true;
+            });
+            updateRRLabel();
+        }
+
+        // Fetch inventory for the dispatch's warehouse
+        try {
+            const invR = await fetch('/api/inventory?warehouse_id=' + dp.warehouse_id);
+            const invD = await invR.json();
+            if (invD.success) {
+                inventoryMap = {};
+                invD.inventory.forEach(inv => { inventoryMap[inv.item_id] = inv.available_quantity; });
+            }
+        } catch(e) {}
+
+        document.getElementById('dp_destination').value = dp.destination || '';
+        document.getElementById('dp_receiver').value = dp.receiver || '';
+        document.getElementById('dp_phone').value = dp.phone || '';
+        document.getElementById('dp_remarks').value = dp.remarks || '';
+
+        if (dp.items && dp.items.length > 0) {
+            const tbody = document.getElementById('dispatchItemsBody');
+            tbody.innerHTML = '';
+            const distItemIds = window.distributableItemIds || new Set();
+            let editHasItems = false;
+
+            let whOptions = '<option value="">-- Select Warehouse --</option>';
+            warehouseList.forEach(w => {
+                whOptions += `<option value="${w.id}">${w.name}</option>`;
+            });
+
+            for (const item of dp.items) {
+                if (item.item_id && !distItemIds.has(item.item_id)) continue;
+                editHasItems = true;
+                const avail = inventoryMap[item.item_id] || 0;
+                const tracking = window.itemTrackingMap && window.itemTrackingMap[item.item_id];
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td style="width:180px"><input type="text" class="form-control form-control-sm" value="${item.item_name}" readonly style="max-width:170px">
+                    <input type="hidden" class="dp-item-id" value="${item.item_id}"></td>
+                    <td style="width:120px"><input type="number" class="form-control form-control-sm" value="${item.quantity}" readonly></td>
+                    <td style="width:120px"><input type="number" class="form-control form-control-sm dp-avail-qty" value="${avail}" readonly></td>
+                    <td style="width:120px"><input type="number" class="form-control form-control-sm dp-dispatch-qty" value="${item.quantity}" min="0" max="${avail}" oninput="validateQty(this)"></td>
+                    <td style="width:90px"><input type="text" class="form-control form-control-sm dp-unit" value="${item.unit || 'pcs'}" readonly></td>
+                    <td style="width:170px">
+                        <select class="form-select form-select-sm dp-warehouse-id" onchange="onItemWarehouseChange(this)">
+                            ${whOptions}
+                        </select>
+                    </td>
+                    <td style="width:140px"><input type="text" class="form-control form-control-sm dp-batch-no" value="${item.batch_no || ''}" ${tracking ? '' : 'disabled'}></td>
+                    <td style="width:140px"><input type="text" class="form-control form-control-sm dp-expiry-date${tracking ? ' nepali-date' : ''}" placeholder="${tracking ? 'YYYY-MM-DD' : 'N/A'}" value="${tracking ? (item.expiry_date || '') : ''}" ${tracking ? '' : 'disabled'}></td>`;
+                tbody.appendChild(tr);
+
+                // Set warehouse dropdown to the item's warehouse (with fallback to dispatch's primary)
+                const whSelect = tr.querySelector('.dp-warehouse-id');
+                if (whSelect) whSelect.value = item.warehouse_id || dp.warehouse_id || '';
+            }
+            if (!editHasItems) {
+                tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">No distributable items in this request</td></tr>';
+            }
+        }
+        // Update card header and button
+        const header = document.querySelector('.card-header span');
+        if (header) header.innerHTML = '<i class="bi bi-pencil me-2 text-warning"></i>Edit Dispatch Order';
+        const btn = document.querySelector('button[onclick="saveDispatch()"]');
+        if (btn) btn.innerHTML = '<i class="bi bi-check-lg me-1"></i>Update Dispatch';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch(e) {
+        showToast('danger', 'Error loading dispatch: ' + e.message);
+    }
+}
+
+function resetDispatchForm() {
+    document.getElementById('dp_id').value = '';
+    document.getElementById('dispatchForm').reset();
+    document.getElementById('dp_dispatch_number').value = 'DSP-' + String(Date.now()).slice(-4);
+    document.getElementById('dp_date').value = today_bs;
+    document.getElementById('dispatchItemsBody').innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">Select relief requests to load items</td></tr>';
+    // Clear checkbox selections
+    document.querySelectorAll('#dp_rr_menu .rr-checkbox').forEach(cb => cb.checked = false);
+    document.getElementById('dp_rr_label').textContent = 'Select Relief Requests';
+    const header = document.querySelector('.card-header span');
+    if (header) header.innerHTML = '<i class="bi bi-plus-circle me-2 text-primary"></i>Create Dispatch Order';
+    const btn = document.querySelector('button[onclick="saveDispatch()"]');
+    if (btn) btn.innerHTML = '<i class="bi bi-check-lg me-1"></i>Create Dispatch';
+}
+
+async function saveDispatch() {
+    if (isSaving) return;
+    const dateVal = document.getElementById('dp_date').value;
+    if (!dateVal) { showToast('danger', 'Please select a dispatch date'); return; }
+
+    const phone = document.getElementById('dp_phone').value;
+    if (phone && !validatePhone(phone)) { showToast('danger', 'Phone number format is invalid'); return; }
+
+    const items = Array.from(document.querySelectorAll('#dispatchItemsBody tr')).map(tr => {
+        const itemIdEl = tr.querySelector('.dp-item-id');
+        const qtyEl = tr.querySelector('.dp-dispatch-qty');
+        const unitEl = tr.querySelector('.dp-unit');
+        const batchEl = tr.querySelector('.dp-batch-no');
+        const expiryEl = tr.querySelector('.dp-expiry-date');
+        const whEl = tr.querySelector('.dp-warehouse-id');
+        if (!itemIdEl || !qtyEl) return null;
+        return {
+            item_id: parseInt(itemIdEl.value),
+            quantity: parseInt(qtyEl.value) || 0,
+            unit: unitEl ? unitEl.value : '',
+            warehouse_id: whEl ? parseInt(whEl.value) : null,
+            batch_no: batchEl ? batchEl.value : '',
+            expiry_date: expiryEl ? expiryEl.value : ''
+        };
+    }).filter(i => i && i.quantity > 0);
+
+    const incident_id = parseInt(document.getElementById('dp_incident_id').value);
+    const rrCheckboxes = document.querySelectorAll('#dp_rr_menu .rr-checkbox:checked');
+    const relief_request_ids = Array.from(rrCheckboxes).map(cb => parseInt(cb.value));
+
+    if (!incident_id) { showToast('danger', 'Please select an incident'); return; }
+    if (items.length === 0) { showToast('danger', 'Please add at least one item with quantity > 0'); return; }
+    if (items.some(i => !i.warehouse_id)) { showToast('danger', 'Please select a warehouse for each item'); return; }
+
+    isSaving = true;
+    const isEdit = !!document.getElementById('dp_id').value;
+    const btn = document.querySelector('button[onclick="saveDispatch()"]');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving...'; }
+
+    try {
+        if (isEdit) {
+            const check = await fetch('/api/dispatch/' + document.getElementById('dp_id').value);
+            const checkData = await check.json();
+            if (checkData.success && checkData.dispatch) {
+                if (checkData.dispatch.has_distribution) {
+                    showToast('warning', 'Cannot save — this dispatch has already been distributed');
+                    isSaving = false;
+                    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-check-lg me-1"></i>Update Dispatch'; }
+                    return;
+                }
+                if (checkData.dispatch.status === 'Cancelled') {
+                    showToast('warning', 'Cannot save — this dispatch has been cancelled');
+                    isSaving = false;
+                    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-check-lg me-1"></i>Update Dispatch'; }
+                    return;
+                }
+            }
+        }
+
+        const primaryWhId = parseInt(document.getElementById('dp_warehouse_id').value) || items[0].warehouse_id;
+        const body = {
+            dispatch_number: document.getElementById('dp_dispatch_number').value,
+            date: dateVal,
+            warehouse_id: primaryWhId,
+            incident_id: incident_id,
+            relief_request_ids: relief_request_ids,
+            destination: document.getElementById('dp_destination').value,
+            receiver: document.getElementById('dp_receiver').value,
+            phone: phone,
+            remarks: document.getElementById('dp_remarks').value,
+            items: items
+        };
+
+        const url = isEdit ? '/api/dispatch/' + document.getElementById('dp_id').value : '/api/dispatch';
+        const r = await fetch(url, {
+            method: isEdit ? 'PUT' : 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrf},
+            body: JSON.stringify(body)
+        });
+        const d = await r.json();
+        if (d.success) {
+            showToast('success', isEdit ? 'Dispatch updated successfully' : d.message || 'Dispatch created successfully');
+            resetDispatchForm();
+            loadDispatches();
+        } else if (d.requires_confirmation) {
+            pendingDispatchBody = body;
+            pendingDispatchIsEdit = isEdit;
+            document.getElementById('proceedDispatchMsg').textContent = d.message;
+            const listEl = document.getElementById('proceedDispatchList');
+            if (d.distributions && d.distributions.length) {
+                listEl.innerHTML = '<strong>Existing distributions:</strong><ul class="mb-0 mt-1">' +
+                    d.distributions.map(dd => `<li>${dd.no} (${dd.date})</li>`).join('') +
+                    '</ul>';
+                if (d.total > d.distributions.length) {
+                    listEl.innerHTML += `<div class="text-muted">...and ${d.total - d.distributions.length} more</div>`;
+                }
+            }
+            new bootstrap.Modal(document.getElementById('proceedDispatchModal')).show();
+        } else {
+            showToast('danger', d.message);
+        }
+    } catch(e) {
+        showToast('danger', 'Error saving dispatch: ' + e.message);
+    } finally {
+        if (!pendingDispatchBody) {
+            isSaving = false;
+            if (btn) { btn.disabled = false; btn.innerHTML = isEdit ? '<i class="bi bi-check-lg me-1"></i>Update Dispatch' : '<i class="bi bi-check-lg me-1"></i>Create Dispatch'; }
+        }
+    }
+}
+
+async function proceedDispatchSave() {
+    if (!pendingDispatchBody) return;
+    pendingDispatchBody.force = true;
+    const modal = bootstrap.Modal.getInstance(document.getElementById('proceedDispatchModal'));
+    if (modal) modal.hide();
+    const isEdit = pendingDispatchIsEdit;
+    const btn = document.querySelector('button[onclick="saveDispatch()"]');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving...'; }
+    try {
+        const url = isEdit ? '/api/dispatch/' + document.getElementById('dp_id').value : '/api/dispatch';
+        const r = await fetch(url, {
+            method: isEdit ? 'PUT' : 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrf},
+            body: JSON.stringify(pendingDispatchBody)
+        });
+        const d = await r.json();
+        if (d.success) {
+            showToast('success', isEdit ? 'Dispatch updated successfully' : d.message || 'Dispatch created successfully');
+            resetDispatchForm();
+            loadDispatches();
+        } else {
+            showToast('danger', d.message);
+        }
+    } catch(e) {
+        showToast('danger', 'Error saving dispatch: ' + e.message);
+    } finally {
+        pendingDispatchBody = null;
+        pendingDispatchIsEdit = false;
+        isSaving = false;
+        if (btn) { btn.disabled = false; btn.innerHTML = isEdit ? '<i class="bi bi-check-lg me-1"></i>Update Dispatch' : '<i class="bi bi-check-lg me-1"></i>Create Dispatch'; }
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadFormData();
+    loadDispatches();
+});
+</script>
+{% endblock %}

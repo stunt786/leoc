@@ -1,0 +1,31 @@
+# Flask environment configuration
+.env
+
+# SQLite databases
+instance/
+*.db
+
+# Python virtual environment
+venv/
+env/
+ENV/
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Temporary and local log/upload/backup directories
+logs/
+backups/
+static/uploads/*
+
+# OS/IDE specific files
+.DS_Store
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
