@@ -134,12 +134,7 @@ UPLOAD_FOLDER=static/uploads
 MAX_CONTENT_LENGTH=16777216
 PORT=5002
 
-# Recommended: Generate a hashed unlock key
-# python -c 'from werkzeug.security import generate_password_hash; print(generate_password_hash("your-strong-password"))'
-UNLOCK_KEY=your-hashed-unlock-key
-
 CACHE_TIMEOUT=300
-LOG_LEVEL=INFO
 ```
 
 ### 2.4 — Initialize Database
@@ -545,7 +540,7 @@ chmod +x production-setup.sh
 This script:
 - Ensures `FLASK_ENV=production`
 - Generates a strong `SECRET_KEY` and displays it (add it to `.env`)
-- Warns if `UNLOCK_KEY` is the default (`admin123`)
+- Verifies `ADMIN_PASSWORD` is set (app will not start without it in production)
 - Verifies `FLASK_DEBUG` is disabled
 
 ### 6.6 — Production Readiness Verification
@@ -573,10 +568,11 @@ Checks performed:
   ```
   Add it to `.env`. Never use defaults.
 
-- [ ] **UNLOCK_KEY** — Change from `admin123` to a strong hashed password:
-  ```bash
-  python -c 'from werkzeug.security import generate_password_hash; print(generate_password_hash("your-strong-password"))'
+- [ ] **ADMIN_PASSWORD** — Set a strong password before deploying:
   ```
+  ADMIN_PASSWORD=your-strong-password-here
+  ```
+  The application will refuse to start in production without this.
 
 - [ ] **Default user passwords** — Change passwords for all built-in users (admin, editor, viewer, operator, finance) after first login.
 

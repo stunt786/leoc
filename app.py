@@ -10163,8 +10163,12 @@ def init_db():
                     )
                 """))
                 import secrets as _sec
-                admin_pw = os.getenv('ADMIN_PASSWORD') or 'admin123'
-                if not os.getenv('ADMIN_PASSWORD'): print("[!] ADMIN_PASSWORD not set. Using default admin password: admin123")
+                admin_pw = os.getenv('ADMIN_PASSWORD')
+                if not admin_pw:
+                    if os.getenv('FLASK_ENV') == 'production':
+                        raise ValueError("CRITICAL: ADMIN_PASSWORD must be set in production. Aborting startup.")
+                    admin_pw = 'admin123'
+                    print("[!] ADMIN_PASSWORD not set. Using default admin password: admin123")
                 db.session.execute(db.text("INSERT INTO \"user\" (username, password_hash, role, full_name, is_active) VALUES (:u, :p, :r, :f, :active)"),
                     {'u': 'admin', 'p': generate_password_hash(admin_pw), 'r': 'admin', 'f': 'System Administrator', 'active': True})
                 mgr_pw = os.getenv('MANAGER_PASSWORD') or _sec.token_urlsafe(16)
@@ -10199,8 +10203,12 @@ def init_db():
                 existing = db.session.execute(db.text("SELECT id FROM \"user\" WHERE username = 'admin'")).fetchone()
                 if not existing:
                     import secrets as _sec
-                    admin_pw = os.getenv('ADMIN_PASSWORD') or 'admin123'
-                    if not os.getenv('ADMIN_PASSWORD'): print("[!] ADMIN_PASSWORD not set. Using default admin password: admin123")
+                    admin_pw = os.getenv('ADMIN_PASSWORD')
+                    if not admin_pw:
+                        if os.getenv('FLASK_ENV') == 'production':
+                            raise ValueError("CRITICAL: ADMIN_PASSWORD must be set in production. Aborting startup.")
+                        admin_pw = 'admin123'
+                        print("[!] ADMIN_PASSWORD not set. Using default admin password: admin123")
                     db.session.execute(db.text("INSERT INTO \"user\" (username, password_hash, role, full_name, is_active) VALUES (:u, :p, :r, :f, :active)"),
                         {'u': 'admin', 'p': generate_password_hash(admin_pw), 'r': 'admin', 'f': 'System Administrator', 'active': True})
                     db.session.commit()

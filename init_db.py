@@ -58,8 +58,11 @@ def seed_default_users():
     """Seed default users and reset the admin password when admin exists."""
     from werkzeug.security import generate_password_hash
     import secrets
-    admin_password = os.getenv('ADMIN_PASSWORD') or 'admin123'
-    if not os.getenv('ADMIN_PASSWORD'):
+    admin_password = os.getenv('ADMIN_PASSWORD')
+    if not admin_password:
+        if os.getenv('FLASK_ENV') == 'production':
+            raise ValueError("CRITICAL: ADMIN_PASSWORD must be set in production. Aborting startup.")
+        admin_password = 'admin123'
         print("[!] ADMIN_PASSWORD not set. Using default admin password: admin123")
     existing = db.session.execute(text("SELECT id FROM \"user\" WHERE username = 'admin'")).fetchone()
     if existing:

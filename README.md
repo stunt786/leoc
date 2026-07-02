@@ -17,6 +17,12 @@ A comprehensive, GIS-enabled disaster management and relief distribution informa
 6. [GIS & Map Setup for New Location](#gis--map-setup-for-new-location)
 7. [System Requirements](#system-requirements)
 8. [Deployment on New Server](#deployment-on-new-server)
+   - [Docker Deployment on Linux (Recommended)](#option-1-docker-deployment-on-linux-recommended--beginner-friendly)
+   - [Docker Management Commands](#docker-management-commands)
+   - [Troubleshooting Common Issues](#troubleshooting-common-issues)
+   - [Updating LEOC](#updating-leoc)
+   - [Linux Server Manual Setup](#option-2-linux-server-manual--advanced)
+   - [Production with Systemd + Nginx](#option-3-production-with-systemd--nginx)
 9. [API Endpoints](#api-endpoints)
 10. [Security](#security)
 11. [Testing](#testing)
@@ -591,28 +597,315 @@ const layerConfig = {
 
 ## Deployment on New Server
 
-### Option 1: Docker Deployment (Recommended)
+### Option 1: Docker Deployment on Linux (Recommended — Beginner Friendly)
+
+This is the **recommended way** to run LEOC in production. Docker handles all dependencies automatically — you don't need to install Python, PostgreSQL, or any system libraries manually.
+
+---
+
+#### Step 1: Install Docker on Your Linux Server
+
+Open a terminal and run the following commands one by one. These instructions work for **Ubuntu/Debian**. For other Linux distributions, see the [official Docker guide](https://docs.docker.com/engine/install/).
 
 ```bash
-# 1. Clone/copy project to server
-git clone <repo> /opt/leoc
-cd /opt/leoc
+# Update your system packages
+sudo apt update && sudo apt upgrade -y
 
-# 2. Configure environment
-cp .env.production.example .env
-# Edit .env: set SECRET_KEY, DB_PASSWORD, etc.
+# Install Docker
+sudo apt install -y docker.io docker-compose-plugin
 
-# 3. Build and start
-./docker-manage.sh build
-./docker-manage.sh start
+# Start Docker and enable it to run on boot
+sudo systemctl enable docker
+sudo systemctl start docker
 
-# 4. Initialize database
-docker exec -it leoc-app python init_db.py
+# Add your user to the docker group (so you don't need sudo for docker commands)
+sudo usermod -aG docker $USER
 
-# 5. Access at http://<server-ip>:5002
+# Log out and log back in for the group change to take effect
+# Or run this temporarily:
+newgrp docker
 ```
 
-### Option 2: Linux Server (Manual)
+**Verify Docker is installed:**
+```bash
+docker --version
+# Should show something like: Docker version 24.x.x
+```
+
+---
+
+#### Step 2: Get the LEOC Project Files
+
+**Option A: From Git (if you have a Git repository)**
+```bash
+# Create the project directory
+sudo mkdir -p /opt/leoc
+cd /opt/leoc
+
+# Clone the repository (replace with your actual repo URL)
+sudo git clone <your-repo-url> .
+```
+
+**Option B: Copy files manually**
+```bash
+# Create the project directory
+sudo mkdir -p /opt/leoc
+
+# Copy all LEOC project files to this directory
+# (copy from your local machine or USB drive)
+sudo cp -r /path/to/your/leoc-files/* /opt/leoc/
+```
+
+Set proper ownership:
+```bash
+sudo chown -R $USER:$USER /opt/leoc
+cd /opt/leoc
+```
+
+---
+
+#### Step 3: Configure Environment Variables
+
+The `.env` file contains all the secret settings for your deployment (passwords, secret keys, etc.).
+
+```bash
+# Copy the example environment file
+cp .env.production.example .env
+```
+
+Now **edit the `.env` file** with a text editor:
+```bash
+nano .env
+```
+
+You must change these values:
+
+**SECRET_KEY (Required — Security)**
+```bash
+# Generate a strong random secret key by running:
+python3 -c 'import secrets; print(secrets.token_hex(32))'
+# Copy the output and paste it as the SECRET_KEY value
+```
+
+**ADMIN_PASSWORD (Required — Set your admin login password)**
+```bash
+# Replace with a strong password (at least 12 characters, mix of letters, numbers, symbols)
+ADMIN_PASSWORD=YourStrongPassword123!
+```
+
+**DB_PASSWORD (Required — PostgreSQL database password)**
+```bash
+# Choose a strong database password
+DB_PASSWORD=YourStrongDbPassword123!
+
+# Also update this line with the same password:
+SQLALCHEMY_DATABASE_URI=postgresql://leoc:YourStrongDbPassword123!@leoc-db:5432/leoc
+```
+
+Save and exit: Press `Ctrl+X`, then `Y`, then `Enter`.
+
+---
+
+#### Step 4: Create Required Directories
+
+```bash
+# Create directories for uploads and backups
+mkdir -p static/uploads backups
+```
+
+---
+
+#### Step 5: Build and Start the Application
+
+```bash
+# Build the Docker image (this may take 3-5 minutes the first time)
+docker compose build --no-cache
+
+# Start both the application and database containers
+docker compose up -d
+```
+
+**What just happened?**
+- `leoc-db` container started — this runs your PostgreSQL database
+- `leoc-app` container started — this runs the LEOC web application
+- Both will automatically restart if the server reboots
+
+**Check if everything is running:**
+```bash
+docker compose ps
+```
+You should see both containers with status `Up` or `running`.
+
+---
+
+#### Step 6: Initialize the Database
+
+The first time you run the application, you need to create the database tables and default data:
+
+```bash
+docker compose exec leoc-app python init_db.py
+```
+
+This creates:
+- All 45+ database tables
+- Default user accounts (admin, editor, viewer, operator, finance)
+- Default settings and ward data
+
+---
+
+#### Step 7: Access LEOC
+
+Open a web browser and go to:
+```
+http://YOUR-SERVER-IP:5002
+```
+
+For example, if your server IP is `192.168.1.100`:
+```
+http://192.168.1.100:5002
+```
+
+**Log in with default credentials:**
+
+| Username | Password | Role |
+|----------|----------|------|
+| admin | admin123 | Admin |
+| editor | (auto-generated) | Editor |
+| viewer | (auto-generated) | Viewer |
+| operator | (auto-generated) | Operator |
+| finance | (auto-generated) | Finance |
+
+> **Important:** Change all passwords immediately after first login via User Management.
+
+---
+
+#### Step 8: Set Up Automated Backups
+
+Backups protect your data from accidental loss. Set up automatic daily backups:
+
+```bash
+# Make the backup script executable
+chmod +x backup_prod.sh
+
+# Test it manually first
+./backup_prod.sh
+
+# Add a cron job for daily backups at 2 AM
+# Open the crontab editor:
+crontab -e
+
+# Add this line at the end:
+0 2 * * * /opt/leoc/backup_prod.sh >> /opt/leoc/logs/backup.log 2>&1
+```
+
+---
+
+#### Step 9: Open Firewall Ports (If Enabled)
+
+If your server has a firewall, you need to allow web traffic:
+
+```bash
+# For UFW (Ubuntu default firewall):
+sudo ufw allow 5002/tcp
+sudo ufw reload
+
+# For firewalld (CentOS/RHEL):
+sudo firewall-cmd --permanent --add-port=5002/tcp
+sudo firewall-cmd --reload
+```
+
+---
+
+### Docker Management Commands
+
+Use these commands to manage your LEOC installation:
+
+| Command | What It Does |
+|---------|--------------|
+| `docker compose up -d` | Start the application |
+| `docker compose down` | Stop the application |
+| `docker compose restart` | Restart the application |
+| `docker compose logs -f` | View live application logs |
+| `docker compose ps` | Check container status |
+| `docker compose exec leoc-app bash` | Open a terminal inside the app container |
+
+Or use the management script:
+```bash
+./docker-manage.sh start      # Start
+./docker-manage.sh stop       # Stop
+./docker-manage.sh restart    # Restart
+./docker-manage.sh logs       # View logs
+./docker-manage.sh build      # Rebuild image
+./docker-manage.sh status     # Check status
+```
+
+---
+
+### Troubleshooting Common Issues
+
+**Problem: Application won't start / containers keep restarting**
+```bash
+# Check the logs for error messages
+docker compose logs leoc-app
+docker compose logs leoc-db
+```
+
+**Problem: "Permission denied" errors**
+```bash
+# Fix file permissions
+sudo chown -R $USER:$USER /opt/leoc
+```
+
+**Problem: Database connection failed**
+```bash
+# Make sure the database container is healthy
+docker compose ps
+# If leoc-db is not running:
+docker compose up -d leoc-db
+# Wait a few seconds, then restart the app:
+docker compose restart leoc-app
+```
+
+**Problem: Port 5002 already in use**
+```bash
+# Find what's using port 5002
+sudo lsof -i :5002
+# Stop that process or change the port in docker-compose.yml
+```
+
+**Problem: "Admin password not set" error**
+```bash
+# Make sure ADMIN_PASSWORD is set in your .env file
+cat .env | grep ADMIN_PASSWORD
+# If missing, edit .env and set it
+nano .env
+# Then restart:
+docker compose restart leoc-app
+```
+
+---
+
+### Updating LEOC
+
+When a new version is released:
+
+```bash
+# Pull the latest code
+git pull origin main
+
+# Rebuild and restart
+docker compose build --no-cache
+docker compose up -d
+
+# Run any database migrations if needed
+docker compose exec leoc-app python init_db.py
+```
+
+---
+
+### Option 2: Linux Server (Manual — Advanced)
+
+For users who prefer to install everything manually without Docker.
 
 ```bash
 # 1. System preparation
@@ -659,14 +952,7 @@ sudo apt install -y certbot python3-certbot-nginx
 sudo certbot --nginx -d leoc.example.com
 ```
 
-### Post-Deployment Steps
-
-1. **Change default passwords** for all built-in users (admin, editor, viewer, operator, finance)
-2. **Generate strong SECRET_KEY**: `python -c 'import secrets; print(secrets.token_hex(32))'`
-3. **Set up automated backups** via cron: `0 2 * * * /opt/leoc/backup_prod.sh`
-4. **Configure firewall**: allow only SSH (22), HTTP (80), HTTPS (443)
-5. **Update GIS boundary files** for your municipality (see GIS section)
-6. **Update organization settings** via Settings UI
+---
 
 ### Default Credentials
 

@@ -69,14 +69,33 @@ def parse_coordinates(data, field='coordinates'):
     return val or None
 
 
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv', 'txt', 'ods', 'odt'}
+
 def save_upload(file, subdir='new_modules'):
+    if not file or not file.filename:
+        return None
+    filename = secure_filename(file.filename)
+    if not filename:
+        return None
+    ext = filename.rsplit('.', 1)[-1].lower() if '.' in filename else ''
+    if ext not in ALLOWED_EXTENSIONS:
+        return None
     upload_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], subdir)
     os.makedirs(upload_dir, exist_ok=True)
-    ext = file.filename.rsplit('.', 1)[-1].lower() if '.' in file.filename else ''
-    filename = f"{uuid.uuid4().hex}.{ext}" if ext else f"{uuid.uuid4().hex}"
-    filepath = os.path.join(upload_dir, filename)
+    safe_name = f"{uuid.uuid4().hex}.{ext}"
+    filepath = os.path.join(upload_dir, safe_name)
     file.save(filepath)
-    return f"uploads/{subdir}/{filename}"
+    return f"uploads/{subdir}/{safe_name}"
+
+
+def filter_fields(data, allowed):
+    return {k: v for k, v in data.items() if k in allowed}
+
+
+CLUSTER_MEMBER_FIELDS = {'organization_name', 'representative', 'contact_number', 'designation'}
+RRT_MEMBER_FIELDS = {'name', 'designation', 'skill', 'contact_number'}
+RRT_RESOURCE_FIELDS = {'equipment_assigned', 'vehicles_assigned'}
+COMMITTEE_MEMBER_FIELDS = {'name', 'position', 'organization', 'contact_number'}
 
 
 def log_activity(action, module, record_id=None, details=None):
@@ -232,10 +251,11 @@ def api_critical_infrastructure():
             for f in files:
                 if f and f.filename:
                     path = save_upload(f, 'infrastructure')
-                    if key == 'photos':
-                        db.session.add(InfrastructurePhoto(infrastructure_id=item.id, filename=path, original_name=f.filename))
-                    else:
-                        db.session.add(InfrastructureDocument(infrastructure_id=item.id, filename=path, original_name=f.filename))
+                    if path:
+                        if key == 'photos':
+                            db.session.add(InfrastructurePhoto(infrastructure_id=item.id, filename=path, original_name=f.filename))
+                        else:
+                            db.session.add(InfrastructureDocument(infrastructure_id=item.id, filename=path, original_name=f.filename))
 
     db.session.commit()
     log_activity('create', 'CriticalInfrastructure', item.id, f"Created infrastructure: {item.name}")
@@ -289,12 +309,14 @@ def api_infrastructure_upload(id):
         for f in request.files.getlist('photo'):
             if f and f.filename:
                 path = save_upload(f, 'infrastructure')
-                db.session.add(InfrastructurePhoto(infrastructure_id=item.id, filename=path, original_name=f.filename))
+                if path:
+                    db.session.add(InfrastructurePhoto(infrastructure_id=item.id, filename=path, original_name=f.filename))
     if 'document' in request.files:
         for f in request.files.getlist('document'):
             if f and f.filename:
                 path = save_upload(f, 'infrastructure')
-                db.session.add(InfrastructureDocument(infrastructure_id=item.id, filename=path, original_name=f.filename))
+                if path:
+                    db.session.add(InfrastructureDocument(infrastructure_id=item.id, filename=path, original_name=f.filename))
     db.session.commit()
     return jsonify({'success': True})
 
@@ -553,7 +575,7 @@ def api_clusters():
     db.session.add(cluster)
     db.session.flush()
     for m in members:
-        db.session.add(ClusterMember(cluster_id=cluster.id, **m))
+        db.session.add(ClusterMember(cluster_id=cluster.id, **filter_fields(m, CLUSTER_MEMBER_FIELDS)))
     db.session.commit()
     log_activity('create', 'Cluster', cluster.id, f"Created cluster: {cluster.cluster_name}")
     return jsonify({'success': True, 'data': cluster.to_dict()})
@@ -582,7 +604,7 @@ def api_cluster_item(id):
     if 'members' in data:
         ClusterMember.query.filter_by(cluster_id=cluster.id).delete()
         for m in data['members']:
-            db.session.add(ClusterMember(cluster_id=cluster.id, **m))
+            db.session.add(ClusterMember(cluster_id=cluster.id, **filter_fields(m, CLUSTER_MEMBER_FIELDS)))
     db.session.commit()
     log_activity('update', 'Cluster', id, f"Updated cluster: {cluster.cluster_name}")
     return jsonify({'success': True, 'data': cluster.to_dict()})
@@ -1014,11 +1036,11 @@ def api_rrt_item(id):
     if 'members' in data:
         RRTMember.query.filter_by(team_id=team.id).delete()
         for m in data['members']:
-            db.session.add(RRTMember(team_id=team.id, **m))
+            db.session.add(RRTMember(team_id=team.id, **filter_fields(m, RRT_MEMBER_FIELDS)))
     if 'resources' in data:
         RRTResource.query.filter_by(team_id=team.id).delete()
         for r in data['resources']:
-            db.session.add(RRTResource(team_id=team.id, **r))
+            db.session.add(RRTResource(team_id=team.id, **filter_fields(r, RRT_RESOURCE_FIELDS)))
     db.session.commit()
     log_activity('update', 'RapidResponseTeam', id, f"Updated RRT: {team.team_name}")
     return jsonify({'success': True, 'data': team.to_dict()})
@@ -1046,7 +1068,7 @@ def api_committees():
     db.session.add(committee)
     db.session.flush()
     for m in data.get('members', []):
-        db.session.add(CommitteeMember(committee_id=committee.id, **m))
+        db.session.add(CommitteeMember(committee_id=committee.id, **filter_fields(m, COMMITTEE_MEMBER_FIELDS)))
     db.session.commit()
     log_activity('create', 'DisasterCommittee', committee.id, f"Created committee: {committee.committee_name}")
     return jsonify({'success': True, 'data': committee.to_dict()})
@@ -1076,7 +1098,7 @@ def api_committee_item(id):
     if 'members' in data:
         CommitteeMember.query.filter_by(committee_id=committee.id).delete()
         for m in data['members']:
-            db.session.add(CommitteeMember(committee_id=committee.id, **m))
+            db.session.add(CommitteeMember(committee_id=committee.id, **filter_fields(m, COMMITTEE_MEMBER_FIELDS)))
     db.session.commit()
     log_activity('update', 'DisasterCommittee', id, f"Updated committee: {committee.committee_name}")
     return jsonify({'success': True, 'data': committee.to_dict()})
