@@ -18876,3 +18876,4 @@ sqlalchemy.exc.OperationalError: (psycopg2.OperationalError) server closed the c
 2026-07-02 11:10:32,397 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:167]
 2026-07-02 11:10:41,542 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:167]
 2026-07-02 11:11:17,317 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:167]
+2026-07-02 13:28:41,773 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:167]

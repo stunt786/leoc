@@ -173,6 +173,7 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['WTF_CSRF_CHECK_DEFAULT'] = True
 app.config['MAX_CONTENT_LENGTH'] = int(os.getenv('MAX_CONTENT_LENGTH', 16 * 1024 * 1024))
 app.config['UPLOAD_FOLDER'] = os.getenv('UPLOAD_FOLDER', 'static/uploads')
+app.config['ENABLE_DANGER_ZONE'] = os.getenv('ENABLE_DANGER_ZONE', 'true').lower() in ('true', '1', 'yes', 'on')
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 from shared import db
@@ -2892,6 +2893,9 @@ def import_sql():
 @permission_required('manage_users')
 def reset_database():
     try:
+        if not app.config.get('ENABLE_DANGER_ZONE', True):
+            return jsonify({'success': False, 'message': 'Reset Database is disabled in this environment.'}), 403
+
         ts = datetime.now().strftime('%Y%m%d_%H%M%S')
         pre_reset_backup = os.path.join(BACKUP_DIR, f'pre_reset_{ts}.json')
         _dump_db_to_json(pre_reset_backup)

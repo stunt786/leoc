@@ -206,6 +206,7 @@
                 </div>
             </div>
             <div class="col-md-6">
+                {% if config.get('ENABLE_DANGER_ZONE', True) %}
                 <div class="card h-100 border-danger">
                     <div class="card-header text-danger"><span><i class="bi bi-exclamation-triangle-fill me-2"></i>Danger Zone</span></div>
                     <div class="card-body d-flex flex-column">
@@ -214,6 +215,14 @@
                         <button class="btn btn-outline-danger" onclick="resetDatabase()"><i class="bi bi-arrow-counterclockwise me-1"></i>Reset & Re-seed</button>
                     </div>
                 </div>
+                {% else %}
+                <div class="card h-100 border-secondary">
+                    <div class="card-header text-secondary"><span><i class="bi bi-shield-lock me-2"></i>Production Safety</span></div>
+                    <div class="card-body d-flex flex-column justify-content-center">
+                        <p class="small text-muted mb-0">The destructive reset action is disabled in this environment.</p>
+                    </div>
+                </div>
+                {% endif %}
             </div>
         </div>
     </div>
