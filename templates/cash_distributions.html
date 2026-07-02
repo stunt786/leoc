@@ -17,7 +17,7 @@
         <div class="table-responsive">
             <table class="table table-hover align-middle" id="cdTable">
                 <thead class="table-light"><tr>
-                    <th>Dist No</th><th>Date</th><th>Fund</th><th>Incident</th>
+                    <th>Dist No</th><th>Date</th><th>Beneficiary</th><th>Incident</th>
                     <th>Source</th><th>Status</th><th>Type</th><th>Amount</th><th>Officer</th><th>Files</th><th>Actions</th>
                 </tr></thead>
                 <tbody id="cdBody"></tbody>
@@ -156,7 +156,7 @@ let paginator = new Paginator({perPage: 25, onPageChange: () => renderCashDistri
 
 function renderCashDistributions(data) {
     const t = document.getElementById('cdBody');
-    if (data.length === 0) { t.innerHTML = '<tr><td colspan="11" class="text-center text-muted py-3">No distributions found</td></tr>'; paginator.update(0); return; }
+    if (data.length === 0) { t.innerHTML = '<tr><td colspan="10" class="text-center text-muted py-3">No distributions found</td></tr>'; paginator.update(0); return; }
     const pageData = paginator.getPageData(data);
     t.innerHTML = pageData.map(cd => {
         const isCancelled = cd.status === 'Cancelled';
@@ -171,9 +171,10 @@ function renderCashDistributions(data) {
             : `<span class="badge bg-success bg-opacity-10 text-success border border-success">Active</span>`;
         const cancelBtn = isCancelled ? '' : `<button class="btn btn-sm btn-outline-danger ms-1" onclick="cancelCd(${cd.id})" title="Cancel"><i class="bi bi-x-circle"></i></button>`;
         const rowClass = isCancelled ? ' class="text-decoration-line-through text-muted"' : '';
+        const benName = (cd.beneficiaries && cd.beneficiaries.length > 0) ? cd.beneficiaries[0].name : '-';
         return `<tr${rowClass}>
         <td>${cd.distribution_no}</td><td>${cd.distribution_date}</td>
-        <td>${cd.fund_name || '-'}</td>
+        <td>${benName}</td>
         <td>${cd.incident_name || '-'}</td>
         <td><small>${cd.relief_request_number ? 'Relief: '+cd.relief_request_number : reqNums ? 'Cash: '+reqNums : '-'}</small></td>
         <td>${statusBadge}</td>

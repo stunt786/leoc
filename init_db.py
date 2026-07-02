@@ -402,6 +402,10 @@ def run_migrations():
         'cash_request': [
             ('beneficiary_id', 'INTEGER REFERENCES beneficiary(id)'),
         ],
+        'cash_receipt': [
+            ('edit_reason', 'TEXT'),
+            ('updated_at', 'TIMESTAMP'),
+        ],
         'document_archive': [
             ('uploaded_by', 'INTEGER'),
         ],

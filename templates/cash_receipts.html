@@ -58,6 +58,55 @@
         </div>
     </div>
 </div>
+
+<div class="modal fade" id="viewCrModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="bi bi-cash-coin me-2"></i><span id="viewCrTitle"></span></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="viewCrBody"></div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="editCrModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title">Edit Cash Receipt</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <form id="editCrForm">
+                <input type="hidden" name="id" id="editCrId">
+                <div class="modal-body">
+                    <div class="alert alert-warning small"><i class="bi bi-exclamation-triangle me-1"></i>Editing a receipt will adjust the fund balance accordingly. A reason is required.</div>
+                    <div class="row g-2">
+                        <div class="col-md-6 mb-3"><label class="form-label">Receipt Date</label><input type="text" class="form-control nepali-date" placeholder="YYYY-MM-DD" name="receipt_date" id="editCrDate"></div>
+                        <div class="col-md-6 mb-3"><label class="form-label">Fund <span class="text-danger">*</span></label><select class="form-select" name="fund_id" id="editCrFund" required></select></div>
+                    </div>
+                    <div class="mb-3"><label class="form-label">Funding Source</label><select class="form-select" name="funding_source" id="editCrSource"></select></div>
+                    <div class="row g-2">
+                        <div class="col-md-4 mb-3"><label class="form-label">Reference No</label><input class="form-control" name="reference_number" id="editCrRef"></div>
+                        <div class="col-md-4 mb-3"><label class="form-label">Voucher No</label><input class="form-control" name="voucher_number" id="editCrVoucher"></div>
+                        <div class="col-md-4 mb-3"><label class="form-label">Bank Transaction No</label><input class="form-control" name="bank_transaction_no" id="editCrBank"></div>
+                    </div>
+                    <div class="row g-2">
+                        <div class="col-md-6 mb-3"><label class="form-label">Amount Received <span class="text-danger">*</span></label><input type="number" step="0.01" class="form-control" name="amount_received" id="editCrAmount" required></div>
+                        <div class="col-md-6 mb-3"><label class="form-label">Received By</label><input class="form-control" name="received_by" id="editCrReceivedBy"></div>
+                    </div>
+                    <div class="mb-3"><label class="form-label">Remarks</label><textarea class="form-control" name="remarks" id="editCrRemarks" rows="2"></textarea></div>
+                    <div class="mb-3"><label class="form-label">Edit Reason <span class="text-danger">*</span></label><textarea class="form-control" name="edit_reason" id="editCrReason" rows="2" required placeholder="Provide a reason for this edit..."></textarea></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-warning"><i class="bi bi-pencil"></i> Update Receipt</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 {% endblock %}
 {% block extra_js %}
 <script>
@@ -72,9 +121,12 @@ function renderReceipts(data) {
     t.innerHTML = pageData.map(cr => `<tr>
         <td>${cr.receipt_no}</td><td>${cr.receipt_date}</td><td>${cr.fund_name || '-'}</td>
         <td>${cr.funding_source || '-'}</td>
-        <td class="fw-bold text-success">${Number(cr.amount_received).toLocaleString()}</td>
+        <td class="fw-bold text-success">${Number(cr.amount_received).toLocaleString()}${cr.edit_reason ? ' <span class="badge bg-warning text-dark" title="Edited">E</span>' : ''}</td>
         <td>${cr.received_by || '-'}</td>
-        <td><button class="btn btn-sm btn-outline-primary" onclick="viewReceipt(${cr.id})"><i class="bi bi-eye"></i></button></td>
+        <td>
+            <button class="btn btn-sm btn-outline-primary" onclick="viewReceipt(${cr.id})" title="View"><i class="bi bi-eye"></i></button>
+            <button class="btn btn-sm btn-outline-primary" onclick="editReceipt(${cr.id})" title="Edit"><i class="bi bi-pencil"></i></button>
+        </td>
     </tr>`).join('');
     paginator.update(data.length);
 }
@@ -91,8 +143,12 @@ async function loadData() {
     const r = await fetch('/api/data');
     const d = await r.json();
     if (!d.success) return;
-    document.getElementById('crFund').innerHTML = '<option value="">Select Fund</option>' + (d.cash_funds||[]).filter(f=>f.status==='Active').map(f => `<option value="${f.id}">${f.name} (Bal: ${Number(f.current_balance).toLocaleString()})</option>`).join('');
-    document.getElementById('crSource').innerHTML = '<option value="">Select</option>' + (d.funding_sources||[]).map(s => `<option value="${s}">${s}</option>`).join('');
+    const fundOpts = '<option value="">Select Fund</option>' + (d.cash_funds||[]).filter(f=>f.status==='Active').map(f => `<option value="${f.id}">${f.name} (Bal: ${Number(f.current_balance).toLocaleString()})</option>`).join('');
+    document.getElementById('crFund').innerHTML = fundOpts;
+    document.getElementById('editCrFund').innerHTML = fundOpts;
+    const srcOpts = '<option value="">Select</option>' + (d.funding_sources||[]).map(s => `<option value="${s}">${s}</option>`).join('');
+    document.getElementById('crSource').innerHTML = srcOpts;
+    document.getElementById('editCrSource').innerHTML = srcOpts;
 }
 
 document.getElementById('crForm').addEventListener('submit', async function(e) {
@@ -121,20 +177,100 @@ async function viewReceipt(id) {
     const d = await r.json();
     if (!d.success) return;
     const cr = d.receipt;
-    const lines = [
-        `<strong>Receipt:</strong> ${cr.receipt_no}`,
-        `<strong>Date:</strong> ${cr.receipt_date}`,
-        `<strong>Fund:</strong> ${cr.fund_name || '-'}`,
-        `<strong>Source:</strong> ${cr.funding_source || '-'}`,
-        `<strong>Reference:</strong> ${cr.reference_number || '-'}`,
-        `<strong>Voucher:</strong> ${cr.voucher_number || '-'}`,
-        `<strong>Bank TXN:</strong> ${cr.bank_transaction_no || '-'}`,
-        `<strong>Amount:</strong> ${Number(cr.amount_received).toLocaleString()}`,
-        `<strong>Received By:</strong> ${cr.received_by || '-'}`,
-        `<strong>Remarks:</strong> ${cr.remarks || '-'}`
-    ];
-    showToast('info', lines.join(' | '));
+    document.getElementById('viewCrTitle').textContent = cr.receipt_no;
+    document.getElementById('viewCrBody').innerHTML = `
+        <div class="row g-2 mb-3">
+            <div class="col-md-8">
+                <div class="card border-0 bg-light h-100">
+                    <div class="card-body py-2">
+                        <div class="row g-1 small">
+                            <div class="col-md-4"><strong>Receipt No:</strong> ${cr.receipt_no}</div>
+                            <div class="col-md-4"><strong>Date:</strong> ${cr.receipt_date}</div>
+                            <div class="col-md-4"><strong>Fund:</strong> ${cr.fund_name || '-'}</div>
+                            <div class="col-md-4"><strong>Source:</strong> ${cr.funding_source || '-'}</div>
+                            <div class="col-md-4"><strong>Received By:</strong> ${cr.received_by || '-'}</div>
+                            <div class="col-12"><strong>Remarks:</strong> ${cr.remarks || '-'}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card border-0 bg-light h-100">
+                    <div class="card-body py-2">
+                        <div class="row g-1 small">
+                            <div class="col-12"><strong>Amount:</strong> <strong class="text-success">${Number(cr.amount_received).toLocaleString()}</strong></div>
+                            <div class="col-12"><strong>Created:</strong> ${cr.created_at || '-'}</div>
+                            <div class="col-12"><strong>Updated:</strong> ${cr.updated_at || '-'}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="card border-0 bg-light mb-3">
+            <div class="card-header bg-white py-2 d-flex justify-content-between align-items-center">
+                <span class="fw-semibold"><i class="bi bi-bank me-1 text-primary"></i>Transaction Details</span>
+            </div>
+            <div class="card-body py-2">
+                <div class="row g-1 small">
+                    <div class="col-md-4"><strong>Reference:</strong> ${cr.reference_number || '-'}</div>
+                    <div class="col-md-4"><strong>Voucher:</strong> ${cr.voucher_number || '-'}</div>
+                    <div class="col-md-4"><strong>Bank TXN:</strong> ${cr.bank_transaction_no || '-'}</div>
+                </div>
+            </div>
+        </div>
+        ${cr.edit_reason ? `<div class="card border-0 bg-warning bg-opacity-10">
+            <div class="card-header bg-warning bg-opacity-25 py-2">
+                <span class="fw-semibold"><i class="bi bi-pencil-square me-1 text-warning"></i>Edit History</span>
+            </div>
+            <div class="card-body py-2 small">
+                <div><strong>Reason:</strong> ${cr.edit_reason}</div>
+                <div><strong>Last Edited:</strong> ${cr.updated_at || '-'}</div>
+            </div>
+        </div>` : ''}`;
+    new bootstrap.Modal(document.getElementById('viewCrModal')).show();
 }
+
+async function editReceipt(id) {
+    const r = await fetch(`/api/cash-receipts/${id}`);
+    const d = await r.json();
+    if (!d.success) return;
+    const cr = d.receipt;
+    document.getElementById('editCrId').value = cr.id;
+    document.getElementById('editCrDate').value = cr.receipt_date;
+    document.getElementById('editCrFund').value = cr.fund_id;
+    document.getElementById('editCrSource').value = cr.funding_source || '';
+    document.getElementById('editCrRef').value = cr.reference_number || '';
+    document.getElementById('editCrVoucher').value = cr.voucher_number || '';
+    document.getElementById('editCrBank').value = cr.bank_transaction_no || '';
+    document.getElementById('editCrAmount').value = cr.amount_received;
+    document.getElementById('editCrReceivedBy').value = cr.received_by || '';
+    document.getElementById('editCrRemarks').value = cr.remarks || '';
+    document.getElementById('editCrReason').value = '';
+    new bootstrap.Modal(document.getElementById('editCrModal')).show();
+}
+
+document.getElementById('editCrForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const id = document.getElementById('editCrId').value;
+    const body = {
+        receipt_date: document.getElementById('editCrDate').value,
+        fund_id: parseInt(document.getElementById('editCrFund').value),
+        funding_source: document.getElementById('editCrSource').value,
+        reference_number: document.getElementById('editCrRef').value,
+        voucher_number: document.getElementById('editCrVoucher').value,
+        bank_transaction_no: document.getElementById('editCrBank').value,
+        amount_received: parseFloat(document.getElementById('editCrAmount').value),
+        received_by: document.getElementById('editCrReceivedBy').value,
+        remarks: document.getElementById('editCrRemarks').value,
+        edit_reason: document.getElementById('editCrReason').value
+    };
+    try {
+        const r = await fetch(`/api/cash-receipts/${id}`, {method:'PUT', headers:{'Content-Type':'application/json','X-CSRFToken':csrf}, body: JSON.stringify(body)});
+        const d = await r.json();
+        if (d.success) { showToast('success', d.message); bootstrap.Modal.getInstance(document.getElementById('editCrModal')).hide(); loadReceipts(); }
+        else showToast('danger', d.message);
+    } catch(e) { showToast('danger', e.message); }
+});
 
 function openCrModal() { document.getElementById('crForm').reset(); }
 

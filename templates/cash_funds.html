@@ -42,7 +42,7 @@
                         <div class="col-md-6 mb-3"><label class="form-label">Funding Source</label><select class="form-select" name="funding_source" id="fundSource"></select></div>
                     </div>
                     <div class="row g-2">
-                        <div class="col-md-6 mb-3"><label class="form-label">Allocated Amount</label><input type="number" step="0.01" class="form-control" name="allocated_amount" id="fundAmount"></div>
+                        <div class="col-md-6 mb-3"><label class="form-label">Allocated Amount</label><input type="number" step="0.01" class="form-control" name="allocated_amount" id="fundAmount"><small class="text-muted" id="fundAmountHint"></small></div>
                         <div class="col-md-6 mb-3"><label class="form-label">Status</label><select class="form-select" name="status" id="fundStatus"><option value="Active">Active</option><option value="Closed">Closed</option></select></div>
                     </div>
                     <div class="mb-3"><label class="form-label">Description</label><textarea class="form-control" name="description" id="fundDesc" rows="2"></textarea></div>
@@ -52,6 +52,21 @@
                     <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg"></i> Save</button>
                 </div>
             </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="viewFundModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="bi bi-wallet2 me-2"></i><span id="viewFundTitle"></span></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="viewFundBody"></div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
         </div>
     </div>
 </div>
@@ -73,6 +88,7 @@ function renderFunds(data) {
         <td><span class="fw-bold ${f.current_balance > 0 ? 'text-success' : 'text-muted'}">${Number(f.current_balance).toLocaleString()}</span></td>
         <td><span class="badge ${f.status === 'Active' ? 'bg-success' : 'bg-secondary'}">${f.status}</span></td>
         <td>
+            <button class="btn btn-sm btn-outline-primary" onclick="viewFund(${f.id})" title="View"><i class="bi bi-eye"></i></button>
             <button class="btn btn-sm btn-outline-primary" onclick="editFund(${f.id})"><i class="bi bi-pencil"></i></button>
             <button class="btn btn-sm btn-outline-danger" onclick="deleteFund(${f.id})"><i class="bi bi-trash"></i></button>
         </td>
@@ -120,6 +136,10 @@ document.getElementById('fundForm').addEventListener('submit', async function(e)
 function openFundModal() {
     document.getElementById('fundForm').reset();
     document.getElementById('fundId').value = '';
+    const amountEl = document.getElementById('fundAmount');
+    amountEl.readOnly = false;
+    amountEl.classList.remove('bg-light');
+    document.getElementById('fundAmountHint').textContent = '';
 }
 
 async function editFund(id) {
@@ -134,7 +154,70 @@ async function editFund(id) {
     document.getElementById('fundAmount').value = f.allocated_amount;
     document.getElementById('fundStatus').value = f.status;
     document.getElementById('fundDesc').value = f.description || '';
+    const amountEl = document.getElementById('fundAmount');
+    const hintEl = document.getElementById('fundAmountHint');
+    if (f.receipt_count > 0) {
+        amountEl.readOnly = true;
+        amountEl.classList.add('bg-light');
+        hintEl.textContent = 'Allocated amount cannot be changed after receipts are added. Use Cash Receipts to add funds.';
+        hintEl.classList.add('text-warning');
+    } else {
+        amountEl.readOnly = false;
+        amountEl.classList.remove('bg-light');
+        hintEl.textContent = '';
+        hintEl.classList.remove('text-warning');
+    }
     new bootstrap.Modal(document.getElementById('fundModal')).show();
+}
+
+async function viewFund(id) {
+    const r = await fetch(`/api/cash-funds/${id}`);
+    const d = await r.json();
+    if (!d.success) return;
+    const f = d.fund;
+    document.getElementById('viewFundTitle').textContent = f.name;
+    document.getElementById('viewFundBody').innerHTML = `
+        <div class="row g-2 mb-3">
+            <div class="col-md-8">
+                <div class="card border-0 bg-light h-100">
+                    <div class="card-body py-2">
+                        <div class="row g-1 small">
+                            <div class="col-md-4"><strong>Fund No:</strong> ${f.fund_no}</div>
+                            <div class="col-md-4"><strong>Name:</strong> ${f.name}</div>
+                            <div class="col-md-4"><strong>Status:</strong> <span class="badge ${f.status === 'Active' ? 'bg-success' : 'bg-secondary'}">${f.status}</span></div>
+                            <div class="col-md-4"><strong>Fiscal Year:</strong> ${f.fiscal_year || '-'}</div>
+                            <div class="col-md-4"><strong>Source:</strong> ${f.funding_source || '-'}</div>
+                            <div class="col-12"><strong>Description:</strong> ${f.description || '-'}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card border-0 bg-light h-100">
+                    <div class="card-body py-2">
+                        <div class="row g-1 small">
+                            <div class="col-12"><strong>Allocated:</strong> <strong>${Number(f.allocated_amount).toLocaleString()}</strong></div>
+                            <div class="col-12"><strong>Balance:</strong> <strong class="${f.current_balance > 0 ? 'text-success' : 'text-muted'}">${Number(f.current_balance).toLocaleString()}</strong></div>
+                            <div class="col-12"><strong>Receipts:</strong> ${f.receipt_count}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="card border-0 bg-light">
+            <div class="card-header bg-white py-2"><span class="fw-semibold"><i class="bi bi-info-circle me-1 text-primary"></i>Fund Summary</span></div>
+            <div class="card-body py-2 small">
+                <div class="row g-1">
+                    <div class="col-md-4"><strong>Used:</strong> ${Number(f.allocated_amount - f.current_balance).toLocaleString()}</div>
+                    <div class="col-md-4"><strong>Remaining:</strong> ${Number(f.current_balance).toLocaleString()}</div>
+                    <div class="col-md-4"><strong>Utilization:</strong> ${f.allocated_amount > 0 ? Math.round(((f.allocated_amount - f.current_balance) / f.allocated_amount) * 100) : 0}%</div>
+                </div>
+                <div class="progress mt-2" style="height:6px">
+                    <div class="progress-bar ${f.allocated_amount > 0 && (f.allocated_amount - f.current_balance) / f.allocated_amount > 0.8 ? 'bg-danger' : 'bg-success'}" style="width:${f.allocated_amount > 0 ? Math.min(100, ((f.allocated_amount - f.current_balance) / f.allocated_amount) * 100) : 0}%"></div>
+                </div>
+            </div>
+        </div>`;
+    new bootstrap.Modal(document.getElementById('viewFundModal')).show();
 }
 
 async function deleteFund(id) {

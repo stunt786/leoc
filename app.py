@@ -1519,8 +1519,22 @@ class WeeklyForecast(db.Model):
     rainfall_snowfall = db.Column(db.String(100))
     high_temperature = db.Column(db.String(50))
     low_temperature = db.Column(db.String(50))
-    forecast_status = db.Column(db.String(100))
     forecast_info = db.Column(db.Text)
+    weather_status = db.Column(db.String(200))
+    important_weather = db.Column(db.Text)
+    remarks = db.Column(db.Text)
+    # --- Per-section fields (साताको शुरुबात: शुक्रबार-शनिबार) ---
+    start_weather = db.Column(db.String(200))
+    start_weather_desc = db.Column(db.Text)
+    start_suggestion = db.Column(db.Text)
+    # --- Per-section fields (साताको मध्य: आइतबार-बुधबार) ---
+    mid_weather = db.Column(db.String(200))
+    mid_weather_desc = db.Column(db.Text)
+    mid_suggestion = db.Column(db.Text)
+    # --- Per-section fields (साताको अन्त्य: बिहीबार) ---
+    end_weather = db.Column(db.String(200))
+    end_weather_desc = db.Column(db.Text)
+    end_suggestion = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=utc_now)
     updated_at = db.Column(db.DateTime, default=utc_now, onupdate=utc_now)
 
@@ -1532,8 +1546,19 @@ class WeeklyForecast(db.Model):
             'rainfall_snowfall': self.rainfall_snowfall or '',
             'high_temperature': self.high_temperature or '',
             'low_temperature': self.low_temperature or '',
-            'forecast_status': self.forecast_status or '',
             'forecast_info': self.forecast_info or '',
+            'weather_status': self.weather_status or '',
+            'important_weather': self.important_weather or '',
+            'remarks': self.remarks or '',
+            'start_weather': self.start_weather or '',
+            'start_weather_desc': self.start_weather_desc or '',
+            'start_suggestion': self.start_suggestion or '',
+            'mid_weather': self.mid_weather or '',
+            'mid_weather_desc': self.mid_weather_desc or '',
+            'mid_suggestion': self.mid_suggestion or '',
+            'end_weather': self.end_weather or '',
+            'end_weather_desc': self.end_weather_desc or '',
+            'end_suggestion': self.end_suggestion or '',
             'created_at': ad_to_bs_date(self.created_at),
             'updated_at': ad_to_bs_date(self.updated_at),
         }
@@ -1769,6 +1794,7 @@ class CashFund(db.Model):
             'fiscal_year': self.fiscal_year, 'funding_source': self.funding_source,
             'allocated_amount': self.allocated_amount, 'current_balance': self.current_balance,
             'description': self.description, 'status': self.status,
+            'receipt_count': len(self.receipts),
             'created_at': ad_to_bs_date(self.created_at)
         }
 
@@ -1786,8 +1812,10 @@ class CashReceipt(db.Model):
     received_by = db.Column(db.String(200))
     remarks = db.Column(db.Text)
     document_file = db.Column(db.String(500))
+    edit_reason = db.Column(db.Text)
     created_by = db.Column(db.Integer)
     created_at = db.Column(db.DateTime, default=utc_now)
+    updated_at = db.Column(db.DateTime, default=utc_now, onupdate=utc_now)
 
     def to_dict(self):
         return {
@@ -1798,7 +1826,9 @@ class CashReceipt(db.Model):
             'voucher_number': self.voucher_number, 'bank_transaction_no': self.bank_transaction_no,
             'amount_received': self.amount_received, 'received_by': self.received_by,
             'remarks': self.remarks, 'document_file': self.document_file,
-            'created_at': ad_to_bs_date(self.created_at)
+            'edit_reason': self.edit_reason,
+            'created_at': ad_to_bs_date(self.created_at),
+            'updated_at': ad_to_bs_date(self.updated_at)
         }
 
 # ============ CASH REQUEST MODEL ============
@@ -5387,9 +5417,49 @@ def handle_cash_receipts():
         db.session.rollback()
         return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
-@app.route('/api/cash-receipts/<int:id>', methods=['GET'])
+@app.route('/api/cash-receipts/<int:id>', methods=['GET', 'PUT'])
 @login_required
 def get_cash_receipt(id):
+    if request.method == 'PUT':
+        if current_user.role not in ('admin', 'data_entry', 'warehouse_manager', 'editor', 'operator', 'finance'):
+            return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
+        receipt = db.session.query(CashReceipt).filter(CashReceipt.id == id).with_for_update().first()
+        if not receipt:
+            return jsonify({'success': False, 'message': 'Cash receipt not found'}), 404
+        data = request.get_json()
+        edit_reason = (data.get('edit_reason') or '').strip()
+        if not edit_reason:
+            return jsonify({'success': False, 'message': 'Edit reason is required'}), 400
+        fund = CashFund.query.filter(CashFund.id == data.get('fund_id', receipt.fund_id)).with_for_update().first()
+        if not fund:
+            return jsonify({'success': False, 'message': 'Fund not found'}), 404
+        new_amount = parse_float_field(data, 'amount_received', minimum=0.01)
+        if new_amount is None or new_amount <= 0:
+            return jsonify({'success': False, 'message': 'Amount received must be greater than 0'}), 400
+        old_amount = receipt.amount_received
+        old_fund_id = receipt.fund_id
+        amount_diff = new_amount - old_amount
+        if fund.id != old_fund_id:
+            old_fund = CashFund.query.filter(CashFund.id == old_fund_id).with_for_update().first()
+            if old_fund:
+                old_fund.current_balance -= old_amount
+            fund.current_balance += new_amount
+        else:
+            fund.current_balance += amount_diff
+        receipt.receipt_date = parse_bs_date_field(data, 'receipt_date', default=receipt.receipt_date)
+        receipt.fund_id = fund.id
+        receipt.funding_source = data.get('funding_source', receipt.funding_source)
+        receipt.reference_number = data.get('reference_number', receipt.reference_number)
+        receipt.voucher_number = data.get('voucher_number', receipt.voucher_number)
+        receipt.bank_transaction_no = data.get('bank_transaction_no', receipt.bank_transaction_no)
+        receipt.amount_received = new_amount
+        receipt.received_by = data.get('received_by', receipt.received_by)
+        receipt.remarks = data.get('remarks', receipt.remarks)
+        receipt.edit_reason = edit_reason
+        receipt.updated_at = utc_now()
+        log_activity('update', 'cash_receipt', resource_id=receipt.id, details=f'Cash receipt {receipt.receipt_no} edited. Reason: {edit_reason}', user=current_user, ip=request.remote_addr)
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Cash receipt updated', 'data': receipt.to_dict()})
     receipt = db_get(CashReceipt, id)
     if not receipt:
         return jsonify({'success': False, 'message': 'Cash receipt not found'}), 404
@@ -6869,8 +6939,19 @@ def handle_weekly_forecasts():
             rainfall_snowfall=data.get('rainfall_snowfall', ''),
             high_temperature=data.get('high_temperature', ''),
             low_temperature=data.get('low_temperature', ''),
-            forecast_status=data.get('forecast_status', ''),
             forecast_info=data.get('forecast_info', ''),
+            weather_status=data.get('weather_status', ''),
+            important_weather=data.get('important_weather', ''),
+            remarks=data.get('remarks', ''),
+            start_weather=data.get('start_weather', ''),
+            start_weather_desc=data.get('start_weather_desc', ''),
+            start_suggestion=data.get('start_suggestion', ''),
+            mid_weather=data.get('mid_weather', ''),
+            mid_weather_desc=data.get('mid_weather_desc', ''),
+            mid_suggestion=data.get('mid_suggestion', ''),
+            end_weather=data.get('end_weather', ''),
+            end_weather_desc=data.get('end_weather_desc', ''),
+            end_suggestion=data.get('end_suggestion', ''),
         )
         db.session.add(forecast)
         db.session.commit()
@@ -6910,13 +6991,48 @@ def manage_weekly_forecast(id):
         forecast.rainfall_snowfall = data.get('rainfall_snowfall', forecast.rainfall_snowfall)
         forecast.high_temperature = data.get('high_temperature', forecast.high_temperature)
         forecast.low_temperature = data.get('low_temperature', forecast.low_temperature)
-        forecast.forecast_status = data.get('forecast_status', forecast.forecast_status)
         forecast.forecast_info = data.get('forecast_info', forecast.forecast_info)
+        forecast.weather_status = data.get('weather_status', forecast.weather_status)
+        forecast.important_weather = data.get('important_weather', forecast.important_weather)
+        forecast.remarks = data.get('remarks', forecast.remarks)
+        forecast.start_weather = data.get('start_weather', forecast.start_weather)
+        forecast.start_weather_desc = data.get('start_weather_desc', forecast.start_weather_desc)
+        forecast.start_suggestion = data.get('start_suggestion', forecast.start_suggestion)
+        forecast.mid_weather = data.get('mid_weather', forecast.mid_weather)
+        forecast.mid_weather_desc = data.get('mid_weather_desc', forecast.mid_weather_desc)
+        forecast.mid_suggestion = data.get('mid_suggestion', forecast.mid_suggestion)
+        forecast.end_weather = data.get('end_weather', forecast.end_weather)
+        forecast.end_weather_desc = data.get('end_weather_desc', forecast.end_weather_desc)
+        forecast.end_suggestion = data.get('end_suggestion', forecast.end_suggestion)
         db.session.commit()
         return jsonify({'success': True, 'message': 'Forecast updated', 'data': forecast.to_dict()})
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': friendly_message(e)}), 500
+
+# --- Weekly Forecast Print ---
+@app.route('/weekly-forecast-preview/<int:id>')
+@login_required
+def weekly_forecast_print(id):
+    forecast = WeeklyForecast.query.get(id)
+    if not forecast:
+        return "Forecast not found", 404
+    office_name = AppSettings.get_setting('office_name', 'थलारा गाउँपालिका')
+    address = AppSettings.get_setting('address', 'खोली, बझाङ, सुदूरपश्चिम प्रदेश, नेपाल')
+    phone = AppSettings.get_setting('phone', '')
+    email = AppSettings.get_setting('email', '')
+    website = AppSettings.get_setting('website', '')
+    report_header = AppSettings.get_setting('report_header', '')
+    report_footer = AppSettings.get_setting('report_footer', '')
+    return render_template('weekly_forecast_print.html',
+                           forecast=forecast,
+                           office_name=office_name,
+                           address=address,
+                           phone=phone,
+                           email=email,
+                           website=website,
+                           report_header=report_header,
+                           report_footer=report_footer)
 
 # ============ FILE UPLOAD ============
 @app.route('/api/upload', methods=['POST'])
@@ -8552,13 +8668,15 @@ def get_report_data(report_type, args):
         q = Distribution.query.order_by(Distribution.distribution_date.desc())
         if incident_id: q = q.filter(Distribution.incident_id == incident_id)
         q = apply_date_filter(q, Distribution.distribution_date)
-        headers = ['Dist No', 'Date', 'Location', 'Incident', 'Officer', 'Beneficiaries', 'Items Distributed', 'Fiscal Year']
+        headers = ['Dist No', 'Date', 'Beneficiary', 'Location', 'Incident', 'Officer', 'Families', 'Items Distributed', 'Fiscal Year']
         rows = []
         for d in q.all():
             items_list = list(set(b.item for b in d.beneficiaries if b.item))
+            unique_families = list({b.family_name for b in d.beneficiaries if b.family_name})
+            first_ben = d.beneficiaries[0].family_name if d.beneficiaries else '-'
             rows.append([d.distribution_no, ad_to_bs_date(d.distribution_date) or '',
-                        d.location or '', d.incident.incident_name if d.incident else '',
-                        d.officer or '', len(d.beneficiaries),
+                        first_ben, d.location or '', d.incident.incident_name if d.incident else '',
+                        d.officer or '', len(unique_families),
                         ', '.join(items_list) if items_list else '',
                         d.fiscal_year or ''])
     elif report_type == 'incidents':
@@ -8698,10 +8816,13 @@ def get_report_data(report_type, args):
         if incident_id: q = q.filter(CashDistribution.incident_id == incident_id)
         if fund_id: q = q.filter(CashDistribution.fund_id == fund_id)
         q = apply_date_filter(q, CashDistribution.distribution_date)
-        headers = ['Dist No', 'Date', 'Fund', 'Incident', 'Type', 'Amount']
-        rows = [[d.distribution_no, ad_to_bs_date(d.distribution_date) or '',
-                 d.fund.name if d.fund else '', d.incident.incident_name if d.incident else '',
-                 d.distribution_type, d.total_amount] for d in q.all()]
+        headers = ['Dist No', 'Date', 'Beneficiary', 'Incident', 'Type', 'Amount']
+        rows = []
+        for d in q.all():
+            first_ben = d.beneficiaries[0].name if d.beneficiaries else '-'
+            rows.append([d.distribution_no, ad_to_bs_date(d.distribution_date) or '',
+                         first_ben, d.incident.incident_name if d.incident else '',
+                         d.distribution_type, d.total_amount])
     elif report_type == 'cash-cancelled':
         q = CashDistribution.query.filter(CashDistribution.status == 'Cancelled').order_by(CashDistribution.cancelled_at.desc())
         incident_id = args.get('incident_id', type=int)
@@ -8709,15 +8830,16 @@ def get_report_data(report_type, args):
         if incident_id: q = q.filter(CashDistribution.incident_id == incident_id)
         if fund_id: q = q.filter(CashDistribution.fund_id == fund_id)
         q = apply_date_filter(q, CashDistribution.distribution_date)
-        headers = ['Dist No', 'Date', 'Fund', 'Incident', 'Amount', 'Cancelled At', 'Cancelled By', 'Reason']
+        headers = ['Dist No', 'Date', 'Beneficiary', 'Incident', 'Amount', 'Cancelled At', 'Cancelled By', 'Reason']
         rows = []
         for d in q.all():
             cancelled_by_name = ''
             if d.cancelled_by:
                 u = get_user_from_db(db, d.cancelled_by)
                 cancelled_by_name = u.full_name or u.username if u else ''
+            first_ben = d.beneficiaries[0].name if d.beneficiaries else '-'
             rows.append([d.distribution_no, ad_to_bs_date(d.distribution_date) or '',
-                         d.fund.name if d.fund else '', d.incident.incident_name if d.incident else '',
+                         first_ben, d.incident.incident_name if d.incident else '',
                          d.total_amount,
                          d.cancelled_at.strftime('%Y-%m-%d %H:%M') if d.cancelled_at else '',
                          cancelled_by_name, d.cancel_reason or ''])
@@ -9933,6 +10055,30 @@ def init_db():
                     except Exception as e:
                         db.session.rollback()
                         print(f"[WARN] Could not cleanup old date column in weekly_forecast: {e}")
+                # Migrate new fields: weather_status, important_weather, remarks + per-section
+                wf_new_cols = [
+                    ('weather_status', 'VARCHAR(200)'),
+                    ('important_weather', 'TEXT'),
+                    ('remarks', 'TEXT'),
+                    ('start_weather', 'VARCHAR(200)'),
+                    ('start_weather_desc', 'TEXT'),
+                    ('start_suggestion', 'TEXT'),
+                    ('mid_weather', 'VARCHAR(200)'),
+                    ('mid_weather_desc', 'TEXT'),
+                    ('mid_suggestion', 'TEXT'),
+                    ('end_weather', 'VARCHAR(200)'),
+                    ('end_weather_desc', 'TEXT'),
+                    ('end_suggestion', 'TEXT'),
+                ]
+                for col_name, col_type in wf_new_cols:
+                    if col_name not in wf_cols:
+                        try:
+                            db.session.execute(db.text(f"ALTER TABLE weekly_forecast ADD COLUMN {col_name} {col_type}"))
+                            db.session.commit()
+                            print(f"[MIGRATE] Added '{col_name}' to weekly_forecast")
+                        except Exception as e:
+                            db.session.rollback()
+                            print(f"[WARN] Could not add {col_name} to weekly_forecast: {e}")
 
             if 'dispatch_item' in inspector.get_table_names():
                 di_cols = [c['name'] for c in inspector.get_columns('dispatch_item')]

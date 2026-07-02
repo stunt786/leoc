@@ -441,7 +441,7 @@ function addItemRow(itemId = '', unit = '', qty = '', batchNo = '', serialNo = '
 function initItemSelect(selectEl) {
     if (selectEl.tomselect) selectEl.tomselect.destroy();
     new TomSelect(selectEl, {
-        maxOptions: 200,
+        maxOptions: null,
         placeholder: 'Search or select item...',
         dropdownParent: 'body',
         onChange: function(value) {

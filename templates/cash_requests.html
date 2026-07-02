@@ -4,6 +4,9 @@
 <li class="breadcrumb-item"><a href="{{ url_for('index') }}"><i class="bi bi-house-fill"></i></a></li>
 <li class="breadcrumb-item active">Cash Requests</li>
 {% endblock %}
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap5.min.css" rel="stylesheet">
+{% endblock %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h4 class="mb-0"><i class="bi bi-send-exclamation me-2"></i>Cash Requests</h4>
@@ -86,15 +89,40 @@
 
 {% endblock %}
 {% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
 <script>
 const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 let beneficiaries = [];
 let incidentsData = [];
 let _cashRequests = [];
 let paginator = new Paginator({perPage: 25, onPageChange: () => renderCashRequests(_cashRequests)});
+let beneficiaryTomSelect = null;
+
+function getBeneficiaryTomSelect() {
+    if (beneficiaryTomSelect) return beneficiaryTomSelect;
+    const el = document.getElementById('crqBeneficiary');
+    if (!el) return null;
+    beneficiaryTomSelect = new TomSelect(el, {
+        maxOptions: null,
+        placeholder: 'Search by name, phone, or ward...',
+        dropdownParent: 'body',
+        onChange: function(value) {
+            if (!value) return;
+            const id = parseInt(value);
+            const ben = beneficiaries.find(b => b.id === id);
+            if (ben) {
+                if (!document.getElementById('crqRequester').value) document.getElementById('crqRequester').value = ben.name;
+                if (!document.getElementById('crqPhone').value) document.getElementById('crqPhone').value = ben.phone || '';
+            }
+        }
+    });
+    return beneficiaryTomSelect;
+}
 
 function onBeneficiaryChange() {
-    const id = parseInt(document.getElementById('crqBeneficiary').value);
+    const ts = getBeneficiaryTomSelect();
+    if (!ts) return;
+    const id = parseInt(ts.getValue());
     const ben = beneficiaries.find(b => b.id === id);
     if (ben) {
         if (!document.getElementById('crqRequester').value) document.getElementById('crqRequester').value = ben.name;
@@ -164,13 +192,17 @@ async function loadData() {
     document.getElementById('crqPriority').innerHTML = (d.cash_priorities||d.priorities||['Low','Medium','High','Urgent']).map(p => `<option value="${p}" ${p==='Medium'?'selected':''}>${p}</option>`).join('');
     document.getElementById('crqPurpose').innerHTML = '<option value="">Select Purpose</option>' + (d.cash_purposes||[]).map(p => `<option value="${p}">${p}</option>`).join('');
     document.getElementById('crqBeneficiary').innerHTML = '<option value="">Select Beneficiary</option>' + beneficiaries.map(b => `<option value="${b.id}">${b.name}${b.phone ? ' - ' + b.phone : ''}${b.ward_name ? ' (' + b.ward_name + ')' : ''}</option>`).join('');
+    if (beneficiaryTomSelect) beneficiaryTomSelect.destroy();
+    beneficiaryTomSelect = null;
+    getBeneficiaryTomSelect();
 }
 
 document.getElementById('crqForm').addEventListener('submit', async function(e) {
     e.preventDefault();
     const id = document.getElementById('crqId').value;
     const incidentId = parseInt(document.getElementById('crqIncident').value);
-    const beneficiaryId = parseInt(document.getElementById('crqBeneficiary').value);
+    const beneficiaryTs = getBeneficiaryTomSelect();
+    const beneficiaryId = parseInt(beneficiaryTs ? beneficiaryTs.getValue() : document.getElementById('crqBeneficiary').value);
     const purpose = document.getElementById('crqPurpose').value;
     const requestedAmount = parseFloat(document.getElementById('crqAmount').value);
     if (!incidentId) { showToast('danger', 'Incident is required'); return; }
@@ -333,7 +365,7 @@ async function viewCrq(id) {
     new bootstrap.Modal(document.getElementById('viewCrqModal')).show();
 }
 
-function openCrqModal() { document.getElementById('crqForm').reset(); document.getElementById('crqId').value = ''; document.getElementById('crqBeneficiary').value = ''; document.getElementById('crqIncidentInfo').textContent = ''; }
+function openCrqModal() { document.getElementById('crqForm').reset(); document.getElementById('crqId').value = ''; const ts = getBeneficiaryTomSelect(); if (ts) ts.clear(); document.getElementById('crqIncidentInfo').textContent = ''; }
 
 async function editCrq(id) {
     const r = await fetch(`/api/cash-requests/${id}`);
@@ -348,7 +380,9 @@ async function editCrq(id) {
     document.getElementById('crqOffice').value = cr.requesting_office || '';
     document.getElementById('crqRequester').value = cr.requester_name || '';
     document.getElementById('crqPhone').value = cr.phone || '';
-    document.getElementById('crqBeneficiary').value = cr.beneficiary_id || '';
+    const ts = getBeneficiaryTomSelect();
+    if (ts) ts.setValue(cr.beneficiary_id ? String(cr.beneficiary_id) : '');
+    else document.getElementById('crqBeneficiary').value = cr.beneficiary_id || '';
     document.getElementById('crqPriority').value = cr.priority;
     document.getElementById('crqPurpose').value = cr.purpose || '';
     document.getElementById('crqAmount').value = cr.requested_amount;

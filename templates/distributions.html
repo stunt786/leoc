@@ -170,7 +170,7 @@
                 <thead>
                     <tr>
                         <th>Distribution #</th>
-                        <th>Dispatch #</th>
+                        <th>Beneficiary</th>
                         <th>Incident</th>
                         <th>Location</th>
                         <th>Date</th>
@@ -917,18 +917,21 @@ function renderDistributions(data) {
     }
     const pageData = paginator.getPageData(data);
     tbody.innerHTML = pageData.map(dist => {
-        const benCount = dist.beneficiaries ? dist.beneficiaries.length : 0;
+        const allBens = dist.beneficiaries || [];
+        const uniqueFamilyNames = [...new Set(allBens.map(b => b.family_name).filter(Boolean))];
+        const benCount = uniqueFamilyNames.length;
+        const firstBenName = allBens.length > 0 ? allBens[0].family_name || '-' : '-';
         const cashBadge = dist.cash_distribution
             ? `<span class="badge bg-success ms-1" title="Cash: ${Number(dist.cash_distribution.total_amount).toLocaleString()}"><i class="bi bi-cash-stack me-1"></i>Cash</span>`
             : '';
         return `<tr>
             <td><strong>${dist.distribution_no}${cashBadge}</strong></td>
-            <td>${dist.dispatch_number || '-'}</td>
+            <td>${firstBenName}</td>
             <td>${dist.incident_name || '-'}</td>
             <td>${dist.location || '-'}</td>
             <td>${dist.distribution_date ? new Date(dist.distribution_date).toLocaleDateString() : '-'}</td>
             <td>${dist.officer || '-'}</td>
-            <td><span class="badge bg-dark">${benCount} beneficiary${benCount !== 1 ? 'ies' : 'y'}</span></td>
+            <td><span class="badge bg-dark">${benCount} family${benCount !== 1 ? 's' : ''}</span></td>
             <td class="text-end">
                 <button class="btn btn-sm btn-primary" onclick="viewDistribution(${dist.id})" title="View"><i class="bi bi-eye me-1"></i>View</button>
                 <button class="btn btn-sm btn-outline-secondary" onclick="window.open('/api/distributions/${dist.id}/print','_blank')" title="Print"><i class="bi bi-printer"></i></button>

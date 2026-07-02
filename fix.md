@@ -1,22 +1,6 @@
-Update disaster-reports html form with following changes
-*change weather_status field and use following fields as dropdown, removing existing ones
--मुख्यतया सफा रहने
--आंसिक बदली रहने
--साधारणतया बदली रहने
--अधिकांस बदली रहने
--पूर्ण बदली रहने
--क्षणिक बर्षा हुने
--लगातार बर्षा हुने
--रोकिदै बर्षा हुने
--ब्यापक बर्षा हुने
--हल्का बर्षाको सम्भावना
--मध्यम बर्षाको सम्भावना
--भारी बर्षाको सम्भावना
--धेरै भारी बर्षाको सम्भावना
--अति धेरै बर्षाको सम्भावना
--हिमपात हुने सम्भावना
--शितलहर हुने सम्भावना
--लु-लहर चल्ने सम्भावना
--स्पष्ट नरहेको
+Update weekly-forecast page and perform the following changes
+**add fields, weather_status, important_weather, remarks
+**Update forecast_status dropdown list with list items available in disaster-reports->weather_status field
+**Create Printable Report with PDF and Image as in disaster-reports as in the format in given image week.png
+    ** Match the image layout and styling and match form fields in report
 
-*In Incidents list Only show 'Active' incidents and not 'Closed' Ones
