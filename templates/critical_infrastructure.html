@@ -7,7 +7,7 @@
 {% block content %}
 <div class="container-fluid">
   <div class="d-flex justify-content-between align-items-center mb-3">
-    <h4 class="mb-0"><i class="bi bi-building-gear me-2"></i>Critical Infrastructure Registry</h4>
+    <h4 class="mb-0"><i class="bi bi-building me-2"></i>Critical Infrastructure Registry</h4>
     <div>
       <button class="btn btn-outline-primary btn-sm me-1" onclick="showMap()"><i class="bi bi-map"></i> Map View</button>
       <button class="btn btn-outline-success btn-sm me-1" onclick="printData('Critical Infrastructure Registry')"><i class="bi bi-printer"></i> Print</button>
@@ -60,7 +60,7 @@
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title"><i class="bi bi-building-gear me-2"></i><span id="formTitle">Add Infrastructure</span></h5>
+        <h5 class="modal-title"><i class="bi bi-building me-2"></i><span id="formTitle">Add Infrastructure</span></h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
@@ -252,10 +252,10 @@ async function viewRecord(id) {
   var badgeCls = item.current_status==='Operational'?'view-badge-success':item.current_status==='Non-Operational'?'view-badge-danger':'view-badge-warning';
   var facs = parseFacilities(item.available_facilities);
   showDetailedViewModal({
-    logo:'bi-building-gear',
+    logo:'bi-building',
     title:item.name,
     hero:{
-      icon:'bi-building-gear',
+      icon:'bi-building',
       name:item.name,
       subtitle:(item.infrastructure_type||'') + (item.settlement ? ' \u2022 ' + item.settlement : ''),
       status:item.current_status,

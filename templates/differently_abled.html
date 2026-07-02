@@ -276,10 +276,10 @@ async function viewRecord(id) {
         };
         for (var k in dmap) { if (rec[k]) disabilityTags.push({icon:dmap[k].icon,text:dmap[k].label + ' Disability'}); }
         showDetailedViewModal({
-            logo:'bi-person-wheelchair',
+            logo:'bi-universal-access',
             title:rec.person_name,
             hero:{
-                icon:'bi-person-wheelchair',
+                icon:'bi-universal-access',
                 name:rec.person_name,
                 subtitle:(rec.gender || '') + (rec.age ? ' \u2022 ' + rec.age + ' yrs' : ''),
                 status:'',

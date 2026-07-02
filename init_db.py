@@ -100,9 +100,7 @@ def seed_default_users():
             )
         db.session.commit()
         print(f"[OK] Seeded {len(users)} default users")
-    else:
-        print("[SKIP] Users already exist")
-
+ 
 def seed_roles_and_permissions():
     """Compatibility placeholder for older deployments.
 

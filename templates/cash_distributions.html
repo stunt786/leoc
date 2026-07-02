@@ -5,6 +5,7 @@
 <li class="breadcrumb-item active">Cash Distributions</li>
 {% endblock %}
 {% block content %}
+
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h4 class="mb-0"><i class="bi bi-cash-stack me-2"></i>Cash Distributions</h4>
     <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#cdModal" onclick="openCdModal()">
@@ -17,7 +18,7 @@
             <table class="table table-hover align-middle" id="cdTable">
                 <thead class="table-light"><tr>
                     <th>Dist No</th><th>Date</th><th>Fund</th><th>Incident</th>
-                    <th>Beneficiary</th><th>Type</th><th>Amount</th><th>Officer</th><th>Files</th><th>Actions</th>
+                    <th>Source</th><th>Status</th><th>Type</th><th>Amount</th><th>Officer</th><th>Files</th><th>Actions</th>
                 </tr></thead>
                 <tbody id="cdBody"></tbody>
             </table>
@@ -51,7 +52,10 @@
                                     <label class="btn btn-outline-primary" for="srcReliefReq">Relief Request</label>
                                 </div>
                             </div>
-                            <select class="form-select" name="cash_request_id" id="cdRequest"></select>
+                            <select class="form-select" name="cash_request_id" id="cdRequest"><option value="">Select Cash Request</option></select>
+                            <div class="d-flex flex-wrap gap-1 mt-1" id="cdSelectedRequests"></div>
+                            <button type="button" class="btn btn-sm btn-outline-primary mt-1" id="cdAddRequestBtn" onclick="addSelectedCashRequest()"><i class="bi bi-plus"></i> Add Request</button>
+                            <small class="text-muted d-block mt-1" id="cdRequestInfo">Select from dropdown and click "Add Request" to add more</small>
                             <select class="form-select" name="relief_request_id" id="cdReliefRequest" style="display:none"></select>
                         </div>
                     </div>
@@ -155,23 +159,29 @@ function renderCashDistributions(data) {
     if (data.length === 0) { t.innerHTML = '<tr><td colspan="11" class="text-center text-muted py-3">No distributions found</td></tr>'; paginator.update(0); return; }
     const pageData = paginator.getPageData(data);
     t.innerHTML = pageData.map(cd => {
+        const isCancelled = cd.status === 'Cancelled';
         const srcMatch = (cd.remarks || '').match(/Source Distribution:\s*(\S+)/);
         const srcHtml = srcMatch ? `<small class="text-muted" title="${cd.remarks}">${srcMatch[1]}</small>` : '-';
         const photoHtml = cd.photo_url ? `<a href="${cd.photo_url}" target="_blank" title="Photo"><i class="bi bi-image text-primary"></i></a>` : '';
         const docHtml = cd.document_url ? `<a href="${cd.document_url}" target="_blank" title="Document"><i class="bi bi-file-pdf text-danger ms-1"></i></a>` : '';
         const filesHtml = (photoHtml || docHtml) ? `${photoHtml}${docHtml}` : '-';
-        return `<tr>
+        const reqNums = (cd.request_numbers || []).length ? cd.request_numbers.join(', ') : (cd.request_number || '');
+        const statusBadge = isCancelled
+            ? `<span class="badge bg-danger bg-opacity-10 text-danger border border-danger">Cancelled</span>`
+            : `<span class="badge bg-success bg-opacity-10 text-success border border-success">Active</span>`;
+        const cancelBtn = isCancelled ? '' : `<button class="btn btn-sm btn-outline-danger ms-1" onclick="cancelCd(${cd.id})" title="Cancel"><i class="bi bi-x-circle"></i></button>`;
+        const rowClass = isCancelled ? ' class="text-decoration-line-through text-muted"' : '';
+        return `<tr${rowClass}>
         <td>${cd.distribution_no}</td><td>${cd.distribution_date}</td>
         <td>${cd.fund_name || '-'}</td>
         <td>${cd.incident_name || '-'}</td>
-        <td><small>${cd.relief_request_number ? 'Relief: '+cd.relief_request_number : cd.request_number ? 'Cash: '+cd.request_number : '-'}</small></td>
+        <td><small>${cd.relief_request_number ? 'Relief: '+cd.relief_request_number : reqNums ? 'Cash: '+reqNums : '-'}</small></td>
+        <td>${statusBadge}</td>
         <td>${cd.distribution_type}</td>
         <td class="fw-bold text-danger">${Number(cd.total_amount).toLocaleString()}</td>
         <td>${cd.officer || '-'}</td>
         <td>${filesHtml}</td>
-        <td>${srcHtml}</td>
-        <td><button class="btn btn-sm btn-outline-primary" onclick="viewCd(${cd.id})" title="View"><i class="bi bi-eye"></i></button>
-            <button class="btn btn-sm btn-outline-danger ms-1" onclick="cancelCd(${cd.id})" title="Cancel"><i class="bi bi-x-circle"></i></button></td>
+        <td><button class="btn btn-sm btn-outline-primary" onclick="viewCd(${cd.id})" title="View"><i class="bi bi-eye"></i></button>${cancelBtn}</td>
     </tr>`}).join('');
     paginator.update(data.length);
 }
@@ -188,10 +198,17 @@ function toggleSourceType() {
     const isCashReq = document.getElementById('srcCashReq').checked;
     document.getElementById('cdRequest').style.display = isCashReq ? '' : 'none';
     document.getElementById('cdReliefRequest').style.display = isCashReq ? 'none' : '';
+    document.getElementById('cdSelectedRequests').style.display = isCashReq ? '' : 'none';
+    document.getElementById('cdAddRequestBtn').style.display = isCashReq ? '' : 'none';
+    document.getElementById('cdRequestInfo').style.display = isCashReq ? '' : 'none';
     const sel = isCashReq ? 'cdRequest' : 'cdReliefRequest';
     document.getElementById(sel).required = true;
     document.getElementById(isCashReq ? 'cdReliefRequest' : 'cdRequest').required = false;
-    document.getElementById(isCashReq ? 'cdReliefRequest' : 'cdRequest').value = '';
+    const otherSel = document.getElementById(isCashReq ? 'cdReliefRequest' : 'cdRequest');
+    if (otherSel.multiple) Array.from(otherSel.options).forEach(o => o.selected = false);
+    else otherSel.value = '';
+    selectedCashRequests = [];
+    renderSelectedRequests();
     const tbody = document.getElementById('benBody');
     tbody.innerHTML = '';
     calcTotal();
@@ -200,6 +217,36 @@ function toggleSourceType() {
 let cashRequestsData = [];
 let beneficiariesData = [];
 let reliefRequestsData = [];
+let selectedCashRequests = [];
+
+function addSelectedCashRequest() {
+    const sel = document.getElementById('cdRequest');
+    const id = parseInt(sel.value);
+    if (!id) { showToast('warning', 'Please select a cash request'); return; }
+    if (selectedCashRequests.find(r => r.id === id)) return;
+    const cr = cashRequestsData.find(r => r.id === id);
+    if (!cr) return;
+    selectedCashRequests.push({ id: cr.id, request_number: cr.request_number, remaining: cr.remaining || 0 });
+    renderSelectedRequests();
+    sel.value = '';
+    calcTotal();
+}
+
+function removeSelectedCashRequest(id) {
+    selectedCashRequests = selectedCashRequests.filter(r => r.id !== id);
+    renderSelectedRequests();
+    calcTotal();
+}
+
+function renderSelectedRequests() {
+    document.getElementById('cdSelectedRequests').innerHTML = selectedCashRequests.map(r =>
+        `<span class="badge bg-primary fs-6 d-inline-flex align-items-center gap-1">${r.request_number} (${Number(r.remaining).toLocaleString()}) <i class="bi bi-x-circle-fill" style="cursor:pointer" onclick="removeSelectedCashRequest(${r.id})"></i></span>`
+    ).join('');
+}
+
+function getSelectedCashRequestIds() {
+    return selectedCashRequests.map(r => r.id);
+}
 
 async function loadData() {
     const r = await fetch('/api/data');
@@ -215,6 +262,11 @@ async function loadData() {
     document.getElementById('cdType').innerHTML = (d.distribution_types||['Individual','Family','Community','Local Government','Organization']).map(t => `<option value="${t}">${t}</option>`).join('');
 }
 
+function getSelectedCashRequestIds() {
+    const sel = document.getElementById('cdRequest');
+    return Array.from(sel.selectedOptions).map(o => parseInt(o.value)).filter(v => !isNaN(v));
+}
+
 function onIncidentChange() {
     const incidentId = parseInt(document.getElementById('cdIncident').value);
     let filteredCash = cashRequestsData;
@@ -224,8 +276,9 @@ function onIncidentChange() {
         filteredRelief = reliefRequestsData.filter(rr => rr.incident_id === incidentId);
     }
     document.getElementById('cdRequest').innerHTML = '<option value="">Select Cash Request</option>' + filteredCash.filter(rq=>['Pending','Approved','Partial'].includes(rq.status) && (rq.remaining || 0) > 0).map(rq => `<option value="${rq.id}">${rq.request_number} - Remaining: ${Number(rq.remaining).toLocaleString()}</option>`).join('');
+    selectedCashRequests = selectedCashRequests.filter(sr => filteredCash.some(rq => rq.id === sr.id));
+    renderSelectedRequests();
     document.getElementById('cdReliefRequest').innerHTML = '<option value="">Select Relief Request</option>' + filteredRelief.filter(rr => rr.requested_cash_amount > 0 && rr.cash_remaining > 0 && ['Pending','Partial'].includes(rr.status)).map(rr => `<option value="${rr.id}">${rr.request_number} - ${rr.incident_name || ''} (Cash: ${Number(rr.cash_remaining).toLocaleString()})</option>`).join('');
-    document.getElementById('cdRequest').value = '';
     document.getElementById('cdReliefRequest').value = '';
     const tbody = document.getElementById('benBody');
     tbody.innerHTML = '';
@@ -262,8 +315,9 @@ function addBeneficiaryFromRequest() {
         return;
     }
     const sel = document.getElementById('cdRequest');
-    if (!sel.value) { showToast('warning', 'Please select a cash request first'); return; }
-    const cr = cashRequestsData.find(r => r.id === parseInt(sel.value));
+    if (!selectedCashRequests.length) { showToast('warning', 'Please add at least one cash request first'); return; }
+    const crId = selectedCashRequests[0].id;
+    const cr = cashRequestsData.find(r => r.id === crId);
     if (!cr || !cr.beneficiary_id) { showToast('warning', 'Selected cash request has no beneficiary'); return; }
     const ben = beneficiariesData.find(b => b.id === cr.beneficiary_id);
     if (!ben) { showToast('warning', 'Beneficiary not found'); return; }
@@ -340,14 +394,27 @@ function calcTotal() {
     document.getElementById('cdTotal').value = total;
     const fundBalanceEl = document.getElementById('cdFundBalance');
     const fundBalance = parseFloat(fundBalanceEl.value.replace(/,/g, '')) || 0;
-    if (total > 0 && fundBalance > 0) {
-        if (total > fundBalance) {
-            fundBalanceEl.className = 'form-control text-danger fw-bold';
-            document.getElementById('cdTotal').className = 'form-control text-danger fw-bold';
-        } else {
-            fundBalanceEl.className = 'form-control text-success fw-bold';
-            document.getElementById('cdTotal').className = 'form-control';
-        }
+    const useReliefReq = document.getElementById('srcReliefReq').checked;
+    const reliefReqId = parseInt(document.getElementById('cdReliefRequest').value);
+    let requestRemaining = 0;
+    if (useReliefReq && reliefReqId) {
+        const rr = reliefRequestsData.find(r => r.id === reliefReqId);
+        requestRemaining = rr ? (rr.cash_remaining || 0) : 0;
+    } else {
+        const ids = getSelectedCashRequestIds();
+        ids.forEach(function(id) {
+            const cr = cashRequestsData.find(r => r.id === id);
+            if (cr) requestRemaining += (cr.remaining || 0);
+        });
+    }
+    const exceedsFund = total > fundBalance && fundBalance > 0;
+    const exceedsRequest = total > requestRemaining && requestRemaining > 0;
+    if (total > 0 && (exceedsFund || exceedsRequest)) {
+        fundBalanceEl.className = 'form-control text-danger fw-bold';
+        document.getElementById('cdTotal').className = 'form-control text-danger fw-bold';
+    } else if (total > 0 && fundBalance > 0) {
+        fundBalanceEl.className = 'form-control text-success fw-bold';
+        document.getElementById('cdTotal').className = 'form-control';
     } else {
         fundBalanceEl.className = 'form-control';
         document.getElementById('cdTotal').className = 'form-control';
@@ -375,9 +442,23 @@ document.getElementById('cdForm').addEventListener('submit', async function(e) {
         return;
     }
     const useReliefReq = document.getElementById('srcReliefReq').checked;
-    const cashReqId = parseInt(document.getElementById('cdRequest').value);
+    const cashReqIds = getSelectedCashRequestIds();
     const reliefReqId = parseInt(document.getElementById('cdReliefRequest').value);
-    if (!useReliefReq && !cashReqId) { showToast('danger', 'Please select a cash request'); return; }
+    let requestRemaining = 0;
+    if (useReliefReq && reliefReqId) {
+        const rr = reliefRequestsData.find(r => r.id === reliefReqId);
+        requestRemaining = rr ? (rr.cash_remaining || 0) : 0;
+    } else {
+        cashReqIds.forEach(function(id) {
+            const cr = cashRequestsData.find(r => r.id === id);
+            if (cr) requestRemaining += (cr.remaining || 0);
+        });
+    }
+    if (total > requestRemaining) {
+        showToast('danger', `Total amount (${Number(total).toLocaleString()}) exceeds available request amount (${Number(requestRemaining).toLocaleString()})`);
+        return;
+    }
+    if (!useReliefReq && cashReqIds.length === 0) { showToast('danger', 'Please select at least one cash request'); return; }
     if (useReliefReq && !reliefReqId) { showToast('danger', 'Please select a relief request'); return; }
     const body = {
         distribution_date: document.getElementById('cdDate').value,
@@ -391,11 +472,11 @@ document.getElementById('cdForm').addEventListener('submit', async function(e) {
     body.photo = document.getElementById('cdPhoto').value || undefined;
     body.document = document.getElementById('cdDocument').value || undefined;
     if (useReliefReq) body.relief_request_id = reliefReqId;
-    else body.cash_request_id = cashReqId;
+    else body.cash_request_ids = cashReqIds;
     try {
         const r = await fetch('/api/cash-distributions', {method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':csrf}, body: JSON.stringify(body)});
         const d = await r.json();
-        if (d.success) { showToast('success', d.message); bootstrap.Modal.getInstance(document.getElementById('cdModal')).hide(); loadDistributions(); document.getElementById('cdForm').reset(); }
+        if (d.success) { showToast('success', d.message); bootstrap.Modal.getInstance(document.getElementById('cdModal')).hide(); loadDistributions(); loadData(); document.getElementById('cdForm').reset(); }
         else showToast('danger', d.message);
     } catch(e) { showToast('danger', e.message); }
 });
@@ -460,7 +541,7 @@ async function viewCd(id) {
             </div>
             <div class="card-body py-2">
                 <div class="row g-1 small">
-                    ${cd.request_number ? `<div class="col-md-4"><strong>Cash Request:</strong> ${cd.request_number}</div>` : ''}
+                    ${cd.request_numbers && cd.request_numbers.length ? `<div class="col-md-4"><strong>Cash Request(s):</strong> ${cd.request_numbers.join(', ')}</div>` : (cd.request_number ? `<div class="col-md-4"><strong>Cash Request:</strong> ${cd.request_number}</div>` : '')}
                     ${cd.relief_request_number ? `<div class="col-md-4"><strong>Relief Request:</strong> ${cd.relief_request_number}</div>` : ''}
                 </div>
             </div>
@@ -505,6 +586,8 @@ function openCdModal() {
     document.getElementById('cdFundBalance').value = '';
     document.getElementById('cdFundBalance').className = 'form-control';
     document.getElementById('cdTotal').className = 'form-control';
+    selectedCashRequests = [];
+    renderSelectedRequests();
     const tbody = document.getElementById('benBody');
     tbody.innerHTML = '';
     document.getElementById('cdPhoto').value = '';
@@ -536,6 +619,7 @@ document.getElementById('confirmCancelBtn').addEventListener('click', async func
             showToast('success', d.message);
             bootstrap.Modal.getInstance(document.getElementById('cancelModal')).hide();
             loadDistributions();
+            loadData();
         } else {
             showToast('danger', d.message);
         }

@@ -89,14 +89,24 @@
               <label class="form-label">आजको मौसम</label>
               <select class="form-select" id="weather_status">
                 <option value="">मौसम चयन गर्नुहोस्</option>
-                <option value="आज मौसम सफा रहेको छ">आज मौसम सफा रहेको छ</option>
-                <option value="आज बादल लागेको छ">आज बादल लागेको छ</option>
-                <option value="आज हल्का वर्षा भइरहेको छ">आज हल्का वर्षा भइरहेको छ</option>
-                <option value="आज भारी वर्षा भइरहेको छ">आज भारी वर्षा भइरहेको छ</option>
-                <option value="आज आँधी चलिरहेको छ">आज आँधी चलिरहेको छ</option>
-                <option value="आज कुहिरो लागेको छ">आज कुहिरो लागेको छ</option>
-                <option value="आज शीतलहर चलिरहेको छ">आज शीतलहर चलिरहेको छ</option>
-                <option value="आज गर्मी लहर चलिरहेको छ">आज गर्मी लहर चलिरहेको छ</option>
+                <option value="मुख्यतया सफा रहने">मुख्यतया सफा रहने</option>
+                <option value="आंसिक बदली रहने">आंसिक बदली रहने</option>
+                <option value="साधारणतया बदली रहने">साधारणतया बदली रहने</option>
+                <option value="अधिकांस बदली रहने">अधिकांस बदली रहने</option>
+                <option value="पूर्ण बदली रहने">पूर्ण बदली रहने</option>
+                <option value="क्षणिक बर्षा हुने">क्षणिक बर्षा हुने</option>
+                <option value="लगातार बर्षा हुने">लगातार बर्षा हुने</option>
+                <option value="रोकिदै बर्षा हुने">रोकिदै बर्षा हुने</option>
+                <option value="ब्यापक बर्षा हुने">ब्यापक बर्षा हुने</option>
+                <option value="हल्का बर्षाको सम्भावना">हल्का बर्षाको सम्भावना</option>
+                <option value="मध्यम बर्षाको सम्भावना">मध्यम बर्षाको सम्भावना</option>
+                <option value="भारी बर्षाको सम्भावना">भारी बर्षाको सम्भावना</option>
+                <option value="धेरै भारी बर्षाको सम्भावना">धेरै भारी बर्षाको सम्भावना</option>
+                <option value="अति धेरै बर्षाको सम्भावना">अति धेरै बर्षाको सम्भावना</option>
+                <option value="हिमपात हुने सम्भावना">हिमपात हुने सम्भावना</option>
+                <option value="शितलहर हुने सम्भावना">शितलहर हुने सम्भावना</option>
+                <option value="लु-लहर चल्ने सम्भावना">लु-लहर चल्ने सम्भावना</option>
+                <option value="स्पष्ट नरहेको">स्पष्ट नरहेको</option>
               </select>
             </div>
             <div class="col-md-4">
@@ -306,7 +316,7 @@ async function loadIncidentTypes() {
 // --- Load incidents ---
 async function loadIncidents() {
   try {
-    const r = await fetch('/api/incidents');
+    const r = await fetch('/api/incidents?status=Active');
     const d = await r.json();
     if (!d.success) { showToast('danger', d.message); return; }
     allIncidents = d.incidents || [];

@@ -1829,7 +1829,11 @@ class CashRequest(db.Model):
         ).join(
             CashDistribution, CashDistributionBeneficiary.distribution_id == CashDistribution.id
         ).filter(
-            CashDistribution.cash_request_id == self.id
+            db.or_(
+                CashDistribution.cash_request_id == self.id,
+                CashDistribution.cash_request_ids.like(f'%"{self.id}"%')
+            ),
+            CashDistribution.status != 'Cancelled'
         ).scalar()
         remaining = self.requested_amount - already_distributed
         return {
@@ -1854,6 +1858,7 @@ class CashDistribution(db.Model):
     fund_id = db.Column(db.Integer, db.ForeignKey('cash_fund.id'), nullable=False, index=True)
     incident_id = db.Column(db.Integer, db.ForeignKey('incident.id'), nullable=False, index=True)
     cash_request_id = db.Column(db.Integer, db.ForeignKey('cash_request.id'), nullable=True, index=True)
+    cash_request_ids = db.Column(db.Text, default='[]')
     relief_request_id = db.Column(db.Integer, db.ForeignKey('relief_request.id'), nullable=True, index=True)
     distribution_type = db.Column(db.String(50), default='Individual')
     total_amount = db.Column(db.Float, nullable=False, default=0)
@@ -1874,6 +1879,12 @@ class CashDistribution(db.Model):
     beneficiaries = db.relationship('CashDistributionBeneficiary', backref='distribution', lazy=True, cascade='all,delete-orphan')
 
     def to_dict(self):
+        cids = json.loads(self.cash_request_ids) if self.cash_request_ids else []
+        req_nums = []
+        for cid in cids:
+            cr = db_get(CashRequest, cid)
+            if cr:
+                req_nums.append(cr.request_number)
         return {
             'id': self.id, 'distribution_no': self.distribution_no,
             'distribution_date': ad_to_bs_date(self.distribution_date),
@@ -1881,7 +1892,9 @@ class CashDistribution(db.Model):
             'incident_id': self.incident_id,
             'incident_name': self.incident.incident_name if self.incident else None,
             'cash_request_id': self.cash_request_id,
-            'request_number': self.cash_request.request_number if self.cash_request else None,
+            'cash_request_ids': cids,
+            'request_numbers': req_nums,
+            'request_number': req_nums[0] if req_nums else (self.cash_request.request_number if self.cash_request else None),
             'relief_request_id': self.relief_request_id,
             'relief_request_number': self.relief_request.request_number if self.relief_request else None,
             'distribution_type': self.distribution_type, 'total_amount': self.total_amount,
@@ -5406,7 +5419,11 @@ def handle_cash_requests():
         for r in cash_reqs:
             d = r.to_dict()
             d['distributed_amount'] = db.session.query(db.func.coalesce(db.func.sum(CashDistribution.total_amount), 0)).filter(
-                CashDistribution.cash_request_id == r.id
+                db.or_(
+                    CashDistribution.cash_request_id == r.id,
+                    CashDistribution.cash_request_ids.like(f'%"{r.id}"%')
+                ),
+                CashDistribution.status != 'Cancelled'
             ).scalar()
             result.append(d)
         return jsonify({'success': True, 'cash_requests': result})
@@ -5482,23 +5499,45 @@ def manage_cash_request(id):
     try:
         if request.method == 'GET':
             cr_dict = req.to_dict()
-            cr_dict['distributions'] = [d.to_dict() for d in CashDistribution.query.filter_by(cash_request_id=req.id).order_by(CashDistribution.distribution_date.desc()).all()]
+            cr_dict['distributions'] = [d.to_dict() for d in CashDistribution.query.filter(
+                db.or_(
+                    CashDistribution.cash_request_id == req.id,
+                    CashDistribution.cash_request_ids.like(f'%"{req.id}"%')
+                )
+            ).order_by(CashDistribution.distribution_date.desc()).all()]
             cr_dict['distributed_amount'] = db.session.query(db.func.coalesce(db.func.sum(CashDistribution.total_amount), 0)).filter(
-                CashDistribution.cash_request_id == req.id
+                db.or_(
+                    CashDistribution.cash_request_id == req.id,
+                    CashDistribution.cash_request_ids.like(f'%"{req.id}"%')
+                ),
+                CashDistribution.status != 'Cancelled'
             ).scalar()
             return jsonify({'success': True, 'cash_request': cr_dict})
         if request.method == 'DELETE':
-            related_dists = CashDistribution.query.filter_by(cash_request_id=req.id).count()
+            if req.status == 'Rejected':
+                return jsonify({'success': False, 'message': 'Cannot delete a rejected/cancelled cash request'}), 400
+            related_dists = CashDistribution.query.filter(
+                db.or_(
+                    CashDistribution.cash_request_id == req.id,
+                    CashDistribution.cash_request_ids.like(f'%"{req.id}"%')
+                )
+            ).count()
             if related_dists:
                 return jsonify({'success': False, 'message': f'Cannot delete: Cash request has {related_dists} distribution(s). Remove all related records first.'}), 400
             db.session.delete(req)
             db.session.commit()
             return jsonify({'success': True, 'message': 'Cash request deleted'})
         distributed = db.session.query(db.func.coalesce(db.func.sum(CashDistribution.total_amount), 0)).filter(
-            CashDistribution.cash_request_id == req.id
+            db.or_(
+                CashDistribution.cash_request_id == req.id,
+                CashDistribution.cash_request_ids.like(f'%"{req.id}"%')
+            ),
+            CashDistribution.status != 'Cancelled'
         ).scalar()
         if distributed and distributed > 0:
             return jsonify({'success': False, 'message': 'Cannot edit: This cash request already has associated distributions. Reverse or remove distributions first.'}), 400
+        if req.status == 'Rejected':
+            return jsonify({'success': False, 'message': 'Cannot edit a rejected/cancelled cash request'}), 400
         data = request.get_json()
         if 'incident_id' in data:
             incident = db_get(Incident, data.get('incident_id'))
@@ -5566,8 +5605,8 @@ def handle_cash_distributions():
             fund_id = request.args.get('fund_id', type=int)
             relief_request_id = request.args.get('relief_request_id', type=int)
             fiscal_year = request.args.get('fiscal_year')
-            include_cancelled = request.args.get('include_cancelled', type=int)
-            if not include_cancelled:
+            hide_cancelled = request.args.get('hide_cancelled', type=int)
+            if hide_cancelled:
                 query = query.filter(db.or_(CashDistribution.status != 'Cancelled', CashDistribution.status.is_(None)))
             if incident_id:
                 query = query.filter(CashDistribution.incident_id == incident_id)
@@ -5589,25 +5628,47 @@ def handle_cash_distributions():
         incident = db_get(Incident, data.get('incident_id'))
         if not fund or not incident:
             return jsonify({'success': False, 'message': 'Fund and incident are required'}), 400
-        if not data.get('cash_request_id') and not data.get('relief_request_id'):
-            return jsonify({'success': False, 'message': 'Cash request or relief request is required'}), 400
-        cash_req = None
+
+        # Collect all cash request IDs (single or multiple)
+        cash_request_ids = data.get('cash_request_ids') or []
+        if isinstance(cash_request_ids, (int, float)):
+            cash_request_ids = [int(cash_request_ids)]
+        elif isinstance(cash_request_ids, str):
+            cash_request_ids = [int(x.strip()) for x in cash_request_ids.split(',') if x.strip()]
+        if data.get('cash_request_id') and int(data['cash_request_id']) not in cash_request_ids:
+            cash_request_ids.insert(0, int(data['cash_request_id']))
+        cash_request_ids = [cid for cid in cash_request_ids if cid]
+
+        if not cash_request_ids and not data.get('relief_request_id'):
+            return jsonify({'success': False, 'message': 'At least one cash request or a relief request is required'}), 400
+        cash_reqs = []
         relief_req = None
-        max_amount = float('inf')
-        if data.get('cash_request_id'):
-            cash_req = db_get(CashRequest, data['cash_request_id'])
-            if not cash_req:
-                return jsonify({'success': False, 'message': 'Cash request not found'}), 404
-            if cash_req.incident_id != incident.id:
-                return jsonify({'success': False, 'message': 'Cash request does not match selected incident'}), 400
+        max_amount = 0
+        for cid in cash_request_ids:
+            cr = db_get(CashRequest, cid)
+            if not cr:
+                return jsonify({'success': False, 'message': f'Cash request #{cid} not found'}), 404
+            if cr.incident_id != incident.id:
+                return jsonify({'success': False, 'message': f'Cash request #{cr.request_number} does not match selected incident'}), 400
+            if cr.status in ('Completed', 'Cancelled', 'Rejected'):
+                return jsonify({'success': False, 'message': f'Cash request #{cr.request_number} is already {cr.status}'}), 400
             already_distributed = db.session.query(
                 db.func.coalesce(db.func.sum(CashDistributionBeneficiary.amount), 0)
             ).join(
                 CashDistribution, CashDistributionBeneficiary.distribution_id == CashDistribution.id
-            ).filter(CashDistribution.cash_request_id == cash_req.id).scalar()
-            remaining = cash_req.requested_amount - already_distributed
-            max_amount = min(max_amount, remaining)
-        
+            ).filter(
+                db.or_(
+                    CashDistribution.cash_request_id == cr.id,
+                    CashDistribution.cash_request_ids.like(f'%"{cr.id}"%')
+                ),
+                CashDistribution.status != 'Cancelled'
+            ).scalar()
+            remaining = cr.requested_amount - already_distributed
+            if remaining <= 0:
+                return jsonify({'success': False, 'message': f'Cash request #{cr.request_number} has no remaining amount'}), 400
+            max_amount += remaining
+            cash_reqs.append(cr)
+
         if data.get('relief_request_id'):
             relief_req = db_get(ReliefRequest, data['relief_request_id'])
             if not relief_req:
@@ -5616,7 +5677,7 @@ def handle_cash_distributions():
                 return jsonify({'success': False, 'message': 'Cannot distribute cash to a cancelled relief request'}), 400
             if relief_req.incident_id != incident.id:
                 return jsonify({'success': False, 'message': 'Relief request does not match selected incident'}), 400
-            max_amount = min(max_amount, relief_req.requested_cash_amount - relief_req.distributed_cash_amount)
+            max_amount += relief_req.requested_cash_amount - relief_req.distributed_cash_amount
         beneficiaries_payload = data.get('beneficiaries', [])
         if not beneficiaries_payload:
             return jsonify({'success': False, 'message': 'At least one beneficiary is required'}), 400
@@ -5640,6 +5701,7 @@ def handle_cash_distributions():
                 CashDistribution
             ).filter(
                 CashDistribution.fiscal_year == fiscal_year,
+                CashDistribution.status != 'Cancelled',
                 db.or_(
                     CashDistributionBeneficiary.beneficiary_id == ben_id,
                     CashDistributionBeneficiary.name.ilike(ben_name)
@@ -5652,6 +5714,7 @@ def handle_cash_distributions():
                 Distribution, DistributionBeneficiary.distribution_id == Distribution.id
             ).filter(
                 Distribution.fiscal_year == fiscal_year,
+                Distribution.status != 'Cancelled',
                 db.or_(
                     DistributionBeneficiary.beneficiary_id == ben_id,
                     DistributionBeneficiary.family_name.ilike(ben_name)
@@ -5659,7 +5722,6 @@ def handle_cash_distributions():
             ).first()
             if existing_relief:
                 if relief_request_id:
-                    # Allow items+cash together when both come from the same relief request
                     relief_dist = existing_relief.distribution
                     same_rr = False
                     if relief_dist and relief_dist.dispatch:
@@ -5676,7 +5738,8 @@ def handle_cash_distributions():
             distribution_no=data.get('distribution_no') or generate_cash_distribution_no(),
             distribution_date=parse_bs_date_field(data, 'distribution_date', default=date.today()),
             fund_id=fund.id, incident_id=incident.id,
-            cash_request_id=data.get('cash_request_id'),
+            cash_request_id=cash_request_ids[0] if cash_request_ids else data.get('cash_request_id'),
+            cash_request_ids=json.dumps(cash_request_ids),
             relief_request_id=data.get('relief_request_id'),
             distribution_type=data.get('distribution_type', 'Individual'),
             total_amount=total, fiscal_year=fiscal_year,
@@ -5686,15 +5749,6 @@ def handle_cash_distributions():
         )
         db.session.add(dist)
         db.session.flush()
-
-        # Auto-link to a CashRequest when distribution comes via relief request
-        if not data.get('cash_request_id') and relief_req:
-            cr_for_incident = CashRequest.query.filter(
-                CashRequest.incident_id == incident.id,
-                CashRequest.status.in_(['Pending', 'Approved', 'Partial'])
-            ).first()
-            if cr_for_incident:
-                dist.cash_request_id = cr_for_incident.id
 
         for ben_data in beneficiaries_payload:
             amount = parse_float_field(ben_data, 'amount', minimum=0.01)
@@ -5710,14 +5764,22 @@ def handle_cash_distributions():
             )
             db.session.add(ben)
         fund.current_balance -= total
-        if cash_req:
+
+        # Update status for ALL linked cash requests
+        for cr in cash_reqs:
             total_distributed = db.session.query(db.func.coalesce(db.func.sum(CashDistributionBeneficiary.amount), 0)).join(
                 CashDistribution, CashDistributionBeneficiary.distribution_id == CashDistribution.id
-            ).filter(CashDistribution.cash_request_id == cash_req.id).scalar()
-            if total_distributed >= cash_req.requested_amount:
-                cash_req.status = 'Completed'
+            ).filter(
+                db.or_(
+                    CashDistribution.cash_request_id == cr.id,
+                    CashDistribution.cash_request_ids.like(f'%"{cr.id}"%')
+                )
+            ).scalar()
+            if total_distributed >= cr.requested_amount:
+                cr.status = 'Completed'
             else:
-                cash_req.status = 'Partial'
+                cr.status = 'Partial'
+
         if relief_req:
             relief_req.distributed_cash_amount += total
             all_items_done = all(
@@ -5728,21 +5790,6 @@ def handle_cash_distributions():
                 relief_req.status = 'Completed'
             elif relief_req.distributed_cash_amount > 0 or any(ri.quantity_dispatched > 0 for ri in relief_req.items):
                 relief_req.status = 'Partial'
-
-        # Cross-update related CashRequest for same incident
-        if not cash_req and incident:
-            related_cash_req = CashRequest.query.filter(
-                CashRequest.incident_id == incident.id,
-                CashRequest.status.in_(['Pending', 'Approved', 'Partial'])
-            ).first()
-            if related_cash_req:
-                total_distributed = db.session.query(db.func.coalesce(db.func.sum(CashDistributionBeneficiary.amount), 0)).join(
-                    CashDistribution, CashDistributionBeneficiary.distribution_id == CashDistribution.id
-                ).filter(CashDistribution.cash_request_id == related_cash_req.id).scalar()
-                if total_distributed >= related_cash_req.requested_amount:
-                    related_cash_req.status = 'Completed'
-                elif total_distributed > 0:
-                    related_cash_req.status = 'Partial'
 
         create_notification(
             title=f'Cash Distribution {dist.distribution_no}',
@@ -5786,22 +5833,12 @@ def cancel_cash_distribution(id):
         if fund:
             fund.current_balance += dist.total_amount
 
-        # Recalculate CashRequest status if linked
-        if dist.cash_request_id:
-            total_left = db.session.query(
-                db.func.coalesce(db.func.sum(CashDistribution.total_amount), 0)
-            ).filter(
-                CashDistribution.cash_request_id == dist.cash_request_id,
-                CashDistribution.id != dist.id
-            ).scalar()
-            cash_req = dist.cash_request
-            if cash_req:
-                if total_left <= 0:
-                    cash_req.status = 'Pending'
-                elif total_left < cash_req.requested_amount:
-                    cash_req.status = 'Partial'
-                else:
-                    cash_req.status = 'Approved'
+        # Mark linked CashRequests as Rejected
+        cids = json.loads(dist.cash_request_ids) if dist.cash_request_ids else ([dist.cash_request_id] if dist.cash_request_id else [])
+        for cid in cids:
+            cr = db_get(CashRequest, cid)
+            if cr and cr.status != 'Rejected':
+                cr.status = 'Rejected'
 
         # Recalculate ReliefRequest cash status if linked
         if dist.relief_request_id:
@@ -7305,13 +7342,16 @@ def get_dashboard():
             'recent_dispatches': recent_dispatches,
             'recent_requests': recent_requests,
             'cash_balance': db.session.query(db.func.coalesce(db.func.sum(CashFund.current_balance), 0)).scalar(),
-            'total_cash_distributed': db.session.query(db.func.coalesce(db.func.sum(CashDistribution.total_amount), 0)).scalar(),
+            'total_cash_distributed': db.session.query(db.func.coalesce(db.func.sum(CashDistribution.total_amount), 0)).filter(
+                db.or_(CashDistribution.status != 'Cancelled', CashDistribution.status.is_(None))).scalar(),
             'todays_cash_distribution': db.session.query(db.func.coalesce(db.func.sum(CashDistribution.total_amount), 0)).filter(
-                db.func.date(CashDistribution.distribution_date) == today).scalar(),
+                db.func.date(CashDistribution.distribution_date) == today,
+                db.or_(CashDistribution.status != 'Cancelled', CashDistribution.status.is_(None))).scalar(),
             'pending_cash_requests': CashRequest.query.filter(CashRequest.status.in_(['Pending', 'Approved'])).count(),
             'cash_distributed_this_month': db.session.query(db.func.coalesce(db.func.sum(CashDistribution.total_amount), 0)).filter(
                 db.extract('year', CashDistribution.distribution_date) == today.year,
-                db.extract('month', CashDistribution.distribution_date) == today.month).scalar(),
+                db.extract('month', CashDistribution.distribution_date) == today.month,
+                db.or_(CashDistribution.status != 'Cancelled', CashDistribution.status.is_(None))).scalar(),
         })
     except Exception as e:
         return jsonify({'success': False, 'message': friendly_message(e)}), 500
@@ -7340,7 +7380,8 @@ def get_relief_dashboard():
             return q
 
         def cash_base():
-            q = CashDistribution.query
+            q = CashDistribution.query.filter(
+                db.or_(CashDistribution.status != 'Cancelled', CashDistribution.status.is_(None)))
             if req_fy:
                 q = q.filter(CashDistribution.fiscal_year == req_fy)
             if req_ward is not None or req_incident_type:
@@ -9810,6 +9851,12 @@ def init_db():
                 if 'document' not in cdcols:
                     try:
                         db.session.execute(db.text("ALTER TABLE cash_distribution ADD COLUMN document VARCHAR(500)"))
+                        db.session.commit()
+                    except Exception:
+                        pass
+                if 'cash_request_ids' not in cdcols:
+                    try:
+                        db.session.execute(db.text("ALTER TABLE cash_distribution ADD COLUMN cash_request_ids TEXT DEFAULT '[]'"))
                         db.session.commit()
                     except Exception:
                         pass

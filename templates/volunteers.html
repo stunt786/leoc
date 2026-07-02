@@ -419,7 +419,7 @@ async function editRecord(id) {
         const r = await fetch('/api/volunteers/' + id);
         const d = await r.json();
         if (!d.success) { showToast('danger', d.message); return; }
-        const v = d.volunteer;
+        const v = d.data || d.volunteer || d;
         document.getElementById('volunteerModalTitle').innerHTML = '<i class="bi bi-pencil me-2"></i>Edit Volunteer';
         document.getElementById('volunteer_id').value = v.id;
         document.getElementById('volunteer_code').value = v.volunteer_code || '';

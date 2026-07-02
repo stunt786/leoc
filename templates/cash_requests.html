@@ -90,9 +90,10 @@ function renderCashRequests(data) {
     if (data.length === 0) { t.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-3">No requests found</td></tr>'; paginator.update(0); return; }
     const pageData = paginator.getPageData(data);
     t.innerHTML = pageData.map(cr => {
+        const rejected = cr.status === 'Rejected';
         const distAmt = cr.distributed_amount || 0;
         const progress = cr.requested_amount > 0 ? Math.min(100, (distAmt / cr.requested_amount) * 100) : 0;
-        return `<tr>
+        return `<tr class="${rejected ? 'table-danger text-decoration-line-through' : ''}">
         <td>${cr.request_number}</td><td>${cr.request_date}</td>
         <td>${cr.incident_name || '-'}</td>
         <td>${cr.requester_name || cr.requesting_office || '-'}</td>
@@ -105,8 +106,8 @@ function renderCashRequests(data) {
         <td><span class="badge ${cr.status === 'Completed' ? 'bg-success' : cr.status === 'Approved' ? 'bg-primary' : cr.status === 'Rejected' ? 'bg-danger' : cr.status === 'Partial' ? 'bg-warning' : 'bg-secondary'}">${cr.status}</span></td>
         <td>
             <button class="btn btn-sm btn-outline-primary" onclick="viewCrq(${cr.id})" title="View"><i class="bi bi-eye"></i></button>
-            <button class="btn btn-sm btn-outline-primary" onclick="editCrq(${cr.id})"><i class="bi bi-pencil"></i></button>
-            <button class="btn btn-sm btn-outline-danger" onclick="deleteCrq(${cr.id})"><i class="bi bi-trash"></i></button>
+            <button class="btn btn-sm btn-outline-primary" onclick="editCrq(${cr.id})" ${rejected ? 'disabled' : ''}><i class="bi bi-pencil"></i></button>
+            <button class="btn btn-sm btn-outline-danger" onclick="deleteCrq(${cr.id})" ${rejected ? 'disabled' : ''}><i class="bi bi-trash"></i></button>
         </td>
     </tr>`}).join('');
     paginator.update(data.length);
@@ -177,8 +178,8 @@ async function viewCrq(id) {
     const d = await r.json();
     if (!d.success) return;
     const cr = d.cash_request;
-    const distInfo = cr.distributed_amount > 0 ? (cr.distributions||[]).map(cd =>
-        `${cd.distribution_no} (${cd.distribution_date}, ${cd.fund_name||'-'}, Amt: ${Number(cd.total_amount).toLocaleString()})`
+    const distInfo = (cr.distributions||[]).length ? (cr.distributions||[]).map(cd =>
+        `${cd.distribution_no} (${cd.distribution_date}, ${cd.fund_name||'-'}, Amt: ${Number(cd.total_amount).toLocaleString()}, Status: ${cd.status})`
     ).join('; ') : 'None';
     const lines = [
         `<strong>Request:</strong> ${cr.request_number} | ${cr.request_date}`,
@@ -198,6 +199,7 @@ async function editCrq(id) {
     const d = await r.json();
     if (!d.success) return;
     const cr = d.cash_request;
+    if (cr.status === 'Rejected') { showToast('warning', 'This cash request was rejected/cancelled and cannot be edited.'); return; }
     document.getElementById('crqId').value = cr.id;
     document.getElementById('crqDate').value = cr.request_date;
     document.getElementById('crqIncident').value = cr.incident_id;
@@ -214,6 +216,8 @@ async function editCrq(id) {
 }
 
 async function deleteCrq(id) {
+    const cr = _cashRequests.find(r => r.id === id);
+    if (cr && cr.status === 'Rejected') { showToast('warning', 'This cash request was rejected/cancelled and cannot be deleted.'); return; }
     if (!confirm('Delete this request?')) return;
     const r = await fetch(`/api/cash-requests/${id}`, {method:'DELETE', headers:{'X-CSRFToken':csrf}});
     const d = await r.json();

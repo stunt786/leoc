@@ -128,12 +128,9 @@
                     <select class="form-select form-select-sm" style="width:160px" id="itemGroupFilter" onchange="applyItemFilters()">
                         <option value="">All Groups</option>
                     </select>
-                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="addItemRow()">
-                        <i class="bi bi-plus-lg me-1"></i>Add Item
-                    </button>
                 </div>
             </div>
-            <div class="table-responsive mb-3">
+            <div class="table-responsive mb-2">
                 <table class="table table-bordered" id="itemsTable">
                     <thead class="table-light">
                         <tr>
@@ -152,6 +149,9 @@
                     <tbody id="itemsBody"></tbody>
                 </table>
             </div>
+            <button type="button" class="btn btn-sm btn-outline-primary mb-3" onclick="addItemRow()">
+                <i class="bi bi-plus-lg me-1"></i>Add Item
+            </button>
 
             <div class="mt-4">
                 <button type="button" class="btn btn-primary" id="saveReceiptBtn" onclick="saveReceipt()"><i class="bi bi-check-lg me-1"></i>Save Receipt</button>
@@ -210,7 +210,12 @@
 </div>
 {% endblock %}
 
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap5.min.css" rel="stylesheet">
+{% endblock %}
+
 {% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
 <script>
 const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 let receipts = [];
@@ -382,6 +387,7 @@ function getFilteredItemOptions(currentItemId) {
     });
     return itemsList
         .filter(i => {
+            if (String(i.id) === String(currentItemId)) return true;
             if (catId && String(i.category_id) !== catId) return false;
             if (groupId && String(i.group_id || '') !== groupId) return false;
             return true;
@@ -400,8 +406,10 @@ function applyItemFilters() {
         const sel = row.querySelector('.receipt-item');
         if (!sel) return;
         const currentVal = sel.value;
+        if (sel.tomselect) sel.tomselect.destroy();
         sel.innerHTML = '<option value="">Select Item</option>' + getFilteredItemOptions(currentVal);
         sel.value = currentVal;
+        initItemSelect(sel);
     });
 }
 
@@ -410,7 +418,7 @@ function addItemRow(itemId = '', unit = '', qty = '', batchNo = '', serialNo = '
     const itemOpts = getFilteredItemOptions(itemId);
     tr.innerHTML = `
         <td>
-            <select class="form-select form-select-sm receipt-item" onchange="checkDuplicateItem(this); updateItemUnit(this); autoFillUnitCost(this); autoFillDates(this);">
+            <select class="form-select form-select-sm receipt-item">
                 <option value="">Select Item</option>
                 ${itemOpts}
             </select>
@@ -426,7 +434,24 @@ function addItemRow(itemId = '', unit = '', qty = '', batchNo = '', serialNo = '
         <td><button class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove()"><i class="bi bi-x"></i></button></td>
     `;
     document.getElementById('itemsBody').appendChild(tr);
+    initItemSelect(tr.querySelector('.receipt-item'));
     calcRowTotal(tr);
+}
+
+function initItemSelect(selectEl) {
+    if (selectEl.tomselect) selectEl.tomselect.destroy();
+    new TomSelect(selectEl, {
+        maxOptions: 200,
+        placeholder: 'Search or select item...',
+        dropdownParent: 'body',
+        onChange: function(value) {
+            if (!value) return;
+            checkDuplicateItem(selectEl);
+            updateItemUnit(selectEl);
+            autoFillUnitCost(selectEl);
+            autoFillDates(selectEl);
+        }
+    });
 }
 
 function updateItemUnit(select) {

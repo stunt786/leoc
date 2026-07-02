@@ -63,22 +63,32 @@
             </div>
 
             <hr>
-            <h6 class="mb-3"><i class="bi bi-box me-2"></i>Transfer Items</h6>
-            <div class="table-responsive mb-3">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                <h6 class="mb-0"><i class="bi bi-box me-2"></i>Transfer Items</h6>
+                <div class="d-flex gap-2 align-items-center">
+                    <select class="form-select form-select-sm" style="width:160px" id="itemCategoryFilter" onchange="applyItemFilters()">
+                        <option value="">All Categories</option>
+                    </select>
+                    <select class="form-select form-select-sm" style="width:160px" id="itemGroupFilter" onchange="applyItemFilters()">
+                        <option value="">All Groups</option>
+                    </select>
+                </div>
+            </div>
+            <div class="table-responsive mb-2">
                 <table class="table table-bordered" id="itemsTable">
                     <thead class="table-light">
                         <tr>
-                            <th style="min-width:200px">Item *</th>
-                            <th style="min-width:100px">Quantity *</th>
-                            <th style="min-width:80px">Unit</th>
-                            <th style="min-width:120px">Batch No</th>
-                            <th style="width:50px"></th>
+                            <th style="min-width:280px">Item *</th>
+                            <th style="min-width:80px">Qty *</th>
+                            <th style="min-width:60px">Unit</th>
+                            <th style="min-width:100px">Batch</th>
+                            <th style="width:40px"></th>
                         </tr>
                     </thead>
                     <tbody id="itemsBody"></tbody>
                 </table>
             </div>
-            <button type="button" class="btn btn-sm btn-outline-primary" onclick="addItemRow()">
+            <button type="button" class="btn btn-sm btn-outline-primary mb-3" onclick="addItemRow()">
                 <i class="bi bi-plus-lg me-1"></i>Add Item
             </button>
 
@@ -140,12 +150,19 @@
 </div>
 {% endblock %}
 
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap5.min.css" rel="stylesheet">
+{% endblock %}
+
 {% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
 <script>
 const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 let transfers = [];
 let warehouses = [];
 let itemsList = [];
+let categories = [];
+let groups = [];
 let paginator = new Paginator({perPage: 25, onPageChange: () => renderTransfers(transfers)});
 
 let _currentWhInventory = [];
@@ -162,13 +179,25 @@ async function loadFormData() {
         const opts = warehouses.map(w => `<option value="${w.id}">${w.name} (${w.code || ''})</option>`).join('');
         fromSel.innerHTML = '<option value="">Select Warehouse</option>' + opts;
         toSel.innerHTML = '<option value="">Select Warehouse</option>' + opts;
+
+        categories = d.categories || [];
+        const catFilter = document.getElementById('itemCategoryFilter');
+        if (catFilter) {
+            catFilter.innerHTML = '<option value="">All Categories</option>' +
+                categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+        }
+        groups = d.item_groups || [];
+        const grpFilter = document.getElementById('itemGroupFilter');
+        if (grpFilter) {
+            grpFilter.innerHTML = '<option value="">All Groups</option>' +
+                groups.map(g => `<option value="${g.id}">${g.name}</option>`).join('');
+        }
         loadTransfers();
     } catch (e) { showToast('danger', 'Error loading form data: ' + e.message); }
 }
 
 async function filterItemsByWarehouse() {
     const whId = parseInt(document.getElementById('from_warehouse_id').value);
-    const itemSelects = document.querySelectorAll('#itemsBody .transfer-item');
     _currentWhInventory = [];
     if (whId) {
         try {
@@ -177,22 +206,52 @@ async function filterItemsByWarehouse() {
             if (data.success) _currentWhInventory = data.inventory || [];
         } catch (e) { /* ignore */ }
     }
+    applyItemFilters();
+}
+
+function getFilteredItemOptions(currentItemId) {
+    const catId = document.getElementById('itemCategoryFilter').value;
+    const groupId = document.getElementById('itemGroupFilter').value;
+    const whId = parseInt(document.getElementById('from_warehouse_id').value);
     const stockMap = {};
-    const availableItemIds = new Set();
+    const availableItemIds = whId ? new Set() : null;
     _currentWhInventory.forEach(inv => {
         stockMap[inv.item_id] = inv.available_quantity;
-        if (inv.available_quantity > 0) availableItemIds.add(inv.item_id);
+        if (inv.available_quantity > 0) availableItemIds?.add(inv.item_id);
     });
-    itemSelects.forEach(sel => {
-        const currentVal = sel.value;
-        const filtered = whId ? itemsList.filter(i => availableItemIds.has(i.id)) : itemsList;
-        const optsHtml = filtered.map(i =>
-            `<option value="${i.id}" data-unit="${i.unit || ''}" ${i.id == currentVal ? 'selected' : ''}>${i.item_code ? i.item_code + ' - ' : ''}${i.name}${whId ? ' (' + (stockMap[i.id] || 0) + ' in stock)' : ''}</option>`
-        ).join('');
-        sel.innerHTML = '<option value="">Select Item</option>' + optsHtml;
-        if (currentVal && !availableItemIds.has(parseInt(currentVal)) && whId) {
-            sel.value = '';
+    const selectedIds = new Set();
+    document.querySelectorAll('#itemsBody tr .transfer-item').forEach(sel => {
+        if (sel.value && String(sel.value) !== String(currentItemId)) {
+            selectedIds.add(String(sel.value));
         }
+    });
+    return itemsList
+        .filter(i => {
+            if (String(i.id) === String(currentItemId)) return true;
+            if (catId && String(i.category_id) !== catId) return false;
+            if (groupId && String(i.group_id || '') !== groupId) return false;
+            if (availableItemIds && !availableItemIds.has(i.id)) return false;
+            return true;
+        })
+        .map(i => {
+            const isSelected = selectedIds.has(String(i.id));
+            const disabled = isSelected ? 'disabled' : '';
+            const cls = isSelected ? ' class="text-muted"' : '';
+            const stockSuffix = whId ? ` (${stockMap[i.id] || 0} in stock)` : '';
+            return `<option value="${i.id}" data-unit="${i.unit || ''}" ${String(i.id) === String(currentItemId) ? 'selected' : ''} ${disabled}${cls}>${i.item_code ? i.item_code + ' - ' : ''}${i.name}${stockSuffix}</option>`;
+        })
+        .join('');
+}
+
+function applyItemFilters() {
+    document.querySelectorAll('#itemsBody tr').forEach(row => {
+        const sel = row.querySelector('.transfer-item');
+        if (!sel) return;
+        const currentVal = sel.value;
+        if (sel.tomselect) sel.tomselect.destroy();
+        sel.innerHTML = '<option value="">Select Item</option>' + getFilteredItemOptions(currentVal);
+        sel.value = currentVal;
+        initItemSelect(sel);
     });
 }
 
@@ -201,23 +260,16 @@ function resetForm() {
     document.getElementById('transfer_no').value = 'TRF-' + String(Date.now()).slice(-6);
     document.getElementById('transfer_date').value = today_bs;
     document.getElementById('itemsBody').innerHTML = '';
+    document.getElementById('itemCategoryFilter').value = '';
+    document.getElementById('itemGroupFilter').value = '';
 }
 
 function addItemRow(itemId = '', qty = '', unit = '', batchNo = '') {
     const tr = document.createElement('tr');
-    const whId = parseInt(document.getElementById('from_warehouse_id').value);
-    const stockMap = {};
-    _currentWhInventory.forEach(inv => { stockMap[inv.item_id] = inv.available_quantity; });
-    const availableItemIds = whId
-        ? new Set(_currentWhInventory.filter(inv => inv.available_quantity > 0).map(inv => inv.item_id))
-        : null;
-    const filtered = availableItemIds ? itemsList.filter(i => availableItemIds.has(i.id)) : itemsList;
-    const itemOpts = filtered.map(i =>
-        `<option value="${i.id}" data-unit="${i.unit || ''}" ${i.id == itemId ? 'selected' : ''}>${i.item_code ? i.item_code + ' - ' : ''}${i.name}${whId ? ' (' + (stockMap[i.id] || 0) + ' in stock)' : ''}</option>`
-    ).join('');
+    const itemOpts = getFilteredItemOptions(itemId);
     tr.innerHTML = `
         <td>
-            <select class="form-select form-select-sm transfer-item" onchange="updateItemUnit(this)">
+            <select class="form-select form-select-sm transfer-item">
                 <option value="">Select Item</option>
                 ${itemOpts}
             </select>
@@ -228,6 +280,20 @@ function addItemRow(itemId = '', qty = '', unit = '', batchNo = '') {
         <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove()"><i class="bi bi-x"></i></button></td>
     `;
     document.getElementById('itemsBody').appendChild(tr);
+    initItemSelect(tr.querySelector('.transfer-item'));
+}
+
+function initItemSelect(selectEl) {
+    if (selectEl.tomselect) selectEl.tomselect.destroy();
+    new TomSelect(selectEl, {
+        maxOptions: 200,
+        placeholder: 'Search or select item...',
+        dropdownParent: 'body',
+        onChange: function(value) {
+            if (!value) return;
+            updateItemUnit(selectEl);
+        }
+    });
 }
 
 function updateItemUnit(select) {

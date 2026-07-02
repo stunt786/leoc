@@ -291,10 +291,10 @@ const LAYER_NAMES = {
   warehouses: 'Warehouses'
 };
 const LAYER_ICONS = {
-  incidents: 'bi-lightning-charge-fill', relief: 'bi-box-seam-fill', infrastructure: 'bi-building-gear',
+  incidents: 'bi-lightning-charge-fill', relief: 'bi-box-seam-fill', infrastructure: 'bi-building',
   facilities: 'bi-hospital', shelters: 'bi-house-door', risk_layers: 'bi-exclamation-triangle',
-  contacts: 'bi-telephone', vulnerable: 'bi-heart', disabled: 'bi-person-wheelchair',
-  high_risk: 'bi-shield-exclamation', volunteers: 'bi-person-check', rrt: 'bi-flag',
+  contacts: 'bi-telephone', vulnerable: 'bi-heart', disabled: 'bi-universal-access',
+  high_risk: 'bi-exclamation-shield', volunteers: 'bi-person-check', rrt: 'bi-flag',
   vehicles: 'bi-truck', warehouses: 'bi-warehouse'
 };
 const MARKER_SHAPES = {
@@ -312,26 +312,26 @@ const SUBTYPE_ICONS = {
   infrastructure: {
     'Hospital': 'bi-hospital', 'Health Post': 'bi-heart-pulse', 'Primary Health Centre': 'bi-heart-pulse',
     'School': 'bi-mortarboard', 'Police Office': 'bi-shield-shaded', 'Armed Police Office': 'bi-shield-fill',
-    'Army Barrack': 'bi-shield-fill-check', 'Fire Station': 'bi-fire', 'Communication Tower': 'bi-broadcast',
+    'Army Barrack': 'bi-shield-check', 'Fire Station': 'bi-fire', 'Communication Tower': 'bi-broadcast',
     'Power Substation': 'bi-lightning', 'Water Supply Facility': 'bi-droplet', 'Irrigation Facility': 'bi-droplet',
     'Bridge': 'bi-signpost-2', 'Government Building': 'bi-building', 'Community Building': 'bi-people',
     'Market Centre': 'bi-shop', 'Fuel Station': 'bi-fuel-pump', 'Bank': 'bi-bank',
     'Municipality Office': 'bi-building', 'Ward Office': 'bi-building'
   },
   facilities: {
-    'Helipad': 'bi-helicopter', 'Safe Shelter': 'bi-house-heart', 'Evacuation Centre': 'bi-people',
+    'Helipad': 'bi-h-circle', 'Safe Shelter': 'bi-house-heart', 'Evacuation Centre': 'bi-people',
     'Open Space': 'bi-tree', 'Relief Distribution Centre': 'bi-box-seam', 'Emergency Warehouse': 'bi-building',
-    'Emergency Operations Centre': 'bi-diagram-3', 'Temporary Camp Site': 'bi-tent'
+    'Emergency Operations Centre': 'bi-diagram-3', 'Temporary Camp Site': 'bi-house'
   },
   shelters: {
     'Temporary Shelter': 'bi-house-door', 'Permanent Shelter': 'bi-building', 'Community Building': 'bi-people',
     'School': 'bi-mortarboard', 'Relief Centre': 'bi-box-seam', 'Open Area/Open Space': 'bi-tree'
   },
   risk_layers: {
-    'Flood Risk Zone': 'bi-water', 'Landslide Risk Zone': 'bi-mountain', 'Fire Risk Zone': 'bi-fire',
+    'Flood Risk Zone': 'bi-water', 'Landslide Risk Zone': 'bi-triangle', 'Fire Risk Zone': 'bi-fire',
     'Earthquake Risk Zone': 'bi-globe2', 'River Cutting Zone': 'bi-water', 'Forest Fire Risk Zone': 'bi-tree',
-    'Drought Risk Zone': 'bi-sun', 'Avalanche Risk Zone': 'bi-snow', 'Windstorm Risk Zone': 'bi-wind',
-    'Lightning Risk Zone': 'bi-cloud-lightning-rain'
+    'Drought Risk Zone': 'bi-sun', 'Avalanche Risk Zone': 'bi-snow2', 'Windstorm Risk Zone': 'bi-wind',
+    'Lightning Risk Zone': 'bi-cloud-lightning-rain-fill'
   },
   vehicles: {
     'Ambulance': 'bi-truck-front', 'Fire Engine': 'bi-fire', 'Backhule Loader': 'bi-tools',
@@ -533,7 +533,7 @@ function processMapData(d) {
 
 function processModulesData(d) {
   const config = [
-    {key:'infrastructure', icon:'bi-building-gear', label:'Infrastructure', fields:[
+    {key:'infrastructure', icon:'bi-building', label:'Infrastructure', fields:[
       {l:'Name',v:r=>r.name},{l:'Type',v:r=>r.type},{l:'Ward',v:r=>r.ward||'-'}
     ]},
     {key:'facilities', icon:'bi-hospital', label:'Facilities', fields:[
@@ -557,10 +557,10 @@ function processModulesData(d) {
     {key:'vulnerable', icon:'bi-heart', label:'Vulnerable', fields:[
       {l:'Head',v:r=>r.head},{l:'Category',v:r=>r.category},{l:'Priority',v:r=>r.priority||'Normal'}
     ]},
-    {key:'disabled', icon:'bi-person-wheelchair', label:'Disabled', fields:[
+    {key:'disabled', icon:'bi-universal-access', label:'Disabled', fields:[
       {l:'Name',v:r=>r.name}
     ]},
-    {key:'high_risk', icon:'bi-shield-exclamation', label:'High Risk', fields:[
+    {key:'high_risk', icon:'bi-exclamation-shield', label:'High Risk', fields:[
       {l:'Name',v:r=>r.name},{l:'Category',v:r=>r.category}
     ]},
     {key:'rrt', icon:'bi-flag', label:'RRT', fields:[
