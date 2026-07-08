@@ -372,8 +372,7 @@
         <tr>
           <th style="border:1px solid #1a3c6e; background:#1a3c6e; color:white; padding:5px 8px; width:70px; text-align:center; font-weight:700;">वार/दिन</th>
           <th class="group-header gh-start" colspan="2">साताको शुरुबात</th>
-          <th class="group-header gh-mid" colspan="4">साताको मध्य</th>
-          <th class="group-header gh-end" colspan="1">साताको अन्त्य</th>
+          <th class="group-header gh-mid" colspan="5">साताको मध्य</th>
         </tr>
         <!-- Day headers -->
         <tr>
@@ -383,8 +382,7 @@
           <th class="day-col-header dc-mid">आइतबार</th>
           <th class="day-col-header dc-mid">सोमबार</th>
           <th class="day-col-header dc-mid">मंगलबार</th>
-          <th class="day-col-header dc-mid">बुधबार</th>
-          <th class="day-col-header dc-end" style="background:#90caf9;">बिहीबार<br><small style="font-size:8.5pt;font-weight:500;">(मौसम प्रणाली)</small></th>
+          <th class="day-col-header dc-mid" colspan="2" style="background:#90caf9;">बुधबार / बिहीबार<br><small style="font-size:8.5pt;font-weight:500;">(मौसम प्रणाली)</small></th>
         </tr>
       </thead>
       <tbody>
@@ -417,7 +415,7 @@
           </td>
 
           {% set ws_mid = forecast.mid_weather or forecast.weather_status or '' %}
-          <td class="weather-cell" colspan="4">
+          {% macro mid_weather_cell() %}
             {% if 'हिमपात' in ws_mid or 'हिम' in ws_mid %}
               <span class="weather-icon">🌨️</span>
             {% elif 'भारी बर्षा' in ws_mid or 'अति धेरै' in ws_mid %}
@@ -433,81 +431,36 @@
             {% else %}
               <span class="weather-icon">🌤️</span>
             {% endif %}
-            <div class="weather-text">
-              {{ forecast.mid_weather or forecast.weather_status or '-' }}
-            </div>
-            {% if forecast.mid_weather_desc %}
-              <div class="weather-desc">{{ forecast.mid_weather_desc }}</div>
-            {% endif %}
-          </td>
-
-          {% set ws_end = forecast.end_weather or forecast.weather_status or '' %}
-          <td class="weather-cell">
-            {% if 'हिमपात' in ws_end or 'हिम' in ws_end %}
-              <span class="weather-icon">🌨️</span>
-            {% elif 'भारी बर्षा' in ws_end or 'अति धेरै' in ws_end %}
-              <span class="weather-icon">⛈️</span>
-            {% elif 'बर्षा' in ws_end or 'वर्षा' in ws_end %}
-              <span class="weather-icon">🌧️</span>
-            {% elif 'बदली' in ws_end %}
-              <span class="weather-icon">⛅</span>
-            {% elif 'सफा' in ws_end %}
-              <span class="weather-icon">☀️</span>
-            {% elif 'शितलहर' in ws_end or 'लु-लहर' in ws_end %}
-              <span class="weather-icon">🌬️</span>
-            {% else %}
-              <span class="weather-icon">🌤️</span>
-            {% endif %}
-            <div class="weather-text">
-              {{ forecast.end_weather or forecast.weather_status or '-' }}
-            </div>
-            {% if forecast.end_weather_desc %}
-              <div class="weather-desc">{{ forecast.end_weather_desc }}</div>
-            {% endif %}
+            <div class="weather-text">{{ forecast.mid_weather or forecast.weather_status or '-' }}</div>
+            {% if forecast.mid_weather_desc %}<div class="weather-desc">{{ forecast.mid_weather_desc }}</div>{% endif %}
+          {% endmacro %}
+          <td class="weather-cell">{{ mid_weather_cell() }}</td>
+          <td class="weather-cell">{{ mid_weather_cell() }}</td>
+          <td class="weather-cell">{{ mid_weather_cell() }}</td>
+          <td class="weather-cell" colspan="2">
+            {{ mid_weather_cell() }}
+            {% if forecast.end_weather %}<div class="weather-desc"><strong>बिहीबार:</strong> {{ forecast.end_weather }}{% if forecast.end_weather_desc %} — {{ forecast.end_weather_desc }}{% endif %}</div>{% endif %}
           </td>
         </tr>
 
-        <!-- Suggestions row: merged into single cell, vertical stack -->
+        <!-- Suggestions row: single merged cell -->
         <tr>
           <td class="row-label" style="background:#27ae60;">सुझाव</td>
           <td class="suggestion-cell" colspan="7">
             <div style="text-align:left;">
-              <div style="margin-bottom:6px; padding-bottom:6px; border-bottom:1px dashed #d0dff0;">
-                <span style="font-weight:700; color:#1a3c6e; font-size:9pt;">साताको शुरुबात (शुक्र-शनि):</span><br>
-                {% if forecast.start_suggestion %}
-                  {{ forecast.start_suggestion }}
-                {% elif forecast.forecast_info %}
-                  {{ forecast.forecast_info }}
-                {% elif forecast.remarks %}
-                  {{ forecast.remarks }}
-                {% else %}
-                  -
-                {% endif %}
-              </div>
-              <div style="margin-bottom:6px; padding-bottom:6px; border-bottom:1px dashed #d0dff0;">
-                <span style="font-weight:700; color:#1a3c6e; font-size:9pt;">साताको मध्य (आइत-बुध):</span><br>
-                {% if forecast.mid_suggestion %}
-                  {{ forecast.mid_suggestion }}
-                {% elif forecast.forecast_info %}
-                  {{ forecast.forecast_info }}
-                {% elif forecast.remarks %}
-                  {{ forecast.remarks }}
-                {% else %}
-                  -
-                {% endif %}
-              </div>
-              <div>
-                <span style="font-weight:700; color:#1a3c6e; font-size:9pt;">साताको अन्त्य (बिही):</span><br>
-                {% if forecast.end_suggestion %}
-                  {{ forecast.end_suggestion }}
-                {% elif forecast.forecast_info %}
-                  {{ forecast.forecast_info }}
-                {% elif forecast.remarks %}
-                  {{ forecast.remarks }}
-                {% else %}
-                  -
-                {% endif %}
-              </div>
+              {% if forecast.suggestion %}
+                {{ forecast.suggestion }}
+              {% elif forecast.start_suggestion or forecast.mid_suggestion or forecast.end_suggestion %}
+                {% if forecast.start_suggestion %}<div>{{ forecast.start_suggestion }}</div>{% endif %}
+                {% if forecast.mid_suggestion %}<div>{{ forecast.mid_suggestion }}</div>{% endif %}
+                {% if forecast.end_suggestion %}<div>{{ forecast.end_suggestion }}</div>{% endif %}
+              {% elif forecast.forecast_info %}
+                {{ forecast.forecast_info }}
+              {% elif forecast.remarks %}
+                {{ forecast.remarks }}
+              {% else %}
+                -
+              {% endif %}
             </div>
           </td>
         </tr>

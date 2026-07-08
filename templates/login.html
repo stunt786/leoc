@@ -11,7 +11,7 @@
             <div class="card-body p-4 text-center">
                 <img src="{{ url_for('static', filename='Emblem_of_Nepal.png') }}" alt="Logo" height="60" class="mb-3">
                 <h5 class="fw-bold mb-1">LEOC</h5>
-                <p class="text-muted small mb-4">थलारा गाउँपालिका, बझाङ</p>
+                <p class="text-muted small mb-4">{{ office_name or 'थलारा गाउँपालिका, बझाङ' }}</p>
 
                 {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}

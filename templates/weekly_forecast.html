@@ -137,11 +137,6 @@
               <label class="form-label">विवरण</label>
               <input type="text" class="form-control" id="start_weather_desc" placeholder="शुरुबातको मौसम विवरण">
             </div>
-            <div class="col-md-4">
-              <label class="form-label">सुझाव</label>
-              <textarea class="form-control" id="start_suggestion" rows="2" placeholder="शुरुबारका लागि सुझाव"></textarea>
-            </div>
-
             <!-- साताको मध्य -->
             <div class="col-12 mt-3">
               <h6 class="text-warning mb-2"><i class="bi bi-cloud-sun me-1"></i> साताको मध्य (आइतबार - बुधबार)</h6>
@@ -172,10 +167,6 @@
             <div class="col-md-4">
               <label class="form-label">विवरण</label>
               <input type="text" class="form-control" id="mid_weather_desc" placeholder="मध्यको मौसम विवरण">
-            </div>
-            <div class="col-md-4">
-              <label class="form-label">सुझाव</label>
-              <textarea class="form-control" id="mid_suggestion" rows="2" placeholder="मध्यका लागि सुझाव"></textarea>
             </div>
 
             <!-- साताको अन्त्य -->
@@ -209,10 +200,6 @@
               <label class="form-label">विवरण</label>
               <input type="text" class="form-control" id="end_weather_desc" placeholder="अन्त्यको मौसम विवरण">
             </div>
-            <div class="col-md-4">
-              <label class="form-label">सुझाव</label>
-              <textarea class="form-control" id="end_suggestion" rows="2" placeholder="अन्त्यका लागि सुझाव"></textarea>
-            </div>
           </div>
         </div>
       </div>
@@ -224,6 +211,10 @@
         </div>
         <div class="card-body">
           <div class="row g-3">
+            <div class="col-12">
+              <label class="form-label">सुझाव</label>
+              <textarea class="form-control" id="suggestion" rows="2" placeholder="साताभरिको सुझाव (एकीकृत)"></textarea>
+            </div>
             <div class="col-12">
               <label class="form-label">कैफियत (remarks)</label>
               <textarea class="form-control" id="remarks" rows="2" placeholder="कुनै विशेष टिप्पणी वा कैफियत"></textarea>
@@ -408,13 +399,11 @@ function resetForecastForm() {
   document.getElementById('forecast_date_to').value = '';
   document.getElementById('start_weather').value = '';
   document.getElementById('start_weather_desc').value = '';
-  document.getElementById('start_suggestion').value = '';
   document.getElementById('mid_weather').value = '';
   document.getElementById('mid_weather_desc').value = '';
-  document.getElementById('mid_suggestion').value = '';
   document.getElementById('end_weather').value = '';
   document.getElementById('end_weather_desc').value = '';
-  document.getElementById('end_suggestion').value = '';
+  document.getElementById('suggestion').value = '';
   document.getElementById('btnSaveText').textContent = 'पूर्वानुमान सुरक्षित गर्नुहोस्';
 }
 
@@ -437,13 +426,11 @@ async function editForecast(id) {
     document.getElementById('remarks').value = f.remarks || '';
     document.getElementById('start_weather').value = f.start_weather || '';
     document.getElementById('start_weather_desc').value = f.start_weather_desc || '';
-    document.getElementById('start_suggestion').value = f.start_suggestion || '';
     document.getElementById('mid_weather').value = f.mid_weather || '';
     document.getElementById('mid_weather_desc').value = f.mid_weather_desc || '';
-    document.getElementById('mid_suggestion').value = f.mid_suggestion || '';
     document.getElementById('end_weather').value = f.end_weather || '';
     document.getElementById('end_weather_desc').value = f.end_weather_desc || '';
-    document.getElementById('end_suggestion').value = f.end_suggestion || '';
+    document.getElementById('suggestion').value = f.suggestion || '';
     document.getElementById('btnSaveText').textContent = 'पूर्वानुमान अद्यावधिक गर्नुहोस्';
     window.scrollTo({ top: 0, behavior: 'smooth' });
     showToast('success', 'पूर्वानुमान सम्पादनको लागि लोड गरियो');
@@ -490,13 +477,11 @@ async function saveForecast() {
     remarks: document.getElementById('remarks').value.trim(),
     start_weather: document.getElementById('start_weather').value,
     start_weather_desc: document.getElementById('start_weather_desc').value.trim(),
-    start_suggestion: document.getElementById('start_suggestion').value.trim(),
     mid_weather: document.getElementById('mid_weather').value,
     mid_weather_desc: document.getElementById('mid_weather_desc').value.trim(),
-    mid_suggestion: document.getElementById('mid_suggestion').value.trim(),
     end_weather: document.getElementById('end_weather').value,
     end_weather_desc: document.getElementById('end_weather_desc').value.trim(),
-    end_suggestion: document.getElementById('end_suggestion').value.trim(),
+    suggestion: document.getElementById('suggestion').value.trim(),
   };
 
   try {

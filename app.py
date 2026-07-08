@@ -1536,6 +1536,8 @@ class WeeklyForecast(db.Model):
     end_weather = db.Column(db.String(200))
     end_weather_desc = db.Column(db.Text)
     end_suggestion = db.Column(db.Text)
+    # --- Combined suggestion (सुझाव) for whole week ---
+    suggestion = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=utc_now)
     updated_at = db.Column(db.DateTime, default=utc_now, onupdate=utc_now)
 
@@ -1560,6 +1562,7 @@ class WeeklyForecast(db.Model):
             'end_weather': self.end_weather or '',
             'end_weather_desc': self.end_weather_desc or '',
             'end_suggestion': self.end_suggestion or '',
+            'suggestion': self.suggestion or '',
             'created_at': ad_to_bs_date(self.created_at),
             'updated_at': ad_to_bs_date(self.updated_at),
         }
@@ -2231,6 +2234,7 @@ def login():
         return redirect(url_for('index'))
 
     locked = False
+    office_name = AppSettings.get_setting('office_name', 'थलारा गाउँपालिका')
 
     if request.method == 'POST':
         username = request.form.get('username', '').strip()
@@ -2249,7 +2253,7 @@ def login():
                 if locked_until > datetime.now(timezone.utc):
                     remaining = max(1, int((locked_until - datetime.now(timezone.utc)).total_seconds() // 60))
                     flash(f'Account locked due to too many failed login attempts. Try again in {remaining} minute(s).', 'danger')
-                    return render_template('login.html', locked=True)
+                    return render_template('login.html', locked=True, office_name=office_name)
 
             if authenticate_user(db, username, password):
                 db.session.execute(
@@ -2280,7 +2284,7 @@ def login():
                     db.session.commit()
                     flash('Account locked due to too many failed login attempts. Try again in 15 minute(s).', 'danger')
                     log_activity('login_failed', 'auth', details=f'Account locked for {username} after {new_count} failed attempts', ip=request.remote_addr)
-                    return render_template('login.html', locked=True)
+                    return render_template('login.html', locked=True, office_name=office_name)
                 else:
                     db.session.execute(
                         db.text("UPDATE \"user\" SET failed_login_attempts = :count WHERE id = :id"),
@@ -2290,14 +2294,14 @@ def login():
                     remaining = 10 - new_count
                     flash(f'Invalid username or password. {remaining} attempt(s) remaining before account lockout.', 'danger')
                     log_activity('login_failed', 'auth', details=f'Failed login attempt for {username} ({remaining} attempts remaining)', ip=request.remote_addr)
-                    return render_template('login.html')
+                    return render_template('login.html', office_name=office_name)
         else:
             flash('Invalid username or password', 'danger')
             log_activity('login_failed', 'auth', details=f'Failed login attempt for unknown user {username}', ip=request.remote_addr)
             time.sleep(1)
-            return render_template('login.html')
+            return render_template('login.html', office_name=office_name)
 
-    return render_template('login.html', locked=False)
+    return render_template('login.html', locked=False, office_name=office_name)
 
 @app.route('/logout', methods=['POST'])
 @login_required
@@ -6956,6 +6960,7 @@ def handle_weekly_forecasts():
             end_weather=data.get('end_weather', ''),
             end_weather_desc=data.get('end_weather_desc', ''),
             end_suggestion=data.get('end_suggestion', ''),
+            suggestion=data.get('suggestion', ''),
         )
         db.session.add(forecast)
         db.session.commit()
@@ -7008,6 +7013,7 @@ def manage_weekly_forecast(id):
         forecast.end_weather = data.get('end_weather', forecast.end_weather)
         forecast.end_weather_desc = data.get('end_weather_desc', forecast.end_weather_desc)
         forecast.end_suggestion = data.get('end_suggestion', forecast.end_suggestion)
+        forecast.suggestion = data.get('suggestion', forecast.suggestion)
         db.session.commit()
         return jsonify({'success': True, 'message': 'Forecast updated', 'data': forecast.to_dict()})
     except Exception as e:
@@ -8311,7 +8317,7 @@ def handle_429(e):
     if request.path.startswith('/api/'):
         return jsonify({'success': False, 'message': 'Too many requests. Please slow down.'}), 429
     flash('Too many requests. Please wait before trying again.', 'danger')
-    return render_template('login.html', locked=False), 429
+    return render_template('login.html', locked=False, office_name=AppSettings.get_setting('office_name', 'थलारा गाउँपालिका')), 429
 
 # ============ REPORTS (PDF) ============
 DEVANAGARI_RE = re.compile(r'[\u0900-\u097F]')
@@ -10073,6 +10079,7 @@ def init_db():
                     ('end_weather', 'VARCHAR(200)'),
                     ('end_weather_desc', 'TEXT'),
                     ('end_suggestion', 'TEXT'),
+                    ('suggestion', 'TEXT'),
                 ]
                 for col_name, col_type in wf_new_cols:
                     if col_name not in wf_cols:
@@ -10083,6 +10090,24 @@ def init_db():
                         except Exception as e:
                             db.session.rollback()
                             print(f"[WARN] Could not add {col_name} to weekly_forecast: {e}")
+                # Backfill combined suggestion from per-day suggestion fields
+                try:
+                    rows = db.session.execute(db.text(
+                        "SELECT id, start_suggestion, mid_suggestion, end_suggestion, suggestion FROM weekly_forecast"
+                    )).fetchall()
+                    for r in rows:
+                        if r[4]:
+                            continue
+                        parts = [p for p in [r[1], r[2], r[3]] if p]
+                        if parts:
+                            combined = "\n".join(parts)
+                            db.session.execute(db.text(
+                                "UPDATE weekly_forecast SET suggestion = :s WHERE id = :i"
+                            ), {"s": combined, "i": r[0]})
+                    db.session.commit()
+                except Exception as e:
+                    db.session.rollback()
+                    print(f"[WARN] Could not backfill suggestion in weekly_forecast: {e}")
 
             if 'dispatch_item' in inspector.get_table_names():
                 di_cols = [c['name'] for c in inspector.get_columns('dispatch_item')]
