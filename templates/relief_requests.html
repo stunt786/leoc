@@ -27,12 +27,11 @@
                 <option value="Completed">Completed</option>
                 <option value="Cancelled">Cancelled</option>
             </select>
-            <input type="text" class="form-control form-control-sm" style="width:200px" id="rrSearch" placeholder="Search requests..." oninput="filterRR()">
         </div>
     </div>
     <div class="card-body p-0">
         <div class="table-responsive">
-            <table class="table table-hover mb-0">
+            <table class="table table-hover mb-0" id="dataTable">
                 <thead>
                     <tr>
                         <th>Request #</th>
@@ -51,10 +50,6 @@
                     <tr><td colspan="10" class="text-center py-4"><div class="spinner-border text-primary"></div></td></tr>
                 </tbody>
             </table>
-        </div>
-        <div class="d-flex justify-content-between align-items-center mt-2 px-2">
-            <small class="text-muted" id="tableInfo">0 records</small>
-            <nav><ul class="pagination pagination-sm mb-0" id="pagination"></ul></nav>
         </div>
     </div>
 </div>
@@ -227,7 +222,6 @@ let itemsData = [];
 let categories = [];
 let groups = [];
 let incidentsData = [];
-let paginator = new Paginator({perPage: 25, onPageChange: () => renderRR(reliefRequests)});
 let inventoryAvailable = {};
 let totalFundBalance = 0;
 let beneficiaries = [];
@@ -410,18 +404,16 @@ async function loadRR() {
 function renderRR(data) {
     const tbody = document.getElementById('rrTableBody');
     if (data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="10" class="text-center py-4 text-muted">No relief requests found</td></tr>';
-        paginator.update(0);
+        tbody.innerHTML = '<tr><td colspan="10" class="text-center text-muted py-3">No records found</td></tr>';
         return;
     }
-    const pageData = paginator.getPageData(data);
-    tbody.innerHTML = pageData.map(r => {
+    tbody.innerHTML = data.map(r => {
         const priorityColors = {Low: 'secondary', Medium: 'info', High: 'warning', Urgent: 'danger'};
         const statusColors = {Pending: 'warning', Partial: 'info', Completed: 'success', Cancelled: 'secondary'};
         const itemsCount = r.items ? r.items.length : 0;
         const hasCash = r.requested_cash_amount > 0;
         const pct = hasCash ? Math.min(100, (r.distributed_cash_amount / r.requested_cash_amount) * 100) : 0;
-        return `<tr style="cursor:pointer" onclick="editRR(${r.id})">
+        return `<tr data-id="${r.id}" style="cursor:pointer" onclick="editRR(${r.id})">
             <td><strong>${r.request_number}</strong></td>
             <td>${r.request_date || '-'}</td>
             <td>${r.incident_name || '-'}</td>
@@ -440,19 +432,7 @@ function renderRR(data) {
             </td>
         </tr>`;
     }).join('');
-    paginator.update(data.length);
-}
-
-function filterRR() {
-    const q = document.getElementById('rrSearch').value.toLowerCase();
-    const filtered = reliefRequests.filter(r =>
-        (r.request_number && r.request_number.toLowerCase().includes(q)) ||
-        (r.incident_name && r.incident_name.toLowerCase().includes(q)) ||
-        (r.organization && r.organization.toLowerCase().includes(q)) ||
-        (r.requester_name && r.requester_name.toLowerCase().includes(q))
-    );
-    if (paginator) paginator.currentPage = 1;
-    renderRR(filtered);
+    DataTableManager.init('dataTable');
 }
 
 function updateFundBalanceDisplay() {

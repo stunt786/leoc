@@ -15,17 +15,13 @@
 <div class="card">
     <div class="card-body">
         <div class="table-responsive">
-            <table class="table table-hover align-middle" id="cdTable">
+            <table class="table table-hover align-middle" id="dataTable">
                 <thead class="table-light"><tr>
                     <th>Dist No</th><th>Date</th><th>Beneficiary</th><th>Incident</th>
                     <th>Source</th><th>Status</th><th>Type</th><th>Amount</th><th>Officer</th><th>Files</th><th>Actions</th>
                 </tr></thead>
                 <tbody id="cdBody"></tbody>
             </table>
-        </div>
-        <div class="d-flex justify-content-between align-items-center mt-2 px-2">
-            <small class="text-muted" id="tableInfo">0 records</small>
-            <nav><ul class="pagination pagination-sm mb-0" id="pagination"></ul></nav>
         </div>
     </div>
 </div>
@@ -152,16 +148,14 @@
 <script>
 const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 let _cashDistributions = [];
-let paginator = new Paginator({perPage: 25, onPageChange: () => renderCashDistributions(_cashDistributions)});
 
 function renderCashDistributions(data) {
     const t = document.getElementById('cdBody');
-    if (data.length === 0) { t.innerHTML = '<tr><td colspan="10" class="text-center text-muted py-3">No distributions found</td></tr>'; paginator.update(0); return; }
-    const pageData = paginator.getPageData(data);
-    t.innerHTML = pageData.map(cd => {
+    if (data.length === 0) { t.innerHTML = '<tr><td colspan="11" class="text-center text-muted py-3">No cash distributions found</td></tr>'; return; }
+    t.innerHTML = data.map(cd => {
         const isCancelled = cd.status === 'Cancelled';
         const srcMatch = (cd.remarks || '').match(/Source Distribution:\s*(\S+)/);
-        const srcHtml = srcMatch ? `<small class="text-muted" title="${cd.remarks}">${srcMatch[1]}</small>` : '-';
+        const srcHtml = srcMatch ? `<small class="text-muted" title="${esc(cd.remarks)}">${esc(srcMatch[1])}</small>` : '-';
         const photoHtml = cd.photo_url ? `<a href="${cd.photo_url}" target="_blank" title="Photo"><i class="bi bi-image text-primary"></i></a>` : '';
         const docHtml = cd.document_url ? `<a href="${cd.document_url}" target="_blank" title="Document"><i class="bi bi-file-pdf text-danger ms-1"></i></a>` : '';
         const filesHtml = (photoHtml || docHtml) ? `${photoHtml}${docHtml}` : '-';
@@ -171,20 +165,20 @@ function renderCashDistributions(data) {
             : `<span class="badge bg-success bg-opacity-10 text-success border border-success">Active</span>`;
         const cancelBtn = isCancelled ? '' : `<button class="btn btn-sm btn-outline-danger ms-1" onclick="cancelCd(${cd.id})" title="Cancel"><i class="bi bi-x-circle"></i></button>`;
         const rowClass = isCancelled ? ' class="text-decoration-line-through text-muted"' : '';
-        const benName = (cd.beneficiaries && cd.beneficiaries.length > 0) ? cd.beneficiaries[0].name : '-';
-        return `<tr${rowClass}>
-        <td>${cd.distribution_no}</td><td>${cd.distribution_date}</td>
+        const benName = (cd.beneficiaries && cd.beneficiaries.length > 0) ? esc(cd.beneficiaries[0].name) : '-';
+        return `<tr data-id="${cd.id}"${rowClass}>
+        <td>${esc(cd.distribution_no)}</td><td>${esc(cd.distribution_date)}</td>
         <td>${benName}</td>
-        <td>${cd.incident_name || '-'}</td>
-        <td><small>${cd.relief_request_number ? 'Relief: '+cd.relief_request_number : reqNums ? 'Cash: '+reqNums : '-'}</small></td>
+        <td>${esc(cd.incident_name || '-')}</td>
+        <td><small>${cd.relief_request_number ? 'Relief: '+esc(cd.relief_request_number) : reqNums ? 'Cash: '+esc(reqNums) : '-'}</small></td>
         <td>${statusBadge}</td>
-        <td>${cd.distribution_type}</td>
+        <td>${esc(cd.distribution_type)}</td>
         <td class="fw-bold text-danger">${Number(cd.total_amount).toLocaleString()}</td>
-        <td>${cd.officer || '-'}</td>
+        <td>${esc(cd.officer || '-')}</td>
         <td>${filesHtml}</td>
         <td><button class="btn btn-sm btn-outline-primary" onclick="viewCd(${cd.id})" title="View"><i class="bi bi-eye"></i></button>${cancelBtn}</td>
     </tr>`}).join('');
-    paginator.update(data.length);
+    DataTableManager.init('dataTable');
 }
 
 async function loadDistributions() {

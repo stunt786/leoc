@@ -19,11 +19,10 @@
 <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
         <span><i class="bi bi-list-check me-2 text-primary"></i>All Categories</span>
-        <input type="text" class="form-control form-control-sm" style="width:200px" id="categorySearch" placeholder="Search..." oninput="filterCategories()">
     </div>
     <div class="card-body p-0">
         <div class="table-responsive">
-            <table class="table table-hover mb-0">
+            <table class="table table-hover mb-0" id="dataTable">
                 <thead>
                     <tr>
                         <th>Name</th>
@@ -36,10 +35,6 @@
                     <tr><td colspan="4" class="text-center py-4"><div class="spinner-border text-primary"></div></td></tr>
                 </tbody>
             </table>
-        </div>
-        <div class="d-flex justify-content-between align-items-center mt-2 px-2">
-            <small class="text-muted" id="tableInfo">0 records</small>
-            <nav><ul class="pagination pagination-sm mb-0" id="pagination"></ul></nav>
         </div>
     </div>
 </div>
@@ -82,7 +77,6 @@
 <script>
 const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 let categories = [];
-let paginator = new Paginator({perPage: 25, onPageChange: () => renderCategories(categories)});
 
 async function loadCategories() {
     const r = await fetch('/api/categories');
@@ -95,32 +89,19 @@ async function loadCategories() {
 function renderCategories(data) {
     const tbody = document.getElementById('categoryTableBody');
     if (data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-muted">No categories found</td></tr>';
-        paginator.update(0);
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-3">No categories found</td></tr>';
         return;
     }
-    const pageData = paginator.getPageData(data);
-    tbody.innerHTML = pageData.map(c => `<tr>
-        <td><strong>${c.name}</strong></td>
-        <td>${c.name_np || '-'}</td>
-        <td>${c.description || '-'}</td>
+    tbody.innerHTML = data.map(c => `<tr data-id="${c.id}">
+        <td><strong>${esc(c.name)}</strong></td>
+        <td>${esc(c.name_np || '-')}</td>
+        <td>${esc(c.description || '-')}</td>
         <td class="text-end">
             <button class="btn btn-sm btn-outline-primary" onclick="editCategory(${c.id})"><i class="bi bi-pencil"></i></button>
             <button class="btn btn-sm btn-outline-danger" onclick="deleteCategory(${c.id})"><i class="bi bi-trash"></i></button>
         </td>
     </tr>`).join('');
-    paginator.update(data.length);
-}
-
-function filterCategories() {
-    const q = document.getElementById('categorySearch').value.toLowerCase();
-    const filtered = categories.filter(c =>
-        c.name.toLowerCase().includes(q) ||
-        (c.description && c.description.toLowerCase().includes(q)) ||
-        (c.name_np && c.name_np.includes(q))
-    );
-    if (paginator) paginator.currentPage = 1;
-    renderCategories(filtered);
+    DataTableManager.init('dataTable');
 }
 
 function resetCategoryForm() {

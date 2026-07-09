@@ -39,7 +39,7 @@
 <div class="card shadow-sm">
     <div class="card-body">
         <div class="table-responsive">
-            <table class="table table-hover align-middle" id="vpTable">
+            <table class="table table-hover align-middle" id="dataTable">
                 <thead class="table-light">
                     <tr>
                         <th>Household ID</th>
@@ -54,10 +54,6 @@
                 </thead>
                 <tbody id="vpBody"></tbody>
             </table>
-        </div>
-        <div class="d-flex justify-content-between align-items-center mt-2 px-2">
-            <small class="text-muted" id="tableInfo">0 records</small>
-            <nav><ul class="pagination pagination-sm mb-0" id="pagination"></ul></nav>
         </div>
     </div>
 </div>
@@ -179,19 +175,16 @@
 const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 const wardMap = {};
 let _records = [];
-let paginator = new Paginator({perPage: 25, onPageChange: () => renderTable(_records)});
 
 function renderTable(data) {
     const t = document.getElementById('vpBody');
     if (data.length === 0) {
         t.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">No records found</td></tr>';
-        paginator.update(0);
         return;
     }
-    const pageData = paginator.getPageData(data);
-    t.innerHTML = pageData.map(r => {
+    t.innerHTML = data.map(r => {
         const priorityClass = r.evacuation_priority === 'Critical' ? 'bg-danger' : r.evacuation_priority === 'High' ? 'bg-warning text-dark' : 'bg-success';
-        return `<tr>
+        return `<tr data-id="${r.id}">
             <td><strong>${r.household_id || r.id}</strong></td>
             <td>${r.head_of_household}</td>
             <td>${r.family_size}</td>
@@ -206,8 +199,7 @@ function renderTable(data) {
             </td>
         </tr>`;
     }).join('');
-    paginator.update(data.length);
-    document.getElementById('tableInfo').textContent = `${data.length} record${data.length !== 1 ? 's' : ''}`;
+    DataTableManager.init('dataTable');
 }
 
 function initWardMap() {
@@ -336,8 +328,9 @@ document.getElementById('vpForm').addEventListener('submit', async function(e) {
         const r = await fetch(url, {method, headers: {'Content-Type':'application/json', 'X-CSRFToken': csrf}, body: JSON.stringify(body)});
         const d = await r.json();
         if (d.success) {
-            showToast('success', d.message);
-            bootstrap.Modal.getInstance(document.getElementById('vpModal')).hide();
+            showToast('success', id ? 'Record updated' : 'Record created');
+            var vpModal = bootstrap.Modal.getInstance(document.getElementById('vpModal'));
+            vpModal.hide();
             loadData();
         } else {
             showToast('danger', d.message);

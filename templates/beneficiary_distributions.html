@@ -52,7 +52,7 @@
 <div class="card">
     <div class="card-body p-0">
         <div class="table-responsive">
-            <table class="table table-hover table-sm mb-0">
+            <table class="table table-hover table-sm mb-0" id="dataTable">
                 <thead class="table-light">
                     <tr>
                         <th>#</th>
@@ -72,10 +72,6 @@
             </table>
         </div>
     </div>
-    <div class="d-flex justify-content-between align-items-center mt-2 px-2">
-        <small class="text-muted" id="tableInfo">0 records</small>
-        <nav><ul class="pagination pagination-sm mb-0" id="pagination"></ul></nav>
-    </div>
 </div>
 {% endblock %}
 {% block extra_js %}
@@ -83,7 +79,6 @@
 const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 let searchTimeout = null;
 let _distributions = [];
-let paginator = new Paginator({perPage: 25, onPageChange: () => renderDistributions(_distributions)});
 
 function debounceSearch() {
     clearTimeout(searchTimeout);
@@ -117,13 +112,11 @@ function renderDistributions(data) {
     const tbody = document.getElementById('distTableBody');
     if (data.length === 0) {
         tbody.innerHTML = '<tr><td colspan="9" class="text-center py-4 text-muted">No records found</td></tr>';
-        paginator.update(0);
         return;
     }
-    const pageData = paginator.getPageData(data);
-    tbody.innerHTML = pageData.map((row, i) => {
+    tbody.innerHTML = data.map((row, i) => {
         const statusBadge = row.status === 'Received' ? 'success' : 'warning';
-        return `<tr>
+        return `<tr data-id="${row.id}">
             <td>${i+1}</td>
             <td><strong>${row.family_name}</strong></td>
             <td>${row.ward_name || row.ward || '-'}</td>
@@ -135,7 +128,7 @@ function renderDistributions(data) {
             <td><small>${row.incident_name || '-'}</small></td>
         </tr>`;
     }).join('');
-    paginator.update(data.length);
+    DataTableManager.init('dataTable');
 }
 
 async function loadData() {

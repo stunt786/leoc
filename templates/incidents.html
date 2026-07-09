@@ -20,7 +20,7 @@
     <div class="card-header d-flex justify-content-between align-items-center">
         <span><i class="bi bi-funnel me-2 text-primary"></i>Filter by Status</span>
         <div>
-            <select class="form-select form-select-sm" style="width:160px" id="statusFilter" onchange="filterIncidents()">
+            <select class="form-select form-select-sm" style="width:160px" id="statusFilter">
                 <option value="">All Status</option>
                 <option value="Active">Active</option>
                 <option value="Closed">Closed</option>
@@ -32,11 +32,10 @@
 <div class="card mt-3">
     <div class="card-header d-flex justify-content-between align-items-center">
         <span><i class="bi bi-list-check me-2 text-primary"></i>All Incidents</span>
-        <input type="text" class="form-control form-control-sm" style="width:200px" id="incidentSearch" placeholder="Search incidents..." oninput="filterIncidents()">
     </div>
     <div class="card-body p-0">
         <div class="table-responsive">
-            <table class="table table-hover mb-0">
+            <table class="table table-hover mb-0" id="dataTable">
                 <thead>
                     <tr>
                         <th>ID</th>
@@ -52,10 +51,6 @@
                     <tr><td colspan="7" class="text-center py-4"><div class="spinner-border text-primary"></div></td></tr>
                 </tbody>
             </table>
-        </div>
-        <div class="d-flex justify-content-between align-items-center mt-2 px-2">
-            <small class="text-muted" id="tableInfo">0 records</small>
-            <nav><ul class="pagination pagination-sm mb-0" id="pagination"></ul></nav>
         </div>
     </div>
 </div>
@@ -359,7 +354,6 @@
 const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 let incidents = [];
 let incidentTypes = [];
-let paginator = new Paginator({perPage: 25, onPageChange: () => renderIncidents(incidents)});
 
 async function loadIncidentTypes() {
     try {
@@ -529,14 +523,12 @@ function getText(i, f) { return i[f] || ''; }
 function renderIncidents(data) {
     const tbody = document.getElementById('incidentTableBody');
     if (data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-muted">No incidents found</td></tr>';
-        paginator.update(0);
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">No records found</td></tr>';
         return;
     }
-    const pageData = paginator.getPageData(data);
-    tbody.innerHTML = pageData.map(i => {
+    tbody.innerHTML = data.map(i => {
         const statusColor = i.status === 'Active' ? 'success' : 'secondary';
-        return `<tr>
+        return `<tr data-id="${i.id}">
             <td>${i.id}</td>
             <td><strong>${i.incident_name}</strong></td>
             <td><span class="badge bg-info">${i.incident_type}</span></td>
@@ -551,17 +543,7 @@ function renderIncidents(data) {
             </td>
         </tr>`;
     }).join('');
-    paginator.update(data.length);
-}
-
-function filterIncidents() {
-    const q = document.getElementById('incidentSearch').value.toLowerCase();
-    const filtered = incidents.filter(i =>
-        (i.incident_name && i.incident_name.toLowerCase().includes(q)) ||
-        (i.incident_type && i.incident_type.toLowerCase().includes(q))
-    );
-    if (paginator) paginator.currentPage = 1;
-    renderIncidents(filtered);
+    DataTableManager.init('dataTable');
 }
 
 document.getElementById('statusFilter').addEventListener('change', loadIncidents);

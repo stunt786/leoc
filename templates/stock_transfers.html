@@ -103,11 +103,10 @@
 <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
         <span><i class="bi bi-list-check me-2 text-primary"></i>Recent Transfers</span>
-        <input type="text" class="form-control form-control-sm" style="width:200px" id="transferSearch" placeholder="Search by transfer no..." oninput="filterTransfers()">
     </div>
     <div class="card-body p-0">
         <div class="table-responsive">
-            <table class="table table-hover mb-0">
+            <table class="table table-hover mb-0" id="dataTable">
                 <thead>
                     <tr>
                         <th>Transfer #</th>
@@ -123,10 +122,6 @@
                     <tr><td colspan="7" class="text-center py-4"><div class="spinner-border text-primary"></div></td></tr>
                 </tbody>
             </table>
-        </div>
-        <div class="d-flex justify-content-between align-items-center mt-2 px-2">
-            <small class="text-muted" id="tableInfo">0 records</small>
-            <nav><ul class="pagination pagination-sm mb-0" id="pagination"></ul></nav>
         </div>
     </div>
 </div>
@@ -163,7 +158,6 @@ let warehouses = [];
 let itemsList = [];
 let categories = [];
 let groups = [];
-let paginator = new Paginator({perPage: 25, onPageChange: () => renderTransfers(transfers)});
 
 let _currentWhInventory = [];
 
@@ -315,14 +309,12 @@ async function loadTransfers() {
 function renderTransfers(data) {
     const tbody = document.getElementById('transferTableBody');
     if (data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-muted">No transfers found</td></tr>';
-        paginator.update(0);
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">No records found</td></tr>';
         return;
     }
-    const pageData = paginator.getPageData(data);
-    tbody.innerHTML = pageData.map(t => {
+    tbody.innerHTML = data.map(t => {
         const itemCount = t.items ? t.items.length : 0;
-        return `<tr>
+        return `<tr data-id="${t.id}">
             <td><strong>${t.transfer_no}</strong></td>
             <td>${t.transfer_date || t.date || '-'}</td>
             <td>${t.from_warehouse_name || '-'}</td>
@@ -334,7 +326,7 @@ function renderTransfers(data) {
             </td>
         </tr>`;
     }).join('');
-    paginator.update(data.length);
+    DataTableManager.init('dataTable');
 }
 
 function statusBadge(status) {
@@ -345,13 +337,6 @@ function statusBadge(status) {
         'Draft': '<span class="badge bg-secondary">Draft</span>'
     };
     return map[status] || `<span class="badge bg-secondary">${status}</span>`;
-}
-
-function filterTransfers() {
-    const q = document.getElementById('transferSearch').value.toLowerCase();
-    const filtered = transfers.filter(t => t.transfer_no.toLowerCase().includes(q));
-    if (paginator) paginator.currentPage = 1;
-    renderTransfers(filtered);
 }
 
 async function saveTransfer() {

@@ -250,10 +250,10 @@ async function loadData() {
   const resp = await fetch(`/api/shelters?${params}`);
   const d = await resp.json();
   const tbody = document.querySelector('#dataTable tbody');
-  if(!d.success) { tbody.innerHTML = '<tr><td colspan="9" class="text-center text-danger">' + (d.message || 'Error loading data') + '</td></tr>'; return; }
+  if(!d.success) { DataTableManager.destroy('dataTable'); tbody.innerHTML = '<tr><td colspan="9" class="text-center text-danger">' + (d.message || 'Error loading data') + '</td></tr>'; return; }
   const items = d.data || [];
-  if(items.length === 0) { tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-4">No shelters found</td></tr>'; return; }
-  tbody.innerHTML = items.map(item => `<tr>
+  if(items.length === 0) { DataTableManager.destroy('dataTable'); tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-4">No shelters found</td></tr>'; return; }
+  tbody.innerHTML = items.map(item => `<tr data-id="${item.id}">
     <td>${item.shelter_name}</td>
     <td>${item.shelter_type || '-'}</td>
     <td>${wardMap[item.ward_id] || '-'}</td>
@@ -268,6 +268,7 @@ async function loadData() {
       <button class="btn btn-sm btn-outline-danger" onclick="deleteRecord(${item.id})" title="Delete"><i class="bi bi-trash"></i></button>
     </td>
   </tr>`).join('');
+  DataTableManager.init('dataTable');
 }
 
 function openForm() {

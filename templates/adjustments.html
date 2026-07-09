@@ -88,7 +88,7 @@
             </div>
             <div class="card-body p-0">
                 <div class="table-responsive">
-                    <table class="table table-hover mb-0">
+                    <table class="table table-hover mb-0" id="dataTable">
                         <thead>
                             <tr>
                                 <th>Adj. No.</th>
@@ -107,10 +107,6 @@
                         </tbody>
                     </table>
                 </div>
-                <div class="d-flex justify-content-between align-items-center mt-2 px-2">
-                    <small class="text-muted" id="tableInfo">0 records</small>
-                    <nav><ul class="pagination pagination-sm mb-0" id="pagination"></ul></nav>
-                </div>
             </div>
         </div>
     </div>
@@ -121,10 +117,6 @@
 <script>
 const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 let _adjustments = [];
-let paginator = new Paginator({
-    perPage: 25,
-    onPageChange: () => renderAdjustments(_adjustments)
-});
 
 function setDefaultDate() {
     document.getElementById('adjDate').value = today_bs;
@@ -217,13 +209,11 @@ async function loadCurrentQty() {
 function renderAdjustments(data) {
     const tbody = document.getElementById('adjustmentTableBody');
     if (data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9" class="text-center py-4 text-muted">No adjustments recorded yet</td></tr>';
-        paginator.update(0);
+        tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-3">No records found</td></tr>';
         return;
     }
-    const pageData = paginator.getPageData(data);
-    tbody.innerHTML = pageData.map(a => {
-        return `<tr>
+    tbody.innerHTML = data.map(a => {
+        return `<tr data-id="${a.id}">
             <td><strong>${a.adjustment_no}</strong></td>
             <td>${a.date}</td>
             <td>${a.warehouse_name || a.warehouse_id}</td>
@@ -235,7 +225,7 @@ function renderAdjustments(data) {
             <td>${a.approval_user || '-'}</td>
         </tr>`;
     }).join('');
-    paginator.update(data.length);
+    DataTableManager.init('dataTable');
 }
 
 async function loadAdjustments() {

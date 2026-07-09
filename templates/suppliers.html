@@ -28,12 +28,11 @@
                 <option value="Active">Active</option>
                 <option value="Inactive">Inactive</option>
             </select>
-            <input type="text" class="form-control form-control-sm" style="width:220px" id="supplierSearch" placeholder="Search by name, contact, phone..." oninput="filterSuppliers()">
         </div>
     </div>
     <div class="card-body p-0">
         <div class="table-responsive">
-            <table class="table table-hover mb-0">
+            <table class="table table-hover mb-0" id="dataTable">
                 <thead>
                     <tr>
                         <th>Name</th>
@@ -50,10 +49,6 @@
                     <tr><td colspan="8" class="text-center py-4"><div class="spinner-border text-primary"></div></td></tr>
                 </tbody>
             </table>
-        </div>
-        <div class="d-flex justify-content-between align-items-center mt-2 px-2">
-            <small class="text-muted" id="tableInfo">0 records</small>
-            <nav><ul class="pagination pagination-sm mb-0" id="pagination"></ul></nav>
         </div>
     </div>
 </div>
@@ -124,7 +119,6 @@
 const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 let suppliers = [];
 let receiptCounts = {};
-let paginator = new Paginator({perPage: 25, onPageChange: () => renderSuppliers(suppliers)});
 
 async function loadSuppliers() {
     try {
@@ -165,17 +159,15 @@ async function loadSuppliers() {
 function renderSuppliers(data) {
     const tbody = document.getElementById('supplierTableBody');
     if (data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-muted">No suppliers found</td></tr>';
-        paginator.update(0);
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">No suppliers found</td></tr>';
         return;
     }
-    const pageData = paginator.getPageData(data);
-    tbody.innerHTML = pageData.map(s => `<tr>
-        <td><strong>${s.name}</strong></td>
-        <td>${s.contact_person || '-'}</td>
-        <td>${s.phone || '-'}</td>
-        <td>${s.email || '-'}</td>
-        <td><span class="badge bg-info text-dark">${s.supplier_type || '-'}</span></td>
+    tbody.innerHTML = data.map(s => `<tr data-id="${s.id}">
+        <td><strong>${esc(s.name)}</strong></td>
+        <td>${esc(s.contact_person || '-')}</td>
+        <td>${esc(s.phone || '-')}</td>
+        <td>${esc(s.email || '-')}</td>
+        <td><span class="badge bg-info text-dark">${esc(s.supplier_type || '-')}</span></td>
         <td>${s.status === 'Inactive' ? '<span class="badge bg-secondary">Inactive</span>' : '<span class="badge bg-success">Active</span>'}</td>
         <td><span class="badge ${(receiptCounts[s.id] || 0) > 0 ? 'bg-primary' : 'bg-secondary'}">${receiptCounts[s.id] || 0}</span></td>
         <td class="text-end">
@@ -183,23 +175,15 @@ function renderSuppliers(data) {
             <button class="btn btn-sm btn-outline-danger" onclick="deleteSupplier(${s.id})"><i class="bi bi-trash"></i></button>
         </td>
     </tr>`).join('');
-    paginator.update(data.length);
+    DataTableManager.init('dataTable');
 }
 
 function filterSuppliers() {
-    const q = document.getElementById('supplierSearch').value.toLowerCase();
     const type = document.getElementById('typeFilter').value;
     const status = document.getElementById('statusFilter').value;
     let filtered = suppliers;
     if (type) filtered = filtered.filter(s => s.supplier_type === type);
     if (status) filtered = filtered.filter(s => s.status === status);
-    if (q) filtered = filtered.filter(s =>
-        s.name.toLowerCase().includes(q) ||
-        (s.contact_person && s.contact_person.toLowerCase().includes(q)) ||
-        (s.phone && s.phone.includes(q)) ||
-        (s.email && s.email.toLowerCase().includes(q))
-    );
-    if (paginator) paginator.currentPage = 1;
     renderSuppliers(filtered);
 }
 

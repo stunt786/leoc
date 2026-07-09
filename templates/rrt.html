@@ -26,7 +26,7 @@
     </div>
     <div class="card-body p-0">
         <div class="table-responsive">
-            <table class="table table-hover mb-0">
+            <table class="table table-hover mb-0" id="dataTable">
                 <thead>
                     <tr>
                         <th>Team Name</th>
@@ -43,10 +43,6 @@
                     <tr><td colspan="8" class="text-center py-4"><div class="spinner-border text-primary"></div></td></tr>
                 </tbody>
             </table>
-        </div>
-        <div class="d-flex justify-content-between align-items-center mt-2 px-2">
-            <small class="text-muted" id="tableInfo">0 records</small>
-            <nav><ul class="pagination pagination-sm mb-0" id="pagination"></ul></nav>
         </div>
     </div>
 </div>
@@ -174,8 +170,6 @@
 <script>
 const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 let records = [];
-let paginator = new Paginator({perPage: 25, onPageChange: () => renderTable(records)});
-
 function getVal(i, f) { return i[f] !== undefined && i[f] !== null && i[f] !== '' ? i[f] : 0; }
 function getText(i, f) { return i[f] || ''; }
 
@@ -197,14 +191,12 @@ function renderTable(data) {
     const tbody = document.getElementById('tableBody');
     if (data.length === 0) {
         tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-muted">No teams found</td></tr>';
-        paginator.update(0);
         return;
     }
-    const pageData = paginator.getPageData(data);
-    tbody.innerHTML = pageData.map(r => {
+    tbody.innerHTML = data.map(r => {
         const membersCount = r.members ? r.members.length : 0;
         const resourcesCount = r.resources ? r.resources.length : 0;
-        return `<tr>
+        return `<tr data-id="${r.id}">
             <td><strong>${getText(r, 'team_name')}</strong></td>
             <td><span class="badge bg-info">${getText(r, 'team_type')}</span></td>
             <td>${getText(r, 'coverage_area')}</td>
@@ -219,8 +211,7 @@ function renderTable(data) {
             </td>
         </tr>`;
     }).join('');
-    paginator.update(data.length);
-    document.getElementById('tableInfo').textContent = data.length + ' record(s)';
+    DataTableManager.init('dataTable');
 }
 
 function openForm() {

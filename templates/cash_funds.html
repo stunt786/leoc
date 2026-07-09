@@ -14,17 +14,13 @@
 <div class="card">
     <div class="card-body">
         <div class="table-responsive">
-            <table class="table table-hover align-middle" id="fundsTable">
+            <table class="table table-hover align-middle" id="dataTable">
                 <thead class="table-light"><tr>
                     <th>Fund No</th><th>Name</th><th>Fiscal Year</th><th>Source</th>
                     <th>Allocated</th><th>Balance</th><th>Status</th><th>Actions</th>
                 </tr></thead>
                 <tbody id="fundsBody"></tbody>
             </table>
-        </div>
-        <div class="d-flex justify-content-between align-items-center mt-2 px-2">
-            <small class="text-muted" id="tableInfo">0 records</small>
-            <nav><ul class="pagination pagination-sm mb-0" id="pagination"></ul></nav>
         </div>
     </div>
 </div>
@@ -75,25 +71,23 @@
 <script>
 const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 let _funds = [];
-let paginator = new Paginator({perPage: 25, onPageChange: () => renderFunds(_funds)});
 
 function renderFunds(data) {
     const t = document.getElementById('fundsBody');
-    if (data.length === 0) { t.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">No funds found</td></tr>'; paginator.update(0); return; }
-    const pageData = paginator.getPageData(data);
-    t.innerHTML = pageData.map(f => `<tr>
-        <td>${f.fund_no}</td><td><strong>${f.name}</strong></td><td>${f.fiscal_year || '-'}</td>
-        <td>${f.funding_source || '-'}</td>
+    if (data.length === 0) { t.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">No cash funds found</td></tr>'; return; }
+    t.innerHTML = data.map(f => `<tr data-id="${f.id}">
+        <td>${esc(f.fund_no)}</td><td><strong>${esc(f.name)}</strong></td><td>${esc(f.fiscal_year || '-')}</td>
+        <td>${esc(f.funding_source || '-')}</td>
         <td>${Number(f.allocated_amount).toLocaleString()}</td>
         <td><span class="fw-bold ${f.current_balance > 0 ? 'text-success' : 'text-muted'}">${Number(f.current_balance).toLocaleString()}</span></td>
-        <td><span class="badge ${f.status === 'Active' ? 'bg-success' : 'bg-secondary'}">${f.status}</span></td>
+        <td><span class="badge ${f.status === 'Active' ? 'bg-success' : 'bg-secondary'}">${esc(f.status)}</span></td>
         <td>
             <button class="btn btn-sm btn-outline-primary" onclick="viewFund(${f.id})" title="View"><i class="bi bi-eye"></i></button>
             <button class="btn btn-sm btn-outline-primary" onclick="editFund(${f.id})"><i class="bi bi-pencil"></i></button>
             <button class="btn btn-sm btn-outline-danger" onclick="deleteFund(${f.id})"><i class="bi bi-trash"></i></button>
         </td>
     </tr>`).join('');
-    paginator.update(data.length);
+    DataTableManager.init('dataTable');
 }
 
 async function loadFunds() {

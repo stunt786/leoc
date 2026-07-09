@@ -105,11 +105,10 @@
 <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
         <span><i class="bi bi-list-check me-2 text-primary"></i>Recent Dispatches</span>
-        <input type="text" class="form-control form-control-sm" style="width:200px" id="dispatchSearch" placeholder="Search..." oninput="filterDispatches()">
     </div>
     <div class="card-body p-0">
         <div class="table-responsive">
-            <table class="table table-hover mb-0">
+            <table class="table table-hover mb-0" id="dataTable">
                 <thead>
                     <tr>
                         <th>Dispatch #</th>
@@ -127,10 +126,6 @@
                     <tr><td colspan="9" class="text-center py-4"><div class="spinner-border text-primary"></div></td></tr>
                 </tbody>
             </table>
-        </div>
-        <div class="d-flex justify-content-between align-items-center mt-2 px-2">
-            <small class="text-muted" id="tableInfo">0 records</small>
-            <nav><ul class="pagination pagination-sm mb-0" id="pagination"></ul></nav>
         </div>
     </div>
 </div>
@@ -188,7 +183,6 @@ let inventoryMap = {};
 let isSaving = false;
 let pendingDispatchBody = null;
 let pendingDispatchIsEdit = false;
-let paginator = new Paginator({perPage: 25, onPageChange: () => renderDispatches(dispatches)});
 
 let warehouseList = [];
 
@@ -429,17 +423,15 @@ async function loadDispatches() {
 function renderDispatches(data) {
     const tbody = document.getElementById('dispatchTableBody');
     if (data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9" class="text-center py-4 text-muted">No dispatches found</td></tr>';
-        paginator.update(0);
+        tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-3">No records found</td></tr>';
         return;
     }
-    const pageData = paginator.getPageData(data);
-    tbody.innerHTML = pageData.map(dp => {
+    tbody.innerHTML = data.map(dp => {
         const itemsCount = dp.items ? dp.items.length : 0;
         const isCancelled = dp.status === 'Cancelled';
         const canEdit = !dp.has_distribution && !isCancelled;
         const canCancel = !dp.has_distribution && !isCancelled;
-        return `<tr class="${isCancelled ? 'table-danger' : ''}">
+        return `<tr data-id="${dp.id}" class="${isCancelled ? 'table-danger' : ''}">
             <td><strong>${dp.dispatch_number}</strong></td>
             <td>${dp.date ? new Date(dp.date).toLocaleDateString() : '-'}</td>
             <td>${dp.warehouse_name || '-'}</td>
@@ -460,18 +452,7 @@ function renderDispatches(data) {
             </td>
         </tr>`;
     }).join('');
-    paginator.update(data.length);
-}
-
-function filterDispatches() {
-    const q = document.getElementById('dispatchSearch').value.toLowerCase();
-    const filtered = dispatches.filter(d =>
-        (d.dispatch_number && d.dispatch_number.toLowerCase().includes(q)) ||
-        (d.destination && d.destination.toLowerCase().includes(q)) ||
-        (d.incident_name && d.incident_name.toLowerCase().includes(q))
-    );
-    if (paginator) paginator.currentPage = 1;
-    renderDispatches(filtered);
+    DataTableManager.init('dataTable');
 }
 
 let cancelModal = null;

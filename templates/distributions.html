@@ -162,11 +162,18 @@
 <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
         <span><i class="bi bi-list-check me-2 text-primary"></i>Recent Distributions</span>
-        <input type="text" class="form-control form-control-sm" style="width:200px" id="distSearch" placeholder="Search..." oninput="filterDistributions()">
+        <div>
+            <select class="form-select form-select-sm" style="width:160px" id="statusFilter" onchange="loadDistributions()">
+                <option value="">All Status</option>
+                <option value="Completed">Completed</option>
+                <option value="Pending">Pending</option>
+                <option value="Cancelled">Cancelled</option>
+            </select>
+        </div>
     </div>
     <div class="card-body p-0">
         <div class="table-responsive">
-            <table class="table table-hover mb-0">
+            <table class="table table-hover mb-0" id="dataTable">
                 <thead>
                     <tr>
                         <th>Distribution #</th>
@@ -183,10 +190,6 @@
                     <tr><td colspan="8" class="text-center py-4"><div class="spinner-border text-primary"></div></td></tr>
                 </tbody>
             </table>
-        </div>
-        <div class="d-flex justify-content-between align-items-center mt-2 px-2">
-            <small class="text-muted" id="tableInfo">0 records</small>
-            <nav><ul class="pagination pagination-sm mb-0" id="pagination"></ul></nav>
         </div>
     </div>
 </div>
@@ -225,7 +228,6 @@ let dispatchItemsCache = {};
 let dispatchDetailsCache = {};
 let dispatchRRMap = {};
 let beneficiaries = [];
-let paginator = new Paginator({perPage: 25, onPageChange: () => renderDistributions(distributions)});
 let benPickerModal = null;
 let isSaving = false;
 let reliefRequestCashMap = {};
@@ -474,9 +476,11 @@ function updateDispatchSummary(aggregated) {
     const tbody = document.getElementById('dispatchItemsSummaryBody');
     const keys = Object.keys(aggregated);
     if (keys.length === 0) {
+        DataTableManager.destroy('dataTable');
         tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-2">No items in selected dispatches</td></tr>';
         return;
     }
+    DataTableManager.destroy('dataTable');
     tbody.innerHTML = keys.map(name => `<tr data-item="${name}">
         <td>${name}</td>
         <td class="text-center dispatched-qty">${aggregated[name].dispatched_total}</td>
@@ -514,7 +518,7 @@ function addBeneficiaryRow(data) {
     data = data || {};
     const tbody = document.getElementById('beneficiaryBody');
     const placeholder = tbody.querySelector('tr td[colspan]');
-    if (placeholder) tbody.innerHTML = '';
+    if (placeholder) { DataTableManager.destroy('dataTable'); tbody.innerHTML = ''; }
 
     // Build aggregated item list from all selected dispatches
     const selectedIds = getSelectedDispatchIds();
@@ -675,9 +679,11 @@ function filterBenPicker() {
 function renderBenPicker(list) {
     const tbody = document.getElementById('benPickerBody');
     if (list.length === 0) {
+        DataTableManager.destroy('dataTable');
         tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">No beneficiaries found</td></tr>';
         return;
     }
+    DataTableManager.destroy('dataTable');
     tbody.innerHTML = list.map(b => `<tr>
         <td>${b.name}</td>
         <td>${b.father_name || '-'}</td>
@@ -897,7 +903,11 @@ async function importFromReliefRequest() {
 
 async function loadDistributions() {
     try {
-        const r = await fetch('/api/distributions');
+        const statusFilter = document.getElementById('statusFilter').value;
+        const params = new URLSearchParams();
+        if (statusFilter) params.set('status', statusFilter);
+        const url = '/api/distributions' + (params.toString() ? '?' + params.toString() : '');
+        const r = await fetch(url);
         if (!r.ok) { showToast('danger', 'Failed to load distributions'); return; }
         const d = await r.json();
         if (!d.success) { showToast('danger', d.message); return; }
@@ -912,11 +922,9 @@ function renderDistributions(data) {
     const tbody = document.getElementById('distributionTableBody');
     if (data.length === 0) {
         tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-muted">No distributions found</td></tr>';
-        paginator.update(0);
         return;
     }
-    const pageData = paginator.getPageData(data);
-    tbody.innerHTML = pageData.map(dist => {
+    tbody.innerHTML = data.map(dist => {
         const allBens = dist.beneficiaries || [];
         const uniqueFamilyNames = [...new Set(allBens.map(b => b.family_name).filter(Boolean))];
         const benCount = uniqueFamilyNames.length;
@@ -924,7 +932,7 @@ function renderDistributions(data) {
         const cashBadge = dist.cash_distribution
             ? `<span class="badge bg-success ms-1" title="Cash: ${Number(dist.cash_distribution.total_amount).toLocaleString()}"><i class="bi bi-cash-stack me-1"></i>Cash</span>`
             : '';
-        return `<tr>
+        return `<tr data-id="${dist.id}">
             <td><strong>${dist.distribution_no}${cashBadge}</strong></td>
             <td>${firstBenName}</td>
             <td>${dist.incident_name || '-'}</td>
@@ -938,19 +946,7 @@ function renderDistributions(data) {
             </td>
         </tr>`;
     }).join('');
-    paginator.update(data.length);
-}
-
-function filterDistributions() {
-    const q = document.getElementById('distSearch').value.toLowerCase();
-    const filtered = distributions.filter(d =>
-        (d.distribution_no && d.distribution_no.toLowerCase().includes(q)) ||
-        (d.dispatch_number && d.dispatch_number.toLowerCase().includes(q)) ||
-        (d.incident_name && d.incident_name.toLowerCase().includes(q)) ||
-        (d.location && d.location.toLowerCase().includes(q))
-    );
-    if (paginator) paginator.currentPage = 1;
-    renderDistributions(filtered);
+    DataTableManager.init('dataTable');
 }
 
 async function viewDistribution(id) {

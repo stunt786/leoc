@@ -73,7 +73,7 @@
     </div>
     <div class="card-body p-0">
         <div class="table-responsive">
-            <table class="table table-hover mb-0">
+            <table class="table table-hover mb-0" id="dataTable">
                 <thead>
                     <tr>
                         <th>Volunteer ID</th>
@@ -91,10 +91,6 @@
                     <tr><td colspan="9" class="text-center py-4"><div class="spinner-border text-primary"></div></td></tr>
                 </tbody>
             </table>
-        </div>
-        <div class="d-flex justify-content-between align-items-center mt-2 px-2">
-            <small class="text-muted" id="tableInfo">0 records</small>
-            <nav><ul class="pagination pagination-sm mb-0" id="pagination"></ul></nav>
         </div>
     </div>
 </div>
@@ -287,7 +283,6 @@ const SKILLS = ['First Aid', 'Search and Rescue', 'Fire Fighting', 'Logistics', 
 let volunteers = [];
 let wards = [];
 const wardMap = {};
-let paginator = new Paginator({perPage: 25, onPageChange: () => renderVolunteers()});
 
 function initWardMap() {
     {% for w in ward_list %}
@@ -300,21 +295,28 @@ async function loadData() {
         const ward = document.getElementById('wardFilter').value;
         const status = document.getElementById('statusFilter').value;
         const search = document.getElementById('searchInput').value;
-        const checkedSkills = SKILLS.filter(s => document.getElementById('skill_' + s.replace(/\s+/g, ''))?.checked)
-            .concat(SKILLS.filter(s => document.getElementById('skill' + s.replace(/\s+/g, ''))?.checked));
-        const skills = SKILLS.filter(s => document.getElementById('skill_' + s)?.checked || document.getElementById('skill' + s.replace(/\s+/g, ''))?.checked);
+        const skills = SKILLS.filter(s => {
+            const cb = document.getElementById('skill' + s.replace(/\s+/g, ''));
+            return cb && cb.checked;
+        });
 
         const params = new URLSearchParams();
         if (ward) params.set('ward_id', ward);
         if (status) params.set('status', status);
         if (search) params.set('search', search);
-        if (skills.length) params.set('skills', skills.join(','));
 
         const r = await fetch('/api/volunteers?' + params.toString());
         const d = await r.json();
         if (!d.success) { showToast('danger', d.message); return; }
         volunteers = d.data || d.volunteers || [];
-        if (paginator) paginator.currentPage = 1;
+
+        if (skills.length > 0) {
+            volunteers = volunteers.filter(v => {
+                const vSkills = v.skills || [];
+                return skills.every(s => vSkills.includes(s));
+            });
+        }
+
         renderVolunteers();
     } catch (e) {
         showToast('danger', 'Error loading volunteers: ' + e.message);
@@ -325,18 +327,16 @@ function renderVolunteers() {
     const tbody = document.getElementById('volunteerTableBody');
     if (volunteers.length === 0) {
         tbody.innerHTML = '<tr><td colspan="9" class="text-center py-4 text-muted">No volunteers found</td></tr>';
-        paginator.update(0);
         return;
     }
-    const pageData = paginator.getPageData(volunteers);
-    tbody.innerHTML = pageData.map(v => {
+    tbody.innerHTML = volunteers.map(v => {
         const skillsList = (v.skills || []).map(s =>
             '<span class="badge bg-info text-dark me-1">' + s + '</span>'
         ).join('');
         const statusBadge = v.availability_status === 'Available' ? 'bg-success' :
             v.availability_status === 'On Duty' ? 'bg-warning text-dark' : 'bg-secondary';
         const wardName = wardMap[v.ward_id] || '-';
-        return '<tr>' +
+        return '<tr data-id="' + v.id + '">' +
             '<td><strong>' + (v.volunteer_code || v.id) + '</strong></td>' +
             '<td>' + (v.name || '-') + '</td>' +
             '<td>' + (v.gender || '-') + '</td>' +
@@ -352,7 +352,7 @@ function renderVolunteers() {
             '</td>' +
             '</tr>';
     }).join('');
-    paginator.update(volunteers.length);
+    DataTableManager.init('dataTable');
 }
 
 function openForm() {

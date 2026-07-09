@@ -16,16 +16,12 @@
 <div class="card shadow-sm">
     <div class="card-body">
         <div class="table-responsive">
-            <table class="table table-hover align-middle" id="clusterTable">
+            <table class="table table-hover align-middle" id="dataTable">
                 <thead class="table-light"><tr>
                     <th>Cluster Name</th><th>Lead Organization</th><th>Focal Person</th><th>Contact</th><th>Members</th><th>Actions</th>
                 </tr></thead>
                 <tbody id="clusterBody"></tbody>
             </table>
-        </div>
-        <div class="d-flex justify-content-between align-items-center mt-2 px-2">
-            <small class="text-muted" id="tableInfo">0 records</small>
-            <nav><ul class="pagination pagination-sm mb-0" id="pagination"></ul></nav>
         </div>
     </div>
 </div>
@@ -253,20 +249,18 @@
 <script>
 function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-let paginator = new Paginator({perPage: 25, onPageChange: () => renderClusters(_clusters)});
 let _clusters = [];
 let currentMeetingsClusterId = null;
 let currentDeploymentsClusterId = null;
 
 function renderClusters(data) {
     const t = document.getElementById('clusterBody');
-    if (data.length === 0) { t.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">No clusters found</td></tr>'; paginator.update(0); return; }
-    const pageData = paginator.getPageData(data);
-    t.innerHTML = pageData.map(c => `<tr>
-        <td><strong>${c.cluster_name}</strong></td>
-        <td>${c.lead_organization || '-'}</td>
-        <td>${c.focal_person || '-'}</td>
-        <td>${c.contact_details || '-'}</td>
+    if (data.length === 0) { t.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">No clusters found</td></tr>'; return; }
+    t.innerHTML = data.map(c => `<tr data-id="${c.id}">
+        <td><strong>${esc(c.cluster_name)}</strong></td>
+        <td>${esc(c.lead_organization || '-')}</td>
+        <td>${esc(c.focal_person || '-')}</td>
+        <td>${esc(c.contact_details || '-')}</td>
         <td>${(c.members && c.members.length) || 0}</td>
         <td>
             <button class="btn btn-sm btn-primary" onclick="viewRecord(${c.id})" title="View"><i class="bi bi-eye me-1"></i>View</button>
@@ -276,7 +270,7 @@ function renderClusters(data) {
             <button class="btn btn-sm btn-outline-danger" onclick="deleteRecord(${c.id})" title="Delete"><i class="bi bi-trash"></i></button>
         </td>
     </tr>`).join('');
-    paginator.update(data.length);
+    DataTableManager.init('dataTable');
 }
 
 async function loadData() {
@@ -452,9 +446,11 @@ async function openMeetings(clusterId) {
         const meetings = d.data || [];
         const tbody = document.getElementById('meetingsBody');
         if (meetings.length === 0) {
+            DataTableManager.destroy('dataTable');
             tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No meetings recorded</td></tr>';
         } else {
-            tbody.innerHTML = meetings.map(m => `<tr>
+            DataTableManager.destroy('dataTable');
+            tbody.innerHTML = meetings.map(m => `<tr
                 <td>${m.meeting_date || '-'}</td>
                 <td>${m.agenda || '-'}</td>
                 <td>${m.decisions || '-'}</td>
@@ -505,9 +501,11 @@ async function openDeployments(clusterId) {
         const deployments = d.data || [];
         const tbody = document.getElementById('deploymentsBody');
         if (deployments.length === 0) {
+            DataTableManager.destroy('dataTable');
             tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No deployments recorded</td></tr>';
         } else {
-            tbody.innerHTML = deployments.map(dp => `<tr>
+            DataTableManager.destroy('dataTable');
+            tbody.innerHTML = deployments.map(dp => `<tr
                 <td>${dp.deployment_date || '-'}</td>
                 <td>${dp.location || '-'}</td>
                 <td>${dp.details || '-'}</td>

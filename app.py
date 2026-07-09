@@ -4814,6 +4814,7 @@ def handle_distributions():
             incident_id = request.args.get('incident_id', type=int)
             fiscal_year = request.args.get('fiscal_year')
             ward = request.args.get('ward', type=int)
+            status = request.args.get('status')
             query = Distribution.query.order_by(Distribution.distribution_date.desc())
             if incident_id:
                 query = query.filter(Distribution.incident_id == incident_id)
@@ -4821,6 +4822,8 @@ def handle_distributions():
                 query = query.filter(Distribution.fiscal_year == fiscal_year)
             if ward:
                 query = query.join(Incident).filter(Incident.ward == ward)
+            if status:
+                query = query.filter(Distribution.status == status)
             distributions = query.all()
             return jsonify({'success': True, 'distributions': [d.to_dict() for d in distributions]})
         except Exception as e:

@@ -14,14 +14,10 @@
 <div class="card">
     <div class="card-body">
         <div class="table-responsive">
-            <table class="table table-hover" id="warehouseTable">
+            <table class="table table-hover" id="dataTable">
                 <thead><tr><th>Code</th><th>Name</th><th>Address</th><th>Contact Person</th><th>Phone</th><th>Capacity</th><th>Total Items</th><th class="text-end">Actions</th></tr></thead>
                 <tbody id="tableBody"><tr class="text-center"><td colspan="8"><div class="spinner-border text-primary"></div></td></tr></tbody>
             </table>
-        </div>
-        <div class="d-flex justify-content-between align-items-center mt-2 px-2">
-            <small class="text-muted" id="tableInfo">0 records</small>
-            <nav><ul class="pagination pagination-sm mb-0" id="pagination"></ul></nav>
         </div>
     </div>
 </div>
@@ -82,25 +78,22 @@
 <script>
 let editId = null;
 let _warehouses = [];
-let paginator = new Paginator({perPage: 25, onPageChange: () => renderWarehouses(_warehouses)});
 
 function renderWarehouses(data) {
     const tbody = document.getElementById('tableBody');
     if (data.length === 0) {
-        tbody.innerHTML = '<tr class="text-center"><td colspan="8" class="py-4 text-muted">No warehouses found</td></tr>';
-        paginator.update(0);
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">No warehouses found</td></tr>';
         return;
     }
-    const pageData = paginator.getPageData(data);
-    tbody.innerHTML = pageData.map(w => `<tr>
-        <td>${w.code || ''}</td><td>${w.name}</td><td>${w.address || ''}</td>
-        <td>${w.contact_person || ''}</td><td>${w.phone || ''}</td>
+    tbody.innerHTML = data.map(w => `<tr data-id="${w.id}">
+        <td>${esc(w.code || '')}</td><td>${esc(w.name)}</td><td>${esc(w.address || '')}</td>
+        <td>${esc(w.contact_person || '')}</td><td>${esc(w.phone || '')}</td>
         <td>${w.capacity || 0}</td><td>${w.total_items}</td>
         <td class="text-end">
             <button class="btn btn-sm btn-outline-primary" onclick="editWarehouse(${w.id})"><i class="bi bi-pencil"></i></button>
             <button class="btn btn-sm btn-outline-danger" onclick="deleteWarehouse(${w.id})"><i class="bi bi-trash"></i></button>
         </td></tr>`).join('');
-    paginator.update(data.length);
+    DataTableManager.init('dataTable');
 }
 
 async function loadWarehouses() {

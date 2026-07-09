@@ -105,10 +105,6 @@
                 <input type="text" class="form-control nepali-date" id="filterToDate" placeholder="YYYY-MM-DD" onchange="loadInventory()">
             </div>
             <div class="col-md-3">
-                <label class="form-label">Search</label>
-                <input type="text" class="form-control" id="filterSearch" placeholder="Search item name..." oninput="debounceSearch()">
-            </div>
-            <div class="col-md-3">
                 <label class="form-label">Item (for Bin Card)</label>
                 <select class="form-select" id="filterItem">
                     <option value="">Select item...</option>
@@ -165,7 +161,7 @@
     </div>
     <div class="card-body p-0">
         <div class="table-responsive">
-            <table class="table table-hover mb-0">
+            <table class="table table-hover mb-0" id="dataTable">
                 <thead>
                     <tr>
                         <th>Item Code</th>
@@ -186,10 +182,6 @@
                 </tbody>
             </table>
         </div>
-        <div class="d-flex justify-content-between align-items-center mt-2 px-2">
-            <small class="text-muted" id="tableInfo">0 records</small>
-            <nav><ul class="pagination pagination-sm mb-0" id="pagination"></ul></nav>
-        </div>
     </div>
     <div class="card-footer d-flex justify-content-between align-items-center">
         <small class="text-muted" id="inventoryCount">Loading...</small>
@@ -205,7 +197,6 @@ let refreshInterval;
 let items = [];
 let warehouses = [];
 let _inventory = [];
-let paginator = new Paginator({perPage: 25, onPageChange: () => renderInventory(_inventory)});
 
 function statusBadge(status) {
     const map = {
@@ -255,14 +246,12 @@ async function loadFormData() {
 function renderInventory(data) {
     const tbody = document.getElementById('inventoryTableBody');
     if (data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="11" class="text-center py-4 text-muted">No inventory records found</td></tr>';
-        paginator.update(0);
+        tbody.innerHTML = '<tr><td colspan="11" class="text-center text-muted py-3">No records found</td></tr>';
         return;
     }
-    const pageData = paginator.getPageData(data);
-    tbody.innerHTML = pageData.map(item => {
+    tbody.innerHTML = data.map(item => {
         const expiryIcon = item.expiry_tracking ? '<i class="bi bi-calendar-check text-warning ms-1" title="Expiry tracking enabled"></i>' : '';
-        return `<tr>
+        return `<tr data-id="${item.id}">
             <td><span class="badge bg-light text-dark">${item.item_code || '-'}</span></td>
             <td><span class="text-muted small">${item.barcode || '-'}</span></td>
             <td class="fw-medium">${item.item_name}${expiryIcon}</td>
@@ -276,7 +265,7 @@ function renderInventory(data) {
             <td>${statusBadge(item.status)}</td>
         </tr>`;
     }).join('');
-    paginator.update(data.length);
+    DataTableManager.init('dataTable');
 }
 
 async function loadInventory() {
@@ -287,7 +276,6 @@ async function loadInventory() {
         const fromDate = document.getElementById('filterFromDate').value;
         const toDate = document.getElementById('filterToDate').value;
         const status = document.getElementById('filterStatus').value;
-        const search = document.getElementById('filterSearch').value;
 
         const params = new URLSearchParams();
         if (warehouse) params.append('warehouse_id', warehouse);
@@ -296,7 +284,6 @@ async function loadInventory() {
         if (fromDate) params.append('from_date', fromDate);
         if (toDate) params.append('to_date', toDate);
         if (status) params.append('status', status);
-        if (search) params.append('search', search);
 
         params.set('grouped', '1');
         const r = await fetch(`/api/inventory?${params.toString()}`);
@@ -320,12 +307,6 @@ async function loadSummary() {
         document.getElementById('outOfStockCount').textContent = d.out_of_stock;
         document.getElementById('expiringCount').textContent = d.expiring_count;
     } catch (e) { showToast('danger', 'Error loading summary: ' + e.message); }
-}
-
-let searchTimeout;
-function debounceSearch() {
-    clearTimeout(searchTimeout);
-    searchTimeout = setTimeout(loadInventory, 400);
 }
 
 function printBinCard() {

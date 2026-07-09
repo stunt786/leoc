@@ -18,17 +18,13 @@
 <div class="card shadow-sm">
     <div class="card-body">
         <div class="table-responsive">
-            <table class="table table-hover align-middle" id="benTable">
+            <table class="table table-hover align-middle" id="dataTable">
                 <thead class="table-light"><tr>
                     <th>Name</th><th>National ID</th><th>Phone</th><th>Address</th>
                     <th>Ward</th><th>Family</th><th>Actions</th>
                 </tr></thead>
                 <tbody id="benBody"></tbody>
             </table>
-        </div>
-        <div class="d-flex justify-content-between align-items-center mt-2 px-2">
-            <small class="text-muted" id="tableInfo">0 records</small>
-            <nav><ul class="pagination pagination-sm mb-0" id="pagination"></ul></nav>
         </div>
     </div>
 </div>
@@ -314,7 +310,7 @@
 <script>
 const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 let _beneficiaries = [];
-let paginator = new Paginator({perPage: 25, onPageChange: () => renderBeneficiaries(_beneficiaries)});
+
 
 function updateFamilyMembersJson() {
     const members = [];
@@ -490,14 +486,13 @@ document.getElementById('benPhone').addEventListener('input', debouncedCheck);
 
 function renderBeneficiaries(data) {
     const t = document.getElementById('benBody');
-    if (data.length === 0) { t.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">No beneficiaries found</td></tr>'; paginator.update(0); return; }
-    const pageData = paginator.getPageData(data);
-    t.innerHTML = pageData.map(b => `<tr>
-        <td><strong>${b.name}</strong></td>
-        <td>${b.national_id || '-'}</td>
-        <td>${b.phone || '-'}</td>
-        <td>${b.address || ''}${b.ward ? ', '+b.ward_name : ''}</td>
-        <td>${b.ward_name || b.ward || '-'}</td>
+    if (data.length === 0) { t.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">No beneficiaries found</td></tr>'; return; }
+    t.innerHTML = data.map(b => `<tr data-id="${b.id}">
+        <td><strong>${esc(b.name)}</strong></td>
+        <td>${esc(b.national_id || '-')}</td>
+        <td>${esc(b.phone || '-')}</td>
+        <td>${esc(b.address || '')}${b.ward ? ', '+esc(b.ward_name) : ''}</td>
+        <td>${esc(b.ward_name || b.ward || '-')}</td>
         <td>${b.family_members || 0}</td>
         <td>
             <button class="btn btn-sm btn-outline-info" onclick="showHistory(${b.id})" title="Assistance History"><i class="bi bi-clock-history"></i></button>
@@ -505,7 +500,7 @@ function renderBeneficiaries(data) {
             <button class="btn btn-sm btn-outline-danger" onclick="deleteBen(${b.id})"><i class="bi bi-trash"></i></button>
         </td>
     </tr>`).join('');
-    paginator.update(data.length);
+    DataTableManager.init('dataTable');
 }
 
 async function loadBeneficiaries() {
@@ -678,8 +673,10 @@ async function showHistory(id) {
     `;
     const events = d.events || [];
     if (events.length === 0) {
+        DataTableManager.destroy('dataTable');
         document.getElementById('historyBody').innerHTML = '<tr><td colspan="4" class="text-center text-muted">No assistance history</td></tr>';
     } else {
+        DataTableManager.destroy('dataTable');
         document.getElementById('historyBody').innerHTML = events.map(e => {
             const cls = e.type === 'Cash' ? 'text-success' : 'text-primary';
             const icon = e.type === 'Cash' ? 'bi bi-cash' : 'bi bi-box';

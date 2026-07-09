@@ -500,6 +500,8 @@ function printData(title) {
   const table = document.getElementById('dataTable') || document.querySelector('table');
   if (!table) { showToast('danger', 'No data table found to print'); return; }
   const cleanTable = stripActionsColumn(table);
+  cleanTable.querySelectorAll('tbody tr').forEach(tr => { tr.style.display = ''; });
+  cleanTable.querySelectorAll('th, td').forEach(c => { c.style.width = ''; });
   const win = window.open('', '_blank');
   win.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">');
   win.document.write('<title>' + (title || 'Data Report') + '</title>');

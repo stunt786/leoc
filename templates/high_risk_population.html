@@ -40,16 +40,13 @@
 <div class="card shadow-sm">
     <div class="card-body">
         <div class="table-responsive">
-            <table class="table table-hover align-middle" id="hrTable">
+            <table class="table table-hover align-middle" id="dataTable">
                 <thead class="table-light"><tr>
                     <th>Name</th><th>Age</th><th>Gender</th><th>Category</th>
                     <th>Ward</th><th>Contact</th><th>Health Condition</th><th>Health Facility</th><th>Actions</th>
                 </tr></thead>
                 <tbody id="hrBody"></tbody>
             </table>
-        </div>
-        <div class="d-flex justify-content-between align-items-center mt-2 px-2">
-            <small class="text-muted" id="tableInfo">0 records</small>
         </div>
     </div>
 </div>
@@ -199,10 +196,9 @@ async function loadData() {
         const t = document.getElementById('hrBody');
         if (data.length === 0) {
             t.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-3">No records found</td></tr>';
-            document.getElementById('tableInfo').textContent = '0 records';
             return;
         }
-        t.innerHTML = data.map(p => `<tr>
+        t.innerHTML = data.map(p => `<tr data-id="${p.id}">
             <td><strong>${p.person_name}</strong></td>
             <td>${p.age ?? '-'}</td>
             <td>${p.gender || '-'}</td>
@@ -217,7 +213,7 @@ async function loadData() {
                 <button class="btn btn-sm btn-outline-danger" onclick="deleteRecord(${p.id})" title="Delete"><i class="bi bi-trash"></i></button>
             </td>
         </tr>`).join('');
-        document.getElementById('tableInfo').textContent = data.length + ' record' + (data.length !== 1 ? 's' : '');
+        DataTableManager.init('dataTable');
     } catch(e) {
         showToast('danger', 'Error loading data: ' + e.message);
     }
@@ -329,8 +325,9 @@ document.getElementById('hrForm').addEventListener('submit', async function(e) {
         const r = await fetch(url, {method, headers: {'Content-Type':'application/json','X-CSRFToken':csrf}, body: JSON.stringify(body)});
         const d = await r.json();
         if (d.success) {
-            showToast('success', id ? 'Record updated successfully' : 'Record created successfully');
-            bootstrap.Modal.getInstance(document.getElementById('hrModal')).hide();
+            showToast('success', id ? 'Record updated' : 'Record created');
+            var hrModal = bootstrap.Modal.getInstance(document.getElementById('hrModal'));
+            hrModal.hide();
             loadData();
         } else {
             showToast('danger', d.message);

@@ -25,7 +25,7 @@
     </div>
     <div class="card-body p-0">
         <div class="table-responsive">
-            <table class="table table-hover mb-0">
+            <table class="table table-hover mb-0" id="dataTable">
                 <thead>
                     <tr>
                         <th>Committee Name</th>
@@ -41,10 +41,6 @@
                     <tr><td colspan="7" class="text-center py-4"><div class="spinner-border text-primary"></div></td></tr>
                 </tbody>
             </table>
-        </div>
-        <div class="d-flex justify-content-between align-items-center mt-2 px-2">
-            <small class="text-muted" id="tableInfo">0 records</small>
-            <nav><ul class="pagination pagination-sm mb-0" id="pagination"></ul></nav>
         </div>
     </div>
 </div>
@@ -211,8 +207,6 @@
 const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 let committees = [];
 let currentMeetingCommitteeId = null;
-let paginator = new Paginator({perPage: 25, onPageChange: () => renderData(committees)});
-
 async function loadData() {
     const q = document.getElementById('searchInput').value;
     const url = '/api/committees' + (q ? '?search=' + encodeURIComponent(q) : '');
@@ -233,11 +227,9 @@ function renderData(data) {
     const tbody = document.getElementById('committeeTableBody');
     if (data.length === 0) {
         tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-muted">No committees found</td></tr>';
-        paginator.update(0);
         return;
     }
-    const pageData = paginator.getPageData(data);
-    tbody.innerHTML = pageData.map(c => `<tr>
+    tbody.innerHTML = data.map(c => `<tr data-id="${c.id}">
         <td><strong>${esc(c.committee_name)}</strong></td>
         <td><span class="badge bg-info">${esc(c.committee_type)}</span></td>
         <td>${esc(c.formation_date) || '-'}</td>
@@ -251,7 +243,7 @@ function renderData(data) {
             <button class="btn btn-sm btn-outline-danger" onclick="deleteRecord(${c.id})" title="Delete"><i class="bi bi-trash"></i></button>
         </td>
     </tr>`).join('');
-    paginator.update(data.length);
+    DataTableManager.init('dataTable');
 }
 
 let memberCounter = 0;
@@ -395,8 +387,13 @@ async function saveRecord() {
         const d = await r.json();
         if (d.success) {
             showToast('success', id ? 'Committee updated' : 'Committee created');
-            bootstrap.Modal.getInstance(document.getElementById('committeeModal')).hide();
-            loadData();
+            var comModalEl = document.getElementById('committeeModal');
+            var comModal = bootstrap.Modal.getInstance(comModalEl);
+            comModal.hide();
+            comModalEl.addEventListener('hidden.bs.modal', function comRefresh() {
+                comModalEl.removeEventListener('hidden.bs.modal', comRefresh);
+                loadData();
+            });
         } else {
             showToast('danger', d.message);
         }

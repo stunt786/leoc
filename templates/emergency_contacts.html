@@ -197,7 +197,8 @@ async function loadData() {
   if (!d.success) { tbody.innerHTML = '<tr><td colspan="8" class="text-center text-danger">' + (d.message || 'Error loading data') + '</td></tr>'; return; }
   const data = d.data || d.contacts || [];
   if(data.length === 0) { tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">No emergency contacts found</td></tr>'; return; }
-  tbody.innerHTML = data.map(item => `<tr>
+  tbody.innerHTML = data.map(item =>
+    `<tr data-id="${item.id}">
     <td>${item.organization_name || '-'}</td>
     <td>${item.contact_person || '-'}</td>
     <td>${item.designation || '-'}</td>
@@ -212,6 +213,7 @@ async function loadData() {
       <button class="btn btn-sm btn-outline-danger" onclick="deleteRecord(${item.id})" title="Delete"><i class="bi bi-trash"></i></button>
     </td>
   </tr>`).join('');
+  DataTableManager.init('dataTable');
 }
 
 function dial(number) {

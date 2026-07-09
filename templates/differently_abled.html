@@ -28,17 +28,13 @@
 <div class="card shadow-sm">
     <div class="card-body">
         <div class="table-responsive">
-            <table class="table table-hover align-middle" id="daTable">
+            <table class="table table-hover align-middle" id="dataTable">
                 <thead class="table-light"><tr>
                     <th>Name</th><th>Gender</th><th>Age</th><th>Ward</th><th>Contact</th>
                     <th>Disabilities</th><th>Caregiver</th><th>Actions</th>
                 </tr></thead>
                 <tbody id="daBody"></tbody>
             </table>
-        </div>
-        <div class="d-flex justify-content-between align-items-center mt-2 px-2">
-            <small class="text-muted" id="tableInfo">0 records</small>
-            <nav><ul class="pagination pagination-sm mb-0" id="pagination"></ul></nav>
         </div>
     </div>
 </div>
@@ -208,13 +204,10 @@ function initWardMap() {
 
 function renderTable(data) {
     const tbody = document.getElementById('daBody');
-    const info = document.getElementById('tableInfo');
     if (data.length === 0) {
         tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">No records found</td></tr>';
-        info.textContent = '0 records';
         return;
     }
-    info.textContent = data.length + ' record' + (data.length !== 1 ? 's' : '');
     tbody.innerHTML = data.map(r => {
         const disabilities = [];
         if (r.physical_disability) disabilities.push('Physical');
@@ -222,7 +215,7 @@ function renderTable(data) {
         if (r.hearing_disability) disabilities.push('Hearing');
         if (r.intellectual_disability) disabilities.push('Intellectual');
         if (r.multiple_disability) disabilities.push('Multiple');
-        return `<tr>
+        return `<tr data-id="${r.id}">
             <td><strong>${r.person_name}</strong></td>
             <td>${r.gender || '-'}</td>
             <td>${r.age || '-'}</td>
@@ -237,6 +230,7 @@ function renderTable(data) {
             </td>
         </tr>`;
     }).join('');
+    DataTableManager.init('dataTable');
 }
 
 async function loadData() {
@@ -378,8 +372,9 @@ document.getElementById('daForm').addEventListener('submit', async function(e) {
         const r = await fetch(url, {method, headers:{'Content-Type':'application/json','X-CSRFToken':csrf}, body: JSON.stringify(body)});
         const d = await r.json();
         if (d.success) {
-            showToast('success', d.message);
-            bootstrap.Modal.getInstance(document.getElementById('daModal')).hide();
+            showToast('success', id ? 'Record updated' : 'Record created');
+            var daModal = bootstrap.Modal.getInstance(document.getElementById('daModal'));
+            daModal.hide();
             loadData();
         } else {
             showToast('danger', d.message);

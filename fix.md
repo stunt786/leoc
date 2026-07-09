@@ -6,18 +6,21 @@
 username: thalaramun
 password: thalaraMUN@3
  
-application location directory: /leoc
+application location directory: /home/thalaramun/leoc
 **Aplication is using docker on port 5002, and requires sudo access for any changes on server so always use sudo with docker commands
 docker containers: leoc-app & leoc-db
 
 ## Migration
 **First backup existing app with db
-**Check existing code base both frontend and db
 **Only mirate new files/changed files and db changes only, keeping existing data. 
 **Make proper backup and test the migration on a staging environment before applying to production
 **Fix any issues that arises while migrating with existing data.. the existing data should properly work with new files and db withpout any issues.
 
+#latest changes files
+app.py
+templates/weekly_forecast.html
+templates/weekly_forecast_print.html
+templates/login.html
 
-
-##Live Server Setting Page
-** The app settings page has danger-zone to delete all data, disable that feature in live production server.
+#Db changes
+new suggestion column to weekly_forecast table
