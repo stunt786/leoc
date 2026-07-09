@@ -3292,10 +3292,10 @@ def manage_supplier(id):
         return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
     try:
         if request.method == 'DELETE':
-            linked_receipts = StockReceipt.query.filter_by(supplier_id=sup.id).count()
+            linked_receipts = StockReceipt.query.filter_by(supplier_id=supplier.id).count()
             if linked_receipts > 0:
-                return jsonify({'success': False, 'message': f'Cannot delete supplier "{sup.name}" because {linked_receipts} stock receipt(s) are linked to it. Remove or reassign those receipts first.'}), 400
-            db.session.delete(sup)
+                return jsonify({'success': False, 'message': f'Cannot delete supplier "{supplier.name}" because {linked_receipts} stock receipt(s) are linked to it. Remove or reassign those receipts first.'}), 400
+            db.session.delete(supplier)
             db.session.commit()
             return jsonify({'success': True, 'message': 'Supplier deleted'})
         data = request.get_json()
@@ -3303,30 +3303,30 @@ def manage_supplier(id):
             name = (data.get('name') or '').strip()
             if not name:
                 return jsonify({'success': False, 'message': 'Supplier name is required'}), 400
-            sup.name = name
+            supplier.name = name
         if 'phone' in data:
             phone = (data.get('phone') or '').strip() or None
             if phone and not validate_phone(phone):
                 return jsonify({'success': False, 'message': 'Phone number format is invalid'}), 400
             if phone:
                 existing = Supplier.query.filter_by(phone=phone).first()
-                if existing and existing.id != sup.id:
+                if existing and existing.id != supplier.id:
                     return jsonify({'success': False, 'message': 'A supplier with this phone number already exists'}), 400
-            sup.phone = phone
+            supplier.phone = phone
         if 'email' in data:
             email = (data.get('email') or '').strip() or None
             if email and not re.match(r'^[^\s@]+@[^\s@]+\.[^\s@]+$', email):
                 return jsonify({'success': False, 'message': 'Email format is invalid'}), 400
             if email:
                 existing = Supplier.query.filter_by(email=email).first()
-                if existing and existing.id != sup.id:
+                if existing and existing.id != supplier.id:
                     return jsonify({'success': False, 'message': 'A supplier with this email already exists'}), 400
-            sup.email = email
+            supplier.email = email
         for field in ['contact_person', 'address', 'supplier_type', 'status', 'remarks']:
             if field in data:
-                setattr(sup, field, data[field])
+                setattr(supplier, field, data[field])
         db.session.commit()
-        return jsonify({'success': True, 'message': 'Supplier updated', 'data': sup.to_dict()})
+        return jsonify({'success': True, 'message': 'Supplier updated', 'data': supplier.to_dict()})
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': friendly_message(e)}), 500
