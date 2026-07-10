@@ -356,7 +356,9 @@ function printPreview() {
     const type = document.getElementById('reportType').value;
     if (!type) return;
     const params = getFilterParams();
-    window.open(`/print-report/${type}${params ? '?' + params : ''}`, '_blank');
+    const qs = params || '';
+    const auto = type !== 'incident-summary' ? (qs ? '&auto=1' : 'auto=1') : '';
+    window.open(`/print-report/${type}${qs ? '?' + qs + auto : auto ? '?' + auto : ''}`, '_blank');
 }
 
 document.addEventListener('DOMContentLoaded', async function() {
