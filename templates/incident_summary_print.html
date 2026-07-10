@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="ne">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Incident Summary - {{ start_bs }}{% if start_bs != end_bs %} to {{ end_bs }}{% endif %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <style>
+        @font-face {
+            font-family: 'Kokila';
+            src: url('{{ url_for("static", filename="fonts/Kokila-Regular.ttf") }}') format('truetype');
+            font-weight: 400;
+            font-style: normal;
+            font-display: swap;
+        }
+        @font-face {
+            font-family: 'Kokila';
+            src: url('{{ url_for("static", filename="fonts/Kokila-Regular.ttf") }}') format('truetype');
+            font-weight: 700;
+            font-style: normal;
+            font-display: swap;
+        }
+        @font-face {
+            font-family: 'Noto Sans';
+            src: url('{{ url_for("static", filename="fonts/NotoSans-Regular.ttf") }}') format('truetype');
+            font-weight: 400;
+            font-style: normal;
+            font-display: swap;
+        }
+        @font-face {
+            font-family: 'Noto Sans';
+            src: url('{{ url_for("static", filename="fonts/NotoSans-Bold.ttf") }}') format('truetype');
+            font-weight: 700;
+            font-style: normal;
+            font-display: swap;
+        }
+        @font-face {
+            font-family: 'Noto Sans Devanagari';
+            src: url('{{ url_for("static", filename="fonts/NotoSansDevanagari-Regular.ttf") }}') format('truetype');
+            font-weight: 400;
+            font-style: normal;
+            font-display: swap;
+        }
+        @font-face {
+            font-family: 'Noto Sans Devanagari';
+            src: url('{{ url_for("static", filename="fonts/NotoSansDevanagari-Bold.ttf") }}') format('truetype');
+            font-weight: 700;
+            font-style: normal;
+            font-display: swap;
+        }
+
+        @page { size: A4 landscape; margin: 5mm; }
+
+        @media print {
+            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .no-print { display: none !important; }
+            .container { width: 100%; max-width: none; padding: 0; }
+            .report-content { page-break-inside: avoid; }
+            canvas { max-height: 180px; }
+        }
+
+        body {
+            font-family: 'Noto Sans', 'Kokila', 'Noto Sans Devanagari', 'Segoe UI', sans-serif;
+            font-size: 11pt;
+            line-height: 1.4;
+            color: #333;
+            background: white;
+        }
+
+        .report-header {
+            position: relative;
+            text-align: center;
+            border-bottom: 2px double #1a472a;
+            padding-bottom: 5px;
+            margin-bottom: 10px;
+            min-height: 80px;
+        }
+
+        .report-header img {
+            position: absolute;
+            left: 5px;
+            top: 0;
+            height: 65px;
+            width: auto;
+        }
+
+        .report-header h1 { color: #d32f2f; font-size: 22pt; font-weight: bold; margin: 0; line-height: 1.1; }
+        .report-header h2 { color: #1a472a; font-size: 14pt; margin: 2px 0; font-weight: bold; }
+        .report-header h3 { color: #1a472a; font-size: 13pt; margin: 1px 0; font-weight: 500; }
+        .report-header h4 { color: #2c5282; font-size: 13pt; margin: 2px 0; font-weight: bold; }
+        .report-header h5 {
+            color: #2c5282; font-size: 14pt; margin-top: 5px;
+            text-decoration: underline; font-weight: bold;
+        }
+
+        .report-meta {
+            display: flex; justify-content: space-between;
+            margin-bottom: 10px; padding: 5px 10px;
+            background-color: #f8f9fa; border-radius: 5px; font-size: 11pt;
+        }
+
+        .section-title {
+            background-color: #2c5282; color: white; padding: 5px 10px;
+            font-weight: bold; font-size: 12pt; margin-bottom: 5px; border-radius: 3px;
+        }
+        .section-title.brown { background-color: #744210; }
+        .section-title.gray { background-color: #4a5568; }
+        .section-title.green { background-color: #059669; }
+        .section-title.purple { background: linear-gradient(135deg, #7c3aed, #4f46e5); }
+
+        .stats-cards {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 4px;
+            margin-bottom: 15px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #4338ca 0%, #6d28d9 100%);
+            color: white; padding: 10px 5px; border-radius: 8px;
+            display: flex; flex-direction: column; align-items: center;
+            justify-content: center; overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            min-height: 80px; position: relative;
+        }
+        .stat-card.danger { background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%); }
+        .stat-card.warning { background: linear-gradient(135deg, #d97706 0%, #92400e 100%); }
+        .stat-card.success { background: linear-gradient(135deg, #059669 0%, #065f46 100%); }
+        .stat-card.info { background: linear-gradient(135deg, #0284c7 0%, #075985 100%); }
+        .stat-card.dark { background: linear-gradient(135deg, #475569 0%, #1e293b 100%); }
+        .stat-card.brown { background: linear-gradient(135deg, #6b4226 0%, #a0522d 100%); }
+
+        .stat-card i { position: absolute; top: 7px; left: 7px; font-size: 12pt; opacity: 0.7; }
+
+        .stat-info {
+            display: flex; flex-direction: column; justify-content: center;
+            align-items: center; width: 100%; text-align: center; padding-top: 5px;
+        }
+        .stat-card .number { font-size: 20pt; font-weight: 800; line-height: 1.1; }
+        .stat-card .label {
+            font-size: 12pt; font-weight: 700; line-height: 1.3;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            width: 100%; opacity: 0.95; margin-top: 2px;
+        }
+
+        .charts-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        .chart-box {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 8px;
+        }
+        .chart-box h6 {
+            text-align: center;
+            font-size: 11pt;
+            font-weight: 700;
+            color: #1e293b;
+            margin-bottom: 5px;
+        }
+        .chart-box canvas {
+            width: 100% !important;
+            max-height: 170px;
+        }
+
+        .data-table { width: 100%; border-collapse: collapse; font-size: 10pt; margin-bottom: 10px; }
+
+        .data-table th {
+            background-color: #2c5282; color: white; padding: 5px 4px;
+            text-align: center; font-weight: bold; border: 1px solid #1a365d;
+            font-size: 10pt;
+        }
+        .data-table th.brown { background-color: #744210; border-color: #553c0d; }
+
+        .data-table td {
+            padding: 4px 4px; text-align: center; border: 1px solid #cbd5e0;
+            vertical-align: middle; font-size: 10pt;
+        }
+        .data-table tr:nth-child(even) { background-color: #f7fafc; }
+        .data-table tr.total-row { background-color: #e2e8f0; font-weight: bold; }
+
+        .infrastructure-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        .infrastructure-item {
+            display: flex; align-items: center; padding: 5px;
+            background-color: #f7fafc; border-radius: 4px;
+            border-left: 3px solid #2c5282; font-size: 10pt;
+        }
+        .infrastructure-item i { margin-right: 8px; font-size: 16pt; }
+        .infrastructure-item .label { font-weight: bold; margin-right: 8px; }
+        .status-normal { color: #28a745; }
+        .status-disrupted { color: #dc3545; }
+
+        .livestock-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 4px;
+            margin-bottom: 12px;
+        }
+        .livestock-card {
+            padding: 6px 5px; border-radius: 5px; text-align: center;
+            font-size: 10pt;
+        }
+        .livestock-card .num { font-weight: 700; font-size: 11pt; }
+        .livestock-card .lbl { font-size: 9pt; opacity: 0.85; }
+
+        .report-footer {
+            margin-top: 10px; padding-top: 5px; border-top: 1px solid #cbd5e0;
+            text-align: center; font-size: 10pt; color: #666; font-style: italic;
+        }
+
+        .print-actions {
+            position: fixed; top: 20px; right: 20px;
+            z-index: 1000; display: flex; gap: 10px;
+        }
+        .btn-print {
+            background-color: #2c5282; color: white; padding: 10px 20px;
+            border: none; border-radius: 5px; cursor: pointer; font-size: 11pt;
+            display: flex; align-items: center; gap: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+        .btn-print:hover { background-color: #1a365d; }
+        .btn-image {
+            background-color: #28a745; color: white; padding: 10px 20px;
+            border: none; border-radius: 5px; cursor: pointer; font-size: 11pt;
+            display: flex; align-items: center; gap: 8px; text-decoration: none;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+        .btn-image:hover { background-color: #218838; }
+        .btn-download:disabled { opacity: 0.6; cursor: not-allowed; }
+
+        .date-selector {
+            position: fixed; top: 20px; left: 20px;
+            z-index: 1000; background: white; padding: 15px;
+            border-radius: 8px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            width: 200px; border: 1px solid #e2e8f0;
+        }
+        .date-selector .form-control { margin-bottom: 8px; font-size: 10pt; }
+        .date-selector .btn-filter {
+            width: 100%; background-color: #2c5282; color: white;
+            border: none; padding: 8px; border-radius: 4px; font-weight: bold;
+        }
+        .date-selector .btn-filter:hover { background-color: #1a365d; }
+    </style>
+</head>
+
+<body>
+    <div class="print-actions no-print">
+        <button class="btn-print" onclick="window.print()">
+            <i class="bi bi-printer"></i> Print / PDF
+        </button>
+        <button class="btn-image btn-download" onclick="downloadImage()" id="btnImg">
+            <i class="bi bi-image"></i> Download Image
+        </button>
+        <button class="btn-print" onclick="window.close()" style="background-color:#4a5568;">
+            <i class="bi bi-arrow-left"></i> Back
+        </button>
+    </div>
+
+    <div class="date-selector no-print">
+        <label class="form-label mb-1"><strong>Date Filter (BS):</strong></label>
+        <div class="mb-2">
+            <small class="text-muted d-block mb-1">From:</small>
+            <input type="text" id="fromDateBS" class="form-control form-control-sm nepali-date" value="{{ start_bs }}" placeholder="YYYY-MM-DD">
+        </div>
+        <div class="mb-3">
+            <small class="text-muted d-block mb-1">To:</small>
+            <input type="text" id="toDateBS" class="form-control form-control-sm nepali-date" value="{{ end_bs }}" placeholder="YYYY-MM-DD">
+        </div>
+        <button class="btn-filter" onclick="applyFilter()">
+            <i class="bi bi-filter"></i> Apply Filter
+        </button>
+        <small class="text-muted d-block mt-2" style="font-size: 9pt;">Format: YYYY-MM-DD</small>
+    </div>
+
+    <div class="container mt-5" id="reportContainer">
+        <div class="report-header">
+            <img src="{{ url_for('static', filename='Emblem_of_Nepal.png') }}" alt="Logo">
+            <h1>{{ office_name }}</h1>
+            <h2>Incident Summary Report</h2>
+            <h4>Local Emergency Operations Centre (LEOC)</h4>
+            <h5>
+                {% if start_bs == end_bs %}
+                Date: {{ start_bs }}
+                {% else %}
+                Period: {{ start_bs }} to {{ end_bs }}
+                {% endif %}
+            </h5>
+        </div>
+
+        <div class="report-meta">
+            <div>
+                <strong>Period (BS):</strong>
+                {{ start_bs }}{% if start_bs != end_bs %} to {{ end_bs }}{% endif %}
+            </div>
+            <div><strong>Report Generated:</strong> {{ generated_at }}</div>
+        </div>
+
+        <div class="stats-cards">
+            <div class="stat-card info">
+                <i class="bi bi-exclamation-triangle"></i>
+                <div class="stat-info">
+                    <span class="number">{{ total.incidents }}</span>
+                    <span class="label">Total Incidents</span>
+                </div>
+            </div>
+            <div class="stat-card danger">
+                <i class="bi bi-person-x-fill"></i>
+                <div class="stat-info">
+                    <span class="number">{{ total.deaths }}</span>
+                    <span class="label">Deaths</span>
+                </div>
+            </div>
+            <div class="stat-card warning">
+                <i class="bi bi-person-dash-fill"></i>
+                <div class="stat-info">
+                    <span class="number">{{ total.missing }}</span>
+                    <span class="label">Missing</span>
+                </div>
+            </div>
+            <div class="stat-card success">
+                <i class="bi bi-bandaid-fill"></i>
+                <div class="stat-info">
+                    <span class="number">{{ total.injured }}</span>
+                    <span class="label">Injured</span>
+                </div>
+            </div>
+            <div class="stat-card dark">
+                <i class="bi bi-cash-stack"></i>
+                <div class="stat-info">
+                    <span class="number">{{ "%.0f"|format(total.estimated_loss) }}</span>
+                    <span class="label">Est. Loss (NRs)</span>
+                </div>
+            </div>
+            <div class="stat-card brown">
+                <i class="bi bi-paw"></i>
+                <div class="stat-info">
+                    <span class="number">{{ livestock_total }}</span>
+                    <span class="label">Livestock Loss</span>
+                </div>
+            </div>
+        </div>
+
+        {% if chart_data and chart_data.disaster_types|length > 0 %}
+        <div class="charts-row">
+            <div class="chart-box">
+                <h6><i class="bi bi-pie-chart me-1"></i>Disaster Type Distribution</h6>
+                <canvas id="disasterTypeChart"></canvas>
+            </div>
+            <div class="chart-box">
+                <h6><i class="bi bi-bar-chart me-1"></i>Incidents by Ward</h6>
+                <canvas id="wardChart"></canvas>
+            </div>
+            <div class="chart-box">
+                <h6><i class="bi bi-heart-pulse me-1"></i>Infrastructure Status</h6>
+                <canvas id="infraChart"></canvas>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="report-content">
+            <div class="section-title">
+                <i class="bi bi-table"></i> Ward-wise Incident Overview
+            </div>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Ward</th>
+                        <th>Incidents</th>
+                        <th>Deaths</th>
+                        <th>Missing</th>
+                        <th>Injured</th>
+                        <th>Affected HH</th>
+                        <th>House Destr</th>
+                        <th>House Dmgd</th>
+                        <th>Pub Bldg Destr</th>
+                        <th>Pub Bldg Dmgd</th>
+                        <th>Est. Loss</th>
+                        <th>Road</th>
+                        <th>Elec</th>
+                        <th>Comm</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for ward_name, ws in ward_stats.items() %}
+                    {% if ws.incidents > 0 %}
+                    <tr>
+                        <td><strong>{{ ward_name }}</strong></td>
+                        <td>{{ ws.incidents }}</td>
+                        <td>{{ ws.deaths }}</td>
+                        <td>{{ ws.missing }}</td>
+                        <td>{{ ws.injured }}</td>
+                        <td>{{ ws.affected_households }}</td>
+                        <td>{{ ws.house_destroyed }}</td>
+                        <td>{{ ws.house_damaged }}</td>
+                        <td>{{ ws.get('public_building_destroyed', 0) }}</td>
+                        <td>{{ ws.get('public_building_damaged', 0) }}</td>
+                        <td>{{ "%.0f"|format(ws.estimated_loss) }}</td>
+                        <td>
+                            {% if ws.road_blocked %}
+                            <span class="badge bg-danger"><i class="bi bi-signpost-split-fill"></i></span>
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if ws.electricity_blocked %}
+                            <span class="badge bg-danger"><i class="bi bi-lightning-charge-fill"></i></span>
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if ws.communication_blocked %}
+                            <span class="badge bg-danger"><i class="bi bi-wifi"></i></span>
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endif %}
+                    {% endfor %}
+                    <tr class="total-row">
+                        <td>Total</td>
+                        <td>{{ total.incidents }}</td>
+                        <td>{{ total.deaths }}</td>
+                        <td>{{ total.missing }}</td>
+                        <td>{{ total.injured }}</td>
+                        <td>{{ total.affected_households }}</td>
+                        <td>{{ total.house_destroyed }}</td>
+                        <td>{{ total.house_damaged }}</td>
+                        <td>{{ total.public_building_destroyed }}</td>
+                        <td>{{ total.public_building_damaged }}</td>
+                        <td>{{ "%.0f"|format(total.estimated_loss) }}</td>
+                        <td>-</td><td>-</td><td>-</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="report-content">
+            <div class="section-title brown">
+                <i class="bi bi-graph-up"></i> Disaster Type Summary
+            </div>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th class="brown">Disaster Type</th>
+                        <th class="brown">Count</th>
+                        <th class="brown">Death (M)</th>
+                        <th class="brown">Death (F)</th>
+                        <th class="brown">Missing</th>
+                        <th class="brown">Injured (M)</th>
+                        <th class="brown">Injured (F)</th>
+                        <th class="brown">Affected HH</th>
+                        <th class="brown">House Dmgd</th>
+                        <th class="brown">House Destr</th>
+                        <th class="brown">Pub Bldg Dmgd</th>
+                        <th class="brown">Pub Bldg Destr</th>
+                        <th class="brown">Livestock</th>
+                        <th class="brown">Est. Loss</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% set ns = namespace(has_data=false) %}
+                    {% for dtype, stats in disaster_type_stats.items() %}
+                    {% if stats.count > 0 %}
+                    {% set ns.has_data = true %}
+                    <tr>
+                        <td><strong>{{ dtype }}</strong></td>
+                        <td>{{ stats.count }}</td>
+                        <td>{{ stats.male_death }}</td>
+                        <td>{{ stats.female_death }}</td>
+                        <td>{{ stats.missing }}</td>
+                        <td>{{ stats.male_injured }}</td>
+                        <td>{{ stats.female_injured }}</td>
+                        <td>{{ stats.affected_households }}</td>
+                        <td>{{ stats.house_damaged }}</td>
+                        <td>{{ stats.house_destroyed }}</td>
+                        <td>{{ stats.public_building_damaged }}</td>
+                        <td>{{ stats.public_building_destroyed }}</td>
+                        <td>{{ stats.livestock_loss }}</td>
+                        <td>{{ "%.0f"|format(stats.estimated_loss) }}</td>
+                    </tr>
+                    {% endif %}
+                    {% endfor %}
+                    {% if not ns.has_data %}
+                    <tr>
+                        <td colspan="14" class="text-center text-muted">No incident data found</td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="report-content">
+            <div class="section-title green">
+                <i class="bi bi-paw"></i> Livestock Impact Breakdown
+            </div>
+            <div class="livestock-grid">
+                <div class="livestock-card" style="background:#fef2f2;border:1px solid #fecaca;">
+                    <div class="num" style="color:#dc2626;">{{ total.cattle_lost }}</div>
+                    <div class="lbl" style="color:#991b1b;">Cattle Lost</div>
+                </div>
+                <div class="livestock-card" style="background:#fff7ed;border:1px solid #fed7aa;">
+                    <div class="num" style="color:#ea580c;">{{ total.cattle_injured }}</div>
+                    <div class="lbl" style="color:#9a3412;">Cattle Injured</div>
+                </div>
+                <div class="livestock-card" style="background:#fef2f2;border:1px solid #fecaca;">
+                    <div class="num" style="color:#dc2626;">{{ total.poultry_lost }}</div>
+                    <div class="lbl" style="color:#991b1b;">Poultry Lost</div>
+                </div>
+                <div class="livestock-card" style="background:#fff7ed;border:1px solid #fed7aa;">
+                    <div class="num" style="color:#ea580c;">{{ total.poultry_injured }}</div>
+                    <div class="lbl" style="color:#9a3412;">Poultry Injured</div>
+                </div>
+                <div class="livestock-card" style="background:#fef2f2;border:1px solid #fecaca;">
+                    <div class="num" style="color:#dc2626;">{{ total.goats_sheep_lost }}</div>
+                    <div class="lbl" style="color:#991b1b;">Goats/Sheep Lost</div>
+                </div>
+                <div class="livestock-card" style="background:#fff7ed;border:1px solid #fed7aa;">
+                    <div class="num" style="color:#ea580c;">{{ total.goats_sheep_injured }}</div>
+                    <div class="lbl" style="color:#9a3412;">Goats/Sheep Injured</div>
+                </div>
+                <div class="livestock-card" style="background:#fef2f2;border:1px solid #fecaca;">
+                    <div class="num" style="color:#dc2626;">{{ total.other_livestock_lost }}</div>
+                    <div class="lbl" style="color:#991b1b;">Other Lost</div>
+                </div>
+                <div class="livestock-card" style="background:#fff7ed;border:1px solid #fed7aa;">
+                    <div class="num" style="color:#ea580c;">{{ total.other_livestock_injured }}</div>
+                    <div class="lbl" style="color:#9a3412;">Other Injured</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="report-content">
+            <div class="section-title gray">
+                <i class="bi bi-hdd-network"></i> Infrastructure Status
+            </div>
+            <div class="infrastructure-grid">
+                <div class="infrastructure-item">
+                    {% if infra_status.electricity_blocked %}
+                    <i class="bi bi-lightning-charge-fill status-disrupted"></i>
+                    <span class="label">Electricity:</span>
+                    <span class="status-disrupted"><i class="bi bi-exclamation-triangle-fill"></i> Disrupted</span>
+                    {% else %}
+                    <i class="bi bi-lightning-charge-fill status-normal"></i>
+                    <span class="label">Electricity:</span>
+                    <span class="status-normal">Normal</span>
+                    {% endif %}
+                </div>
+                <div class="infrastructure-item">
+                    {% if infra_status.road_blocked %}
+                    <i class="bi bi-signpost-split-fill status-disrupted"></i>
+                    <span class="label">Roads:</span>
+                    <span class="status-disrupted"><i class="bi bi-exclamation-triangle-fill"></i> Disrupted</span>
+                    {% else %}
+                    <i class="bi bi-signpost-split-fill status-normal"></i>
+                    <span class="label">Roads:</span>
+                    <span class="status-normal">Normal</span>
+                    {% endif %}
+                </div>
+                <div class="infrastructure-item">
+                    {% if infra_status.communication_blocked %}
+                    <i class="bi bi-wifi status-disrupted"></i>
+                    <span class="label">Communication:</span>
+                    <span class="status-disrupted"><i class="bi bi-exclamation-triangle-fill"></i> Disrupted</span>
+                    {% else %}
+                    <i class="bi bi-wifi status-normal"></i>
+                    <span class="label">Communication:</span>
+                    <span class="status-normal">Normal</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="report-footer">
+            <p>Report generated: {{ generated_at }} | LEOC {{ office_name }}</p>
+            <p style="font-size: 10pt; margin-top: 3px;">
+                This is an official document of the Local Emergency Operations Centre.
+            </p>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <script src="{{ url_for('static', filename='js/nepali-datepicker.js') }}"></script>
+    <script>
+        const reportEl = document.getElementById('reportContainer');
+
+        function applyFilter() {
+            const fromDate = document.getElementById('fromDateBS').value;
+            const toDate = document.getElementById('toDateBS').value;
+            if (fromDate && toDate) {
+                const params = new URLSearchParams();
+                if (fromDate === toDate) {
+                    params.set('bs_date', fromDate);
+                } else {
+                    params.set('from_bs_date', fromDate);
+                    params.set('to_bs_date', toDate);
+                }
+                const ward = '{{ request.args.get("ward_id", "")|safe }}';
+                const fiscal = '{{ request.args.get("fiscal_year", "")|safe }}';
+                if (ward) params.set('ward_id', ward);
+                if (fiscal) params.set('fiscal_year', fiscal);
+                window.location.href = '/incident-summary-preview?' + params.toString();
+            } else {
+                alert('Please enter both dates');
+            }
+        }
+
+        function setLoading(loading) {
+            const btn = document.getElementById('btnImg');
+            if (loading) {
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Preparing...';
+            } else {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-image"></i> Download Image';
+            }
+        }
+
+        async function waitForFonts() {
+            if (document.fonts && document.fonts.ready) {
+                try { await document.fonts.ready; } catch (e) {}
+            }
+            await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        }
+
+        async function downloadImage() {
+            setLoading(true);
+            if (typeof html2canvas === 'undefined') {
+                setLoading(false);
+                alert('html2canvas library failed to load. Please refresh and try again.');
+                return;
+            }
+            await waitForFonts();
+            const origStyle = reportEl.getAttribute('style') || '';
+            reportEl.style.width = '1122px';
+            reportEl.style.maxWidth = 'none';
+            reportEl.style.margin = '0 auto';
+            reportEl.style.paddingTop = '40px';
+            const timeout = setTimeout(function () {
+                reportEl.setAttribute('style', origStyle);
+                setLoading(false);
+                alert('Image download timed out. Please try again.');
+            }, 45000);
+            html2canvas(reportEl, {
+                scale: 2, useCORS: true, logging: false,
+                allowTaint: true, width: 1122, windowWidth: 1122,
+                backgroundColor: '#ffffff',
+            }).then(function (canvas) {
+                clearTimeout(timeout);
+                reportEl.setAttribute('style', origStyle);
+                var link = document.createElement('a');
+                link.download = 'incident_summary_{{ start_bs }}_{{ end_bs }}.png';
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+                setLoading(false);
+            }).catch(function (err) {
+                clearTimeout(timeout);
+                reportEl.setAttribute('style', origStyle);
+                console.error('Image download failed:', err);
+                setLoading(false);
+                alert('Image download failed. Please try again.');
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            {% if chart_data and chart_data.disaster_types|length > 0 %}
+            const colorPalette = ['#4361ee', '#3a86ff', '#8338ec', '#ff006e', '#fb5607', '#ffbe0b', '#06d6a0', '#118ab2'];
+
+            new Chart(document.getElementById('disasterTypeChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: {{ chart_data.disaster_types|tojson }},
+                    datasets: [{
+                        data: {{ chart_data.disaster_counts|tojson }},
+                        backgroundColor: colorPalette.slice(0, {{ chart_data.disaster_types|length }}),
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { boxWidth: 10, padding: 8, font: { size: 9 } } }
+                    }
+                }
+            });
+
+            new Chart(document.getElementById('wardChart'), {
+                type: 'bar',
+                data: {
+                    labels: {{ chart_data.ward_names|tojson }},
+                    datasets: [{
+                        label: 'Incidents',
+                        data: {{ chart_data.ward_incident_counts|tojson }},
+                        backgroundColor: colorPalette.slice(0, {{ chart_data.ward_names|length }}),
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: { beginAtZero: true, ticks: { font: { size: 9 }, stepSize: 1 } },
+                        x: { ticks: { font: { size: 9 } } }
+                    }
+                }
+            });
+
+            new Chart(document.getElementById('infraChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: ['Normal ({{ chart_data.infra_normal }})', 'Disrupted ({{ chart_data.infra_disrupted }})'],
+                    datasets: [{
+                        data: [{{ chart_data.infra_normal }}, {{ chart_data.infra_disrupted }}],
+                        backgroundColor: ['#059669', '#dc2626'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { boxWidth: 10, padding: 8, font: { size: 10 } } }
+                    }
+                }
+            });
+            {% endif %}
+        });
+    </script>
+</body>
+</html>

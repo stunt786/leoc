@@ -30,6 +30,7 @@
                 <option value="dispatch">Dispatch Report</option>
                 <option value="distribution">Distribution Report</option>
                 <option value="incidents">Incident Report</option>
+                <option value="incident-summary">Incident Summary</option>
                 <option value="requests">Relief Request Report</option>
                 <option value="disaster-assessments">Disaster Assessment Report</option>
             </optgroup>
@@ -112,7 +113,7 @@
                     <option value="High">High</option><option value="Urgent">Urgent</option>
                 </select>
             </div>
-            <div class="col-auto filter-optional" data-types="distribution,beneficiary-history,beneficiaries,incidents,disaster-assessments">
+            <div class="col-auto filter-optional" data-types="distribution,beneficiary-history,beneficiaries,incidents,disaster-assessments,incident-summary">
                 <label class="form-label small">Ward</label>
                 <select class="form-select form-select-sm" id="filterWard" onchange="loadReportData()"><option value="">All</option></select>
             </div>
@@ -161,7 +162,7 @@
                     <option value="no">Non-Distributable</option>
                 </select>
             </div>
-            <div class="col-auto filter-optional" data-types="inventory,dispatch,distribution,incidents,requests,adjustments,low-stock,stock-receipts,stock-transfers,stock-book,expiry-tracking,cash-balance,cash-receipts,cash-requests,cash-distributions,cash-yearly">
+            <div class="col-auto filter-optional" data-types="inventory,dispatch,distribution,incidents,incident-summary,requests,adjustments,low-stock,stock-receipts,stock-transfers,stock-book,expiry-tracking,cash-balance,cash-receipts,cash-requests,cash-distributions,cash-yearly">
                 <label class="form-label small">Fiscal Year</label>
                 <select class="form-select form-select-sm" id="filterFiscalYear" onchange="loadReportData()"><option value="">All</option></select>
             </div>
@@ -297,6 +298,8 @@ async function onTypeChange() {
     // Clear date filters on type change so stale dates don't filter new report
     document.getElementById('dateFrom').value = '';
     document.getElementById('dateTo').value = '';
+    // Yield so MutationObserver settles before loadReportData reads date values
+    await new Promise(r => setTimeout(r, 0));
     if (type) {
         await loadReportData();
     } else {

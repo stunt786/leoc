@@ -4102,7 +4102,7 @@ def handle_incidents():
         incident = Incident(
             incident_name=incident_name, incident_type=incident_type,
             ward=ward, fiscal_year=fiscal_year,
-            start_date=parse_bs_date_field(data, 'start_date', default=date.today()),
+            start_date=parse_bs_date_field(data, 'disaster_date_bs', default=date.today()),
             status=data.get('status', 'Active'), description=data.get('description')
         )
         _apply_incident_fields(incident, data)
@@ -4165,8 +4165,8 @@ def manage_incident(id):
         for field in ['status', 'description', 'fiscal_year']:
             if field in data:
                 setattr(incident, field, data[field])
-        if data.get('start_date'):
-            incident.start_date = parse_bs_date_field(data, 'start_date', default=incident.start_date)
+        if data.get('disaster_date_bs'):
+            incident.start_date = parse_bs_date_field(data, 'disaster_date_bs', default=incident.start_date)
         _apply_incident_fields(incident, data)
         db.session.commit()
         return jsonify({'success': True, 'message': 'Incident updated', 'data': incident.to_dict()})
@@ -6666,6 +6666,154 @@ def generate_disaster_pdf(incidents, total, ward_stats, type_stats, start_bs, en
     buffer.seek(0)
     return buffer
 
+@app.route('/incident-summary-preview', methods=['GET'])
+@login_required
+def incident_summary_preview():
+    from_bs = request.args.get('from_bs_date') or request.args.get('date_from')
+    to_bs = request.args.get('to_bs_date') or request.args.get('date_to')
+    bs_date = request.args.get('bs_date')
+    ward_id = request.args.get('ward_id', type=int)
+    fiscal_year = request.args.get('fiscal_year')
+    today = date.today()
+    start_bs = end_bs = ad_to_bs(today.year, today.month, today.day)
+    start_date = end_date = None
+
+    has_explicit_dates = False
+    if from_bs and to_bs and is_valid_nepali_date(from_bs) and is_valid_nepali_date(to_bs):
+        start_bs, end_bs = from_bs, to_bs
+        has_explicit_dates = True
+    elif bs_date and is_valid_nepali_date(bs_date):
+        start_bs = end_bs = bs_date
+        has_explicit_dates = True
+
+    q = Incident.query
+    if has_explicit_dates:
+        from sqlalchemy import or_
+        bs_filters = [Incident.disaster_date_bs >= start_bs, Incident.disaster_date_bs <= end_bs]
+        ad_filters = []
+        try:
+            ad_start_date = datetime.strptime(bs_to_ad(start_bs), '%Y-%m-%d').date()
+            ad_end_date = datetime.strptime(bs_to_ad(end_bs), '%Y-%m-%d').date()
+            ad_filters = [Incident.start_date >= ad_start_date, Incident.start_date <= ad_end_date]
+        except Exception: pass
+        conditions = [db.and_(*bs_filters)]
+        if ad_filters: conditions.append(db.and_(*ad_filters))
+        q = q.filter(or_(*conditions))
+    if ward_id:
+        q = q.filter(Incident.ward == ward_id)
+    if fiscal_year:
+        q = q.filter(Incident.fiscal_year == fiscal_year)
+    incidents_data = q.order_by(Incident.disaster_date_bs.desc()).all()
+
+    total = {
+        'incidents': len(incidents_data),
+        'deaths': sum((i.death_male or 0) + (i.death_female or 0) for i in incidents_data),
+        'death_male': sum(i.death_male or 0 for i in incidents_data),
+        'death_female': sum(i.death_female or 0 for i in incidents_data),
+        'missing': sum((i.missing_male or 0) + (i.missing_female or 0) for i in incidents_data),
+        'injured': sum((i.injured_male or 0) + (i.injured_female or 0) for i in incidents_data),
+        'injured_male': sum(i.injured_male or 0 for i in incidents_data),
+        'injured_female': sum(i.injured_female or 0 for i in incidents_data),
+        'affected_households': sum(i.affected_households or 0 for i in incidents_data),
+        'affected_people': sum(i.affected_people or 0 for i in incidents_data),
+        'house_destroyed': sum(i.house_destroyed or 0 for i in incidents_data),
+        'house_damaged': sum(i.house_damaged or 0 for i in incidents_data),
+        'public_building_destroyed': sum(i.public_building_destroyed or 0 for i in incidents_data),
+        'public_building_damaged': sum(i.public_building_damaged or 0 for i in incidents_data),
+        'estimated_loss': sum(i.estimated_loss or 0 for i in incidents_data),
+        'livestock_loss': sum((i.cattle_lost or 0) + (i.poultry_lost or 0) + (i.goats_sheep_lost or 0) + (i.other_livestock_lost or 0) for i in incidents_data),
+        'cattle_lost': sum(i.cattle_lost or 0 for i in incidents_data),
+        'cattle_injured': sum(i.cattle_injured or 0 for i in incidents_data),
+        'poultry_lost': sum(i.poultry_lost or 0 for i in incidents_data),
+        'poultry_injured': sum(i.poultry_injured or 0 for i in incidents_data),
+        'goats_sheep_lost': sum(i.goats_sheep_lost or 0 for i in incidents_data),
+        'goats_sheep_injured': sum(i.goats_sheep_injured or 0 for i in incidents_data),
+        'other_livestock_lost': sum(i.other_livestock_lost or 0 for i in incidents_data),
+        'other_livestock_injured': sum(i.other_livestock_injured or 0 for i in incidents_data),
+    }
+
+    ward_stats = {}
+    for w in Ward.query.order_by(Ward.sort_order).all():
+        w_incidents = [i for i in incidents_data if i.ward == w.id]
+        ward_stats[w.name] = {
+            'incidents': len(w_incidents),
+            'deaths': sum((i.death_male or 0) + (i.death_female or 0) for i in w_incidents),
+            'injured': sum((i.injured_male or 0) + (i.injured_female or 0) for i in w_incidents),
+            'missing': sum((i.missing_male or 0) + (i.missing_female or 0) for i in w_incidents),
+            'affected_households': sum(i.affected_households or 0 for i in w_incidents),
+            'house_destroyed': sum(i.house_destroyed or 0 for i in w_incidents),
+            'house_damaged': sum(i.house_damaged or 0 for i in w_incidents),
+            'public_building_destroyed': sum(i.public_building_destroyed or 0 for i in w_incidents),
+            'public_building_damaged': sum(i.public_building_damaged or 0 for i in w_incidents),
+            'estimated_loss': sum(i.estimated_loss or 0 for i in w_incidents),
+            'road_blocked': any(i.road_blocked for i in w_incidents),
+            'electricity_blocked': any(i.electricity_blocked for i in w_incidents),
+            'communication_blocked': any(i.communication_blocked for i in w_incidents),
+        }
+
+    disaster_type_stats = {}
+    for i in incidents_data:
+        t = i.incident_type or 'Unknown'
+        if t not in disaster_type_stats:
+            disaster_type_stats[t] = {'count': 0, 'male_death': 0, 'female_death': 0,
+                'missing': 0, 'male_injured': 0, 'female_injured': 0,
+                'affected_households': 0, 'house_damaged': 0, 'house_destroyed': 0,
+                'public_building_damaged': 0, 'public_building_destroyed': 0,
+                'estimated_loss': 0, 'livestock_loss': 0,
+                'cattle_lost': 0, 'cattle_injured': 0, 'poultry_lost': 0, 'poultry_injured': 0,
+                'goats_sheep_lost': 0, 'goats_sheep_injured': 0,
+                'other_livestock_lost': 0, 'other_livestock_injured': 0}
+        disaster_type_stats[t]['count'] += 1
+        disaster_type_stats[t]['male_death'] += i.death_male or 0
+        disaster_type_stats[t]['female_death'] += i.death_female or 0
+        disaster_type_stats[t]['missing'] += (i.missing_male or 0) + (i.missing_female or 0)
+        disaster_type_stats[t]['male_injured'] += i.injured_male or 0
+        disaster_type_stats[t]['female_injured'] += i.injured_female or 0
+        disaster_type_stats[t]['affected_households'] += i.affected_households or 0
+        disaster_type_stats[t]['house_damaged'] += i.house_damaged or 0
+        disaster_type_stats[t]['house_destroyed'] += i.house_destroyed or 0
+        disaster_type_stats[t]['public_building_damaged'] += i.public_building_damaged or 0
+        disaster_type_stats[t]['public_building_destroyed'] += i.public_building_destroyed or 0
+        disaster_type_stats[t]['estimated_loss'] += i.estimated_loss or 0
+        disaster_type_stats[t]['livestock_loss'] += (i.cattle_lost or 0) + (i.poultry_lost or 0) + \
+            (i.goats_sheep_lost or 0) + (i.other_livestock_lost or 0)
+        disaster_type_stats[t]['cattle_lost'] += i.cattle_lost or 0
+        disaster_type_stats[t]['cattle_injured'] += i.cattle_injured or 0
+        disaster_type_stats[t]['poultry_lost'] += i.poultry_lost or 0
+        disaster_type_stats[t]['poultry_injured'] += i.poultry_injured or 0
+        disaster_type_stats[t]['goats_sheep_lost'] += i.goats_sheep_lost or 0
+        disaster_type_stats[t]['goats_sheep_injured'] += i.goats_sheep_injured or 0
+        disaster_type_stats[t]['other_livestock_lost'] += i.other_livestock_lost or 0
+        disaster_type_stats[t]['other_livestock_injured'] += i.other_livestock_injured or 0
+
+    infra_status = {
+        'road_blocked': any(i.road_blocked for i in incidents_data),
+        'electricity_blocked': any(i.electricity_blocked for i in incidents_data),
+        'communication_blocked': any(i.communication_blocked for i in incidents_data),
+    }
+
+    office_name = AppSettings.get_setting('office_name', 'थलारा गाउँपालिका')
+
+    chart_data = {
+        'disaster_types': list(disaster_type_stats.keys()),
+        'disaster_counts': [disaster_type_stats[d]['count'] for d in disaster_type_stats],
+        'ward_names': [w for w in ward_stats if ward_stats[w]['incidents'] > 0],
+        'ward_incident_counts': [ward_stats[w]['incidents'] for w in ward_stats if ward_stats[w]['incidents'] > 0],
+        'infra_normal': 3 - sum(1 for v in infra_status.values() if v),
+        'infra_disrupted': sum(1 for v in infra_status.values() if v),
+    }
+
+    return render_template('incident_summary_print.html', total=total,
+                           ward_stats=ward_stats,
+                           disaster_type_stats=disaster_type_stats,
+                           start_bs=start_bs, end_bs=end_bs,
+                           office_name=office_name,
+                           infra_status=infra_status,
+                           generated_at=f"{today_bs()} {datetime.now().strftime('%H:%M')}",
+                           livestock_total=total['livestock_loss'],
+                           chart_data=chart_data)
+
+
 @app.route('/daily-report-preview', methods=['GET'])
 @login_required
 def daily_report_preview():
@@ -8707,6 +8855,134 @@ def get_report_data(report_type, args):
                  ad_to_bs_date(inc.start_date) or '', inc.severity or '', inc.status,
                  inc.affected_households or 0, inc.deaths or 0, inc.injured or 0,
                  inc.fiscal_year or ''] for inc in q.all()]
+    elif report_type == 'incident-summary':
+        date_from = args.get('date_from')
+        date_to = args.get('date_to')
+        fiscal_year = args.get('fiscal_year')
+        ward_id = args.get('ward_id', type=int)
+        q = Incident.query.order_by(Incident.disaster_date_bs.desc())
+        if ward_id: q = q.filter(Incident.ward == ward_id)
+        if date_from or date_to:
+            from sqlalchemy import or_
+            bs_filters = []
+            ad_filters = []
+            if date_from and is_valid_nepali_date(date_from):
+                bs_filters.append(Incident.disaster_date_bs >= date_from)
+                try:
+                    ad_filters.append(Incident.start_date >= datetime.strptime(bs_to_ad(date_from), '%Y-%m-%d').date())
+                except Exception: pass
+            if date_to and is_valid_nepali_date(date_to):
+                bs_filters.append(Incident.disaster_date_bs <= date_to)
+                try:
+                    ad_filters.append(Incident.start_date <= datetime.strptime(bs_to_ad(date_to), '%Y-%m-%d').date())
+                except Exception: pass
+            conditions = []
+            if bs_filters: conditions.append(db.and_(*bs_filters))
+            if ad_filters: conditions.append(db.and_(*ad_filters))
+            if conditions:
+                q = q.filter(or_(*conditions))
+        if fiscal_year:
+            q = q.filter(Incident.fiscal_year == fiscal_year)
+        incidents_data = q.all()
+
+        total = {
+            'incidents': len(incidents_data),
+            'deaths': sum((i.death_male or 0) + (i.death_female or 0) for i in incidents_data),
+            'death_male': sum(i.death_male or 0 for i in incidents_data),
+            'death_female': sum(i.death_female or 0 for i in incidents_data),
+            'missing': sum((i.missing_male or 0) + (i.missing_female or 0) for i in incidents_data),
+            'injured': sum((i.injured_male or 0) + (i.injured_female or 0) for i in incidents_data),
+            'injured_male': sum(i.injured_male or 0 for i in incidents_data),
+            'injured_female': sum(i.injured_female or 0 for i in incidents_data),
+            'affected_households': sum(i.affected_households or 0 for i in incidents_data),
+            'affected_people': sum(i.affected_people or 0 for i in incidents_data),
+            'house_destroyed': sum(i.house_destroyed or 0 for i in incidents_data),
+            'house_damaged': sum(i.house_damaged or 0 for i in incidents_data),
+            'public_building_destroyed': sum(i.public_building_destroyed or 0 for i in incidents_data),
+            'public_building_damaged': sum(i.public_building_damaged or 0 for i in incidents_data),
+            'estimated_loss': sum(i.estimated_loss or 0 for i in incidents_data),
+            'cattle_lost': sum(i.cattle_lost or 0 for i in incidents_data),
+            'cattle_injured': sum(i.cattle_injured or 0 for i in incidents_data),
+            'poultry_lost': sum(i.poultry_lost or 0 for i in incidents_data),
+            'poultry_injured': sum(i.poultry_injured or 0 for i in incidents_data),
+            'goats_sheep_lost': sum(i.goats_sheep_lost or 0 for i in incidents_data),
+            'goats_sheep_injured': sum(i.goats_sheep_injured or 0 for i in incidents_data),
+            'other_livestock_lost': sum(i.other_livestock_lost or 0 for i in incidents_data),
+            'other_livestock_injured': sum(i.other_livestock_injured or 0 for i in incidents_data),
+        }
+
+        ward_stats = {}
+        for w in Ward.query.order_by(Ward.sort_order).all():
+            w_incidents = [i for i in incidents_data if i.ward == w.id]
+            ward_stats[w.name] = {
+                'incidents': len(w_incidents),
+                'deaths': sum((i.death_male or 0) + (i.death_female or 0) for i in w_incidents),
+                'injured': sum((i.injured_male or 0) + (i.injured_female or 0) for i in w_incidents),
+                'missing': sum((i.missing_male or 0) + (i.missing_female or 0) for i in w_incidents),
+                'affected_households': sum(i.affected_households or 0 for i in w_incidents),
+                'house_destroyed': sum(i.house_destroyed or 0 for i in w_incidents),
+                'house_damaged': sum(i.house_damaged or 0 for i in w_incidents),
+                'public_building_destroyed': sum(i.public_building_destroyed or 0 for i in w_incidents),
+                'public_building_damaged': sum(i.public_building_damaged or 0 for i in w_incidents),
+                'estimated_loss': sum(i.estimated_loss or 0 for i in w_incidents),
+                'road_blocked': any(i.road_blocked for i in w_incidents),
+                'electricity_blocked': any(i.electricity_blocked for i in w_incidents),
+                'communication_blocked': any(i.communication_blocked for i in w_incidents),
+            }
+
+        disaster_type_stats = {}
+        for i in incidents_data:
+            t = i.incident_type or 'Unknown'
+            if t not in disaster_type_stats:
+                disaster_type_stats[t] = {'count': 0, 'male_death': 0, 'female_death': 0,
+                    'missing': 0, 'male_injured': 0, 'female_injured': 0,
+                    'affected_households': 0, 'affected_people': 0,
+                    'house_damaged': 0, 'house_destroyed': 0,
+                    'public_building_damaged': 0, 'public_building_destroyed': 0,
+                    'estimated_loss': 0, 'livestock_loss': 0,
+                    'cattle_lost': 0, 'cattle_injured': 0, 'poultry_lost': 0, 'poultry_injured': 0,
+                    'goats_sheep_lost': 0, 'goats_sheep_injured': 0,
+                    'other_livestock_lost': 0, 'other_livestock_injured': 0}
+            disaster_type_stats[t]['count'] += 1
+            disaster_type_stats[t]['male_death'] += i.death_male or 0
+            disaster_type_stats[t]['female_death'] += i.death_female or 0
+            disaster_type_stats[t]['missing'] += (i.missing_male or 0) + (i.missing_female or 0)
+            disaster_type_stats[t]['male_injured'] += i.injured_male or 0
+            disaster_type_stats[t]['female_injured'] += i.injured_female or 0
+            disaster_type_stats[t]['affected_households'] += i.affected_households or 0
+            disaster_type_stats[t]['affected_people'] += i.affected_people or 0
+            disaster_type_stats[t]['house_damaged'] += i.house_damaged or 0
+            disaster_type_stats[t]['house_destroyed'] += i.house_destroyed or 0
+            disaster_type_stats[t]['public_building_damaged'] += i.public_building_damaged or 0
+            disaster_type_stats[t]['public_building_destroyed'] += i.public_building_destroyed or 0
+            disaster_type_stats[t]['estimated_loss'] += i.estimated_loss or 0
+            disaster_type_stats[t]['livestock_loss'] += (i.cattle_lost or 0) + (i.poultry_lost or 0) + \
+                (i.goats_sheep_lost or 0) + (i.other_livestock_lost or 0)
+            disaster_type_stats[t]['cattle_lost'] += i.cattle_lost or 0
+            disaster_type_stats[t]['cattle_injured'] += i.cattle_injured or 0
+            disaster_type_stats[t]['poultry_lost'] += i.poultry_lost or 0
+            disaster_type_stats[t]['poultry_injured'] += i.poultry_injured or 0
+            disaster_type_stats[t]['goats_sheep_lost'] += i.goats_sheep_lost or 0
+            disaster_type_stats[t]['goats_sheep_injured'] += i.goats_sheep_injured or 0
+            disaster_type_stats[t]['other_livestock_lost'] += i.other_livestock_lost or 0
+            disaster_type_stats[t]['other_livestock_injured'] += i.other_livestock_injured or 0
+
+        infra_status = {
+            'road_blocked': any(i.road_blocked for i in incidents_data),
+            'electricity_blocked': any(i.electricity_blocked for i in incidents_data),
+            'communication_blocked': any(i.communication_blocked for i in incidents_data),
+        }
+
+        headers = ['Metric', 'Value']
+        rows = [['Total Incidents', total['incidents']],
+                ['Total Deaths', total['deaths']],
+                ['Total Injured', total['injured']],
+                ['Missing Persons', total['missing']],
+                ['Affected Households', total['affected_households']],
+                ['Affected People', total['affected_people']],
+                ['Houses Destroyed', total['house_destroyed']],
+                ['Houses Damaged', total['house_damaged']],
+                ['Estimated Loss (NRs)', total['estimated_loss']]]
     elif report_type == 'requests':
         status = args.get('status')
         incident_id = args.get('incident_id', type=int)
@@ -9277,6 +9553,10 @@ def reports_data_json(report_type):
 @app.route('/print-report/<report_type>', methods=['GET'])
 @login_required
 def print_report_preview(report_type):
+    if report_type == 'incident-summary':
+        from urllib.parse import urlencode
+        params = [(k, v) for k, v in request.args.items()]
+        return redirect('/incident-summary-preview?' + urlencode(params))
     try:
         headers, rows = get_report_data(report_type, request.args)
         report_titles = {
@@ -9293,6 +9573,7 @@ def print_report_preview(report_type):
             'items-master': 'Items Master List', 'stock-transfers': 'Stock Transfer Report',
             'stock-book': 'Stock Book', 'bin-card': 'Bin Card',
             'expiry-tracking': 'Expiry Tracking Report', 'stock-movement': 'Stock Movement Report',
+            'incident-summary': 'Incident Summary Report',
             'disaster-assessments': 'Disaster Assessment Report',
             'beneficiaries': 'Beneficiary Report', 'beneficiary-history': 'Beneficiary Distribution History',
             'beneficiary-demographics': 'Beneficiary Demographics',
@@ -9350,6 +9631,10 @@ def print_report_preview(report_type):
 @app.route('/api/reports/<report_type>', methods=['GET'])
 @login_required
 def report_pdf_generic(report_type):
+    if report_type == 'incident-summary':
+        from urllib.parse import urlencode
+        params = [(k, v) for k, v in request.args.items()]
+        return redirect('/incident-summary-preview?' + urlencode(params))
     try:
         headers, rows = get_report_data(report_type, request.args)
         report_titles = {
@@ -9366,6 +9651,7 @@ def report_pdf_generic(report_type):
             'items-master': 'Items Master List', 'stock-transfers': 'Stock Transfer Report',
             'stock-book': 'Stock Book', 'bin-card': 'Bin Card',
             'expiry-tracking': 'Expiry Tracking Report', 'stock-movement': 'Stock Movement Report',
+            'incident-summary': 'Incident Summary Report',
             'disaster-assessments': 'Disaster Assessment Report',
             'beneficiaries': 'Beneficiary Report', 'beneficiary-history': 'Beneficiary Distribution History',
             'beneficiary-demographics': 'Beneficiary Demographics',
