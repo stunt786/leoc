@@ -30,6 +30,7 @@ services:
     environment:
       - FLASK_ENV=production
       - FLASK_DEBUG=False
+      - GUNICORN_WORKERS=${GUNICORN_WORKERS:-2}
       - SQLALCHEMY_DATABASE_URI=postgresql://leoc:${DB_PASSWORD}@leoc-db:5432/leoc
     depends_on:
       leoc-db:
@@ -43,6 +44,27 @@ services:
       retries: 3
       start_period: 15s
 
+  leoc-cron:
+    build: .
+    image: leoc-app:latest
+    container_name: leoc-cron
+    restart: unless-stopped
+    entrypoint: ["/app/entrypoint-cron.sh"]
+    volumes:
+      - backup_data:/app/backups
+    environment:
+      - DB_HOST=leoc-db
+      - DB_NAME=leoc
+      - DB_USER=leoc
+      - DB_PASSWORD=${DB_PASSWORD}
+      - RETENTION_COUNT=7
+      - CRON_SCHEDULE=0 2 * * *
+    depends_on:
+      leoc-db:
+        condition: service_healthy
+    env_file:
+      - .env
+
 volumes:
   leoc_db_data:
   upload_data:
@@ -51,7 +73,8 @@ volumes:
       device: ${APP_DIR:-/home/thalaramun/leoc}/static/uploads
       o: bind
   backup_data:
+    driver: local
     driver_opts:
-      type: none
-      device: ${APP_DIR:-/home/thalaramun/leoc}/backups
-      o: bind
+      type: nfs
+      o: addr=192.168.101.12,nolock,soft,rw,vers=3
+      device: :/volume1/leoc-backups

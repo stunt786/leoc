@@ -16,11 +16,3 @@ docker containers: leoc-app & leoc-db
 **Make proper backup and test the migration on a staging environment before applying to production
 **Fix any issues that arises while migrating with existing data.. the existing data should properly work with new files and db withpout any issues.
 
-#latest changes files
-app.py
-templates/weekly_forecast.html
-templates/weekly_forecast_print.html
-templates/login.html
-
-#Db changes
-new suggestion column to weekly_forecast table
