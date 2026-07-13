@@ -1,7 +1,7 @@
 services:
   leoc-db:
     image: postgres:16-alpine
-    container_name: leoc-db
+    # container_name: leoc-db
     restart: unless-stopped
     environment:
       POSTGRES_DB: leoc
@@ -20,7 +20,7 @@ services:
   leoc-app:
     build: .
     image: leoc-app:latest
-    container_name: leoc-app
+    # container_name: leoc-app
     restart: unless-stopped
     ports:
       - "5002:5002"
@@ -47,7 +47,7 @@ services:
   leoc-cron:
     build: .
     image: leoc-app:latest
-    container_name: leoc-cron
+    # container_name: leoc-cron
     restart: unless-stopped
     entrypoint: ["/app/entrypoint-cron.sh"]
     volumes:
@@ -68,13 +68,4 @@ services:
 volumes:
   leoc_db_data:
   upload_data:
-    driver_opts:
-      type: none
-      device: ${APP_DIR:-/home/thalaramun/leoc}/static/uploads
-      o: bind
   backup_data:
-    driver: local
-    driver_opts:
-      type: nfs
-      o: addr=192.168.101.12,nolock,soft,rw,vers=3
-      device: :/volume1/leoc-backups

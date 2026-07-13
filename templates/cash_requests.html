@@ -5,7 +5,9 @@
 <li class="breadcrumb-item active">Cash Requests</li>
 {% endblock %}
 {% block extra_css %}
-<link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap5.min.css" rel="stylesheet">
+<style>
+.ts-dropdown { z-index: 9999 !important; }
+</style>
 {% endblock %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
@@ -42,9 +44,11 @@
                     <div class="row g-2">
                         <div class="col-md-6 mb-3"><label class="form-label">Requesting Office</label><input class="form-control" name="requesting_office" id="crqOffice"></div>
                         <div class="col-md-6 mb-3"><label class="form-label">Beneficiary <span class="text-danger">*</span></label>
-                            <select class="form-select" id="crqBeneficiary" onchange="onBeneficiaryChange()" required>
-                                <option value="">Select Beneficiary</option>
-                            </select>
+                            <input type="hidden" id="crqBeneficiaryId" name="beneficiary_id">
+                            <div class="input-group">
+                                <input type="text" class="form-control" id="crqBeneficiaryName" readonly placeholder="Select from registry">
+                                <button type="button" class="btn btn-outline-info" onclick="openBenPicker()" title="Select from Registry"><i class="bi bi-person-lines-fill"></i></button>
+                            </div>
                         </div>
                     </div>
                     <div class="row g-2">
@@ -83,45 +87,84 @@
     </div>
 </div>
 
+<div class="modal fade" id="crqBenPickerModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-person-lines-fill me-2"></i>Select Beneficiary</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <input type="text" class="form-control" id="crqBenPickerSearch" placeholder="Search by name, ID, phone..." oninput="filterBenPicker()">
+                </div>
+                <div class="table-responsive" style="max-height:350px">
+                    <table class="table table-sm table-hover mb-0">
+                        <thead class="table-light sticky-top">
+                            <tr><th>Name</th><th>Father's Name</th><th>Phone</th><th>Ward</th><th></th></tr>
+                        </thead>
+                        <tbody id="crqBenPickerBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 {% block extra_js %}
-<script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
 <script>
 const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 let beneficiaries = [];
 let incidentsData = [];
 let _cashRequests = [];
-let beneficiaryTomSelect = null;
+let benPickerModal = null;
 
-function getBeneficiaryTomSelect() {
-    if (beneficiaryTomSelect) return beneficiaryTomSelect;
-    const el = document.getElementById('crqBeneficiary');
-    if (!el) return null;
-    beneficiaryTomSelect = new TomSelect(el, {
-        maxOptions: null,
-        placeholder: 'Search by name, phone, or ward...',
-        dropdownParent: 'body',
-        onChange: function(value) {
-            if (!value) return;
-            const id = parseInt(value);
-            const ben = beneficiaries.find(b => b.id === id);
-            if (ben) {
-                if (!document.getElementById('crqRequester').value) document.getElementById('crqRequester').value = ben.name;
-                if (!document.getElementById('crqPhone').value) document.getElementById('crqPhone').value = ben.phone || '';
-            }
-        }
-    });
-    return beneficiaryTomSelect;
+function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+function openBenPicker() {
+    renderBenPicker(beneficiaries);
+    if (!benPickerModal) {
+        benPickerModal = new bootstrap.Modal(document.getElementById('crqBenPickerModal'));
+    }
+    benPickerModal.show();
 }
 
-function onBeneficiaryChange() {
-    const ts = getBeneficiaryTomSelect();
-    if (!ts) return;
-    const id = parseInt(ts.getValue());
+function renderBenPicker(list) {
+    const tbody = document.getElementById('crqBenPickerBody');
+    if (list.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">No beneficiaries found</td></tr>';
+        return;
+    }
+    tbody.innerHTML = list.map(b => `<tr>
+        <td>${esc(b.name)}</td>
+        <td>${esc(b.father_name || '-')}</td>
+        <td>${esc(b.phone || '-')}</td>
+        <td>${esc(b.ward_name || b.ward || '-')}</td>
+        <td><button class="btn btn-sm btn-outline-primary" onclick="selectBenFromPicker(${b.id})"><i class="bi bi-plus-lg"></i></button></td>
+    </tr>`).join('');
+}
+
+function filterBenPicker() {
+    const q = document.getElementById('crqBenPickerSearch').value.toLowerCase();
+    const filtered = beneficiaries.filter(b =>
+        (b.name && b.name.toLowerCase().includes(q)) ||
+        (b.father_name && b.father_name.toLowerCase().includes(q)) ||
+        (b.national_id && b.national_id.toLowerCase().includes(q)) ||
+        (b.phone && b.phone.toLowerCase().includes(q))
+    );
+    renderBenPicker(filtered);
+}
+
+function selectBenFromPicker(id) {
     const ben = beneficiaries.find(b => b.id === id);
     if (ben) {
+        document.getElementById('crqBeneficiaryId').value = ben.id;
+        document.getElementById('crqBeneficiaryName').value = ben.name;
         if (!document.getElementById('crqRequester').value) document.getElementById('crqRequester').value = ben.name;
         if (!document.getElementById('crqPhone').value) document.getElementById('crqPhone').value = ben.phone || '';
+        const modal = bootstrap.Modal.getInstance(document.getElementById('crqBenPickerModal'));
+        if (modal) modal.hide();
     }
 }
 
@@ -185,18 +228,13 @@ async function loadData() {
     document.getElementById('crqIncident').innerHTML = '<option value="">Select Incident</option>' + incidentsData.map(i => `<option value="${i.id}">${i.incident_name}</option>`).join('');
     document.getElementById('crqPriority').innerHTML = (d.cash_priorities||d.priorities||['Low','Medium','High','Urgent']).map(p => `<option value="${p}" ${p==='Medium'?'selected':''}>${p}</option>`).join('');
     document.getElementById('crqPurpose').innerHTML = '<option value="">Select Purpose</option>' + (d.cash_purposes||[]).map(p => `<option value="${p}">${p}</option>`).join('');
-    document.getElementById('crqBeneficiary').innerHTML = '<option value="">Select Beneficiary</option>' + beneficiaries.map(b => `<option value="${b.id}">${b.name}${b.phone ? ' - ' + b.phone : ''}${b.ward_name ? ' (' + b.ward_name + ')' : ''}</option>`).join('');
-    if (beneficiaryTomSelect) beneficiaryTomSelect.destroy();
-    beneficiaryTomSelect = null;
-    getBeneficiaryTomSelect();
 }
 
 document.getElementById('crqForm').addEventListener('submit', async function(e) {
     e.preventDefault();
     const id = document.getElementById('crqId').value;
     const incidentId = parseInt(document.getElementById('crqIncident').value);
-    const beneficiaryTs = getBeneficiaryTomSelect();
-    const beneficiaryId = parseInt(beneficiaryTs ? beneficiaryTs.getValue() : document.getElementById('crqBeneficiary').value);
+    const beneficiaryId = parseInt(document.getElementById('crqBeneficiaryId').value);
     const purpose = document.getElementById('crqPurpose').value;
     const requestedAmount = parseFloat(document.getElementById('crqAmount').value);
     if (!incidentId) { showToast('danger', 'Incident is required'); return; }
@@ -359,7 +397,7 @@ async function viewCrq(id) {
     new bootstrap.Modal(document.getElementById('viewCrqModal')).show();
 }
 
-function openCrqModal() { document.getElementById('crqForm').reset(); document.getElementById('crqId').value = ''; const ts = getBeneficiaryTomSelect(); if (ts) ts.clear(); document.getElementById('crqIncidentInfo').textContent = ''; }
+function openCrqModal() { document.getElementById('crqForm').reset(); document.getElementById('crqId').value = ''; document.getElementById('crqBeneficiaryId').value = ''; document.getElementById('crqBeneficiaryName').value = ''; document.getElementById('crqIncidentInfo').textContent = ''; }
 
 async function editCrq(id) {
     const r = await fetch(`/api/cash-requests/${id}`);
@@ -374,9 +412,9 @@ async function editCrq(id) {
     document.getElementById('crqOffice').value = cr.requesting_office || '';
     document.getElementById('crqRequester').value = cr.requester_name || '';
     document.getElementById('crqPhone').value = cr.phone || '';
-    const ts = getBeneficiaryTomSelect();
-    if (ts) ts.setValue(cr.beneficiary_id ? String(cr.beneficiary_id) : '');
-    else document.getElementById('crqBeneficiary').value = cr.beneficiary_id || '';
+    document.getElementById('crqBeneficiaryId').value = cr.beneficiary_id || '';
+    const ben = beneficiaries.find(b => b.id === cr.beneficiary_id);
+    document.getElementById('crqBeneficiaryName').value = ben ? ben.name : (cr.beneficiary_name || '');
     document.getElementById('crqPriority').value = cr.priority;
     document.getElementById('crqPurpose').value = cr.purpose || '';
     document.getElementById('crqAmount').value = cr.requested_amount;
