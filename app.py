@@ -1528,11 +1528,14 @@ class WeeklyForecast(db.Model):
     start_weather = db.Column(db.String(200))
     start_weather_desc = db.Column(db.Text)
     start_suggestion = db.Column(db.Text)
-    # --- Per-section fields (साताको मध्य: आइतबार-बुधबार) ---
-    mid_weather = db.Column(db.String(200))
-    mid_weather_desc = db.Column(db.Text)
-    mid_suggestion = db.Column(db.Text)
-    # --- Per-section fields (साताको अन्त्य: बिहीबार) ---
+    # --- Per-day fields (साताको मध्य: आइतबार-मंगलबार) ---
+    sun_weather = db.Column(db.String(200))
+    sun_weather_desc = db.Column(db.Text)
+    mon_weather = db.Column(db.String(200))
+    mon_weather_desc = db.Column(db.Text)
+    tue_weather = db.Column(db.String(200))
+    tue_weather_desc = db.Column(db.Text)
+    # --- Per-section fields (साताको अन्त्य: बुधबार-बिहीबार) ---
     end_weather = db.Column(db.String(200))
     end_weather_desc = db.Column(db.Text)
     end_suggestion = db.Column(db.Text)
@@ -1556,9 +1559,12 @@ class WeeklyForecast(db.Model):
             'start_weather': self.start_weather or '',
             'start_weather_desc': self.start_weather_desc or '',
             'start_suggestion': self.start_suggestion or '',
-            'mid_weather': self.mid_weather or '',
-            'mid_weather_desc': self.mid_weather_desc or '',
-            'mid_suggestion': self.mid_suggestion or '',
+            'sun_weather': self.sun_weather or '',
+            'sun_weather_desc': self.sun_weather_desc or '',
+            'mon_weather': self.mon_weather or '',
+            'mon_weather_desc': self.mon_weather_desc or '',
+            'tue_weather': self.tue_weather or '',
+            'tue_weather_desc': self.tue_weather_desc or '',
             'end_weather': self.end_weather or '',
             'end_weather_desc': self.end_weather_desc or '',
             'end_suggestion': self.end_suggestion or '',
@@ -7105,9 +7111,12 @@ def handle_weekly_forecasts():
             start_weather=data.get('start_weather', ''),
             start_weather_desc=data.get('start_weather_desc', ''),
             start_suggestion=data.get('start_suggestion', ''),
-            mid_weather=data.get('mid_weather', ''),
-            mid_weather_desc=data.get('mid_weather_desc', ''),
-            mid_suggestion=data.get('mid_suggestion', ''),
+            sun_weather=data.get('sun_weather', ''),
+            sun_weather_desc=data.get('sun_weather_desc', ''),
+            mon_weather=data.get('mon_weather', ''),
+            mon_weather_desc=data.get('mon_weather_desc', ''),
+            tue_weather=data.get('tue_weather', ''),
+            tue_weather_desc=data.get('tue_weather_desc', ''),
             end_weather=data.get('end_weather', ''),
             end_weather_desc=data.get('end_weather_desc', ''),
             end_suggestion=data.get('end_suggestion', ''),
@@ -7158,9 +7167,12 @@ def manage_weekly_forecast(id):
         forecast.start_weather = data.get('start_weather', forecast.start_weather)
         forecast.start_weather_desc = data.get('start_weather_desc', forecast.start_weather_desc)
         forecast.start_suggestion = data.get('start_suggestion', forecast.start_suggestion)
-        forecast.mid_weather = data.get('mid_weather', forecast.mid_weather)
-        forecast.mid_weather_desc = data.get('mid_weather_desc', forecast.mid_weather_desc)
-        forecast.mid_suggestion = data.get('mid_suggestion', forecast.mid_suggestion)
+        forecast.sun_weather = data.get('sun_weather', forecast.sun_weather)
+        forecast.sun_weather_desc = data.get('sun_weather_desc', forecast.sun_weather_desc)
+        forecast.mon_weather = data.get('mon_weather', forecast.mon_weather)
+        forecast.mon_weather_desc = data.get('mon_weather_desc', forecast.mon_weather_desc)
+        forecast.tue_weather = data.get('tue_weather', forecast.tue_weather)
+        forecast.tue_weather_desc = data.get('tue_weather_desc', forecast.tue_weather_desc)
         forecast.end_weather = data.get('end_weather', forecast.end_weather)
         forecast.end_weather_desc = data.get('end_weather_desc', forecast.end_weather_desc)
         forecast.end_suggestion = data.get('end_suggestion', forecast.end_suggestion)
@@ -10362,9 +10374,12 @@ def init_db():
                     ('start_weather', 'VARCHAR(200)'),
                     ('start_weather_desc', 'TEXT'),
                     ('start_suggestion', 'TEXT'),
-                    ('mid_weather', 'VARCHAR(200)'),
-                    ('mid_weather_desc', 'TEXT'),
-                    ('mid_suggestion', 'TEXT'),
+                    ('sun_weather', 'VARCHAR(200)'),
+                    ('sun_weather_desc', 'TEXT'),
+                    ('mon_weather', 'VARCHAR(200)'),
+                    ('mon_weather_desc', 'TEXT'),
+                    ('tue_weather', 'VARCHAR(200)'),
+                    ('tue_weather_desc', 'TEXT'),
                     ('end_weather', 'VARCHAR(200)'),
                     ('end_weather_desc', 'TEXT'),
                     ('end_suggestion', 'TEXT'),
@@ -10397,6 +10412,21 @@ def init_db():
                 except Exception as e:
                     db.session.rollback()
                     print(f"[WARN] Could not backfill suggestion in weekly_forecast: {e}")
+                # Migrate mid_weather to per-day fields if mid_weather exists
+                try:
+                    rows = db.session.execute(db.text(
+                        "SELECT id, mid_weather, mid_weather_desc, sun_weather FROM weekly_forecast WHERE mid_weather IS NOT NULL AND sun_weather IS NULL"
+                    )).fetchall()
+                    for r in rows:
+                        db.session.execute(db.text(
+                            "UPDATE weekly_forecast SET sun_weather = :sw, mon_weather = :mw, tue_weather = :tw, sun_weather_desc = :swd, mon_weather_desc = :mwd, tue_weather_desc = :twd WHERE id = :i"
+                        ), {"sw": r[1], "mw": r[1], "tw": r[1], "swd": r[2], "mwd": r[2], "twd": r[2], "i": r[0]})
+                    db.session.commit()
+                    if rows:
+                        print(f"[MIGRATE] Migrated mid_weather to per-day fields for {len(rows)} records")
+                except Exception as e:
+                    db.session.rollback()
+                    print(f"[WARN] Could not migrate mid_weather to per-day fields: {e}")
 
             if 'dispatch_item' in inspector.get_table_names():
                 di_cols = [c['name'] for c in inspector.get_columns('dispatch_item')]

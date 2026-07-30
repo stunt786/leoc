@@ -257,16 +257,45 @@ async function getSetting(key) {
     } catch(e) { return null; }
 }
 
+function esc(s) {
+    if (!s) return '';
+    const d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+}
+
 async function renderList(key, containerId) {
     const container = document.getElementById(containerId);
     const items = await getSetting(key);
     if (!Array.isArray(items)) return;
     container.innerHTML = items.map((item, i) =>
         `<div class="d-flex justify-content-between align-items-center mb-1 p-1 border rounded">
-            <span>${item}</span>
+            <div class="d-flex align-items-center gap-2 flex-grow-1">
+                <input type="text" class="form-control form-control-sm list-item-input" value="${esc(item)}" data-key="${key}" data-index="${i}" style="max-width:250px">
+            </div>
             <button class="btn btn-sm btn-outline-danger" onclick="removeListItem('${key}', ${i}, '${containerId}')"><i class="bi bi-x"></i></button>
         </div>`
     ).join('');
+    container.querySelectorAll('.list-item-input').forEach(inp => {
+        inp.addEventListener('change', async function() {
+            const k = this.dataset.key;
+            const idx = parseInt(this.dataset.index);
+            const val = this.value.trim();
+            if (!val) return;
+            const list = await getSetting(k) || [];
+            list[idx] = val;
+            const resp = await fetch(`/api/settings/${k}`, {
+                method: 'POST',
+                headers: {'Content-Type':'application/json','X-CSRFToken':document.querySelector('meta[name="csrf-token"]').getAttribute('content')},
+                body: JSON.stringify({value: list})
+            });
+            const d = await resp.json();
+            if (!d.success) { showToast('danger', d.message); await renderList(k, containerId); return; }
+            await renderList(k, containerId);
+            if (k === 'fiscal_years') renderActiveFiscalYear();
+            showToast('success', `${k} updated`);
+        });
+    });
 }
 
 async function renderActiveFiscalYear() {

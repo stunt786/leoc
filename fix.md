@@ -1,8 +1,8 @@
 #Migration to Live Server
-**Migrate the frontend code templates/cash_requests.html
+**Migrate the frontend code changed today (settings, weekly-forecast, weekly-forecast-preview) & db columns without destructing functionality
 
 ##Server Details
-100.122.245.52
+192.168.101.10
 username: thalaramun
 password: thalaraMUN@3
  
@@ -11,5 +11,5 @@ application location directory: /home/thalaramun/leoc
 docker containers: leoc-app & leoc-db
 
 ## Migration Note
-just only copy emplates/cash_requests.html file that is updated and restart or rebuild the leoc-app to make changes on the server
+just only migrate latest update code for weekly-forecast, weekly-forecast-preview and settings page changes and db changes for respective pages if
 
