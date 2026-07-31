@@ -1,5 +1,5 @@
 #Migration to Live Server
-**Migrate the frontend code changed today (settings, weekly-forecast, weekly-forecast-preview) & db columns without destructing functionality
+**Migrate the frontend code changed today (incidents form, weekly-forecast, weekly-forecast-preview, notifications,dateBs fix) & db columns without destructing functionality
 
 ##Server Details
 192.168.101.10
@@ -11,5 +11,5 @@ application location directory: /home/thalaramun/leoc
 docker containers: leoc-app & leoc-db
 
 ## Migration Note
-just only migrate latest update code for weekly-forecast, weekly-forecast-preview and settings page changes and db changes for respective pages if
+just only migrate latest update code for weekly-forecast, weekly-forecast-preview and incidents, notifications page, datebs issue showing wrong days count in some months changes and db changes for respective pages if
 

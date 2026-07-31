@@ -20459,3 +20459,4 @@ sqlalchemy.exc.OperationalError: (psycopg2.OperationalError) connection to serve
 	Is the server running on that host and accepting TCP/IP connections?
 
 (Background on this error at: https://sqlalche.me/e/20/e3q8)
+2026-07-31 12:54:06,580 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:167]

@@ -219,6 +219,8 @@
         }
         const dot = document.querySelector('.notification-dot');
         if (dot) dot.style.display = count > 0 ? 'block' : 'none';
+        const clearBtn = document.getElementById('clearAllNotifications');
+        if (clearBtn) clearBtn.style.display = count > 0 ? 'inline-block' : 'none';
     }
 
     function renderHighAlerts(notifications) {
@@ -327,6 +329,37 @@
         } catch (e) {
             console.error('Failed to load notifications:', e);
         }
+    }
+
+    async function clearAllNotifications() {
+        try {
+            const response = await fetch('/api/notifications/clear', {
+                method: 'POST',
+                headers: {'X-CSRFToken': getCsrfToken()},
+            });
+            if (!response.ok) return;
+            const data = await response.json();
+            if (data && data.success) {
+                const container = document.getElementById('notificationList');
+                if (container) {
+                    container.innerHTML = '<div class="p-4 text-center text-muted"><i class="bi bi-bell-slash d-block mb-2" style="font-size:2rem"></i><small>No notifications</small></div>';
+                }
+                const alertContainer = document.getElementById('highAlertContainer');
+                if (alertContainer) alertContainer.innerHTML = '';
+                updateNotificationBadge(0);
+            }
+        } catch (e) {
+            console.error('Failed to clear all notifications:', e);
+        }
+    }
+
+    const clearAllBtn = document.getElementById('clearAllNotifications');
+    if (clearAllBtn) {
+        clearAllBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            clearAllNotifications();
+        });
     }
 
     const notifToggle = document.getElementById('notificationToggle');

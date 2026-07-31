@@ -449,7 +449,10 @@
                         <div class="dropdown-menu dropdown-menu-end" style="width:340px;max-height:450px;overflow-y:auto">
                             <div class="dropdown-header d-flex justify-content-between align-items-center">
                                 <strong>Notifications</strong>
-                                <span class="badge bg-primary rounded-pill" id="notificationBadge" style="display:none">0</span>
+                                <div class="d-flex align-items-center gap-2">
+                                    <button class="btn btn-sm btn-outline-danger px-2 py-0" id="clearAllNotifications" style="font-size:0.7rem;display:none">Clear All</button>
+                                    <span class="badge bg-primary rounded-pill" id="notificationBadge" style="display:none">0</span>
+                                </div>
                             </div>
                             <div id="notificationList"></div>
                             <div class="dropdown-footer border-top text-center p-2">

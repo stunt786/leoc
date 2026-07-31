@@ -396,6 +396,7 @@ document.getElementById('inc_incident_name').addEventListener('input', function(
 });
 
 let _autoCalcFlag = false;
+const userSetMissing = new Set();
 
 function setValidity(id, ok) {
     const el = document.getElementById(id);
@@ -413,35 +414,41 @@ function validateIncidentFields() {
     const m_m = v('inc_missing_male'), m_f = v('inc_missing_female');
     const hh = v('inc_affected_households'), h_dest = v('inc_house_destroyed'), h_dam = v('inc_house_damaged');
 
-    // Rule 1: Total = Male + Female
-    const totalOk = ap === 0 || (ap_m + ap_f) === ap;
+    // Check if gender fields were explicitly inputted (non-default)
+    const apEntered = ap_m > 0 || ap_f > 0;
+    // Rule 1: Total = Male + Female (only if gender entered)
+    const totalOk = !apEntered || (ap_m + ap_f) === ap;
     const totalMsg = totalOk
-        ? (ap > 0 ? `<span class="text-success"><i class="bi bi-check-circle me-1"></i>${ap} = ${ap_m} (M) + ${ap_f} (F)</span>` : '')
-        : `<span class="text-danger"><i class="bi bi-exclamation-triangle me-1"></i>${ap} ≠ ${ap_m} + ${ap_f} = ${ap_m + ap_f}</span>`;
+        ? (apEntered ? `<span class="text-success"><i class="bi bi-check-circle me-1"></i>${ap_m} (M) + ${ap_f} (F) = ${ap_m + ap_f}</span>` : '')
+        : `<span class="text-danger"><i class="bi bi-exclamation-triangle me-1"></i>${ap_m} (M) + ${ap_f} (F) = ${ap_m + ap_f} ≠ ${ap}</span>`;
     setValidity('inc_affected_people', totalOk);
     setValidity('inc_affected_people_male', totalOk);
     setValidity('inc_affected_people_female', totalOk);
     const te = $('val_total_people');
     if (te) te.innerHTML = totalMsg;
 
-    // Rule 2: Male sub-categories = Male total
+    // Check if male sub-fields were explicitly inputted
+    const maleSubEntered = d_m > 0 || i_m > 0 || m_m > 0;
+    // Rule 2: Male sub-categories each <= Male total, and sum <= Male total (safe allowed)
     const maleSum = d_m + i_m + m_m;
-    const maleOk = ap_m === 0 || maleSum === ap_m;
+    const maleOk = !maleSubEntered || (d_m <= ap_m && i_m <= ap_m && m_m <= ap_m && maleSum <= ap_m);
     const maleMsg = maleOk
-        ? (ap_m > 0 ? `<span class="text-success"><i class="bi bi-check-circle me-1"></i>${d_m}+${i_m}+${m_m} = ${ap_m} (M)</span>` : '')
-        : `<span class="text-danger"><i class="bi bi-exclamation-triangle me-1"></i>${d_m}+${i_m}+${m_m} = ${maleSum} ≠ ${ap_m}</span>`;
+        ? (maleSubEntered ? `<span class="text-success"><i class="bi bi-check-circle me-1"></i>Death ${d_m} ≤ ${ap_m}, Injured ${i_m} ≤ ${ap_m}, Missing ${m_m} ≤ ${ap_m}, Sum ${maleSum} ≤ ${ap_m} (M)</span>` : '')
+        : `<span class="text-danger"><i class="bi bi-exclamation-triangle me-1"></i>Death ${d_m}, Injured ${i_m}, Missing ${m_m} exceed Male ${ap_m}</span>`;
     setValidity('inc_death_male', maleOk);
     setValidity('inc_injured_male', maleOk);
     setValidity('inc_missing_male', maleOk);
     const me = $('val_male');
     if (me) me.innerHTML = maleMsg;
 
-    // Rule 3: Female sub-categories = Female total
+    // Check if female sub-fields were explicitly inputted
+    const femaleSubEntered = d_f > 0 || i_f > 0 || m_f > 0;
+    // Rule 3: Female sub-categories each <= Female total, and sum <= Female total (safe allowed)
     const femaleSum = d_f + i_f + m_f;
-    const femaleOk = ap_f === 0 || femaleSum === ap_f;
+    const femaleOk = !femaleSubEntered || (d_f <= ap_f && i_f <= ap_f && m_f <= ap_f && femaleSum <= ap_f);
     const femaleMsg = femaleOk
-        ? (ap_f > 0 ? `<span class="text-success"><i class="bi bi-check-circle me-1"></i>${d_f}+${i_f}+${m_f} = ${ap_f} (F)</span>` : '')
-        : `<span class="text-danger"><i class="bi bi-exclamation-triangle me-1"></i>${d_f}+${i_f}+${m_f} = ${femaleSum} ≠ ${ap_f}</span>`;
+        ? (femaleSubEntered ? `<span class="text-success"><i class="bi bi-check-circle me-1"></i>Death ${d_f} ≤ ${ap_f}, Injured ${i_f} ≤ ${ap_f}, Missing ${m_f} ≤ ${ap_f}, Sum ${femaleSum} ≤ ${ap_f} (F)</span>` : '')
+        : `<span class="text-danger"><i class="bi bi-exclamation-triangle me-1"></i>Death ${d_f}, Injured ${i_f}, Missing ${m_f} exceed Female ${ap_f}</span>`;
     setValidity('inc_death_female', femaleOk);
     setValidity('inc_injured_female', femaleOk);
     setValidity('inc_missing_female', femaleOk);
@@ -484,11 +491,11 @@ function autoCalcIncidentFields(changedId) {
         else if (ap_m > 0) s('inc_affected_people', ap_m + ap_f);
     }
 
-    // Rule 2+3: Death + Injured + Missing = Gender total (auto-fill missing)
+    // Rule 2+3: Death + Injured + Missing = Gender total (auto-fill missing, but respect user-entered values)
     const ap_m2 = v('inc_affected_people_male'), ap_f2 = v('inc_affected_people_female');
-    if (ap_m2 > 0 && !['inc_missing_male'].includes(changedId))
+    if (ap_m2 > 0 && !userSetMissing.has('inc_missing_male'))
         s('inc_missing_male', Math.max(0, ap_m2 - d_m - i_m));
-    if (ap_f2 > 0 && !['inc_missing_female'].includes(changedId))
+    if (ap_f2 > 0 && !userSetMissing.has('inc_missing_female'))
         s('inc_missing_female', Math.max(0, ap_f2 - d_f - i_f));
 
     // Rule 4: Affected Households = Destroyed + Damaged
@@ -604,6 +611,9 @@ function deserializeForm(i) {
         }
     });
     document.getElementById('inc_ward').value = i.ward || '';
+    // Treat existing missing values as user-set (don't auto-calc over them)
+    userSetMissing.add('inc_missing_male');
+    userSetMissing.add('inc_missing_female');
     validateIncidentFields();
 }
 
@@ -617,6 +627,7 @@ function resetIncidentForm() {
     delete document.getElementById('inc_incident_name').dataset.userEdited;
     // Zero out all number fields
     document.querySelectorAll('#incidentForm input[type="number"]').forEach(el => el.value = 0);
+    userSetMissing.clear();
     clearValidation();
     loadIncidentTypes();
 }
@@ -644,16 +655,21 @@ async function saveIncident() {
     if (!body.ward) { showToast('danger', 'Ward is required'); return; }
     if (!body.coordinates || !body.coordinates.trim()) { showToast('danger', 'Coordinates are required'); return; }
     // Reject inconsistent numeric fields
-    if (body.affected_people > 0 && (body.affected_people_male + body.affected_people_female) !== body.affected_people) {
-        showToast('danger', `Affected people (${body.affected_people}) must equal Male (${body.affected_people_male}) + Female (${body.affected_people_female})`);
+    const apEntered = body.affected_people_male > 0 || body.affected_people_female > 0;
+    if (apEntered && (body.affected_people_male + body.affected_people_female) !== body.affected_people) {
+        showToast('danger', `Male (${body.affected_people_male}) + Female (${body.affected_people_female}) = ${body.affected_people_male + body.affected_people_female} ≠ Affected (${body.affected_people})`);
         return;
     }
-    if (body.affected_people_male > 0 && (body.death_male + body.injured_male + body.missing_male) !== body.affected_people_male) {
-        showToast('danger', `Male death+injured+missing (${body.death_male + body.injured_male + body.missing_male}) must equal Male affected (${body.affected_people_male})`);
+    const maleSubEntered = body.death_male > 0 || body.injured_male > 0 || body.missing_male > 0;
+    const maleSum = body.death_male + body.injured_male + body.missing_male;
+    if (maleSubEntered && (body.death_male > body.affected_people_male || body.injured_male > body.affected_people_male || body.missing_male > body.affected_people_male || maleSum > body.affected_people_male)) {
+        showToast('danger', `Male: Death(${body.death_male}), Injured(${body.injured_male}), Missing(${body.missing_male}) cannot exceed Male Affected(${body.affected_people_male}), Sum(${maleSum}) ≤ ${body.affected_people_male}`);
         return;
     }
-    if (body.affected_people_female > 0 && (body.death_female + body.injured_female + body.missing_female) !== body.affected_people_female) {
-        showToast('danger', `Female death+injured+missing (${body.death_female + body.injured_female + body.missing_female}) must equal Female affected (${body.affected_people_female})`);
+    const femaleSubEntered = body.death_female > 0 || body.injured_female > 0 || body.missing_female > 0;
+    const femaleSum = body.death_female + body.injured_female + body.missing_female;
+    if (femaleSubEntered && (body.death_female > body.affected_people_female || body.injured_female > body.affected_people_female || body.missing_female > body.affected_people_female || femaleSum > body.affected_people_female)) {
+        showToast('danger', `Female: Death(${body.death_female}), Injured(${body.injured_female}), Missing(${body.missing_female}) cannot exceed Female Affected(${body.affected_people_female}), Sum(${femaleSum}) ≤ ${body.affected_people_female}`);
         return;
     }
     if (body.affected_households > 0 && (body.house_destroyed + body.house_damaged) !== body.affected_households) {
@@ -778,7 +794,11 @@ document.addEventListener('DOMContentLoaded', () => {
     ];
     autoFields.forEach(id => {
         const el = document.getElementById(id);
-        if (el) el.addEventListener('input', () => autoCalcIncidentFields(id));
+        if (!el) return;
+        el.addEventListener('input', () => {
+            if (id === 'inc_missing_male' || id === 'inc_missing_female') userSetMissing.add(id);
+            autoCalcIncidentFields(id);
+        });
     });
 });
 </script>

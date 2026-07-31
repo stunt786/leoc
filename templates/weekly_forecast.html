@@ -137,9 +137,9 @@
               <label class="form-label">विवरण</label>
               <input type="text" class="form-control" id="start_weather_desc" placeholder="शुरुबातको मौसम विवरण">
             </div>
-            <!-- साताको मध्य - आइतबार -->
+            <!-- साताको मध्य -->
             <div class="col-12 mt-3">
-              <h6 class="text-warning mb-2"><i class="bi bi-cloud-sun me-1"></i> आइतबार</h6>
+              <h6 class="text-warning mb-2"><i class="bi bi-cloud-sun me-1"></i> साताको मध्य (आइतबार / सोमबार / मंगलबार)</h6>
             </div>
             <div class="col-md-4">
               <label class="form-label">मौसम स्थिति</label>
@@ -166,71 +166,7 @@
             </div>
             <div class="col-md-4">
               <label class="form-label">विवरण</label>
-              <input type="text" class="form-control" id="sun_weather_desc" placeholder="आइतबारको मौसम विवरण">
-            </div>
-
-            <!-- साताको मध्य - सोमबार -->
-            <div class="col-12 mt-3">
-              <h6 class="text-warning mb-2"><i class="bi bi-cloud-sun me-1"></i> सोमबार</h6>
-            </div>
-            <div class="col-md-4">
-              <label class="form-label">मौसम स्थिति</label>
-              <select class="form-select" id="mon_weather">
-                <option value="">चयन गर्नुहोस्</option>
-                <option value="मुख्यतया सफा रहने">मुख्यतया सफा रहने</option>
-                <option value="आंसिक बदली रहने">आंसिक बदली रहने</option>
-                <option value="साधारणतया बदली रहने">साधारणतया बदली रहने</option>
-                <option value="अधिकांस बदली रहने">अधिकांस बदली रहने</option>
-                <option value="पूर्ण बदली रहने">पूर्ण बदली रहने</option>
-                <option value="क्षणिक बर्षा हुने">क्षणिक बर्षा हुने</option>
-                <option value="लगातार बर्षा हुने">लगातार बर्षा हुने</option>
-                <option value="रोकिदै बर्षा हुने">रोकिदै बर्षा हुने</option>
-                <option value="ब्यापक बर्षा हुने">ब्यापक बर्षा हुने</option>
-                <option value="हल्का बर्षाको सम्भावना">हल्का बर्षाको सम्भावना</option>
-                <option value="मध्यम बर्षाको सम्भावना">मध्यम बर्षाको सम्भावना</option>
-                <option value="भारी बर्षाको सम्भावना">भारी बर्षाको सम्भावना</option>
-                <option value="धेरै भारी बर्षाको सम्भावना">धेरै भारी बर्षाको सम्भावना</option>
-                <option value="अति धेरै बर्षाको सम्भावना">अति धेरै बर्षाको सम्भावना</option>
-                <option value="हिमपात हुने सम्भावना">हिमपात हुने सम्भावना</option>
-                <option value="शितलहर हुने सम्भावना">शितलहर हुने सम्भावना</option>
-                <option value="लु-लहर चल्ने सम्भावना">लु-लहर चल्ने सम्भावना</option>
-              </select>
-            </div>
-            <div class="col-md-4">
-              <label class="form-label">विवरण</label>
-              <input type="text" class="form-control" id="mon_weather_desc" placeholder="सोमबारको मौसम विवरण">
-            </div>
-
-            <!-- साताको मध्य - मंगलबार -->
-            <div class="col-12 mt-3">
-              <h6 class="text-warning mb-2"><i class="bi bi-cloud-sun me-1"></i> मंगलबार</h6>
-            </div>
-            <div class="col-md-4">
-              <label class="form-label">मौसम स्थिति</label>
-              <select class="form-select" id="tue_weather">
-                <option value="">चयन गर्नुहोस्</option>
-                <option value="मुख्यतया सफा रहने">मुख्यतया सफा रहने</option>
-                <option value="आंसिक बदली रहने">आंसिक बदली रहने</option>
-                <option value="साधारणतया बदली रहने">साधारणतया बदली रहने</option>
-                <option value="अधिकांस बदली रहने">अधिकांस बदली रहने</option>
-                <option value="पूर्ण बदली रहने">पूर्ण बदली रहने</option>
-                <option value="क्षणिक बर्षा हुने">क्षणिक बर्षा हुने</option>
-                <option value="लगातार बर्षा हुने">लगातार बर्षा हुने</option>
-                <option value="रोकिदै बर्षा हुने">रोकिदै बर्षा हुने</option>
-                <option value="ब्यापक बर्षा हुने">ब्यापक बर्षा हुने</option>
-                <option value="हल्का बर्षाको सम्भावना">हल्का बर्षाको सम्भावना</option>
-                <option value="मध्यम बर्षाको सम्भावना">मध्यम बर्षाको सम्भावना</option>
-                <option value="भारी बर्षाको सम्भावना">भारी बर्षाको सम्भावना</option>
-                <option value="धेरै भारी बर्षाको सम्भावना">धेरै भारी बर्षाको सम्भावना</option>
-                <option value="अति धेरै बर्षाको सम्भावना">अति धेरै बर्षाको सम्भावना</option>
-                <option value="हिमपात हुने सम्भावना">हिमपात हुने सम्भावना</option>
-                <option value="शितलहर हुने सम्भावना">शितलहर हुने सम्भावना</option>
-                <option value="लु-लहर चल्ने सम्भावना">लु-लहर चल्ने सम्भावना</option>
-              </select>
-            </div>
-            <div class="col-md-4">
-              <label class="form-label">विवरण</label>
-              <input type="text" class="form-control" id="tue_weather_desc" placeholder="मंगलबारको मौसम विवरण">
+              <input type="text" class="form-control" id="sun_weather_desc" placeholder="मध्यको मौसम विवरण">
             </div>
 
             <!-- साताको अन्त्य -->
@@ -465,10 +401,6 @@ function resetForecastForm() {
   document.getElementById('start_weather_desc').value = '';
   document.getElementById('sun_weather').value = '';
   document.getElementById('sun_weather_desc').value = '';
-  document.getElementById('mon_weather').value = '';
-  document.getElementById('mon_weather_desc').value = '';
-  document.getElementById('tue_weather').value = '';
-  document.getElementById('tue_weather_desc').value = '';
   document.getElementById('end_weather').value = '';
   document.getElementById('end_weather_desc').value = '';
   document.getElementById('suggestion').value = '';
@@ -496,10 +428,6 @@ async function editForecast(id) {
     document.getElementById('start_weather_desc').value = f.start_weather_desc || '';
     document.getElementById('sun_weather').value = f.sun_weather || '';
     document.getElementById('sun_weather_desc').value = f.sun_weather_desc || '';
-    document.getElementById('mon_weather').value = f.mon_weather || '';
-    document.getElementById('mon_weather_desc').value = f.mon_weather_desc || '';
-    document.getElementById('tue_weather').value = f.tue_weather || '';
-    document.getElementById('tue_weather_desc').value = f.tue_weather_desc || '';
     document.getElementById('end_weather').value = f.end_weather || '';
     document.getElementById('end_weather_desc').value = f.end_weather_desc || '';
     document.getElementById('suggestion').value = f.suggestion || '';
@@ -551,10 +479,6 @@ async function saveForecast() {
     start_weather_desc: document.getElementById('start_weather_desc').value.trim(),
     sun_weather: document.getElementById('sun_weather').value,
     sun_weather_desc: document.getElementById('sun_weather_desc').value.trim(),
-    mon_weather: document.getElementById('mon_weather').value,
-    mon_weather_desc: document.getElementById('mon_weather_desc').value.trim(),
-    tue_weather: document.getElementById('tue_weather').value,
-    tue_weather_desc: document.getElementById('tue_weather_desc').value.trim(),
     end_weather: document.getElementById('end_weather').value,
     end_weather_desc: document.getElementById('end_weather_desc').value.trim(),
     suggestion: document.getElementById('suggestion').value.trim(),

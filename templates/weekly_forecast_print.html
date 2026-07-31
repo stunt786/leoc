@@ -372,7 +372,7 @@
         <tr>
           <th style="border:1px solid #1a3c6e; background:#1a3c6e; color:white; padding:5px 8px; width:70px; text-align:center; font-weight:700;">वार/दिन</th>
           <th class="group-header gh-start" colspan="2">साताको शुरुबात</th>
-          <th class="group-header gh-mid" colspan="3">साताको मध्य</th>
+          <th class="group-header gh-mid">साताको मध्य</th>
           <th class="group-header gh-end" colspan="2">साताको अन्त्य</th>
         </tr>
         <!-- Day headers -->
@@ -380,9 +380,7 @@
           <th style="border:1px solid #90caf9; background:#dce8f5; padding:5px; text-align:center; font-weight:700; font-size:10pt;">मौसम</th>
           <th class="day-col-header dc-start">शुक्रबार</th>
           <th class="day-col-header dc-start">शनिबार</th>
-          <th class="day-col-header dc-mid">आइतबार</th>
-          <th class="day-col-header dc-mid">सोमबार</th>
-          <th class="day-col-header dc-mid">मंगलबार</th>
+          <th class="day-col-header dc-mid">आइतबार / सोमबार / मंगलबार</th>
           <th class="day-col-header dc-end" colspan="2">बुधबार / बिहीबार</th>
         </tr>
       </thead>
@@ -415,71 +413,26 @@
             {% endif %}
           </td>
 
-          {% set ws_sun = forecast.sun_weather or forecast.weather_status or '' %}
-          {% macro sun_weather_cell() %}
-            {% if 'हिमपात' in ws_sun or 'हिम' in ws_sun %}
+          {% set ws_mid = forecast.sun_weather or forecast.weather_status or '' %}
+          <td class="weather-cell">
+            {% if 'हिमपात' in ws_mid or 'हिम' in ws_mid %}
               <span class="weather-icon">🌨️</span>
-            {% elif 'भारी बर्षा' in ws_sun or 'अति धेरै' in ws_sun %}
+            {% elif 'भारी बर्षा' in ws_mid or 'अति धेरै' in ws_mid %}
               <span class="weather-icon">⛈️</span>
-            {% elif 'बर्षा' in ws_sun or 'वर्षा' in ws_sun %}
+            {% elif 'बर्षा' in ws_mid or 'वर्षा' in ws_mid %}
               <span class="weather-icon">🌧️</span>
-            {% elif 'बदली' in ws_sun %}
+            {% elif 'बदली' in ws_mid %}
               <span class="weather-icon">⛅</span>
-            {% elif 'सफा' in ws_sun %}
+            {% elif 'सफा' in ws_mid %}
               <span class="weather-icon">☀️</span>
-            {% elif 'शितलहर' in ws_sun or 'लु-लहर' in ws_sun %}
+            {% elif 'शितलहर' in ws_mid or 'लु-लहर' in ws_mid %}
               <span class="weather-icon">🌬️</span>
             {% else %}
               <span class="weather-icon">🌤️</span>
             {% endif %}
             <div class="weather-text">{{ forecast.sun_weather or forecast.weather_status or '-' }}</div>
             {% if forecast.sun_weather_desc %}<div class="weather-desc">{{ forecast.sun_weather_desc }}</div>{% endif %}
-          {% endmacro %}
-          <td class="weather-cell">{{ sun_weather_cell() }}</td>
-
-          {% set ws_mon = forecast.mon_weather or forecast.weather_status or '' %}
-          {% macro mon_weather_cell() %}
-            {% if 'हिमपात' in ws_mon or 'हिम' in ws_mon %}
-              <span class="weather-icon">🌨️</span>
-            {% elif 'भारी बर्षा' in ws_mon or 'अति धेरै' in ws_mon %}
-              <span class="weather-icon">⛈️</span>
-            {% elif 'बर्षा' in ws_mon or 'वर्षा' in ws_mon %}
-              <span class="weather-icon">🌧️</span>
-            {% elif 'बदली' in ws_mon %}
-              <span class="weather-icon">⛅</span>
-            {% elif 'सफा' in ws_mon %}
-              <span class="weather-icon">☀️</span>
-            {% elif 'शितलहर' in ws_mon or 'लु-लहर' in ws_mon %}
-              <span class="weather-icon">🌬️</span>
-            {% else %}
-              <span class="weather-icon">🌤️</span>
-            {% endif %}
-            <div class="weather-text">{{ forecast.mon_weather or forecast.weather_status or '-' }}</div>
-            {% if forecast.mon_weather_desc %}<div class="weather-desc">{{ forecast.mon_weather_desc }}</div>{% endif %}
-          {% endmacro %}
-          <td class="weather-cell">{{ mon_weather_cell() }}</td>
-
-          {% set ws_tue = forecast.tue_weather or forecast.weather_status or '' %}
-          {% macro tue_weather_cell() %}
-            {% if 'हिमपात' in ws_tue or 'हिम' in ws_tue %}
-              <span class="weather-icon">🌨️</span>
-            {% elif 'भारी बर्षा' in ws_tue or 'अति धेरै' in ws_tue %}
-              <span class="weather-icon">⛈️</span>
-            {% elif 'बर्षा' in ws_tue or 'वर्षा' in ws_tue %}
-              <span class="weather-icon">🌧️</span>
-            {% elif 'बदली' in ws_tue %}
-              <span class="weather-icon">⛅</span>
-            {% elif 'सफा' in ws_tue %}
-              <span class="weather-icon">☀️</span>
-            {% elif 'शितलहर' in ws_tue or 'लु-लहर' in ws_tue %}
-              <span class="weather-icon">🌬️</span>
-            {% else %}
-              <span class="weather-icon">🌤️</span>
-            {% endif %}
-            <div class="weather-text">{{ forecast.tue_weather or forecast.weather_status or '-' }}</div>
-            {% if forecast.tue_weather_desc %}<div class="weather-desc">{{ forecast.tue_weather_desc }}</div>{% endif %}
-          {% endmacro %}
-          <td class="weather-cell">{{ tue_weather_cell() }}</td>
+          </td>
 
           {% set ws_end = forecast.end_weather or forecast.weather_status or '' %}
           {% macro end_weather_cell() %}
@@ -507,7 +460,7 @@
         <!-- Suggestions row: single merged cell -->
         <tr>
           <td class="row-label" style="background:#27ae60;">सुझाव</td>
-          <td class="suggestion-cell" colspan="7">
+          <td class="suggestion-cell" colspan="5">
             <div style="text-align:left;">
               {% if forecast.suggestion %}
                 {{ forecast.suggestion }}
