@@ -152,7 +152,6 @@
         dispatch: 'bi-truck-front-fill text-info',
         distribution: 'bi-people-fill text-success',
         cash_receipt: 'bi-cash-coin text-success',
-        cash_request: 'bi-send-exclamation-fill text-warning',
         cash_distribution: 'bi-cash-stack text-danger',
         default: 'bi-bell-fill text-secondary'
     };
@@ -187,7 +186,7 @@
     function getNotificationGroup(notification) {
         const type = notification.type || '';
         if (['low_stock', 'expiry'].includes(type)) return 'Inventory';
-        if (['cash_receipt', 'cash_request', 'cash_distribution'].includes(type)) return 'Finance';
+        if (['cash_receipt', 'cash_distribution'].includes(type)) return 'Finance';
         if (['incident', 'relief_request'].includes(type)) return 'Incidents';
         return 'System';
     }

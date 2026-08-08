@@ -235,13 +235,30 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <div class="mb-3">
-                    <input type="text" class="form-control" id="benPickerSearch" placeholder="Search by name, ID, phone..." oninput="filterBenPicker()">
+                <div class="row g-2 mb-3">
+                    <div class="col-md-6">
+                        <input type="text" class="form-control" id="benPickerSearch" placeholder="Search by name, ID, phone..." oninput="filterBenPicker()">
+                    </div>
+                    <div class="col-md-4">
+                        <select class="form-select" id="benPickerWardFilter" onchange="filterBenPicker()">
+                            <option value="">All Wards</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <span class="form-control form-control-sm text-muted" id="benPickerCount" style="border:none;background:transparent"></span>
+                    </div>
                 </div>
                 <div class="table-responsive" style="max-height:350px">
-                    <table class="table table-sm table-hover mb-0">
+                    <table class="table table-sm table-hover mb-0" id="benPickerTable">
                         <thead class="table-light sticky-top">
-                            <tr><th>Name</th><th>Father's Name</th><th>National ID</th><th>Ward</th><th>Members</th><th></th></tr>
+                            <tr>
+                                <th class="sortable" onclick="sortBenPicker('name')">Name <i class="bi bi-arrow-down-up sort-icon"></i></th>
+                                <th class="sortable" onclick="sortBenPicker('father_name')">Father's Name <i class="bi bi-arrow-down-up sort-icon"></i></th>
+                                <th class="sortable" onclick="sortBenPicker('national_id')">National ID <i class="bi bi-arrow-down-up sort-icon"></i></th>
+                                <th class="sortable" onclick="sortBenPicker('ward')">Ward <i class="bi bi-arrow-down-up sort-icon"></i></th>
+                                <th class="sortable" onclick="sortBenPicker('family_members')">Members <i class="bi bi-arrow-down-up sort-icon"></i></th>
+                                <th></th>
+                            </tr>
                         </thead>
                         <tbody id="benPickerBody"></tbody>
                     </table>
@@ -422,6 +439,8 @@ let beneficiaryDistHistory = {};
 let pendingPhotoFiles = [];
 let pendingDocFiles = [];
 let editingId = null;
+let benPickerSortCol = 'name';
+let benPickerSortDir = 'asc';
 
 async function loadFormData() {
     try {
@@ -873,22 +892,48 @@ async function openBeneficiaryPicker() {
     if (!incidentId) { showToast('danger', 'Please select an incident first before selecting beneficiaries'); return; }
     await loadBeneficiaries();
     await loadAlreadyBeneficiated();
-    renderBenPicker(beneficiaries);
+    loadBenPickerWards();
+    filterBenPicker();
     if (!benPickerModal) {
         benPickerModal = new bootstrap.Modal(document.getElementById('benPickerModal'));
     }
     benPickerModal.show();
 }
 
+function loadBenPickerWards() {
+    const wardSel = document.getElementById('benPickerWardFilter');
+    if (wardSel.options.length > 1) return;
+    fetch('/api/data').then(r => r.json()).then(d => {
+        const wards = d.wards || [];
+        wardSel.innerHTML = '<option value="">All Wards</option>' + wards.map(w => `<option value="${w.id}">${w.name}</option>`).join('');
+    });
+}
+
 function filterBenPicker() {
     const q = document.getElementById('benPickerSearch').value.toLowerCase();
-    const filtered = beneficiaries.filter(b =>
+    const wardVal = document.getElementById('benPickerWardFilter').value;
+    let filtered = beneficiaries.filter(b =>
         (b.name && b.name.toLowerCase().includes(q)) ||
         (b.father_name && b.father_name.toLowerCase().includes(q)) ||
         (b.national_id && b.national_id.toLowerCase().includes(q)) ||
         (b.phone && b.phone.toLowerCase().includes(q))
     );
+    if (wardVal) {
+        filtered = filtered.filter(b => String(b.ward) === String(wardVal));
+    }
     renderBenPicker(filtered);
+}
+
+function sortBenPicker(col) {
+    if (benPickerSortCol === col) {
+        benPickerSortDir = benPickerSortDir === 'asc' ? 'desc' : 'asc';
+    } else {
+        benPickerSortCol = col;
+        benPickerSortDir = 'asc';
+    }
+    document.querySelectorAll('#benPickerTable th').forEach(th => th.classList.remove('sort-active'));
+    event.currentTarget.classList.add('sort-active');
+    filterBenPicker();
 }
 
 function isAlreadySelectedInDist(benId) {
@@ -901,6 +946,25 @@ function isAlreadySelectedInDist(benId) {
 
 function renderBenPicker(list) {
     const tbody = document.getElementById('benPickerBody');
+    const countEl = document.getElementById('benPickerCount');
+    list.sort((a, b) => {
+        let valA = a[benPickerSortCol] ?? '';
+        let valB = b[benPickerSortCol] ?? '';
+        if (benPickerSortCol === 'family_members') { valA = Number(valA) || 0; valB = Number(valB) || 0; }
+        else if (benPickerSortCol === 'ward') { valA = Number(a.ward) || 0; valB = Number(b.ward) || 0; }
+        else { valA = String(valA).toLowerCase(); valB = String(valB).toLowerCase(); }
+        if (valA < valB) return benPickerSortDir === 'asc' ? -1 : 1;
+        if (valA > valB) return benPickerSortDir === 'asc' ? 1 : -1;
+        return 0;
+    });
+    if (countEl) countEl.textContent = list.length + ' found';
+    document.querySelectorAll('#benPickerTable th').forEach(th => th.classList.remove('sort-active'));
+    const headers = ['name', 'father_name', 'national_id', 'ward', 'family_members'];
+    const idx = headers.indexOf(benPickerSortCol);
+    if (idx >= 0) {
+        const th = document.querySelectorAll('#benPickerTable th')[idx];
+        if (th) th.classList.add('sort-active');
+    }
     if (list.length === 0) {
         DataTableManager.destroy('dataTable');
         tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">No beneficiaries found</td></tr>';
@@ -1062,6 +1126,11 @@ function renderDistributions(data) {
         tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-muted">No distributions found</td></tr>';
         return;
     }
+    data = [...data].sort((a, b) => {
+        const da = a.distribution_date || '';
+        const db = b.distribution_date || '';
+        return db.localeCompare(da);
+    });
     tbody.innerHTML = data.map(dist => {
         const allBens = dist.beneficiaries || [];
         const uniqueFamilyNames = [...new Set(allBens.map(b => b.family_name).filter(Boolean))];
@@ -2039,4 +2108,13 @@ document.addEventListener('DOMContentLoaded', function() {
     loadDistributions();
 });
 </script>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    #benPickerTable .sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+    #benPickerTable .sortable:hover { background-color: #e9ecef; }
+    #benPickerTable .sort-icon { font-size: 0.7rem; opacity: 0.4; margin-left: 4px; }
+    #benPickerTable th.sort-active .sort-icon { opacity: 1; color: #0d6efd; }
+</style>
 {% endblock %}

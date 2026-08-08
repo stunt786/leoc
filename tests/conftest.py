@@ -258,7 +258,7 @@ class LeocTestCase(unittest.TestCase):
         self.assertEqual(response.status_code, 201, response.get_json())
         return response.get_json()['data']
 
-    def create_cash_distribution(self, fund_id, incident_id, cash_request_id, amount=300, beneficiary_ids=None):
+    def create_cash_distribution(self, fund_id, incident_id, cash_request_id=None, amount=300, beneficiary_ids=None):
         if beneficiary_ids is None:
             b1 = self.create_beneficiary()
             b2 = self.create_beneficiary()
@@ -272,7 +272,6 @@ class LeocTestCase(unittest.TestCase):
         payload = {
             'fund_id': fund_id,
             'incident_id': incident_id,
-            'cash_request_id': cash_request_id,
             'distribution_type': 'Individual',
             'distribution_date': '2082-03-03',
             'officer': 'Test Officer',

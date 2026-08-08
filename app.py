@@ -1908,22 +1908,12 @@ class CashDistribution(db.Model):
     beneficiaries = db.relationship('CashDistributionBeneficiary', backref='distribution', lazy=True, cascade='all,delete-orphan')
 
     def to_dict(self):
-        cids = json.loads(self.cash_request_ids) if self.cash_request_ids else []
-        req_nums = []
-        for cid in cids:
-            cr = db_get(CashRequest, cid)
-            if cr:
-                req_nums.append(cr.request_number)
         return {
             'id': self.id, 'distribution_no': self.distribution_no,
             'distribution_date': ad_to_bs_date(self.distribution_date),
             'fund_id': self.fund_id, 'fund_name': self.fund.name if self.fund else None,
             'incident_id': self.incident_id,
             'incident_name': self.incident.incident_name if self.incident else None,
-            'cash_request_id': self.cash_request_id,
-            'cash_request_ids': cids,
-            'request_numbers': req_nums,
-            'request_number': req_nums[0] if req_nums else (self.cash_request.request_number if self.cash_request else None),
             'distribution_id': self.distribution_id,
             'distribution_type': self.distribution_type, 'total_amount': self.total_amount,
             'fiscal_year': self.fiscal_year,
@@ -1954,7 +1944,7 @@ class CashDistributionBeneficiary(db.Model):
         return {
             'id': self.id, 'name': self.name, 'national_id': self.national_id,
             'address': self.address, 'phone': self.phone, 'amount': self.amount,
-            'beneficiary_id': self.beneficiary_id, 'cash_request_id': self.cash_request_id
+            'beneficiary_id': self.beneficiary_id
         }
 
 # ============ BENEFICIARY MODEL (shared) ============
@@ -2150,7 +2140,6 @@ VIEW_ENDPOINTS = {
     '/api/beneficiaries': 'beneficiaries',
     '/api/distributions': 'distributions',
     '/api/cash-receipts': 'cash_receipts',
-    '/api/cash-requests': 'cash_requests',
     '/api/cash-distributions': 'cash_distributions',
     '/api/warehouses': 'warehouses',
     '/api/categories': 'categories',
@@ -2399,11 +2388,6 @@ def cash_funds_page():
 @login_required
 def cash_receipts_page():
     return render_template('cash_receipts.html')
-
-@app.route('/cash-requests')
-@login_required
-def cash_requests_page():
-    return render_template('cash_requests.html')
 
 @app.route('/cash-distributions')
 @login_required
@@ -4179,12 +4163,6 @@ def incident_history(id):
             d['_label'] = d['distribution_no']
             d['_date'] = d['distribution_date']
             timeline.append(d)
-        for cr in CashRequest.query.filter_by(incident_id=id).order_by(CashRequest.created_at.desc()).all():
-            d = cr.to_dict()
-            d['_type'] = 'cash_request'
-            d['_label'] = d['request_number']
-            d['_date'] = d['request_date']
-            timeline.append(d)
         for cd in CashDistribution.query.filter_by(incident_id=id).order_by(CashDistribution.created_at.desc()).all():
             d = cd.to_dict()
             d['_type'] = 'cash_distribution'
@@ -4204,7 +4182,6 @@ def incident_history(id):
             'timeline': timeline,
             'counts': {
                 'distributions': sum(1 for t in timeline if t['_type'] == 'distribution'),
-                'cash_requests': sum(1 for t in timeline if t['_type'] == 'cash_request'),
                 'cash_distributions': sum(1 for t in timeline if t['_type'] == 'cash_distribution'),
                 'assessments': sum(1 for t in timeline if t['_type'] == 'assessment'),
             }
@@ -4929,15 +4906,12 @@ def manage_cash_fund(id):
         if request.method == 'DELETE':
             related_receipts = CashReceipt.query.filter_by(fund_id=fund.id).count()
             related_distributions = CashDistribution.query.filter_by(fund_id=fund.id).count()
-            related_requests = db.session.query(CashRequest).join(CashDistribution).filter(CashDistribution.fund_id == fund.id).distinct().count()
-            if related_receipts or related_distributions or related_requests:
+            if related_receipts or related_distributions:
                 parts = []
                 if related_receipts:
                     parts.append(f'{related_receipts} receipt(s)')
                 if related_distributions:
                     parts.append(f'{related_distributions} distribution(s)')
-                if related_requests:
-                    parts.append(f'{related_requests} request(s)')
                 return jsonify({'success': False, 'message': f'Cannot delete: Fund has {" and ".join(parts)}. Remove all related records first.'}), 400
             db.session.delete(fund)
             db.session.commit()
@@ -5156,7 +5130,7 @@ def handle_cash_requests():
             type_name='cash_request',
             priority='High' if (req.priority or 'Medium') in ('High', 'Urgent') else 'Medium',
             resource_id=req.id,
-            url=url_for('cash_requests_page')
+            url=url_for('cash_distributions_page')
         )
         log_activity('create', 'cash_request', resource_id=req.id, details=f'Cash request {req.request_number} recorded', user=current_user, ip=request.remote_addr)
         db.session.commit()
@@ -5321,51 +5295,12 @@ def handle_cash_distributions():
         if not fund or not incident:
             return jsonify({'success': False, 'message': 'Fund and incident are required'}), 400
 
-        # Collect all cash request IDs (single or multiple) - optional
-        cash_request_ids = data.get('cash_request_ids') or []
-        if isinstance(cash_request_ids, (int, float)):
-            cash_request_ids = [int(cash_request_ids)]
-        elif isinstance(cash_request_ids, str):
-            cash_request_ids = [int(x.strip()) for x in cash_request_ids.split(',') if x.strip()]
-        if data.get('cash_request_id') and int(data['cash_request_id']) not in cash_request_ids:
-            cash_request_ids.insert(0, int(data['cash_request_id']))
-        cash_request_ids = [cid for cid in cash_request_ids if cid]
-
-        cash_reqs = []
-        max_amount = 0
-        if cash_request_ids:
-            for cid in cash_request_ids:
-                cr = db_get(CashRequest, cid)
-                if not cr:
-                    return jsonify({'success': False, 'message': f'Cash request #{cid} not found'}), 404
-                if cr.incident_id != incident.id:
-                    return jsonify({'success': False, 'message': f'Cash request #{cr.request_number} does not match selected incident'}), 400
-                if cr.status in ('Completed', 'Cancelled', 'Rejected'):
-                    return jsonify({'success': False, 'message': f'Cash request #{cr.request_number} is already {cr.status}'}), 400
-                already_distributed = db.session.query(
-                    db.func.coalesce(db.func.sum(CashDistributionBeneficiary.amount), 0)
-                ).join(
-                    CashDistribution, CashDistributionBeneficiary.distribution_id == CashDistribution.id
-                ).filter(
-                    CashDistributionBeneficiary.cash_request_id == cr.id,
-                    CashDistribution.status != 'Cancelled'
-                ).scalar()
-                remaining = cr.requested_amount - already_distributed
-                if remaining <= 0:
-                    return jsonify({'success': False, 'message': f'Cash request #{cr.request_number} has no remaining amount'}), 400
-                max_amount += remaining
-                cash_reqs.append(cr)
-        else:
-            max_amount = fund.current_balance
-
         beneficiaries_payload = data.get('beneficiaries', [])
         if not beneficiaries_payload:
             return jsonify({'success': False, 'message': 'At least one beneficiary is required'}), 400
         total = sum(parse_float_field(b, 'amount', minimum=0.01, default=0) or 0 for b in beneficiaries_payload)
         if total <= 0:
             return jsonify({'success': False, 'message': 'At least one beneficiary with amount > 0 is required'}), 400
-        if cash_reqs and total > max_amount:
-            return jsonify({'success': False, 'message': f'Total amount ({total}) exceeds available amount from cash requests ({max_amount})'}), 400
         if total > fund.current_balance:
             return jsonify({'success': False, 'message': f'Insufficient fund balance. Available: {fund.current_balance}, Required: {total}'}), 400
         fiscal_year = AppSettings.get_setting('active_fiscal_year', '2081/82')
@@ -5405,8 +5340,6 @@ def handle_cash_distributions():
             distribution_no=data.get('distribution_no') or generate_cash_distribution_no(),
             distribution_date=parse_bs_date_field(data, 'distribution_date', default=date.today()),
             fund_id=fund.id, incident_id=incident.id,
-            cash_request_id=cash_request_ids[0] if cash_request_ids else data.get('cash_request_id'),
-            cash_request_ids=json.dumps(cash_request_ids),
             distribution_type=data.get('distribution_type', 'Individual'),
             distribution_id=data.get('distribution_id'),
             total_amount=total, fiscal_year=fiscal_year,
@@ -5427,23 +5360,10 @@ def handle_cash_distributions():
                 distribution_id=dist.id, name=ben_data['name'].strip(),
                 national_id=ben_data.get('national_id'), address=ben_data.get('address'),
                 phone=ben_data.get('phone'), amount=amount,
-                beneficiary_id=ben_data.get('beneficiary_id'),
-                cash_request_id=ben_data.get('cash_request_id')
+                beneficiary_id=ben_data.get('beneficiary_id')
             )
             db.session.add(ben)
         fund.current_balance -= total
-
-        # Update status for ALL linked cash requests
-        for cr in cash_reqs:
-            total_distributed = db.session.query(db.func.coalesce(db.func.sum(CashDistributionBeneficiary.amount), 0)).join(
-                CashDistribution, CashDistributionBeneficiary.distribution_id == CashDistribution.id
-            ).filter(
-                CashDistributionBeneficiary.cash_request_id == cr.id
-            ).scalar()
-            if total_distributed >= cr.requested_amount:
-                cr.status = 'Completed'
-            else:
-                cr.status = 'Partial'
 
         create_notification(
             title=f'Cash Distribution {dist.distribution_no}',
@@ -5488,13 +5408,6 @@ def cancel_cash_distribution(id):
         fund = CashFund.query.filter(CashFund.id == dist.fund_id).with_for_update().first() if dist.fund_id else None
         if fund:
             fund.current_balance += dist.total_amount
-
-        # Mark linked CashRequests as Rejected
-        cids = json.loads(dist.cash_request_ids) if dist.cash_request_ids else ([dist.cash_request_id] if dist.cash_request_id else [])
-        for cid in cids:
-            cr = db_get(CashRequest, cid)
-            if cr and cr.status != 'Rejected':
-                cr.status = 'Rejected'
 
         dist.status = 'Cancelled'
         dist.cancelled_at = utc_now()
@@ -5703,15 +5616,12 @@ def manage_beneficiary(id):
         if request.method == 'DELETE':
             related_dists = DistributionBeneficiary.query.filter_by(beneficiary_id=ben.id).count()
             related_cash_dists = CashDistributionBeneficiary.query.filter_by(beneficiary_id=ben.id).count()
-            related_cash_requests = CashRequest.query.filter_by(beneficiary_id=ben.id).count()
-            if related_dists or related_cash_dists or related_cash_requests:
+            if related_dists or related_cash_dists:
                 parts = []
                 if related_dists:
                     parts.append(f'{related_dists} material distribution link(s)')
                 if related_cash_dists:
                     parts.append(f'{related_cash_dists} cash distribution link(s)')
-                if related_cash_requests:
-                    parts.append(f'{related_cash_requests} cash request(s)')
                 return jsonify({'success': False, 'message': f'Cannot delete: Beneficiary has {" and ".join(parts)}. Remove all related records first.'}), 400
             db.session.delete(ben)
             db.session.commit()
@@ -7189,7 +7099,6 @@ def get_dashboard():
             'todays_cash_distribution': db.session.query(db.func.coalesce(db.func.sum(CashDistribution.total_amount), 0)).filter(
                 db.func.date(CashDistribution.distribution_date) == today,
                 db.or_(CashDistribution.status != 'Cancelled', CashDistribution.status.is_(None))).scalar(),
-            'pending_cash_requests': CashRequest.query.filter(CashRequest.status.in_(['Pending', 'Approved'])).count(),
             'cash_distributed_this_month': db.session.query(db.func.coalesce(db.func.sum(CashDistribution.total_amount), 0)).filter(
                 db.extract('year', CashDistribution.distribution_date) == today.year,
                 db.extract('month', CashDistribution.distribution_date) == today.month,
@@ -7958,14 +7867,12 @@ def get_form_data():
             'ssf_types': AppSettings.get_setting('ssf_types', ['OAS (बर्षा पेन्सन)', 'विधवा (Widow)', 'अपाङ्गता (Disabled)', 'कोही नभएको (Endangered)', 'बाल भत्ता (Child Grant)', 'अन्य (Other)']),
             'wards': [w.to_dict() for w in get_ward_list()],
             'cash_funds': [f.to_dict() for f in CashFund.query.all()],
-            'cash_requests': [r.to_dict() for r in CashRequest.query.all()],
             'beneficiaries': [b.to_dict() for b in Beneficiary.query.all()],
             'suppliers': [s.to_dict() for s in Supplier.query.filter(Supplier.status == 'Active').all()],
             'supplier_types': ['Government Supply', 'Donation', 'NGO', 'Local Government', 'Purchase', 'Supplier', 'Transfer', 'Other'],
             'warehouse_zones': [z.to_dict() for z in WarehouseZone.query.all()],
             'funding_sources': ['Federal Government', 'Provincial Government', 'Municipality', 'Disaster Relief Fund', 'Donor Agency', 'NGO', 'Other'],
             'cash_purposes': ['Medical Support', 'Immediate Relief', 'Temporary Shelter', 'Funeral Support', 'Food Assistance', 'Livelihood Support', 'Other'],
-            'cash_request_statuses': ['Pending', 'Approved', 'Rejected', 'Partial', 'Completed'],
             'distribution_types': ['Individual', 'Family', 'Community', 'Local Government', 'Organization'],
             'cash_priorities': ['Low', 'Medium', 'High', 'Urgent'],
             'distribution_statuses': ['Received', 'Pending'],

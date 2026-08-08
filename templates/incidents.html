@@ -725,7 +725,6 @@ async function showIncidentHistory(id) {
         </div>`;
         html += `<div class="row g-2 mb-3">
             <div class="col"><div class="card text-center py-2 border-success"><div class="h5 mb-0 text-success">${counts.distributions}</div><small>Distributions</small></div></div>
-            <div class="col"><div class="card text-center py-2 border-warning"><div class="h5 mb-0 text-warning">${counts.cash_requests}</div><small>Cash Requests</small></div></div>
             <div class="col"><div class="card text-center py-2 border-danger"><div class="h5 mb-0 text-danger">${counts.cash_distributions}</div><small>Cash Distributions</small></div></div>
             <div class="col"><div class="card text-center py-2 border-secondary"><div class="h5 mb-0 text-secondary">${counts.assessments}</div><small>Assessments</small></div></div>
         </div>`;
@@ -734,7 +733,6 @@ async function showIncidentHistory(id) {
         } else {
             const typeMeta = {
                 distribution:     {icon:'bi-box-seam', color:'success', label:'Distribution'},
-                cash_request:     {icon:'bi-cash-stack', color:'warning', label:'Cash Request'},
                 cash_distribution:{icon:'bi-wallet2', color:'danger', label:'Cash Distribution'},
                 assessment:       {icon:'bi-clipboard-data', color:'secondary', label:'Assessment'},
             };
@@ -750,10 +748,6 @@ async function showIncidentHistory(id) {
                     html += ` <small class="text-muted">${esc(item.location || item.destination || '')}</small>`;
                     if (item.items) html += ` <span class="badge bg-light text-dark">${item.items.length} item(s)</span>`;
                     html += ` <span class="badge bg-${item.status === 'Completed' ? 'success' : 'secondary'}">${esc(item.status)}</span>`;
-                } else if (item._type === 'cash_request') {
-                    html += ` <small class="text-muted">${esc(item.requesting_office || '')} - ${esc(item.requester_name || '')}</small>`;
-                    html += ` <span class="badge bg-light text-dark">Rs. ${item.requested_amount}</span>`;
-                    html += ` <span class="badge bg-${item.status === 'Approved' ? 'success' : item.status === 'Pending' ? 'warning text-dark' : 'secondary'}">${esc(item.status)}</span>`;
                 } else if (item._type === 'cash_distribution') {
                     html += ` <small class="text-muted">${esc(item.fund_name || '')}</small>`;
                     html += ` <span class="badge bg-light text-dark">Rs. ${item.total_amount}</span>`;

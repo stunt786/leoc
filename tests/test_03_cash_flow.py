@@ -69,15 +69,11 @@ class CashManagementTest(LeocTestCase):
         fund = self.create_fund(allocated=50000)
         self.create_cash_receipt(fund['id'], amount=30000)
 
-        cash_req = self.create_cash_request(inc['id'], amount=20000)
-        cash_dist = self.create_cash_distribution(fund['id'], inc['id'], cash_req['id'], amount=15000)
+        cash_dist = self.create_cash_distribution(fund['id'], inc['id'], amount=15000)
 
         with app_module.app.app_context():
             f = app_module.db.session.get(app_module.CashFund, fund['id'])
             self.assertEqual(f.current_balance, 65000)
-
-            cr = app_module.db.session.get(app_module.CashRequest, cash_req['id'])
-            self.assertEqual(cr.status, 'Partial')
 
     def test_cash_distribution_cancel_returns_funds(self):
         self.login()

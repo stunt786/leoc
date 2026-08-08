@@ -166,10 +166,6 @@
                             <i class="bi bi-cash-coin"></i>
                             <span class="nav-label">Cash Receipts</span>
                         </a>
-                        <a href="{{ url_for('cash_requests_page') }}" class="nav-item sub-item {% if request.path == '/cash-requests' %}active{% endif %}">
-                            <i class="bi bi-send-exclamation"></i>
-                            <span class="nav-label">Cash Requests</span>
-                        </a>
                         <a href="{{ url_for('cash_distributions_page') }}" class="nav-item sub-item {% if request.path == '/cash-distributions' %}active{% endif %}">
                             <i class="bi bi-cash-stack"></i>
                             <span class="nav-label">Cash Distribution</span>

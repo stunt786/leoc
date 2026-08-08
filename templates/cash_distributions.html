@@ -12,13 +12,14 @@
         <i class="bi bi-plus-lg"></i> New Distribution
     </button>
 </div>
+
 <div class="card">
     <div class="card-body">
         <div class="table-responsive">
             <table class="table table-hover align-middle" id="dataTable">
                 <thead class="table-light"><tr>
                     <th>Dist No</th><th>Date</th><th>Beneficiary</th><th>Incident</th>
-                    <th>Source</th><th>Status</th><th>Type</th><th>Amount</th><th>Officer</th><th>Files</th><th>Actions</th>
+                    <th>Status</th><th>Type</th><th>Amount</th><th>Officer</th><th>Files</th><th>Actions</th>
                 </tr></thead>
                 <tbody id="cdBody"></tbody>
             </table>
@@ -37,20 +38,8 @@
                         <div class="col-md-6 mb-3"><label class="form-label">Distribution Type</label><select class="form-select" name="distribution_type" id="cdType"></select></div>
                     </div>
                     <div class="row g-2">
-                        <div class="col-md-4 mb-3"><label class="form-label">Fund <span class="text-danger">*</span></label><select class="form-select" name="fund_id" id="cdFund" required onchange="onFundChange()"></select></div>
-                        <div class="col-md-4 mb-3"><label class="form-label">Incident <span class="text-danger">*</span></label><select class="form-select" name="incident_id" id="cdIncident" required onchange="onIncidentChange()"></select></div>
-                        <div class="col-md-4 mb-3"><label class="form-label">Source Request (Optional)</label>
-                            <div class="d-flex gap-2 mb-1">
-                                <div class="btn-group btn-group-sm w-100" role="group">
-                                    <input type="radio" class="btn-check" name="sourceType" id="srcCashReq" value="cash_request" checked onchange="toggleSourceType()">
-                                    <label class="btn btn-outline-primary" for="srcCashReq">Cash Request</label>
-                                </div>
-                            </div>
-                            <select class="form-select" name="cash_request_id" id="cdRequest"><option value="">No Cash Request (Direct Distribution)</option></select>
-                            <div class="d-flex flex-wrap gap-1 mt-1" id="cdSelectedRequests"></div>
-                            <button type="button" class="btn btn-sm btn-outline-primary mt-1" id="cdAddRequestBtn" onclick="addSelectedCashRequest()"><i class="bi bi-plus"></i> Add Request</button>
-                            <small class="text-muted d-block mt-1" id="cdRequestInfo">Optional: Select from dropdown to link cash requests</small>
-                        </div>
+                        <div class="col-md-6 mb-3"><label class="form-label">Fund <span class="text-danger">*</span></label><select class="form-select" name="fund_id" id="cdFund" required onchange="onFundChange()"></select></div>
+                        <div class="col-md-6 mb-3"><label class="form-label">Incident <span class="text-danger">*</span></label><select class="form-select" name="incident_id" id="cdIncident" required onchange="onIncidentChange()"></select></div>
                     </div>
                     <div class="row g-2">
                         <div class="col-md-4 mb-3"><label class="form-label">Officer</label><input class="form-control" name="officer" id="cdOfficer"></div>
@@ -77,8 +66,8 @@
                     <div class="d-flex justify-content-between align-items-center mb-2">
                         <label class="form-label fw-bold mb-0">Beneficiaries</label>
                         <div>
-                            <button type="button" class="btn btn-sm btn-outline-success" onclick="addBeneficiaryRow()"><i class="bi bi-person-plus"></i> Add Beneficiary</button>
-                            <button type="button" class="btn btn-sm btn-outline-info" onclick="addBeneficiaryFromRequest()"><i class="bi bi-person-plus"></i> Add from Request</button>
+                            <button type="button" class="btn btn-sm btn-outline-success" onclick="openNewBenModal()"><i class="bi bi-person-plus"></i> Add Beneficiary</button>
+                            <button type="button" class="btn btn-sm btn-outline-info" onclick="addBeneficiaryFromRegistry()"><i class="bi bi-person-lines-fill"></i> From Registry</button>
                         </div>
                     </div>
                     <div class="table-responsive">
@@ -91,8 +80,7 @@
                                 <th style="min-width:80px">Amount <span class="text-danger">*</span></th>
                                 <th style="width:40px"></th>
                             </tr></thead>
-                            <tbody id="benBody">
-                            </tbody>
+                            <tbody id="benBody"></tbody>
                         </table>
                     </div>
                 </div>
@@ -104,6 +92,7 @@
         </div>
     </div>
 </div>
+
 <div class="modal fade" id="cancelModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -112,7 +101,7 @@
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <p class="mb-3">Are you sure you want to cancel this cash distribution? The fund balance will be restored and the distribution record will be removed.</p>
+                <p class="mb-3">Are you sure you want to cancel this cash distribution? The fund balance will be restored.</p>
                 <div class="mb-3">
                     <label class="form-label fw-bold">Reason for Cancellation <span class="text-danger">*</span></label>
                     <textarea class="form-control" id="cancelReason" rows="3" placeholder="Enter the reason for cancelling this distribution..."></textarea>
@@ -140,23 +129,452 @@
         </div>
     </div>
 </div>
+
+<div class="modal fade" id="benPickerModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-person-lines-fill me-2"></i>Select Beneficiary</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row g-2 mb-3">
+                    <div class="col-md-6">
+                        <input type="text" class="form-control" id="benPickerSearch" placeholder="Search by name, ID, phone..." oninput="filterBenPicker()">
+                    </div>
+                    <div class="col-md-4">
+                        <select class="form-select" id="benPickerWardFilter" onchange="filterBenPicker()">
+                            <option value="">All Wards</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <span class="form-control form-control-sm text-muted" id="benPickerCount" style="border:none;background:transparent"></span>
+                    </div>
+                </div>
+                <div class="table-responsive" style="max-height:350px">
+                    <table class="table table-sm table-hover mb-0" id="benPickerTable">
+                        <thead class="table-light sticky-top">
+                            <tr>
+                                <th class="sortable" onclick="sortBenPicker('name')">Name <i class="bi bi-arrow-down-up sort-icon"></i></th>
+                                <th class="sortable" onclick="sortBenPicker('father_name')">Father's Name <i class="bi bi-arrow-down-up sort-icon"></i></th>
+                                <th class="sortable" onclick="sortBenPicker('phone')">Phone <i class="bi bi-arrow-down-up sort-icon"></i></th>
+                                <th class="sortable" onclick="sortBenPicker('ward')">Ward <i class="bi bi-arrow-down-up sort-icon"></i></th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="benPickerBody"></tbody>
+                    </table>
+                </div>
+            </div>
+</div>
+</div>
+</div>
+
+<div class="modal fade" id="newBenModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="bi bi-person-plus me-2"></i>Add New Beneficiary</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="newBenForm">
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <div class="card border-primary">
+                                <div class="card-header bg-light py-2"><h6 class="mb-0 fw-bold"><i class="bi bi-person-vcard text-primary me-2"></i>Beneficiary Details</h6></div>
+                                <div class="card-body">
+                                    <div class="row g-3">
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-medium">Full Name <span class="text-danger">*</span></label>
+                                            <input type="text" class="form-control" id="nbName" required placeholder="Full name">
+                                            <small class="text-danger" id="nbNameError"></small>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-medium">National ID <span class="text-danger">*</span></label>
+                                            <input type="text" class="form-control" id="nbNid" required placeholder="e.g. BEN-001">
+                                            <small class="text-danger" id="nbNidError"></small>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-medium">Father's Name <span class="text-danger">*</span></label>
+                                            <input type="text" class="form-control" id="nbFatherName" required placeholder="Father's name">
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-medium">Phone <span class="text-danger">*</span></label>
+                                            <input type="text" class="form-control" id="nbPhone" placeholder="Phone number">
+                                            <small class="text-danger" id="nbPhoneError"></small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <div class="card border-secondary">
+                                <div class="card-header bg-light py-2"><h6 class="mb-0 fw-bold"><i class="bi bi-geo-alt text-secondary me-2"></i>Address</h6></div>
+                                <div class="card-body">
+                                    <div class="row g-3">
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-medium">Address</label>
+                                            <input type="text" class="form-control" id="nbAddress" placeholder="Address">
+                                        </div>
+                                        <div class="col-md-2">
+                                            <label class="form-label fw-medium">Ward <span class="text-danger">*</span></label>
+                                            <select class="form-select" id="nbWard" required><option value="">Select</option></select>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label fw-medium">Tole <span class="text-danger">*</span></label>
+                                            <input type="text" class="form-control" id="nbTole" required placeholder="Tole">
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-medium">Current Shelter</label>
+                                            <input type="text" class="form-control" id="nbShelter" placeholder="Current shelter location">
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-medium">Coordinates</label>
+                                            <input type="text" class="form-control" id="nbCoordinates" placeholder="Latitude, Longitude">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <div class="card border-success">
+                                <div class="card-header bg-light py-2 d-flex justify-content-between align-items-center">
+                                    <h6 class="mb-0 fw-bold"><i class="bi bi-people text-success me-2"></i>Family Members</h6>
+                                    <span class="badge bg-success rounded-pill" id="nbFamilyCountBadge">0 members</span>
+                                </div>
+                                <div class="card-body">
+                                    <div id="nbFamilyMembersContainer">
+                                        <p class="text-muted text-center py-3 mb-0" id="nbNoFamilyMsg"><i class="bi bi-info-circle me-1"></i>No family members added. Click "Add Member" below.</p>
+                                    </div>
+                                    <button type="button" class="btn btn-outline-success btn-sm mt-2" onclick="nbAddFamilyMember()"><i class="bi bi-plus-circle"></i> Add Family Member</button>
+                                    <input type="hidden" id="nbFamilyMembersJson" value="[]">
+                                    <input type="hidden" id="nbFamilyCount" value="0">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <div class="card border-warning">
+                                <div class="card-header bg-light py-2"><h6 class="mb-0 fw-bold"><i class="bi bi-shield-check text-warning me-2"></i>Social Security & Status</h6></div>
+                                <div class="card-body">
+                                    <div class="row g-3 align-items-end">
+                                        <div class="col-md-4">
+                                            <div class="form-check form-switch">
+                                                <input class="form-check-input" type="checkbox" id="nbSocialSecurity">
+                                                <label class="form-check-label fw-medium" for="nbSocialSecurity">Social Security Fund</label>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4" id="nbSsfTypeDiv" style="display:none;">
+                                            <label class="form-label fw-medium">SSF Type</label>
+                                            <select class="form-select" id="nbSsfType"><option value="">Select</option></select>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="form-check form-switch">
+                                                <input class="form-check-input" type="checkbox" id="nbPovertyCard">
+                                                <label class="form-check-label fw-medium" for="nbPovertyCard">Poverty Card Holder</label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <div class="card border-info">
+                                <div class="card-header bg-light py-2"><h6 class="mb-0 fw-bold"><i class="bi bi-bank text-info me-2"></i>Bank Account</h6></div>
+                                <div class="card-body">
+                                    <div class="row g-3">
+                                        <div class="col-md-4">
+                                            <label class="form-label fw-medium">Account Holder Name</label>
+                                            <input type="text" class="form-control" id="nbBankHolder" placeholder="Name on bank account">
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label fw-medium">Account Number</label>
+                                            <input type="text" class="form-control" id="nbBank" placeholder="Account number">
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label fw-medium">Bank Name</label>
+                                            <input type="text" class="form-control" id="nbBankName" placeholder="Bank name">
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label fw-medium">Wallet (esewa/khalti)</label>
+                                            <input type="text" class="form-control" id="nbWallet" placeholder="Wallet number">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-medium">Remarks</label>
+                            <textarea class="form-control" id="nbRemarks" rows="2" placeholder="Remarks..."></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary px-4" id="nbSaveBtn"><i class="bi bi-check-lg me-1"></i> Save & Select</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 {% block extra_js %}
 <script>
 const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+let beneficiaries = [];
+let incidentsData = [];
 let _cashDistributions = [];
+let benPickerModal = null;
+let benPickerSortCol = 'name';
+let benPickerSortDir = 'asc';
+let activeFiscalYear = '';
+let alreadyBenificiatedIds = new Set();
+let sameIncidentBenIds = new Set();
+let beneficiaryDistHistory = {};
+
+async function loadAlreadyBeneficiated() {
+    alreadyBenificiatedIds = new Set();
+    sameIncidentBenIds = new Set();
+    beneficiaryDistHistory = {};
+    const currentIncidentId = document.getElementById('cdIncident').value;
+    if (!currentIncidentId || !activeFiscalYear) return;
+    try {
+        const r = await fetch(`/api/distributions?fiscal_year=${encodeURIComponent(activeFiscalYear)}`);
+        const d = await r.json();
+        if (d.success && d.distributions) {
+            d.distributions.forEach(dist => {
+                if (dist.status === 'Completed') {
+                    const isSameIncident = String(dist.incident_id) === String(currentIncidentId);
+                    (dist.beneficiaries || []).forEach(b => {
+                        if (b.beneficiary_id) {
+                            alreadyBenificiatedIds.add(b.beneficiary_id);
+                            if (isSameIncident) sameIncidentBenIds.add(b.beneficiary_id);
+                            if (!beneficiaryDistHistory[b.beneficiary_id]) beneficiaryDistHistory[b.beneficiary_id] = [];
+                            beneficiaryDistHistory[b.beneficiary_id].push({
+                                type: 'Material', incident: dist.incident_name, date: dist.distribution_date, dist_no: dist.distribution_no
+                            });
+                        }
+                    });
+                }
+            });
+        }
+        const cr = await fetch(`/api/cash-distributions?fiscal_year=${encodeURIComponent(activeFiscalYear)}`);
+        const cd = await cr.json();
+        if (cd.success && cd.distributions) {
+            cd.distributions.forEach(cdist => {
+                if (cdist.status === 'Completed') {
+                    const isSameIncident = String(cdist.incident_id) === String(currentIncidentId);
+                    (cdist.beneficiaries || []).forEach(b => {
+                        if (b.beneficiary_id) {
+                            if (!isSameIncident) alreadyBenificiatedIds.add(b.beneficiary_id);
+                            if (isSameIncident) sameIncidentBenIds.add(b.beneficiary_id);
+                            if (!beneficiaryDistHistory[b.beneficiary_id]) beneficiaryDistHistory[b.beneficiary_id] = [];
+                            beneficiaryDistHistory[b.beneficiary_id].push({
+                                type: 'Cash', incident: cdist.incident_name, date: cdist.distribution_date, dist_no: cdist.distribution_no, amount: b.amount
+                            });
+                        }
+                    });
+                }
+            });
+        }
+    } catch(e) { /* ignore */ }
+}
+
+function getBeneficiaryHistory(benId) {
+    return beneficiaryDistHistory[benId] || [];
+}
+
+function isBeneficiatedInSameIncident(benId) {
+    return sameIncidentBenIds.has(benId);
+}
+
+function isBeneficiatedInOtherIncident(benId) {
+    return alreadyBenificiatedIds.has(benId) && !sameIncidentBenIds.has(benId);
+}
+
+function isAlreadySelectedInDist(benId) {
+    return Array.from(document.querySelectorAll('#benBody tr')).some(tr => {
+        const inp = tr.querySelector('input[name="ben_name[]"]');
+        return inp && inp.getAttribute('data-ben-id') && String(inp.getAttribute('data-ben-id')) === String(benId);
+    });
+}
+
+async function openBenPicker() {
+    const incidentId = document.getElementById('cdIncident').value;
+    if (!incidentId) { showToast('danger', 'Please select an incident first before selecting beneficiaries'); return; }
+    await loadAlreadyBeneficiated();
+    loadBenPickerWards();
+    filterBenPicker();
+    if (!benPickerModal) benPickerModal = new bootstrap.Modal(document.getElementById('benPickerModal'));
+    benPickerModal.show();
+}
+
+function loadBenPickerWards() {
+    const wardSel = document.getElementById('benPickerWardFilter');
+    if (wardSel.options.length > 1) return;
+    fetch('/api/data').then(r => r.json()).then(d => {
+        const wards = d.wards || [];
+        wardSel.innerHTML = '<option value="">All Wards</option>' + wards.map(w => `<option value="${w.id}">${w.name}</option>`).join('');
+    });
+}
+
+function renderBenPicker(list) {
+    const tbody = document.getElementById('benPickerBody');
+    const countEl = document.getElementById('benPickerCount');
+    list.sort((a, b) => {
+        let valA = a[benPickerSortCol] ?? '';
+        let valB = b[benPickerSortCol] ?? '';
+        if (benPickerSortCol === 'ward') { valA = Number(a.ward) || 0; valB = Number(b.ward) || 0; }
+        else { valA = String(valA).toLowerCase(); valB = String(valB).toLowerCase(); }
+        if (valA < valB) return benPickerSortDir === 'asc' ? -1 : 1;
+        if (valA > valB) return benPickerSortDir === 'asc' ? 1 : -1;
+        return 0;
+    });
+    if (countEl) countEl.textContent = list.length + ' found';
+    document.querySelectorAll('#benPickerTable th').forEach(th => th.classList.remove('sort-active'));
+    const headers = ['name', 'father_name', 'phone', 'ward'];
+    const idx = headers.indexOf(benPickerSortCol);
+    if (idx >= 0) {
+        const th = document.querySelectorAll('#benPickerTable th')[idx];
+        if (th) th.classList.add('sort-active');
+    }
+    if (list.length === 0) { tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">No beneficiaries found</td></tr>'; return; }
+    tbody.innerHTML = list.map(b => {
+        const isSameInc = isBeneficiatedInSameIncident(b.id);
+        const isOtherInc = isBeneficiatedInOtherIncident(b.id);
+        const isSelected = isAlreadySelectedInDist(b.id);
+        const history = getBeneficiaryHistory(b.id);
+        let rowClass = '';
+        let btn;
+        if (isSameInc) {
+            rowClass = 'table-secondary text-muted';
+            btn = '<span class="badge bg-danger"><i class="bi bi-x-circle me-1"></i>Already Beneficiated (Same Incident)</span>';
+        } else if (isOtherInc) {
+            rowClass = 'table-warning';
+            const incNames = [...new Set(history.map(h => h.incident))].join(', ');
+            btn = `<button class="btn btn-sm btn-outline-warning" onclick="selectBenFromPicker(${b.id})" title="Beneficiated in: ${incNames}"><i class="bi bi-exclamation-triangle me-1"></i><i class="bi bi-plus-lg"></i></button>`;
+        } else if (isSelected) {
+            rowClass = 'table-info';
+            btn = '<span class="badge bg-info"><i class="bi bi-check2-all me-1"></i>Already Selected</span>';
+        } else {
+            btn = `<button class="btn btn-sm btn-outline-primary" onclick="selectBenFromPicker(${b.id})"><i class="bi bi-plus-lg"></i></button>`;
+        }
+        let histBadge = '';
+        if (isOtherInc) {
+            histBadge += `<small class="text-danger d-block"><i class="bi bi-exclamation-triangle me-1"></i>Beneficiated in other incident(s) this FY</small>`;
+        } else if (history.length > 0 && !isSameInc && !isSelected) {
+            histBadge += `<small class="text-warning d-block"><i class="bi bi-clock-history me-1"></i>${history.length} prior dist.</small>`;
+        }
+        return `<tr class="${rowClass}">
+            <td>${esc(b.name)}${histBadge}</td>
+            <td>${esc(b.father_name || '-')}</td>
+            <td>${esc(b.phone || '-')}</td>
+            <td>${esc(b.ward_name || b.ward || '-')}</td>
+            <td>${btn}</td>
+        </tr>`;
+    }).join('');
+}
+
+function filterBenPicker() {
+    const q = document.getElementById('benPickerSearch').value.toLowerCase();
+    const wardVal = document.getElementById('benPickerWardFilter').value;
+    let filtered = beneficiaries.filter(b =>
+        (b.name && b.name.toLowerCase().includes(q)) ||
+        (b.father_name && b.father_name.toLowerCase().includes(q)) ||
+        (b.national_id && b.national_id.toLowerCase().includes(q)) ||
+        (b.phone && b.phone.toLowerCase().includes(q))
+    );
+    if (wardVal) {
+        filtered = filtered.filter(b => String(b.ward) === String(wardVal));
+    }
+    renderBenPicker(filtered);
+}
+
+function sortBenPicker(col) {
+    if (benPickerSortCol === col) {
+        benPickerSortDir = benPickerSortDir === 'asc' ? 'desc' : 'asc';
+    } else {
+        benPickerSortCol = col;
+        benPickerSortDir = 'asc';
+    }
+    document.querySelectorAll('#benPickerTable th').forEach(th => th.classList.remove('sort-active'));
+    event.currentTarget.classList.add('sort-active');
+    filterBenPicker();
+}
+
+function showCrossIncidentWarning(benId, benName) {
+    const history = getBeneficiaryHistory(benId);
+    if (history.length === 0) return Promise.resolve(true);
+    const rows = history.map(h => {
+        const icon = h.type === 'Cash' ? 'bi-cash text-success' : 'bi-box text-primary';
+        return `<tr><td><i class="bi ${icon} me-1"></i>${h.type}</td><td>${h.incident || '-'}</td><td>${h.date || '-'}</td><td>${h.dist_no || '-'}${h.amount ? ' (NPR ' + Number(h.amount).toLocaleString() + ')' : ''}</td></tr>`;
+    }).join('');
+    const currentInc = document.getElementById('cdIncident');
+    const currentIncName = currentInc.options[currentInc.selectedIndex]?.text || 'current incident';
+    const modal = document.createElement('div');
+    modal.className = 'modal fade';
+    modal.innerHTML = `<div class="modal-dialog modal-dialog-centered"><div class="modal-content">
+        <div class="modal-header bg-warning text-dark">
+            <h5 class="modal-title"><i class="bi bi-exclamation-triangle me-2"></i>Cross-Incident Distribution Warning</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+            <p><strong>${benName}</strong> has already received distributions in <strong>other incident(s)</strong> during this fiscal year (${activeFiscalYear}):</p>
+            <table class="table table-sm table-bordered"><thead class="table-light"><tr><th>Type</th><th>Incident</th><th>Date</th><th>Reference</th></tr></thead><tbody>${rows}</tbody></table>
+            <div class="alert alert-warning mb-0"><i class="bi bi-exclamation-triangle me-1"></i><strong>Warning:</strong> This beneficiary already received relief from a different incident. Adding them to <strong>${currentIncName}</strong> means they will receive aid from multiple incidents in the same fiscal year. Do you want to proceed?</div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="button" class="btn btn-warning" id="confirmCrossIncSelect"><i class="bi bi-check-lg me-1"></i>Yes, Add Anyway</button>
+        </div>
+    </div></div>`;
+    document.body.appendChild(modal);
+    modal.addEventListener('hidden.bs.modal', () => modal.remove());
+    const bsModal = new bootstrap.Modal(modal);
+    bsModal.show();
+    return new Promise(resolve => {
+        document.getElementById('confirmCrossIncSelect').onclick = () => { bsModal.hide(); resolve(true); };
+        modal.querySelector('[data-bs-dismiss="modal"]').onclick = () => { bsModal.hide(); resolve(false); };
+    });
+}
+
+async function selectBenFromPicker(id) {
+    if (isBeneficiatedInSameIncident(id)) {
+        showToast('danger', 'This beneficiary has already received distribution for this incident in the current fiscal year.');
+        return;
+    }
+    if (isAlreadySelectedInDist(id)) {
+        showToast('danger', 'This beneficiary is already selected in the current distribution.');
+        return;
+    }
+    const ben = beneficiaries.find(b => b.id === id);
+    if (!ben) return;
+    if (isBeneficiatedInOtherIncident(id)) {
+        const confirmed = await showCrossIncidentWarning(id, ben.name);
+        if (!confirmed) return;
+    }
+    addBeneficiaryRowWithData(ben);
+    const modal = bootstrap.Modal.getInstance(document.getElementById('benPickerModal'));
+    if (modal) modal.hide();
+}
 
 function renderCashDistributions(data) {
     const t = document.getElementById('cdBody');
-    if (data.length === 0) { t.innerHTML = '<tr><td colspan="11" class="text-center text-muted py-3">No cash distributions found</td></tr>'; return; }
+    if (data.length === 0) { t.innerHTML = '<tr><td colspan="10" class="text-center text-muted py-3">No cash distributions found</td></tr>'; return; }
+    data = [...data].sort((a, b) => {
+        const da = a.distribution_date || '';
+        const db = b.distribution_date || '';
+        return db.localeCompare(da);
+    });
     t.innerHTML = data.map(cd => {
         const isCancelled = cd.status === 'Cancelled';
-        const srcMatch = (cd.remarks || '').match(/Source Distribution:\s*(\S+)/);
-        const srcHtml = srcMatch ? `<small class="text-muted" title="${esc(cd.remarks)}">${esc(srcMatch[1])}</small>` : '-';
         const photoHtml = cd.photo_url ? `<a href="${cd.photo_url}" target="_blank" title="Photo"><i class="bi bi-image text-primary"></i></a>` : '';
         const docHtml = cd.document_url ? `<a href="${cd.document_url}" target="_blank" title="Document"><i class="bi bi-file-pdf text-danger ms-1"></i></a>` : '';
         const filesHtml = (photoHtml || docHtml) ? `${photoHtml}${docHtml}` : '-';
-        const reqNums = (cd.request_numbers || []).length ? cd.request_numbers.join(', ') : (cd.request_number || '');
         const statusBadge = isCancelled
             ? `<span class="badge bg-danger bg-opacity-10 text-danger border border-danger">Cancelled</span>`
             : `<span class="badge bg-success bg-opacity-10 text-success border border-success">Active</span>`;
@@ -167,7 +585,6 @@ function renderCashDistributions(data) {
         <td>${esc(cd.distribution_no)}</td><td>${esc(cd.distribution_date)}</td>
         <td>${benName}</td>
         <td>${esc(cd.incident_name || '-')}</td>
-        <td><small>${reqNums ? 'Cash: '+esc(reqNums) : '-'}</small></td>
         <td>${statusBadge}</td>
         <td>${esc(cd.distribution_type)}</td>
         <td class="fw-bold text-danger">${Number(cd.total_amount).toLocaleString()}</td>
@@ -186,111 +603,8 @@ async function loadDistributions() {
     renderCashDistributions(_cashDistributions);
 }
 
-function toggleSourceType() {
-    const isCashReq = document.getElementById('srcCashReq').checked;
-    document.getElementById('cdRequest').style.display = isCashReq ? '' : 'none';
-    document.getElementById('cdSelectedRequests').style.display = isCashReq ? '' : 'none';
-    document.getElementById('cdAddRequestBtn').style.display = isCashReq ? '' : 'none';
-    document.getElementById('cdRequestInfo').style.display = isCashReq ? '' : 'none';
-    document.getElementById('cdRequest').required = true;
-    selectedCashRequests = [];
-    renderSelectedRequests();
-    const tbody = document.getElementById('benBody');
-    tbody.innerHTML = '';
-    calcTotal();
-}
-
-let cashRequestsData = [];
-let beneficiariesData = [];
-let selectedCashRequests = [];
-
-function addSelectedCashRequest() {
-    const sel = document.getElementById('cdRequest');
-    const id = parseInt(sel.value);
-    if (!id) { showToast('warning', 'Please select a cash request'); return; }
-    if (selectedCashRequests.find(r => r.id === id)) return;
-    const cr = cashRequestsData.find(r => r.id === id);
-    if (!cr) return;
-    selectedCashRequests.push({ id: cr.id, request_number: cr.request_number, remaining: cr.remaining || 0 });
-    renderSelectedRequests();
-    sel.value = '';
-    calcTotal();
-}
-
-function removeSelectedCashRequest(id) {
-    selectedCashRequests = selectedCashRequests.filter(r => r.id !== id);
-    renderSelectedRequests();
-    calcTotal();
-}
-
-function renderSelectedRequests() {
-    document.getElementById('cdSelectedRequests').innerHTML = selectedCashRequests.map(r =>
-        `<span class="badge bg-primary fs-6 d-inline-flex align-items-center gap-1">${r.request_number} (${Number(r.remaining).toLocaleString()}) <i class="bi bi-x-circle-fill" style="cursor:pointer" onclick="removeSelectedCashRequest(${r.id})"></i></span>`
-    ).join('');
-}
-
-function getSelectedCashRequestIds() {
-    return selectedCashRequests.map(r => r.id);
-}
-
-async function loadData() {
-    const r = await fetch('/api/data');
-    const d = await r.json();
-    if (!d.success) return;
-    cashRequestsData = d.cash_requests || [];
-    beneficiariesData = d.beneficiaries || [];
-    window._cashFundsData = d.cash_funds || [];
-    document.getElementById('cdFund').innerHTML = '<option value="">Select Fund</option>' + (d.cash_funds||[]).filter(f=>f.status==='Active').map(f => `<option value="${f.id}">${f.name} (Bal: ${Number(f.current_balance).toLocaleString()})</option>`).join('');
-    document.getElementById('cdIncident').innerHTML = '<option value="">Select Incident</option>' + (d.incidents||[]).filter(i=>i.status==='Active').map(i => `<option value="${i.id}">${i.incident_name}</option>`).join('');
-    onIncidentChange();
-    document.getElementById('cdType').innerHTML = (d.distribution_types||['Individual','Family','Community','Local Government','Organization']).map(t => `<option value="${t}">${t}</option>`).join('');
-}
-
 function onIncidentChange() {
-    const incidentId = parseInt(document.getElementById('cdIncident').value);
-    let filteredCash = cashRequestsData;
-    if (incidentId) {
-        filteredCash = cashRequestsData.filter(rq => rq.incident_id === incidentId);
-    }
-    document.getElementById('cdRequest').innerHTML = '<option value="">Select Cash Request</option>' + filteredCash.filter(rq=>['Pending','Approved','Partial'].includes(rq.status) && (rq.remaining || 0) > 0).map(rq => `<option value="${rq.id}">${rq.request_number} - Remaining: ${Number(rq.remaining).toLocaleString()}</option>`).join('');
-    selectedCashRequests = selectedCashRequests.filter(sr => filteredCash.some(rq => rq.id === sr.id));
-    renderSelectedRequests();
-    const tbody = document.getElementById('benBody');
-    tbody.innerHTML = '';
-    calcTotal();
-}
-
-function addBeneficiaryFromRequest() {
-    const sel = document.getElementById('cdRequest');
-    if (!selectedCashRequests.length) { showToast('warning', 'Please add at least one cash request first'); return; }
-    const existingNames = document.querySelectorAll('#benBody input[name="ben_name[]"]');
-    const existingSet = new Set(Array.from(existingNames).map(inp => inp.value.trim().toLowerCase()));
-    let selectedCr = null;
-    for (const sr of selectedCashRequests) {
-        const crCheck = cashRequestsData.find(r => r.id === sr.id);
-        if (crCheck && crCheck.beneficiary_id) {
-            const benCheck = beneficiariesData.find(b => b.id === crCheck.beneficiary_id);
-            if (benCheck && !existingSet.has(benCheck.name.trim().toLowerCase())) {
-                selectedCr = crCheck;
-                break;
-            }
-        }
-    }
-    if (!selectedCr) { showToast('warning', 'No more unprocessed cash requests available'); return; }
-    const ben = beneficiariesData.find(b => b.id === selectedCr.beneficiary_id);
-    if (!ben) { showToast('warning', 'Beneficiary not found'); return; }
-    const tbody = document.getElementById('benBody');
-    const tr = document.createElement('tr');
-    tr.setAttribute('data-cr-id', selectedCr.id);
-    tr.innerHTML = `
-        <td><input class="form-control form-control-sm" name="ben_name[]" required value="${ben.name.replace(/"/g, '&quot;')}" data-ben-id="${ben.id}"></td>
-        <td><input class="form-control form-control-sm" name="ben_nid[]" value="${(ben.national_id||'').replace(/"/g, '&quot;')}"></td>
-        <td><input class="form-control form-control-sm" name="ben_addr[]" value="${(ben.address||'').replace(/"/g, '&quot;')}"></td>
-        <td><input class="form-control form-control-sm" name="ben_phone[]" value="${(ben.phone||'').replace(/"/g, '&quot;')}"></td>
-            <td><input type="number" step="0.01" class="form-control form-control-sm ben-amount" name="ben_amount[]" required oninput="calcTotal()" value="${selectedCr.remaining > 0 ? selectedCr.remaining : (selectedCr.requested_amount || '')}"></td>
-        <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove();calcTotal()"><i class="bi bi-x"></i></button></td>
-    `;
-    tbody.appendChild(tr);
+    document.getElementById('benBody').innerHTML = '';
     calcTotal();
 }
 
@@ -300,22 +614,15 @@ async function uploadCdFile(input, type) {
     const fd = new FormData();
     fd.append('file', file);
     fd.append('type', type);
-    const r = await fetch('/api/upload/cash-distribution-file', {
-        method: 'POST',
-        headers: {'X-CSRFToken': csrf},
-        body: fd
-    });
+    const r = await fetch('/api/upload/cash-distribution-file', { method: 'POST', headers: {'X-CSRFToken': csrf}, body: fd });
     const d = await r.json();
     if (!d.success) { showToast('danger', d.message); input.value = ''; return; }
     const hiddenId = type === 'photo' ? 'cdPhoto' : 'cdDocument';
     const previewId = type === 'photo' ? 'cdPhotoPreview' : 'cdDocPreview';
     document.getElementById(hiddenId).value = d.data.filename;
     const preview = document.getElementById(previewId);
-    if (type === 'photo') {
-        preview.innerHTML = `<img src="${d.data.url}" class="img-thumbnail" style="max-height:100px">`;
-    } else {
-        preview.innerHTML = `<a href="${d.data.url}" target="_blank" class="btn btn-sm btn-outline-primary"><i class="bi bi-file-pdf"></i> View PDF</a>`;
-    }
+    if (type === 'photo') preview.innerHTML = `<img src="${d.data.url}" class="img-thumbnail" style="max-height:100px">`;
+    else preview.innerHTML = `<a href="${d.data.url}" target="_blank" class="btn btn-sm btn-outline-primary"><i class="bi bi-file-pdf"></i> View PDF</a>`;
 }
 
 function addBeneficiaryRow() {
@@ -327,10 +634,30 @@ function addBeneficiaryRow() {
         <td><input class="form-control form-control-sm" name="ben_addr[]"></td>
         <td><input class="form-control form-control-sm" name="ben_phone[]"></td>
         <td><input type="number" step="0.01" class="form-control form-control-sm ben-amount" name="ben_amount[]" required oninput="calcTotal()"></td>
-        <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove();calcTotal()"><i class="bi bi-x"></i></button></td>
-    `;
+        <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove();calcTotal()"><i class="bi bi-x"></i></button></td>`;
     tbody.appendChild(tr);
     calcTotal();
+}
+
+function addBeneficiaryRowWithData(ben) {
+    const tbody = document.getElementById('benBody');
+    const existingNames = tbody.querySelectorAll('input[name="ben_name[]"]');
+    const existingSet = new Set(Array.from(existingNames).map(inp => inp.value.trim().toLowerCase()));
+    if (existingSet.has(ben.name.trim().toLowerCase())) { showToast('warning', 'Beneficiary already added'); return; }
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+        <td><input class="form-control form-control-sm" name="ben_name[]" required value="${esc(ben.name)}" data-ben-id="${ben.id}"></td>
+        <td><input class="form-control form-control-sm" name="ben_nid[]" value="${esc(ben.national_id || '')}"></td>
+        <td><input class="form-control form-control-sm" name="ben_addr[]" value="${esc(ben.address || '')}"></td>
+        <td><input class="form-control form-control-sm" name="ben_phone[]" value="${esc(ben.phone || '')}"></td>
+        <td><input type="number" step="0.01" class="form-control form-control-sm ben-amount" name="ben_amount[]" required oninput="calcTotal()"></td>
+        <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove();calcTotal()"><i class="bi bi-x"></i></button></td>`;
+    tbody.appendChild(tr);
+    calcTotal();
+}
+
+function addBeneficiaryFromRegistry() {
+    openBenPicker();
 }
 
 function onFundChange() {
@@ -346,15 +673,7 @@ function calcTotal() {
     document.getElementById('cdTotal').value = total;
     const fundBalanceEl = document.getElementById('cdFundBalance');
     const fundBalance = parseFloat(fundBalanceEl.value.replace(/,/g, '')) || 0;
-    const ids = getSelectedCashRequestIds();
-    let requestRemaining = 0;
-    ids.forEach(function(id) {
-        const cr = cashRequestsData.find(r => r.id === id);
-        if (cr) requestRemaining += (cr.remaining || 0);
-    });
-    const exceedsFund = total > fundBalance && fundBalance > 0;
-    const exceedsRequest = total > requestRemaining && requestRemaining > 0;
-    if (total > 0 && (exceedsFund || exceedsRequest)) {
+    if (total > 0 && total > fundBalance && fundBalance > 0) {
         fundBalanceEl.className = 'form-control text-danger fw-bold';
         document.getElementById('cdTotal').className = 'form-control text-danger fw-bold';
     } else if (total > 0 && fundBalance > 0) {
@@ -369,34 +688,21 @@ function calcTotal() {
 document.getElementById('cdForm').addEventListener('submit', async function(e) {
     e.preventDefault();
     const rows = document.querySelectorAll('#benBody tr');
-    const beneficiaries = [];
+    const beneficiaryList = [];
     rows.forEach(tr => {
         const inputs = tr.querySelectorAll('input');
         const name = inputs[0].value.trim();
         const amount = parseFloat(inputs[4].value);
         if (name && amount > 0) {
             const benId = inputs[0].getAttribute('data-ben-id');
-            const crId = tr.getAttribute('data-cr-id');
-            beneficiaries.push({ name, national_id: inputs[1].value, address: inputs[2].value, phone: inputs[3].value, amount, beneficiary_id: benId ? parseInt(benId) : undefined, cash_request_id: crId ? parseInt(crId) : undefined });
+            beneficiaryList.push({ name, national_id: inputs[1].value, address: inputs[2].value, phone: inputs[3].value, amount, beneficiary_id: benId ? parseInt(benId) : undefined });
         }
     });
-    if (beneficiaries.length === 0) { showToast('danger', 'At least one beneficiary required'); return; }
+    if (beneficiaryList.length === 0) { showToast('danger', 'At least one beneficiary required'); return; }
     const fundBal = parseFloat(document.getElementById('cdFundBalance').value.replace(/,/g, '')) || 0;
-    const total = beneficiaries.reduce((s, b) => s + (b.amount || 0), 0);
+    const total = beneficiaryList.reduce((s, b) => s + (b.amount || 0), 0);
     if (fundBal > 0 && total > fundBal) {
-        showToast('danger', `Total amount (${Number(total).toLocaleString()}) exceeds available fund balance (${Number(fundBal).toLocaleString()})`);
-        return;
-    }
-    const cashReqIds = getSelectedCashRequestIds();
-    let requestRemaining = 0;
-    const allCrIds = [...new Set(beneficiaries.map(b => b.cash_request_id).filter(Boolean))];
-    const idsToCheck = allCrIds.length ? allCrIds : cashReqIds;
-    idsToCheck.forEach(function(id) {
-        const cr = cashRequestsData.find(r => r.id === id);
-        if (cr) requestRemaining += (cr.remaining || 0);
-    });
-    if (cashReqIds.length > 0 && total > requestRemaining) {
-        showToast('danger', `Total amount (${Number(total).toLocaleString()}) exceeds available request amount (${Number(requestRemaining).toLocaleString()})`);
+        showToast('danger', `Total amount (${Number(total).toLocaleString()}) exceeds fund balance (${Number(fundBal).toLocaleString()})`);
         return;
     }
     const body = {
@@ -406,14 +712,10 @@ document.getElementById('cdForm').addEventListener('submit', async function(e) {
         distribution_type: document.getElementById('cdType').value,
         officer: document.getElementById('cdOfficer').value,
         remarks: document.getElementById('cdRemarks').value,
-        beneficiaries
+        beneficiaries: beneficiaryList
     };
     body.photo = document.getElementById('cdPhoto').value || undefined;
     body.document = document.getElementById('cdDocument').value || undefined;
-    {
-        const allCrIds = [...new Set(beneficiaries.map(b => b.cash_request_id).filter(Boolean))];
-        body.cash_request_ids = allCrIds.length ? allCrIds : cashReqIds;
-    }
     try {
         const r = await fetch('/api/cash-distributions', {method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':csrf}, body: JSON.stringify(body)});
         const d = await r.json();
@@ -429,94 +731,38 @@ async function viewCd(id) {
     const cd = d.distribution;
     const bens = cd.beneficiaries || [];
     document.getElementById('viewCdTitle').textContent = cd.distribution_no;
-
-    const benRows = bens.map((b, i) => `<tr>
-        <td>${i + 1}</td>
-        <td>${b.name}</td>
-        <td>${b.national_id || '-'}</td>
-        <td>${b.address || '-'}</td>
-        <td>${b.phone || '-'}</td>
-        <td class="text-end fw-semibold text-danger">${Number(b.amount).toLocaleString()}</td>
-    </tr>`).join('');
-
+    const benRows = bens.map((b, i) => `<tr><td>${i + 1}</td><td>${b.name}</td><td>${b.national_id || '-'}</td><td>${b.address || '-'}</td><td>${b.phone || '-'}</td><td class="text-end fw-semibold text-danger">${Number(b.amount).toLocaleString()}</td></tr>`).join('');
     const totalAmount = bens.reduce((s, b) => s + (b.amount || 0), 0);
-
     const photoHtml = cd.photo_url ? `<a href="${cd.photo_url}" target="_blank" class="btn btn-sm btn-outline-primary"><i class="bi bi-image me-1"></i>View Photo</a>` : '';
     const docHtml = cd.document_url ? `<a href="${cd.document_url}" target="_blank" class="btn btn-sm btn-outline-secondary"><i class="bi bi-file-earmark-pdf me-1"></i>View Document</a>` : '';
-
     document.getElementById('viewCdBody').innerHTML = `
         <div class="row g-2 mb-3">
-            <div class="col-md-8">
-                <div class="card border-0 bg-light h-100">
-                    <div class="card-body py-2">
-                        <div class="row g-1 small">
-                            <div class="col-md-4"><strong>Dist No:</strong> ${cd.distribution_no}</div>
-                            <div class="col-md-4"><strong>Date:</strong> ${cd.distribution_date || '-'}</div>
-                            <div class="col-md-4"><strong>Type:</strong> ${cd.distribution_type || '-'}</div>
-                            <div class="col-md-4"><strong>Officer:</strong> ${cd.officer || '-'}</div>
-                            <div class="col-md-4"><strong>Fund:</strong> ${cd.fund_name || '-'}</div>
-                            <div class="col-md-4"><strong>Fiscal Year:</strong> ${cd.fiscal_year || '-'}</div>
-                            <div class="col-12"><strong>Remarks:</strong> ${cd.remarks || '-'}</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card border-0 bg-light h-100">
-                    <div class="card-body py-2">
-                        <div class="row g-1 small">
-                            <div class="col-6"><strong>Incident:</strong> ${cd.incident_name || '-'}</div>
-                            <div class="col-6"><strong>Status:</strong> <span class="badge bg-${cd.status === 'Completed' ? 'success' : 'danger'}">${cd.status}</span></div>
-                            <div class="col-6"><strong>Total Amount:</strong> <strong class="text-danger">${Number(totalAmount).toLocaleString()}</strong></div>
-                            <div class="col-6"><strong>Beneficiaries:</strong> ${bens.length}</div>
-                            ${cd.cancel_reason ? `<div class="col-12"><strong>Cancel Reason:</strong> <span class="text-danger">${cd.cancel_reason}</span></div>` : ''}
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <div class="col-md-8"><div class="card border-0 bg-light h-100"><div class="card-body py-2"><div class="row g-1 small">
+                <div class="col-md-4"><strong>Dist No:</strong> ${cd.distribution_no}</div>
+                <div class="col-md-4"><strong>Date:</strong> ${cd.distribution_date || '-'}</div>
+                <div class="col-md-4"><strong>Type:</strong> ${cd.distribution_type || '-'}</div>
+                <div class="col-md-4"><strong>Officer:</strong> ${cd.officer || '-'}</div>
+                <div class="col-md-4"><strong>Fund:</strong> ${cd.fund_name || '-'}</div>
+                <div class="col-md-4"><strong>Fiscal Year:</strong> ${cd.fiscal_year || '-'}</div>
+                <div class="col-12"><strong>Remarks:</strong> ${cd.remarks || '-'}</div>
+            </div></div></div></div>
+            <div class="col-md-4"><div class="card border-0 bg-light h-100"><div class="card-body py-2"><div class="row g-1 small">
+                <div class="col-6"><strong>Incident:</strong> ${cd.incident_name || '-'}</div>
+                <div class="col-6"><strong>Status:</strong> <span class="badge bg-${cd.status === 'Completed' ? 'success' : cd.status === 'Cancelled' ? 'danger' : 'secondary'}">${cd.status}</span></div>
+                <div class="col-6"><strong>Total Amount:</strong> <strong class="text-danger">${Number(totalAmount).toLocaleString()}</strong></div>
+                <div class="col-6"><strong>Beneficiaries:</strong> ${bens.length}</div>
+                ${cd.cancel_reason ? `<div class="col-12"><strong>Cancel Reason:</strong> <span class="text-danger">${cd.cancel_reason}</span></div>` : ''}
+            </div></div></div></div>
         </div>
-
-        <div class="card border-0 bg-light mb-3">
-            <div class="card-header bg-white py-2 d-flex justify-content-between align-items-center">
-                <span class="fw-semibold"><i class="bi bi-file-text me-1 text-primary"></i>Source Request</span>
-            </div>
-            <div class="card-body py-2">
-                <div class="row g-1 small">
-                    ${cd.request_numbers && cd.request_numbers.length ? `<div class="col-md-4"><strong>Cash Request(s):</strong> ${cd.request_numbers.join(', ')}</div>` : (cd.request_number ? `<div class="col-md-4"><strong>Cash Request:</strong> ${cd.request_number}</div>` : '')}
-                </div>
-            </div>
-        </div>
-
-        <div class="card border-0 bg-light mb-3">
-            <div class="card-header bg-white py-2 d-flex justify-content-between align-items-center">
-                <span class="fw-semibold"><i class="bi bi-paperclip me-1 text-primary"></i>Attachments</span>
-            </div>
-            <div class="card-body py-2">
-                ${photoHtml || docHtml ? `<div class="d-flex gap-2">${photoHtml}${docHtml}</div>` : '<span class="text-muted small">No attachments</span>'}
-            </div>
-        </div>
-
-        <div class="card border-0 bg-light">
-            <div class="card-header bg-white py-2 d-flex justify-content-between align-items-center">
-                <span class="fw-semibold"><i class="bi bi-people me-1 text-primary"></i>Beneficiaries (${bens.length})</span>
-                <span class="badge bg-primary">Total: ${Number(totalAmount).toLocaleString()}</span>
-            </div>
-            <div class="card-body p-0">
-                <div class="table-responsive">
-                    <table class="table table-sm table-bordered mb-0 small">
-                        <thead class="table-light"><tr>
-                            <th style="width:40px">#</th>
-                            <th>Name</th>
-                            <th>National ID</th>
-                            <th>Address</th>
-                            <th>Phone</th>
-                            <th class="text-end" style="width:120px">Amount</th>
-                        </tr></thead>
-                        <tbody>${benRows || '<tr><td colspan="6" class="text-center text-muted py-2">No beneficiaries</td></tr>'}</tbody>
-                    </table>
-                </div>
-            </div>
-        </div>`;
+        <div class="card border-0 bg-light mb-3"><div class="card-header bg-white py-2"><span class="fw-semibold"><i class="bi bi-paperclip me-1 text-primary"></i>Attachments</span></div>
+            <div class="card-body py-2">${photoHtml || docHtml ? `<div class="d-flex gap-2">${photoHtml}${docHtml}</div>` : '<span class="text-muted small">No attachments</span>'}</div></div>
+        <div class="card border-0 bg-light"><div class="card-header bg-white py-2 d-flex justify-content-between align-items-center">
+            <span class="fw-semibold"><i class="bi bi-people me-1 text-primary"></i>Beneficiaries (${bens.length})</span>
+            <span class="badge bg-primary">Total: ${Number(totalAmount).toLocaleString()}</span></div>
+            <div class="card-body p-0"><div class="table-responsive"><table class="table table-sm table-bordered mb-0 small">
+                <thead class="table-light"><tr><th style="width:40px">#</th><th>Name</th><th>National ID</th><th>Address</th><th>Phone</th><th class="text-end" style="width:120px">Amount</th></tr></thead>
+                <tbody>${benRows || '<tr><td colspan="6" class="text-center text-muted py-2">No beneficiaries</td></tr>'}</tbody>
+            </table></div></div></div>`;
     new bootstrap.Modal(document.getElementById('viewCdModal')).show();
 }
 
@@ -526,10 +772,7 @@ function openCdModal() {
     document.getElementById('cdFundBalance').value = '';
     document.getElementById('cdFundBalance').className = 'form-control';
     document.getElementById('cdTotal').className = 'form-control';
-    selectedCashRequests = [];
-    renderSelectedRequests();
-    const tbody = document.getElementById('benBody');
-    tbody.innerHTML = '';
+    document.getElementById('benBody').innerHTML = '';
     document.getElementById('cdPhoto').value = '';
     document.getElementById('cdDocument').value = '';
     document.getElementById('cdPhotoPreview').innerHTML = '';
@@ -537,41 +780,204 @@ function openCdModal() {
 }
 
 let cancelDistId = null;
-
 async function cancelCd(id) {
     cancelDistId = id;
     document.getElementById('cancelReason').value = '';
     new bootstrap.Modal(document.getElementById('cancelModal')).show();
 }
-
 document.getElementById('confirmCancelBtn').addEventListener('click', async function() {
     const reason = document.getElementById('cancelReason').value.trim();
     if (!reason) { showToast('danger', 'Cancellation reason is required'); return; }
     this.disabled = true;
     try {
-        const r = await fetch(`/api/cash-distributions/${cancelDistId}/cancel`, {
+        const r = await fetch(`/api/cash-distributions/${cancelDistId}/cancel`, { method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrf}, body: JSON.stringify({ cancel_reason: reason }) });
+        const d = await r.json();
+        if (d.success) { showToast('success', d.message); bootstrap.Modal.getInstance(document.getElementById('cancelModal')).hide(); loadDistributions(); loadData(); }
+        else showToast('danger', d.message);
+    } catch(e) { showToast('danger', e.message); }
+    finally { this.disabled = false; cancelDistId = null; }
+});
+
+async function loadData() {
+    const r = await fetch('/api/data');
+    const d = await r.json();
+    if (!d.success) return;
+    beneficiaries = d.beneficiaries || [];
+    incidentsData = (d.incidents || []).filter(i => i.status === 'Active');
+    activeFiscalYear = d.active_fiscal_year || '';
+    window._cashFundsData = d.cash_funds || [];
+
+    document.getElementById('cdFund').innerHTML = '<option value="">Select Fund</option>' + (d.cash_funds||[]).filter(f=>f.status==='Active').map(f => `<option value="${f.id}">${f.name} (Bal: ${Number(f.current_balance).toLocaleString()})</option>`).join('');
+    document.getElementById('cdIncident').innerHTML = '<option value="">Select Incident</option>' + incidentsData.map(i => `<option value="${i.id}">${i.incident_name}</option>`).join('');
+    document.getElementById('cdType').innerHTML = (d.distribution_types||['Individual','Family','Community','Local Government','Organization']).map(t => `<option value="${t}">${t}</option>`).join('');
+}
+
+function openNewBenModal() {
+    const incidentId = document.getElementById('cdIncident').value;
+    if (!incidentId) { showToast('danger', 'Please select an incident first before adding a beneficiary'); return; }
+    document.getElementById('newBenForm').reset();
+    document.getElementById('nbFamilyMembersContainer').innerHTML = '<p class="text-muted text-center py-3 mb-0" id="nbNoFamilyMsg"><i class="bi bi-info-circle me-1"></i>No family members added. Click "Add Member" below.</p>';
+    document.getElementById('nbFamilyMembersJson').value = '[]';
+    document.getElementById('nbFamilyCount').value = 0;
+    document.getElementById('nbFamilyCountBadge').textContent = '0 members';
+    document.getElementById('nbSocialSecurity').checked = false;
+    document.getElementById('nbSsfTypeDiv').style.display = 'none';
+    document.getElementById('nbPovertyCard').checked = false;
+    document.getElementById('nbNameError').textContent = '';
+    document.getElementById('nbNidError').textContent = '';
+    document.getElementById('nbPhoneError').textContent = '';
+    const wardSel = document.getElementById('nbWard');
+    if (wardSel.options.length <= 1) {
+        fetch('/api/data').then(r => r.json()).then(d => {
+            const wards = d.wards || [];
+            wardSel.innerHTML = '<option value="">Select</option>' + wards.map(w => `<option value="${w.id}">${w.name}</option>`).join('');
+            const ssfSel = document.getElementById('nbSsfType');
+            if (d.ssf_types) ssfSel.innerHTML = '<option value="">Select</option>' + d.ssf_types.map(t => `<option value="${t}">${t}</option>`).join('');
+        });
+    }
+    new bootstrap.Modal(document.getElementById('newBenModal')).show();
+}
+
+function nbAddFamilyMember(data) {
+    data = data || {};
+    const container = document.getElementById('nbFamilyMembersContainer');
+    const noMsg = document.getElementById('nbNoFamilyMsg');
+    if (noMsg) noMsg.remove();
+    const row = document.createElement('div');
+    row.className = 'family-member-row card bg-light p-3 mb-2';
+    row.innerHTML = `
+        <div class="row g-2 align-items-center">
+            <div class="col-md-3"><label class="form-label small fw-medium">Name <span class="text-danger">*</span></label><input type="text" class="form-control form-control-sm fm-name" placeholder="Name" value="${data.name || ''}"></div>
+            <div class="col-md-2"><label class="form-label small fw-medium">ID</label><input type="text" class="form-control form-control-sm fm-id" placeholder="ID" value="${data.id || ''}"></div>
+            <div class="col-md-2"><label class="form-label small fw-medium">Relation</label>
+                <select class="form-select form-select-sm fm-relation"><option value="">Select</option>
+                <option value="Self" ${data.relation==='Self'?'selected':''}>Self</option><option value="Spouse" ${data.relation==='Spouse'?'selected':''}>Spouse</option>
+                <option value="Son" ${data.relation==='Son'?'selected':''}>Son</option><option value="Daughter" ${data.relation==='Daughter'?'selected':''}>Daughter</option>
+                <option value="Father" ${data.relation==='Father'?'selected':''}>Father</option><option value="Mother" ${data.relation==='Mother'?'selected':''}>Mother</option>
+                <option value="Brother" ${data.relation==='Brother'?'selected':''}>Brother</option><option value="Sister" ${data.relation==='Sister'?'selected':''}>Sister</option>
+                <option value="Other" ${data.relation==='Other'?'selected':''}>Other</option></select>
+            </div>
+            <div class="col-md-1"><label class="form-label small fw-medium">Age</label><input type="number" class="form-control form-control-sm fm-age" min="0" max="150" placeholder="0" value="${data.age || ''}"></div>
+            <div class="col-md-2"><label class="form-label small fw-medium">Gender</label>
+                <select class="form-select form-select-sm fm-gender"><option value="">Select</option>
+                <option value="Male" ${data.gender==='Male'?'selected':''}>Male</option><option value="Female" ${data.gender==='Female'?'selected':''}>Female</option></select>
+            </div>
+            <div class="col-md-1"><div class="form-check mt-3"><input type="checkbox" class="form-check-input fm-disabled" ${data.is_disabled?'checked':''}><label class="form-check-label small">Disabled</label></div></div>
+            <div class="col-md-1 text-end"><button type="button" class="btn btn-outline-danger btn-sm mt-3" onclick="nbRemoveFamilyMember(this)" title="Remove"><i class="bi bi-x-lg"></i></button></div>
+        </div>`;
+    container.appendChild(row);
+    nbUpdateFamilyCount();
+}
+
+function nbRemoveFamilyMember(btn) {
+    btn.closest('.family-member-row').remove();
+    nbUpdateFamilyCount();
+}
+
+function nbUpdateFamilyCount() {
+    const names = document.querySelectorAll('#nbFamilyMembersContainer .family-member-row .fm-name');
+    let count = 0;
+    names.forEach(el => { if (el.value.trim()) count++; });
+    document.getElementById('nbFamilyCountBadge').textContent = count + ' member' + (count !== 1 ? 's' : '');
+    document.getElementById('nbFamilyCount').value = count;
+    nbUpdateFamilyJson();
+}
+
+function nbUpdateFamilyJson() {
+    const members = [];
+    document.querySelectorAll('#nbFamilyMembersContainer .family-member-row').forEach(row => {
+        const name = row.querySelector('.fm-name').value.trim();
+        if (!name) return;
+        members.push({
+            name: name, id: row.querySelector('.fm-id').value.trim(),
+            relation: row.querySelector('.fm-relation').value,
+            age: parseInt(row.querySelector('.fm-age').value) || null,
+            gender: row.querySelector('.fm-gender').value,
+            is_disabled: row.querySelector('.fm-disabled').checked
+        });
+    });
+    document.getElementById('nbFamilyMembersJson').value = JSON.stringify(members);
+}
+
+document.getElementById('nbFamilyMembersContainer').addEventListener('input', function(e) {
+    if (e.target.classList.contains('fm-name')) nbUpdateFamilyCount();
+});
+
+document.getElementById('nbSocialSecurity').addEventListener('change', function() {
+    document.getElementById('nbSsfTypeDiv').style.display = this.checked ? '' : 'none';
+});
+
+document.getElementById('newBenForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    nbUpdateFamilyJson();
+    const saveBtn = document.getElementById('nbSaveBtn');
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving...';
+    document.getElementById('nbNameError').textContent = '';
+    document.getElementById('nbNidError').textContent = '';
+    document.getElementById('nbPhoneError').textContent = '';
+    const fmJson = JSON.parse(document.getElementById('nbFamilyMembersJson').value || '[]');
+    let fmCount = fmJson.length;
+    if (fmCount === 0 && document.getElementById('nbName').value.trim()) fmCount = 1;
+    const body = {
+        name: document.getElementById('nbName').value.trim(),
+        national_id: document.getElementById('nbNid').value.trim(),
+        father_name: document.getElementById('nbFatherName').value.trim(),
+        phone: document.getElementById('nbPhone').value.trim(),
+        address: document.getElementById('nbAddress').value.trim(),
+        ward: document.getElementById('nbWard').value ? parseInt(document.getElementById('nbWard').value) : null,
+        tole: document.getElementById('nbTole').value.trim(),
+        current_shelter_location: document.getElementById('nbShelter').value.trim(),
+        coordinates: document.getElementById('nbCoordinates').value.trim(),
+        family_members: fmCount,
+        family_members_json: fmJson,
+        in_social_security_fund: document.getElementById('nbSocialSecurity').checked,
+        ssf_type: document.getElementById('nbSsfType').value,
+        poverty_card_holder: document.getElementById('nbPovertyCard').checked,
+        bank_account_holder_name: document.getElementById('nbBankHolder').value.trim(),
+        bank_account: document.getElementById('nbBank').value.trim(),
+        bank_name: document.getElementById('nbBankName').value.trim(),
+        mobile_wallet: document.getElementById('nbWallet').value.trim(),
+        remarks: document.getElementById('nbRemarks').value.trim()
+    };
+    try {
+        const r = await fetch('/api/beneficiaries', {
             method: 'POST',
             headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrf},
-            body: JSON.stringify({ cancel_reason: reason })
+            body: JSON.stringify(body)
         });
         const d = await r.json();
         if (d.success) {
-            showToast('success', d.message);
-            bootstrap.Modal.getInstance(document.getElementById('cancelModal')).hide();
-            loadDistributions();
-            loadData();
+            const newBen = d.data;
+            beneficiaries.push(newBen);
+            addBeneficiaryRowWithData(newBen);
+            bootstrap.Modal.getInstance(document.getElementById('newBenModal')).hide();
+            showToast('success', 'Beneficiary created and added to distribution');
         } else {
-            showToast('danger', d.message);
+            const msg = d.message || '';
+            if (msg.toLowerCase().includes('name')) document.getElementById('nbNameError').textContent = msg;
+            else if (msg.toLowerCase().includes('national id')) document.getElementById('nbNidError').textContent = msg;
+            else if (msg.toLowerCase().includes('phone')) document.getElementById('nbPhoneError').textContent = msg;
+            else showToast('danger', msg);
         }
     } catch(e) {
-        showToast('danger', e.message);
+        showToast('danger', 'Error creating beneficiary: ' + e.message);
     } finally {
-        this.disabled = false;
-        cancelDistId = null;
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = '<i class="bi bi-check-lg me-1"></i> Save & Select';
     }
 });
 
 loadDistributions();
 loadData();
 </script>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    #benPickerTable .sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+    #benPickerTable .sortable:hover { background-color: #e9ecef; }
+    #benPickerTable .sort-icon { font-size: 0.7rem; opacity: 0.4; margin-left: 4px; }
+    #benPickerTable th.sort-active .sort-icon { opacity: 1; color: #0d6efd; }
+</style>
 {% endblock %}

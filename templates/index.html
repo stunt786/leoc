@@ -108,15 +108,6 @@
         </div>
     </div>
     <div class="col-md-3 col-6">
-        <div class="stat-card stat-card-warning">
-            <div class="stat-icon"><i class="bi bi-send-exclamation"></i></div>
-            <div class="stat-content">
-                <div class="stat-label">Pending Cash Req.</div>
-                <div class="stat-value" id="pendingCashRequests">0</div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3 col-6">
         <div class="stat-card stat-card-primary">
             <div class="stat-icon"><i class="bi bi-calendar-check"></i></div>
             <div class="stat-content">
@@ -893,7 +884,6 @@ async function loadDashboard() {
 
         document.getElementById('cashBalance').textContent = (data.cash_balance ?? 0).toLocaleString();
         document.getElementById('totalCashDistributed').textContent = (data.total_cash_distributed ?? 0).toLocaleString();
-        document.getElementById('pendingCashRequests').textContent = data.pending_cash_requests ?? 0;
         document.getElementById('cashThisMonth').textContent = (data.cash_distributed_this_month ?? 0).toLocaleString();
 
         if (data.stock_by_category && data.stock_by_category.length) {
