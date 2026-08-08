@@ -49,6 +49,8 @@
         .signature-line { border-top: 1px solid #000; width: 200px; display: inline-block; margin-top: 5px; }
         .totals-row { font-weight: 700; background-color: #e9ecef; }
         .striped tbody tr:nth-of-type(even) { background-color: #f8f9fa; }
+        .category-header td { background-color: #2c5282; color: #fff; font-weight: 700; font-size: 11px; padding: 5px 8px; }
+        .subtotal-row td { background-color: #e2e8f0; font-weight: 600; font-style: italic; }
     </style>
 </head>
 <body>
@@ -84,40 +86,55 @@
         <thead class="table-dark">
             <tr>
                 <th style="width:30px;">S.No</th>
-                <th style="width:100px;">Item Code / कोड</th>
-                <th style="width:200px;">Item Name / सामानको नाम</th>
-                <th style="width:50px;">Unit / एकाइ</th>
-                <th style="width:70px;">Opening / मौ. वा</th>
-                <th style="width:70px;">Received / प्राप्त</th>
-                <th style="width:70px;">Dispatched / खर्च</th>
-                <th style="width:70px;">Closing / मौ. जि</th>
+                <th style="width:80px;">Item Code / कोड</th>
+                <th style="width:180px;">Item Name / सामानको नाम</th>
+                <th style="width:80px;">Group / समूह</th>
+                <th style="width:45px;">Unit / एकाइ</th>
+                <th style="width:60px;">Opening / मौ. वा</th>
+                <th style="width:60px;">Received / प्राप्त</th>
+                <th style="width:60px;">Dispatched / खर्च</th>
+                <th style="width:60px;">Closing / मौ. जि</th>
                 <th>Remarks / टिप्पणी</th>
             </tr>
         </thead>
         <tbody>
-            {% if rows %}
-                {% for row in rows %}
-                <tr>
-                    <td class="text-center">{{ loop.index }}</td>
-                    <td><small>{{ row.item_code }}</small></td>
-                    <td>{{ row.item_name }}{% if row.local_name %} ({{ row.local_name }}){% endif %}</td>
-                    <td class="text-center">{{ row.unit }}</td>
-                    <td class="text-end">{{ row.opening }}</td>
-                    <td class="text-end">{{ row.received }}</td>
-                    <td class="text-end">{{ row.dispatched }}</td>
-                    <td class="text-end fw-bold">{{ row.balance }}</td>
-                    <td></td>
-                </tr>
+            {% if grouped_rows %}
+                {% for cat_name, cat_data in grouped_rows.items() %}
+                    <tr class="category-header">
+                        <td colspan="10">{{ cat_name }}{% if cat_data.category_name_np %} ({{ cat_data.category_name_np }}){% endif %}</td>
+                    </tr>
+                    {% for row in cat_data.item_rows %}
+                        <tr>
+                            <td class="text-center">{{ row.serial_no }}</td>
+                            <td><small>{{ row.item_code }}</small></td>
+                            <td>{{ row.item_name }}{% if row.local_name %} ({{ row.local_name }}){% endif %}</td>
+                            <td>{{ row.group_name }}</td>
+                            <td class="text-center">{{ row.unit }}</td>
+                            <td class="text-end">{{ row.opening }}</td>
+                            <td class="text-end">{{ row.received }}</td>
+                            <td class="text-end">{{ row.dispatched }}</td>
+                            <td class="text-end fw-bold">{{ row.balance }}</td>
+                            <td></td>
+                        </tr>
+                    {% endfor %}
+                    <tr class="subtotal-row">
+                        <td colspan="5" class="text-end">Subtotal / उपजम्मा</td>
+                        <td class="text-end">{{ cat_data.subtotal.opening }}</td>
+                        <td class="text-end">{{ cat_data.subtotal.received }}</td>
+                        <td class="text-end">{{ cat_data.subtotal.dispatched }}</td>
+                        <td class="text-end">{{ cat_data.subtotal.balance }}</td>
+                        <td></td>
+                    </tr>
                 {% endfor %}
             {% else %}
                 <tr>
-                    <td colspan="9" class="text-center py-3 text-muted">No stock records found for this warehouse.</td>
+                    <td colspan="10" class="text-center py-3 text-muted">No stock records found for this warehouse.</td>
                 </tr>
             {% endif %}
         </tbody>
         <tfoot>
             <tr class="totals-row">
-                <td colspan="4" class="text-end fw-bold">Total / जम्मा</td>
+                <td colspan="5" class="text-end fw-bold">Total / जम्मा</td>
                 <td class="text-end">{{ grand_opening }}</td>
                 <td class="text-end">{{ grand_received }}</td>
                 <td class="text-end">{{ grand_dispatched }}</td>

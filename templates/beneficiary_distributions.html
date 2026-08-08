@@ -59,17 +59,58 @@
                         <th>Beneficiary Name</th>
                         <th>Ward</th>
                         <th>Phone</th>
-                        <th>Items Received</th>
+                        <th>Items</th>
                         <th>Cash</th>
-                        <th>Date</th>
+                        <th>Latest Date</th>
                         <th>Status</th>
-                        <th>Incident</th>
+                        <th class="text-center">View</th>
                     </tr>
                 </thead>
                 <tbody id="distTableBody">
                     <tr><td colspan="9" class="text-center py-4"><div class="spinner-border text-primary"></div></td></tr>
                 </tbody>
             </table>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="viewDistModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-person-lines-fill me-2"></i><span id="modalBenName"></span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row mb-3">
+                    <div class="col-md-4"><strong>Ward:</strong> <span id="modalWard"></span></div>
+                    <div class="col-md-4"><strong>Phone:</strong> <span id="modalPhone"></span></div>
+                    <div class="col-md-4"><strong>Total Distributions:</strong> <span id="modalTotalDist"></span></div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-6"><strong>Total Items:</strong> <span id="modalTotalItems" class="badge bg-info"></span></div>
+                    <div class="col-md-6"><strong>Total Cash:</strong> <span id="modalTotalCash" class="badge bg-success"></span></div>
+                </div>
+                <hr>
+                <h6>Item Distributions</h6>
+                <div class="table-responsive mb-3">
+                    <table class="table table-sm table-bordered mb-0" id="modalItemsTable">
+                        <thead class="table-light">
+                            <tr><th>Date</th><th>Item</th><th>Qty</th><th>Dist No</th><th>Incident</th><th>Status</th></tr>
+                        </thead>
+                        <tbody id="modalItemsBody"></tbody>
+                    </table>
+                </div>
+                <h6>Cash Distributions</h6>
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered mb-0" id="modalCashTable">
+                        <thead class="table-light">
+                            <tr><th>Date</th><th>Amount</th><th>Dist No</th><th>Incident</th><th>Status</th></tr>
+                        </thead>
+                        <tbody id="modalCashBody"></tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -116,19 +157,75 @@ function renderDistributions(data) {
     }
     tbody.innerHTML = data.map((row, i) => {
         const statusBadge = row.status === 'Received' ? 'success' : 'warning';
-        return `<tr data-id="${row.id}">
+        const itemsText = row.total_items > 0 ? `${row.distribution_count} dist(s)` : '-';
+        const cashText = row.total_cash > 0 ? `Rs. ${Number(row.total_cash).toLocaleString()}` : '-';
+        return `<tr>
             <td>${i+1}</td>
             <td><strong>${row.family_name}</strong></td>
-            <td>${row.ward_name || row.ward || '-'}</td>
+            <td>${row.ward_name || '-'}</td>
             <td>${row.phone || '-'}</td>
-            <td>${row.items_received}</td>
-            <td>${row.cash ? Number(row.cash).toLocaleString() : '-'}</td>
-            <td>${row.date || '-'}</td>
+            <td>${itemsText}</td>
+            <td>${cashText}</td>
+            <td>${row.latest_date || '-'}</td>
             <td><span class="badge bg-${statusBadge}">${row.status}</span></td>
-            <td><small>${row.incident_name || '-'}</small></td>
+            <td class="text-center">
+                <button class="btn btn-sm btn-outline-primary" onclick="viewBeneficiary(${i})" title="View Details">
+                    <i class="bi bi-eye"></i>
+                </button>
+            </td>
         </tr>`;
     }).join('');
     DataTableManager.init('dataTable');
+}
+
+function viewBeneficiary(index) {
+    const b = _distributions[index];
+    if (!b) return;
+
+    document.getElementById('modalBenName').textContent = b.family_name;
+    document.getElementById('modalWard').textContent = b.ward_name || '-';
+    document.getElementById('modalPhone').textContent = b.phone || '-';
+    document.getElementById('modalTotalDist').textContent = b.distribution_count;
+    document.getElementById('modalTotalItems').textContent = b.total_items > 0 ? b.total_items : '0';
+    document.getElementById('modalTotalCash').textContent = b.total_cash > 0 ? `Rs. ${Number(b.total_cash).toLocaleString()}` : 'Rs. 0';
+
+    const items = b.distributions.filter(d => d.item_name);
+    const cash = b.distributions.filter(d => d.cash);
+
+    const itemsBody = document.getElementById('modalItemsBody');
+    if (items.length === 0) {
+        itemsBody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No item distributions</td></tr>';
+    } else {
+        itemsBody.innerHTML = items.map(d => {
+            const statusBadge = d.status === 'Received' ? 'success' : 'warning';
+            return `<tr>
+                <td>${d.date || '-'}</td>
+                <td>${d.item_name}</td>
+                <td>${d.quantity}</td>
+                <td><small>${d.distribution_no || '-'}</small></td>
+                <td><small>${d.incident_name || '-'}</small></td>
+                <td><span class="badge bg-${statusBadge}">${d.status}</span></td>
+            </tr>`;
+        }).join('');
+    }
+
+    const cashBody = document.getElementById('modalCashBody');
+    if (cash.length === 0) {
+        cashBody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">No cash distributions</td></tr>';
+    } else {
+        cashBody.innerHTML = cash.map(d => {
+            return `<tr>
+                <td>${d.date || '-'}</td>
+                <td>Rs. ${Number(d.cash).toLocaleString()}</td>
+                <td><small>${d.distribution_no || '-'}</small></td>
+                <td><small>${d.incident_name || '-'}</small></td>
+                <td><span class="badge bg-success">${d.status}</span></td>
+            </tr>`;
+        }).join('');
+    }
+
+    const modal = new bootstrap.Modal(document.getElementById('viewDistModal'));
+    modal.show();
 }
 
 async function loadData() {

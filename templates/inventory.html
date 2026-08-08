@@ -9,7 +9,7 @@
 <div class="page-header d-flex justify-content-between align-items-center">
     <div>
         <h4><i class="bi bi-box-seam-fill me-2"></i>Current Stock</h4>
-        <p>System-generated inventory view — updates automatically from Stock Receipt, Dispatch, and Adjustments.</p>
+        <p class="text-muted mb-0">System-generated inventory view — updates automatically from Stock Receipt, Dispatch, and Adjustments.</p>
     </div>
     <div class="d-flex gap-2 align-items-start">
         <button class="btn btn-sm btn-outline-secondary" onclick="printBinCard()"><i class="bi bi-card-list me-1"></i>Bin Card</button>
@@ -17,8 +17,8 @@
     </div>
 </div>
 
-<div class="row g-3 mb-4" id="summaryCards">
-    <div class="col-md-3 col-6">
+<div class="row g-2 mb-4" id="summaryCards">
+    <div class="col">
         <div class="stat-card stat-card-primary">
             <div class="stat-icon"><i class="bi bi-boxes"></i></div>
             <div class="stat-content">
@@ -27,7 +27,7 @@
             </div>
         </div>
     </div>
-    <div class="col-md-3 col-6">
+    <div class="col">
         <div class="stat-card stat-card-success">
             <div class="stat-icon"><i class="bi bi-cubes"></i></div>
             <div class="stat-content">
@@ -36,25 +36,25 @@
             </div>
         </div>
     </div>
-    <div class="col-md-3 col-6">
+    <div class="col">
         <div class="stat-card stat-card-warning">
             <div class="stat-icon"><i class="bi bi-exclamation-triangle"></i></div>
             <div class="stat-content">
-                <div class="stat-label">Low Stock Items</div>
+                <div class="stat-label">Low Stock</div>
                 <div class="stat-value" id="lowStockCount">0</div>
             </div>
         </div>
     </div>
-    <div class="col-md-3 col-6">
+    <div class="col">
         <div class="stat-card stat-card-danger">
             <div class="stat-icon"><i class="bi bi-x-circle"></i></div>
             <div class="stat-content">
-                <div class="stat-label">Out of Stock Items</div>
+                <div class="stat-label">Out of Stock</div>
                 <div class="stat-value" id="outOfStockCount">0</div>
             </div>
         </div>
     </div>
-    <div class="col-md-3 col-6">
+    <div class="col">
         <div class="stat-card stat-card-orange">
             <div class="stat-icon"><i class="bi bi-clock-history"></i></div>
             <div class="stat-content">
@@ -66,49 +66,53 @@
 </div>
 
 <div class="card mb-4">
+    <div class="card-header bg-light">
+        <i class="bi bi-funnel me-2 text-primary"></i><strong>Filters</strong>
+        <button class="btn btn-sm btn-outline-danger float-end" onclick="clearFilters()"><i class="bi bi-x-lg me-1"></i>Clear</button>
+    </div>
     <div class="card-body">
         <div class="row g-2 align-items-end">
-            <div class="col-md-2">
-                <label class="form-label">Warehouse</label>
-                <select class="form-select" id="filterWarehouse" onchange="loadInventory()">
+            <div class="col-lg-2 col-md-4 col-sm-6">
+                <label class="form-label fw-semibold">Warehouse</label>
+                <select class="form-select form-select-sm" id="filterWarehouse" onchange="loadInventory()">
                     <option value="">All Warehouses</option>
                 </select>
             </div>
-            <div class="col-md-2">
-                <label class="form-label">Category</label>
-                <select class="form-select" id="filterCategory" onchange="loadInventory()">
+            <div class="col-lg-2 col-md-4 col-sm-6">
+                <label class="form-label fw-semibold">Group</label>
+                <select class="form-select form-select-sm" id="filterGroup" onchange="loadInventory()">
+                    <option value="">All Groups</option>
+                </select>
+            </div>
+            <div class="col-lg-2 col-md-4 col-sm-6">
+                <label class="form-label fw-semibold">Category</label>
+                <select class="form-select form-select-sm" id="filterCategory" onchange="loadInventory()">
                     <option value="">All Categories</option>
                 </select>
             </div>
-            <div class="col-md-2">
-                <label class="form-label">Status</label>
-                <select class="form-select" id="filterStatus" onchange="loadInventory()">
+            <div class="col-lg-2 col-md-4 col-sm-6">
+                <label class="form-label fw-semibold">Status</label>
+                <select class="form-select form-select-sm" id="filterStatus" onchange="loadInventory()">
                     <option value="">All Status</option>
                     <option value="available">Available</option>
                     <option value="low_stock">Low Stock</option>
                     <option value="out_of_stock">Out of Stock</option>
-                    <option value="expired">Expired Items</option>
+                    <option value="expired">Expired</option>
                 </select>
             </div>
-            <div class="col-md-2">
-                <label class="form-label">Supplier</label>
-                <select class="form-select" id="filterSupplier" onchange="loadInventory()">
+            <div class="col-lg-2 col-md-4 col-sm-6">
+                <label class="form-label fw-semibold">Supplier</label>
+                <select class="form-select form-select-sm" id="filterSupplier" onchange="loadInventory()">
                     <option value="">All Suppliers</option>
                 </select>
             </div>
-            <div class="col-md-2">
-                <label class="form-label">From Date (BS)</label>
-                <input type="text" class="form-control nepali-date" id="filterFromDate" placeholder="YYYY-MM-DD" onchange="loadInventory()">
+            <div class="col-lg-1 col-md-4 col-sm-6">
+                <label class="form-label fw-semibold">From (BS)</label>
+                <input type="text" class="form-control form-control-sm nepali-date" id="filterFromDate" placeholder="YYYY-MM-DD" onchange="loadInventory()">
             </div>
-            <div class="col-md-2">
-                <label class="form-label">To Date (BS)</label>
-                <input type="text" class="form-control nepali-date" id="filterToDate" placeholder="YYYY-MM-DD" onchange="loadInventory()">
-            </div>
-            <div class="col-md-3">
-                <label class="form-label">Item (for Bin Card)</label>
-                <select class="form-select" id="filterItem">
-                    <option value="">Select item...</option>
-                </select>
+            <div class="col-lg-1 col-md-4 col-sm-6">
+                <label class="form-label fw-semibold">To (BS)</label>
+                <input type="text" class="form-control form-control-sm nepali-date" id="filterToDate" placeholder="YYYY-MM-DD" onchange="loadInventory()">
             </div>
         </div>
     </div>
@@ -116,37 +120,37 @@
 
 <div class="card mb-4 border-info">
     <div class="card-header bg-info bg-opacity-10">
-        <i class="bi bi-printer me-2 text-info"></i>Print Options
+        <i class="bi bi-printer me-2 text-info"></i><strong>Print Options</strong>
     </div>
     <div class="card-body">
         <div class="row g-2 align-items-end">
             <div class="col-md-3">
-                <label class="form-label">Warehouse <span class="text-danger">*</span></label>
-                <select class="form-select" id="printWarehouse">
+                <label class="form-label fw-semibold">Warehouse <span class="text-danger">*</span></label>
+                <select class="form-select form-select-sm" id="printWarehouse">
                     <option value="">Select warehouse...</option>
                 </select>
             </div>
             <div class="col-md-3">
-                <label class="form-label">Item <span class="text-danger">*</span></label>
-                <select class="form-select" id="printItem">
+                <label class="form-label fw-semibold">Item <span class="text-danger">*</span></label>
+                <select class="form-select form-select-sm" id="printItem">
                     <option value="">Select item...</option>
                 </select>
             </div>
             <div class="col-md-2 d-grid">
-                <button class="btn btn-outline-primary" onclick="printBinCard()">
+                <button class="btn btn-outline-primary btn-sm" onclick="printBinCard()">
                     <i class="bi bi-card-list me-1"></i>Print Bin Card
                 </button>
             </div>
             <div class="col-md-2">
-                <label class="form-label">From Date</label>
-                <input type="text" class="form-control nepali-date" placeholder="YYYY-MM-DD" id="stockBookFrom">
+                <label class="form-label fw-semibold">From Date</label>
+                <input type="text" class="form-control form-control-sm nepali-date" placeholder="YYYY-MM-DD" id="stockBookFrom">
             </div>
             <div class="col-md-2">
-                <label class="form-label">To Date</label>
-                <input type="text" class="form-control nepali-date" placeholder="YYYY-MM-DD" id="stockBookTo">
+                <label class="form-label fw-semibold">To Date</label>
+                <input type="text" class="form-control form-control-sm nepali-date" placeholder="YYYY-MM-DD" id="stockBookTo">
             </div>
             <div class="col-md-2 d-grid">
-                <button class="btn btn-outline-success" onclick="printStockBook()">
+                <button class="btn btn-outline-success btn-sm" onclick="printStockBook()">
                     <i class="bi bi-book me-1"></i>Print Stock Book
                 </button>
             </div>
@@ -156,8 +160,8 @@
 
 <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
-        <span><i class="bi bi-list-check me-2 text-primary"></i>Inventory Records</span>
-        <span class="text-muted small"><i class="bi bi-info-circle me-1"></i>View-only — inventory is system-generated and updates automatically from Stock Receipt, Dispatch, and Adjustments.</span>
+        <span><i class="bi bi-list-check me-2 text-primary"></i><strong>Inventory Records</strong></span>
+        <small class="text-muted"><i class="bi bi-info-circle me-1"></i>View-only — updates automatically from Stock Receipt, Dispatch, and Adjustments.</small>
     </div>
     <div class="card-body p-0">
         <div class="table-responsive">
@@ -165,8 +169,8 @@
                 <thead>
                     <tr>
                         <th>Item Code</th>
-                        <th>Barcode</th>
                         <th>Item Name</th>
+                        <th>Group</th>
                         <th>Category</th>
                         <th>Warehouse(s)</th>
                         <th class="text-end">Available Qty</th>
@@ -208,6 +212,17 @@ function statusBadge(status) {
     return map[status] || `<span class="badge bg-secondary">${status}</span>`;
 }
 
+function clearFilters() {
+    document.getElementById('filterWarehouse').value = '';
+    document.getElementById('filterGroup').value = '';
+    document.getElementById('filterCategory').value = '';
+    document.getElementById('filterStatus').value = '';
+    document.getElementById('filterSupplier').value = '';
+    document.getElementById('filterFromDate').value = '';
+    document.getElementById('filterToDate').value = '';
+    loadInventory();
+}
+
 async function loadFormData() {
     try {
         const r = await fetch('/api/data');
@@ -223,6 +238,11 @@ async function loadFormData() {
             printWarehouseSel.innerHTML += `<option value="${w.id}">${w.name}</option>`;
         });
 
+        const groupSel = document.getElementById('filterGroup');
+        (d.item_groups || []).forEach(g => {
+            groupSel.innerHTML += `<option value="${g.id}">${g.name}</option>`;
+        });
+
         const catSel = document.getElementById('filterCategory');
         (d.categories || []).forEach(c => {
             catSel.innerHTML += `<option value="${c.id}">${c.name}</option>`;
@@ -233,11 +253,9 @@ async function loadFormData() {
             supSel.innerHTML += `<option value="${s.id}">${s.name}</option>`;
         });
 
-        const itemSel = document.getElementById('filterItem');
         const printItemSel = document.getElementById('printItem');
         items.forEach(i => {
             const label = `${i.name} ${i.item_code ? '('+i.item_code+')' : ''}`;
-            itemSel.innerHTML += `<option value="${i.id}">${label}</option>`;
             printItemSel.innerHTML += `<option value="${i.id}">${label}</option>`;
         });
     } catch (e) { showToast('danger', 'Error loading form data: ' + e.message); }
@@ -253,8 +271,8 @@ function renderInventory(data) {
         const expiryIcon = item.expiry_tracking ? '<i class="bi bi-calendar-check text-warning ms-1" title="Expiry tracking enabled"></i>' : '';
         return `<tr data-id="${item.id}">
             <td><span class="badge bg-light text-dark">${item.item_code || '-'}</span></td>
-            <td><span class="text-muted small">${item.barcode || '-'}</span></td>
             <td class="fw-medium">${item.item_name}${expiryIcon}</td>
+            <td>${item.group_name || '-'}</td>
             <td>${item.category_name || '-'}</td>
             <td>${item.warehouse_name || '-'}</td>
             <td class="text-end fw-bold">${item.available_quantity}</td>
@@ -272,6 +290,7 @@ async function loadInventory() {
     try {
         const warehouse = document.getElementById('filterWarehouse').value;
         const category = document.getElementById('filterCategory').value;
+        const group = document.getElementById('filterGroup').value;
         const supplier = document.getElementById('filterSupplier').value;
         const fromDate = document.getElementById('filterFromDate').value;
         const toDate = document.getElementById('filterToDate').value;
@@ -280,6 +299,7 @@ async function loadInventory() {
         const params = new URLSearchParams();
         if (warehouse) params.append('warehouse_id', warehouse);
         if (category) params.append('category_id', category);
+        if (group) params.append('group_id', group);
         if (supplier) params.append('supplier_id', supplier);
         if (fromDate) params.append('from_date', fromDate);
         if (toDate) params.append('to_date', toDate);

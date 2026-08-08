@@ -3711,6 +3711,7 @@ def get_inventory():
     try:
         warehouse_id = request.args.get('warehouse_id', type=int)
         category_id = request.args.get('category_id', type=int)
+        group_id = request.args.get('group_id', type=int)
         supplier_id = request.args.get('supplier_id', type=int)
         from_date_str = request.args.get('from_date')
         to_date_str = request.args.get('to_date')
@@ -3723,6 +3724,8 @@ def get_inventory():
             query = query.filter(Inventory.warehouse_id == warehouse_id)
         if category_id:
             query = query.filter(Item.category_id == category_id)
+        if group_id:
+            query = query.filter(Item.group_id == group_id)
         if search:
             query = query.filter(Item.name.ilike(f'%{search}%'))
         if supplier_id or from_date_str or to_date_str:
@@ -3764,6 +3767,7 @@ def get_inventory():
                         'item_uuid': item.uuid if item else None,
                         'barcode': item.barcode if item else None,
                         'category_name': item.category.name if item and item.category else None,
+                        'group_name': item.group.name if item and item.group else None,
                         'quantity': 0,
                         'reserved_quantity': 0,
                         'unit': item.unit if item else None,
@@ -5768,28 +5772,28 @@ def get_beneficiary_distributions():
             q = f'%{search}%'
             query = query.filter(DistributionBeneficiary.family_name.ilike(q))
 
-        results = query.limit(500).all()
-        data = []
+        results = query.limit(1000).all()
+        all_items = []
         for db_ben in results:
             ben_reg = db_get(Beneficiary, db_ben.beneficiary_id) if db_ben.beneficiary_id else None
             w = db_ben.distribution.incident.ward if db_ben.distribution and db_ben.distribution.incident else (ben_reg.ward if ben_reg else None)
-            data.append({
+            all_items.append({
                 'id': db_ben.id,
                 'beneficiary_id': db_ben.beneficiary_id,
                 'family_name': db_ben.family_name,
                 'ward': w,
                 'ward_name': ward_name_filter(w),
                 'phone': ben_reg.phone if ben_reg else None,
-                'items_received': f"{db_ben.item} x {db_ben.quantity}" if db_ben.item else '-',
+                'item_name': db_ben.item or None,
+                'quantity': db_ben.quantity or 0,
                 'date': ad_to_bs_date(db_ben.distribution.distribution_date) if db_ben.distribution else None,
-                'cash': None,
                 'status': db_ben.status,
                 'distribution_no': db_ben.distribution.distribution_no if db_ben.distribution else None,
                 'incident_name': db_ben.distribution.incident.incident_name if db_ben.distribution and db_ben.distribution.incident else None,
                 'incident_type': db_ben.distribution.incident.incident_type if db_ben.distribution and db_ben.distribution.incident else None,
             })
 
-        # Also get cash distributions for same beneficiaries
+        # Also get cash distributions
         cash_query = db.session.query(CashDistributionBeneficiary).join(
             CashDistribution, CashDistributionBeneficiary.distribution_id == CashDistribution.id
         ).join(
@@ -5809,27 +5813,62 @@ def get_beneficiary_distributions():
             q = f'%{search}%'
             cash_query = cash_query.filter(CashDistributionBeneficiary.name.ilike(q))
 
-        cash_results = cash_query.limit(500).all()
+        cash_results = cash_query.limit(1000).all()
         for cb in cash_results:
             ben_reg = db_get(Beneficiary, cb.beneficiary_id) if cb.beneficiary_id else None
             w = cb.distribution.incident.ward if cb.distribution and cb.distribution.incident else (ben_reg.ward if ben_reg else None)
-            data.append({
+            all_items.append({
                 'id': cb.id,
                 'beneficiary_id': cb.beneficiary_id,
                 'family_name': cb.name,
                 'ward': w,
                 'ward_name': ward_name_filter(w),
                 'phone': ben_reg.phone if ben_reg else None,
-                'items_received': '-',
-                'date': ad_to_bs_date(cb.distribution.distribution_date) if cb.distribution else None,
+                'item_name': None,
+                'quantity': 0,
                 'cash': cb.amount,
+                'date': ad_to_bs_date(cb.distribution.distribution_date) if cb.distribution else None,
                 'status': 'Received',
                 'distribution_no': cb.distribution.distribution_no if cb.distribution else None,
                 'incident_name': cb.distribution.incident.incident_name if cb.distribution and cb.distribution.incident else None,
                 'incident_type': cb.distribution.incident.incident_type if cb.distribution and cb.distribution.incident else None,
             })
 
-        data.sort(key=lambda x: x['date'] or '', reverse=True)
+        # Group by beneficiary
+        grouped = {}
+        for item in all_items:
+            bkey = item['beneficiary_id'] or item['family_name']
+            if bkey not in grouped:
+                grouped[bkey] = {
+                    'beneficiary_id': item['beneficiary_id'],
+                    'family_name': item['family_name'],
+                    'ward': item['ward'],
+                    'ward_name': item['ward_name'],
+                    'phone': item['phone'],
+                    'distributions': [],
+                }
+            grouped[bkey]['distributions'].append({
+                'id': item['id'],
+                'item_name': item.get('item_name'),
+                'quantity': item.get('quantity', 0),
+                'cash': item.get('cash'),
+                'date': item['date'],
+                'status': item['status'],
+                'distribution_no': item['distribution_no'],
+                'incident_name': item['incident_name'],
+                'incident_type': item['incident_type'],
+            })
+
+        data = list(grouped.values())
+        for entry in data:
+            dists = entry['distributions']
+            entry['total_items'] = sum(d['quantity'] for d in dists if d.get('quantity'))
+            entry['total_cash'] = sum(d['cash'] for d in dists if d.get('cash'))
+            entry['latest_date'] = dists[0]['date'] if dists else None
+            entry['status'] = next((d['status'] for d in dists if d.get('status') == 'Pending'), 'Received')
+            entry['distribution_count'] = len(dists)
+
+        data.sort(key=lambda x: x['latest_date'] or '', reverse=True)
 
         return jsonify({
             'success': True,
@@ -9322,7 +9361,7 @@ def print_bin_card():
     receipts = [r for r in receipts if r.receipt and r.receipt.warehouse_id == warehouse_id]
     adjustments = ManualAdjustment.query.filter_by(item_id=item_id, warehouse_id=warehouse_id).all()
     dist_items = DistributionItem.query.filter_by(item_id=item_id).all()
-    dist_items = [d for d in dist_items if d.warehouse_id == warehouse_id]
+    dist_items = [d for d in dist_items if d.warehouse_id == warehouse_id and d.distribution and d.distribution.status != 'Cancelled']
     transfers_out = StockTransferItem.query.filter_by(item_id=item_id).all()
     transfers_out = [t for t in transfers_out if t.transfer and t.transfer.from_warehouse_id == warehouse_id]
     transfers_in = StockTransferItem.query.filter_by(item_id=item_id).all()
@@ -9397,6 +9436,7 @@ def print_bin_card():
 @app.route('/api/inventory/stock-book', methods=['GET'])
 @login_required
 def print_stock_book():
+    from collections import OrderedDict
     warehouse_id = request.args.get('warehouse_id', type=int)
     from_date_str = request.args.get('from_date')
     to_date_str = request.args.get('to_date')
@@ -9428,7 +9468,7 @@ def print_stock_book():
         all_receipts = [r for r in all_receipts if r.receipt and r.receipt.warehouse_id == warehouse_id]
 
         all_dist_items = DistributionItem.query.filter_by(item_id=item.id).all()
-        all_dist_items = [d for d in all_dist_items if d.warehouse_id == warehouse_id]
+        all_dist_items = [d for d in all_dist_items if d.warehouse_id == warehouse_id and d.distribution and d.distribution.status != 'Cancelled']
 
         all_adjustments = ManualAdjustment.query.filter_by(item_id=item.id, warehouse_id=warehouse_id).all()
 
@@ -9536,6 +9576,9 @@ def print_stock_book():
         closing = opening + received - dispatched
         closing = max(closing, 0)
 
+        cat_name = item.category.name if item.category else 'Uncategorized'
+        cat_name_np = item.category.name_np if item.category else 'वर्गीकरण नभएका'
+
         rows.append({
             'item_name': item.name,
             'item_code': item.item_code or '',
@@ -9544,19 +9587,41 @@ def print_stock_book():
             'opening': opening,
             'received': received,
             'dispatched': dispatched,
-            'balance': closing
+            'balance': closing,
+            'category_name': cat_name,
+            'category_name_np': cat_name_np,
+            'group_name': item.group.name if item.group else ''
         })
         grand_opening += opening
         grand_received += received
         grand_dispatched += dispatched
         grand_balance += closing
 
+    # Group rows by category
+    grouped_rows = OrderedDict()
+    serial_counter = 0
+    for row in rows:
+        cat_key = row['category_name']
+        if cat_key not in grouped_rows:
+            grouped_rows[cat_key] = {
+                'category_name_np': row['category_name_np'],
+                'item_rows': [],
+                'subtotal': {'opening': 0, 'received': 0, 'dispatched': 0, 'balance': 0}
+            }
+        serial_counter += 1
+        row['serial_no'] = serial_counter
+        grouped_rows[cat_key]['item_rows'].append(row)
+        grouped_rows[cat_key]['subtotal']['opening'] += row['opening']
+        grouped_rows[cat_key]['subtotal']['received'] += row['received']
+        grouped_rows[cat_key]['subtotal']['dispatched'] += row['dispatched']
+        grouped_rows[cat_key]['subtotal']['balance'] += row['balance']
+
     office = AppSettings.get_setting('office_name', 'LEOC')
     address = AppSettings.get_setting('address', '')
     fiscal_year = AppSettings.get_setting('active_fiscal_year', '')
     report_header = AppSettings.get_setting('report_header', '')
     now_val = datetime.now()
-    return render_template('print_stock_book.html', warehouse=warehouse, rows=rows,
+    return render_template('print_stock_book.html', warehouse=warehouse, grouped_rows=grouped_rows,
                            office=office, address=address, report_header=report_header,
                            from_date=from_date_str or '', to_date=to_date_str or '',
                            grand_opening=grand_opening, grand_received=grand_received,
