@@ -66,6 +66,7 @@ class ValidationEdgeCaseTest(LeocTestCase):
         self.login()
         resp = self.client.post('/api/incidents', json={
             'incident_name': 'Test', 'incident_type': 'Flood', 'ward': 99,
+            'coordinates': '28.5,81.5',
         })
         self.assertEqual(resp.status_code, 400)
         self.assertIn('Invalid ward', resp.get_json()['message'])
@@ -76,7 +77,7 @@ class ValidationEdgeCaseTest(LeocTestCase):
         self.assertEqual(resp.status_code, 400)
         self.assertIn('required', resp.get_json()['message'])
 
-    def test_future_dispatch_date_rejected(self):
+    def test_future_distribution_date_rejected(self):
         self.login()
         cat = self.create_category()
         wh = self.create_warehouse()
@@ -84,11 +85,12 @@ class ValidationEdgeCaseTest(LeocTestCase):
         inc = self.create_incident()
         self.create_stock_receipt(wh['id'], item['id'], quantity=10)
 
-        resp = self.client.post('/api/dispatch', json={
+        resp = self.client.post('/api/distributions', json={
             'warehouse_id': wh['id'], 'incident_id': inc['id'],
             'destination': 'Test', 'receiver': 'Test',
-            'date': '2099-01-01',
-            'items': [{'item_id': item['id'], 'quantity': 4, 'unit': 'Piece'}],
+            'distribution_date': '2099-01-01',
+            'items': [{'item_id': item['id'], 'warehouse_id': wh['id'], 'quantity': 4, 'unit': 'Piece'}],
+            'beneficiaries': [{'family_name': 'A', 'quantity': 4}],
         })
         self.assertEqual(resp.status_code, 400)
         self.assertIn('future', resp.get_json()['message'])
@@ -143,37 +145,37 @@ class ValidationEdgeCaseTest(LeocTestCase):
         })
         self.assertEqual(resp.status_code, 400)
 
-    def test_dispatch_cancel_without_reason(self):
+    def test_distribution_cancel_without_reason(self):
         self.login()
         cat = self.create_category()
         wh = self.create_warehouse()
         item = self.create_item(cat['id'])
         inc = self.create_incident()
         self.create_stock_receipt(wh['id'], item['id'], quantity=10)
-        rr = self.create_relief_request(inc['id'], item['id'], quantity=8)
-        dispatch = self.create_dispatch(wh['id'], inc['id'], item['id'], quantity=4, relief_request_id=rr['id'])
+        dist = self.create_distribution(wh['id'], inc['id'], item['id'], quantity=4)
 
-        resp = self.client.post(f"/api/dispatch/{dispatch['id']}/cancel", json={})
+        resp = self.client.post(f"/api/distributions/{dist['id']}/cancel", json={})
         self.assertEqual(resp.status_code, 400)
 
-    def test_distribution_exceeds_dispatch_rejected(self):
+    def test_distribution_exceeds_available_stock_rejected(self):
         self.login()
         cat = self.create_category()
         wh = self.create_warehouse()
         item = self.create_item(cat['id'])
         inc = self.create_incident()
-        self.create_stock_receipt(wh['id'], item['id'], quantity=10)
-        rr = self.create_relief_request(inc['id'], item['id'], quantity=8)
-        dispatch = self.create_dispatch(wh['id'], inc['id'], item['id'], quantity=3, relief_request_id=rr['id'])
+        self.create_stock_receipt(wh['id'], item['id'], quantity=2)
 
         resp = self.client.post('/api/distributions', json={
-            'dispatch_id': dispatch['id'], 'location': 'Ward 1',
+            'warehouse_id': wh['id'], 'incident_id': inc['id'],
+            'destination': 'Ward 1', 'receiver': 'Test',
             'distribution_date': '2082-03-03', 'officer': 'Test',
+            'items': [{'item_id': item['id'], 'warehouse_id': wh['id'], 'quantity': 5, 'unit': 'Piece'}],
             'beneficiaries': [
-                {'family_name': 'A', 'members': 2, 'item': item['name'], 'quantity': 4},
+                {'family_name': 'A', 'members': 2, 'item': None, 'quantity': 5},
             ],
         })
         self.assertEqual(resp.status_code, 400)
+        self.assertIn('Insufficient stock', resp.get_json()['message'])
 
     def test_not_found_returns_404(self):
         self.login()
@@ -195,9 +197,8 @@ class ReportGenerationTest(LeocTestCase):
         item = self.create_item(cat['id'])
         inc = self.create_incident()
         self.create_stock_receipt(wh['id'], item['id'], quantity=20)
-        rr = self.create_relief_request(inc['id'], item['id'], quantity=5)
-        dispatch = self.create_dispatch(wh['id'], inc['id'], item['id'], quantity=5, relief_request_id=rr['id'])
-        return cat, wh, item, inc, rr, dispatch
+        dist = self.create_distribution(wh['id'], inc['id'], item['id'], quantity=5)
+        return cat, wh, item, inc, dist
 
     def test_print_report_html(self):
         self.login()
@@ -215,16 +216,15 @@ class ReportGenerationTest(LeocTestCase):
 
     def test_pdf_report_dispatch(self):
         self.login()
-        cat, wh, item, inc, rr, dispatch = self.create_setup_data()
-        resp = self.client.get(f'/api/reports/dispatch?id={dispatch["id"]}')
+        cat, wh, item, inc, dist = self.create_setup_data()
+        resp = self.client.get('/api/reports/dispatch')
         self.assertEqual(resp.status_code, 200)
         self.assertIn('application/pdf', resp.headers.get('Content-Type', ''))
 
     def test_pdf_report_distribution(self):
         self.login()
-        cat, wh, item, inc, rr, dispatch = self.create_setup_data()
-        dist = self.create_distribution(dispatch['id'], item['name'])
-        resp = self.client.get(f'/api/reports/distribution?id={dist["id"]}')
+        cat, wh, item, inc, dist = self.create_setup_data()
+        resp = self.client.get('/api/reports/distribution')
         self.assertEqual(resp.status_code, 200)
         self.assertIn('application/pdf', resp.headers.get('Content-Type', ''))
 
@@ -234,12 +234,6 @@ class ReportGenerationTest(LeocTestCase):
         resp = self.client.get('/api/reports/incidents')
         self.assertEqual(resp.status_code, 200)
         self.assertIn('application/pdf', resp.headers.get('Content-Type', ''))
-
-    def test_pdf_report_requests(self):
-        self.login()
-        self.create_setup_data()
-        resp = self.client.get('/api/reports/requests')
-        self.assertEqual(resp.status_code, 200)
 
     def test_pdf_report_adjustments(self):
         self.login()
@@ -301,16 +295,9 @@ class ReportGenerationTest(LeocTestCase):
 
     def test_print_individual_documents(self):
         self.login()
-        cat, wh, item, inc, rr, dispatch = self.create_setup_data()
-        dist = self.create_distribution(dispatch['id'], item['name'])
+        cat, wh, item, inc, dist = self.create_setup_data()
 
         resp = self.client.get(f'/api/distributions/{dist["id"]}/print')
-        self.assertEqual(resp.status_code, 200)
-
-        resp = self.client.get(f'/api/dispatch/{dispatch["id"]}/print')
-        self.assertEqual(resp.status_code, 200)
-
-        resp = self.client.get(f'/api/relief-requests/{rr["id"]}/print')
         self.assertEqual(resp.status_code, 200)
 
         resp = self.client.get(f'/api/incidents/{inc["id"]}/print')
@@ -318,7 +305,7 @@ class ReportGenerationTest(LeocTestCase):
 
     def test_bin_card_and_stock_book(self):
         self.login()
-        cat, wh, item, inc, rr, dispatch = self.create_setup_data()
+        cat, wh, item, inc, dist = self.create_setup_data()
 
         resp = self.client.get(f'/api/inventory/bin-card?item_id={item["id"]}&warehouse_id={wh["id"]}')
         self.assertEqual(resp.status_code, 200)

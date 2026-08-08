@@ -1,4 +1,4 @@
-"""Tests for disaster management workflows: incidents, relief requests, dispatches, distributions, assessments, daily bulletins, weekly forecasts."""
+"""Tests for disaster management workflows: incidents, distributions, assessments, daily bulletins, weekly forecasts."""
 import uuid
 from datetime import datetime, timezone
 from tests.conftest import LeocTestCase, app_module
@@ -71,6 +71,7 @@ class DisasterWorkflowTest(LeocTestCase):
             'road_blocked': True, 'electricity_blocked': True,
             'communication_blocked': False, 'drinking_water_disrupted': True,
             'rescue_operations': 'Search and rescue ongoing',
+            'coordinates': '28.5,81.5',
         }
         resp = self.client.post('/api/incidents', json=payload)
         self.assertEqual(resp.status_code, 201)
@@ -80,7 +81,7 @@ class DisasterWorkflowTest(LeocTestCase):
         self.assertEqual(data['estimated_loss'], 5000000.0)
         self.assertTrue(data['road_blocked'])
 
-    def test_relief_request_with_cash_and_items(self):
+    def test_distribution_with_items_and_beneficiaries(self):
         self.login()
         cat = self.create_category()
         wh = self.create_warehouse()
@@ -90,36 +91,38 @@ class DisasterWorkflowTest(LeocTestCase):
 
         payload = {
             'incident_id': inc['id'],
-            'organization': 'NGO',
-            'requester_name': 'Field Officer',
+            'warehouse_id': wh['id'],
+            'destination': 'Test Destination',
+            'receiver': 'Field Officer',
             'phone': '9800000001',
-            'priority': 'Urgent',
-            'requested_cash_amount': 50000,
-            'cash_purpose': 'Food supplies',
+            'location': 'Ward 2',
+            'distribution_date': '2082-03-05',
+            'officer': 'Test Officer',
             'remarks': 'Urgent need',
             'items': [
-                {'item_id': item['id'], 'quantity_requested': 10, 'unit': 'Piece'},
+                {'item_id': item['id'], 'warehouse_id': wh['id'], 'quantity': 10, 'unit': 'Piece'},
+            ],
+            'beneficiaries': [
+                {'family_name': 'Family A', 'members': 4, 'item': None, 'quantity': 10},
             ],
         }
-        resp = self.client.post('/api/relief-requests', json=payload)
-        self.assertEqual(resp.status_code, 201)
+        resp = self.client.post('/api/distributions', json=payload)
+        self.assertEqual(resp.status_code, 201, resp.get_json())
         data = resp.get_json()['data']
-        self.assertEqual(data['status'], 'Pending')
-        self.assertEqual(data['requested_cash_amount'], 50000)
+        self.assertEqual(data['status'], 'Completed')
+        self.assertEqual(data['distribution_date'], '2082-03-05')
         self.assertEqual(len(data['items']), 1)
-        self.assertEqual(data['items'][0]['quantity_requested'], 10)
+        self.assertEqual(data['items'][0]['quantity'], 10)
 
-        rr_id = data['id']
-        resp = self.client.get(f'/api/relief-requests/{rr_id}')
+        dist_id = data['id']
+        resp = self.client.get(f'/api/distributions/{dist_id}')
         self.assertEqual(resp.status_code, 200)
 
-        # Create a cash request automatically
         with app_module.app.app_context():
-            cash_req = app_module.CashRequest.query.filter_by(incident_id=inc['id']).first()
-            self.assertIsNotNone(cash_req)
-            self.assertEqual(cash_req.requested_amount, 50000)
+            inv = app_module.Inventory.query.filter_by(item_id=item['id'], warehouse_id=wh['id']).first()
+            self.assertEqual(inv.quantity, 10)
 
-    def test_relief_request_item_status_updates(self):
+    def test_distribution_inventory_reduction_and_beneficiaries(self):
         self.login()
         cat = self.create_category()
         wh = self.create_warehouse()
@@ -127,43 +130,31 @@ class DisasterWorkflowTest(LeocTestCase):
         inc = self.create_incident()
         self.create_stock_receipt(wh['id'], item['id'], quantity=10)
 
-        rr = self.create_relief_request(inc['id'], item['id'], quantity=8)
-        self.assertEqual(rr['status'], 'Pending')
-
-        dispatch = self.create_dispatch(wh['id'], inc['id'], item['id'], quantity=6, relief_request_id=rr['id'])
-        self.assertIsNotNone(dispatch)
-
-        with app_module.app.app_context():
-            req = app_module.db.session.get(app_module.ReliefRequest, rr['id'])
-            self.assertEqual(req.status, 'Partial')
-            rr_item = app_module.ReliefRequestItem.query.filter_by(request_id=rr['id']).first()
-            self.assertEqual(rr_item.quantity_dispatched, 6)
-
-        dist = self.create_distribution(dispatch['id'], item['name'], quantity=3)
+        dist = self.create_distribution(wh['id'], inc['id'], item['id'], quantity=6)
         self.assertIsNotNone(dist)
 
         with app_module.app.app_context():
-            req = app_module.db.session.get(app_module.ReliefRequest, rr['id'])
-            self.assertEqual(req.status, 'Completed')
-            rr_item = app_module.ReliefRequestItem.query.filter_by(request_id=rr['id']).first()
-            self.assertEqual(rr_item.quantity_distributed, 6)
+            inv = app_module.Inventory.query.filter_by(item_id=item['id'], warehouse_id=wh['id']).first()
+            self.assertEqual(inv.quantity, 4)
+            di = app_module.DistributionItem.query.filter_by(distribution_id=dist['id']).first()
+            self.assertIsNotNone(di)
+            self.assertEqual(di.quantity, 6)
 
-    def test_dispatch_cancel_restores_inventory(self):
+    def test_distribution_cancel_restores_inventory(self):
         self.login()
         cat = self.create_category()
         wh = self.create_warehouse()
         item = self.create_item(cat['id'])
         inc = self.create_incident()
         self.create_stock_receipt(wh['id'], item['id'], quantity=10)
-        rr = self.create_relief_request(inc['id'], item['id'], quantity=8)
 
-        dispatch = self.create_dispatch(wh['id'], inc['id'], item['id'], quantity=4, relief_request_id=rr['id'])
+        dist = self.create_distribution(wh['id'], inc['id'], item['id'], quantity=4)
 
         with app_module.app.app_context():
             inv = app_module.Inventory.query.filter_by(item_id=item['id'], warehouse_id=wh['id']).first()
             self.assertEqual(inv.quantity, 6)
 
-        resp = self.client.post(f"/api/dispatch/{dispatch['id']}/cancel", json={'cancel_reason': 'Test cancel'})
+        resp = self.client.post(f"/api/distributions/{dist['id']}/cancel", json={'cancel_reason': 'Test cancel'})
         self.assertEqual(resp.status_code, 200)
 
         with app_module.app.app_context():
@@ -177,9 +168,7 @@ class DisasterWorkflowTest(LeocTestCase):
         item = self.create_item(cat['id'])
         inc = self.create_incident()
         self.create_stock_receipt(wh['id'], item['id'], quantity=10)
-        rr = self.create_relief_request(inc['id'], item['id'], quantity=8)
-        dispatch = self.create_dispatch(wh['id'], inc['id'], item['id'], quantity=4, relief_request_id=rr['id'])
-        dist = self.create_distribution(dispatch['id'], item['name'], quantity=2)
+        dist = self.create_distribution(wh['id'], inc['id'], item['id'], quantity=4)
 
         with app_module.app.app_context():
             ben = app_module.DistributionBeneficiary.query.filter_by(distribution_id=dist['id']).first()
@@ -274,14 +263,12 @@ class DisasterWorkflowTest(LeocTestCase):
         item = self.create_item(cat['id'])
         inc = self.create_incident()
         self.create_stock_receipt(wh['id'], item['id'], quantity=10)
-        rr = self.create_relief_request(inc['id'], item['id'], quantity=4)
-        dispatch = self.create_dispatch(wh['id'], inc['id'], item['id'], quantity=4, relief_request_id=rr['id'])
+        self.create_distribution(wh['id'], inc['id'], item['id'], quantity=4)
 
         resp = self.client.get(f"/api/incidents/{inc['id']}/history")
         self.assertEqual(resp.status_code, 200)
         timeline = resp.get_json()['timeline']
-        self.assertTrue(any(r['_type'] == 'relief_request' for r in timeline))
-        self.assertTrue(any(d['_type'] == 'dispatch' for d in timeline))
+        self.assertTrue(any(d['_type'] == 'distribution' for d in timeline))
 
 
 # Add io import for in-memory file uploads

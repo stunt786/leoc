@@ -119,25 +119,31 @@ class SmokeTestCase(unittest.TestCase):
         self.assertEqual(response.status_code, 201, response.get_json())
         return response.get_json()['data']
 
-    def create_relief_request(self, client, incident_id, item_id, quantity_requested=4):
+    def create_distribution(self, client, warehouse_id, incident_id, item_id, quantity=4):
         payload = {
             'incident_id': incident_id,
-            'organization': 'Smoke Relief Org',
-            'requester_name': 'Smoke Requester',
+            'warehouse_id': warehouse_id,
+            'destination': 'Smoke Test Destination',
+            'receiver': 'Smoke Receiver',
             'phone': '9800000000',
-            'priority': 'High',
-            'requested_cash_amount': 0,
-            'cash_purpose': 'Smoke test',
-            'remarks': 'Smoke test relief request',
+            'distribution_date': '2082-03-02',
+            'officer': 'Smoke Officer',
+            'remarks': 'Smoke distribution',
             'items': [
                 {
                     'item_id': item_id,
-                    'quantity_requested': quantity_requested,
+                    'warehouse_id': warehouse_id,
+                    'quantity': quantity,
                     'unit': 'Piece',
+                    'batch_no': 'BATCH-001',
+                    'expiry_date': '2083-09-01',
                 }
             ],
+            'beneficiaries': [
+                {'family_name': 'Family A', 'members': 3, 'item': None, 'quantity': quantity},
+            ],
         }
-        response = client.post('/api/relief-requests', json=payload)
+        response = client.post('/api/distributions', json=payload)
         self.assertEqual(response.status_code, 201, response.get_json())
         return response.get_json()['data']
 
@@ -266,51 +272,9 @@ class SmokeTestCase(unittest.TestCase):
         )
         self.assertEqual(receipt_response.status_code, 201, receipt_response.get_json())
 
-        relief_request = self.create_relief_request(client, incident['id'], item['id'], quantity_requested=4)
-        dispatch_response = client.post(
-            '/api/dispatch',
-            json={
-                'warehouse_id': warehouse['id'],
-                'incident_id': incident['id'],
-                'relief_request_id': relief_request['id'],
-                'destination': 'Smoke Test Destination',
-                'receiver': 'Smoke Receiver',
-                'phone': '9800000000',
-                'date': '2082-03-02',
-                'items': [
-                    {
-                        'item_id': item['id'],
-                        'quantity': 4,
-                        'unit': 'Piece',
-                        'batch_no': 'BATCH-001',
-                        'expiry_date': '2083-09-01',
-                    }
-                ],
-            },
-        )
-        self.assertEqual(dispatch_response.status_code, 201, dispatch_response.get_json())
-        dispatch = dispatch_response.get_json()['data']
-
-        distribution_response = client.post(
-            '/api/distributions',
-            json={
-                'dispatch_id': dispatch['id'],
-                'location': 'Ward 1',
-                'distribution_date': '2082-03-03',
-                'officer': 'Smoke Officer',
-                'remarks': 'Smoke distribution',
-                'beneficiaries': [
-                    {'family_name': 'Family A', 'members': 3, 'item': item['name'], 'quantity': 2},
-                    {'family_name': 'Family B', 'members': 4, 'item': item['name'], 'quantity': 2},
-                ],
-            },
-        )
-        self.assertEqual(distribution_response.status_code, 201, distribution_response.get_json())
+        distribution = self.create_distribution(client, warehouse['id'], incident['id'], item['id'], quantity=4)
 
         with app_module.app.app_context():
-            req = app_module.db.session.get(app_module.ReliefRequest, relief_request['id'])
-            self.assertIsNotNone(req)
-            self.assertEqual(req.status, 'Completed')
             inv = app_module.Inventory.query.filter_by(
                 item_id=item['id'],
                 warehouse_id=warehouse['id'],

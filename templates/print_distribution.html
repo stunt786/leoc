@@ -235,7 +235,7 @@
     {% endfor %}
 
     <!-- Cash Distribution -->
-    {% set cash_dist = dist.dispatch.relief_request.cash_distributions_ref[0] if dist.dispatch and dist.dispatch.relief_request and dist.dispatch.relief_request.cash_distributions_ref else None %}
+    {% set cash_dist = dist.cash_distribution %}
     {% if cash_dist %}
     <div class="section-title">नगद वितरण (Cash Distribution)</div>
     <table class="table table-sm table-bordered mb-2">

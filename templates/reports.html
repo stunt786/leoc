@@ -27,11 +27,9 @@
                 <option value="stock-movement">Stock Movement Report</option>
             </optgroup>
             <optgroup label="--- Operations ---">
-                <option value="dispatch">Dispatch Report</option>
                 <option value="distribution">Distribution Report</option>
                 <option value="incidents">Incident Report</option>
                 <option value="incident-summary">Incident Summary</option>
-                <option value="requests">Relief Request Report</option>
                 <option value="disaster-assessments">Disaster Assessment Report</option>
             </optgroup>
             <optgroup label="--- Finance ---">
@@ -82,15 +80,15 @@
                 <label class="form-label small">Warehouse</label>
                 <select class="form-select form-select-sm" id="filterWarehouse" onchange="loadReportData()"><option value="">All</option></select>
             </div>
-            <div class="col-auto filter-optional" data-types="inventory,dispatch,requests,items-master,stock-receipts,expiry-tracking,stock-movement,low-stock">
+            <div class="col-auto filter-optional" data-types="inventory,dispatch,items-master,stock-receipts,expiry-tracking,stock-movement,low-stock">
                 <label class="form-label small">Category</label>
                 <select class="form-select form-select-sm" id="filterCategory" onchange="loadReportData()"><option value="">All</option></select>
             </div>
-            <div class="col-auto filter-optional" data-types="dispatch,distribution,incidents,requests,cash-distributions,cash-requests,disaster-assessments">
+            <div class="col-auto filter-optional" data-types="dispatch,distribution,incidents,cash-distributions,cash-requests,disaster-assessments">
                 <label class="form-label small">Incident</label>
                 <select class="form-select form-select-sm" id="filterIncident" onchange="loadReportData()"><option value="">All</option></select>
             </div>
-            <div class="col-auto filter-optional" data-types="incidents,requests,cash-requests,disaster-assessments,suppliers,warehouses,beneficiaries,cash-funds">
+            <div class="col-auto filter-optional" data-types="incidents,cash-requests,disaster-assessments,suppliers,warehouses,beneficiaries,cash-funds">
                 <label class="form-label small">Status</label>
                 <select class="form-select form-select-sm" id="filterStatus" onchange="loadReportData()"><option value="">All</option>
                     <option value="Active">Active</option><option value="Inactive">Inactive</option>
@@ -106,7 +104,7 @@
                     <option value="high">High</option><option value="critical">Critical</option>
                 </select>
             </div>
-            <div class="col-auto filter-optional" data-types="requests,dispatch,cash-requests,stock-transfers">
+            <div class="col-auto filter-optional" data-types="dispatch,cash-requests,stock-transfers">
                 <label class="form-label small">Priority</label>
                 <select class="form-select form-select-sm" id="filterPriority" onchange="loadReportData()"><option value="">All</option>
                     <option value="Low">Low</option><option value="Medium">Medium</option>
@@ -162,7 +160,7 @@
                     <option value="no">Non-Distributable</option>
                 </select>
             </div>
-            <div class="col-auto filter-optional" data-types="inventory,dispatch,distribution,incidents,incident-summary,requests,adjustments,low-stock,stock-receipts,stock-transfers,stock-book,expiry-tracking,cash-balance,cash-receipts,cash-requests,cash-distributions,cash-yearly">
+            <div class="col-auto filter-optional" data-types="inventory,dispatch,distribution,incidents,incident-summary,adjustments,low-stock,stock-receipts,stock-transfers,stock-book,expiry-tracking,cash-balance,cash-receipts,cash-requests,cash-distributions,cash-yearly">
                 <label class="form-label small">Fiscal Year</label>
                 <select class="form-select form-select-sm" id="filterFiscalYear" onchange="loadReportData()"><option value="">All</option></select>
             </div>

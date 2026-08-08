@@ -168,7 +168,7 @@ class CashManagementTest(LeocTestCase):
         self.assertEqual(resp.status_code, 400)
         self.assertIn('Insufficient', resp.get_json()['message'])
 
-    def test_mixed_relief_and_cash_request(self):
+    def test_cash_request_creation(self):
         self.login()
         cat = self.create_category()
         wh = self.create_warehouse()
@@ -176,14 +176,12 @@ class CashManagementTest(LeocTestCase):
         inc = self.create_incident()
         self.create_stock_receipt(wh['id'], item['id'], quantity=20)
 
-        rr = self.create_relief_request(inc['id'], item['id'], quantity=5, cash_amount=10000)
+        cash_req = self.create_cash_request(inc['id'], amount=10000)
 
         with app_module.app.app_context():
-            rr_model = app_module.db.session.get(app_module.ReliefRequest, rr['id'])
-            self.assertIsNotNone(rr_model)
-            cash_req = app_module.CashRequest.query.filter_by(incident_id=inc['id']).first()
-            self.assertIsNotNone(cash_req)
-            self.assertEqual(cash_req.requested_amount, 10000)
+            cr_model = app_module.db.session.get(app_module.CashRequest, cash_req['id'])
+            self.assertIsNotNone(cr_model)
+            self.assertEqual(cr_model.requested_amount, 10000)
 
 
 import io

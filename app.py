@@ -260,7 +260,15 @@ def parse_date_field(data, field_name, default=None):
 
 def friendly_message(e):
     if isinstance(e, IntegrityError):
-        return "This operation failed because the record is linked to other records. Please remove all related records and try again."
+        msg = str(e.orig) if getattr(e, 'orig', None) else str(e)
+        lower = msg.lower()
+        if 'not null constraint' in lower or 'check constraint' in lower:
+            return "A required field is missing or invalid. Please check all required fields and try again."
+        if 'unique constraint' in lower:
+            return "A record with this number already exists. Please use a different number or refresh the page."
+        if 'foreign key' in lower:
+            return "This operation failed because the record is linked to other records. Please remove all related records and try again."
+        return f"This operation failed. {msg}"
     return str(e)
 
 
@@ -908,7 +916,7 @@ class Notification(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(200), nullable=False)
     message = db.Column(db.Text, nullable=False)
-    type = db.Column(db.String(50), nullable=False)  # 'stock_receipt', 'stock_transfer', 'adjustment', 'low_stock', 'expiry', 'incident', 'relief_request', 'dispatch', 'distribution', 'cash_request', 'cash_distribution'
+    type = db.Column(db.String(50), nullable=False)  # 'stock_receipt', 'stock_transfer', 'adjustment', 'low_stock', 'expiry', 'incident', 'distribution', 'cash_request', 'cash_distribution'
     priority = db.Column(db.String(20), default='Medium')  # 'Low', 'Medium', 'High', 'Urgent'
     resource_id = db.Column(db.String(100), nullable=True)
     url = db.Column(db.String(500), nullable=True)
@@ -1357,144 +1365,21 @@ class Incident(db.Model):
             'rescue_operations': self.rescue_operations,
         }
 
-# ============ RELIEF REQUEST MODEL (Module 10) ============
-class ReliefRequest(db.Model):
+# ============ DISTRIBUTION MODEL (unified relief request + dispatch + distribution) ============
+class DistributionItem(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    request_number = db.Column(db.String(50), unique=True, nullable=False, index=True)
-    request_date = db.Column(db.Date, nullable=False, default=date.today)
-    incident_id = db.Column(db.Integer, db.ForeignKey('incident.id'), nullable=False, index=True)
-    organization = db.Column(db.String(200))
-    requester_name = db.Column(db.String(200))
-    phone = db.Column(db.String(50))
-    priority = db.Column(db.String(20), default='Medium', index=True)
-    requested_cash_amount = db.Column(db.Float, default=0)
-    distributed_cash_amount = db.Column(db.Float, default=0)
-    cash_purpose = db.Column(db.String(300))
-    remarks = db.Column(db.Text)
-    status = db.Column(db.String(20), default='Pending', index=True)
-    created_at = db.Column(db.DateTime, default=utc_now)
-    incident = db.relationship('Incident', backref=db.backref('relief_requests', lazy=True))
-    items = db.relationship('ReliefRequestItem', backref='request', lazy=True, cascade='all,delete-orphan')
-
-    def to_dict(self):
-        return {
-            'id': self.id, 'request_number': self.request_number,
-            'request_date': ad_to_bs_date(self.request_date),
-            'incident_id': self.incident_id,
-            'incident_name': self.incident.incident_name if self.incident else None,
-            'organization': self.organization, 'requester_name': self.requester_name,
-            'phone': self.phone, 'priority': self.priority,
-            'requested_cash_amount': self.requested_cash_amount,
-            'distributed_cash_amount': self.distributed_cash_amount,
-            'cash_purpose': self.cash_purpose,
-            'cash_remaining': max(0, self.requested_cash_amount - self.distributed_cash_amount),
-            'remarks': self.remarks, 'status': self.status,
-            'items': [i.to_dict() for i in self.items]
-        }
-
-class ReliefRequestItem(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    request_id = db.Column(db.Integer, db.ForeignKey('relief_request.id'), nullable=False, index=True)
-    item_id = db.Column(db.Integer, db.ForeignKey('item.id'), nullable=False)
-    quantity_requested = db.Column(db.Integer, nullable=False)
-    quantity_dispatched = db.Column(db.Integer, default=0)
-    quantity_distributed = db.Column(db.Integer, default=0)
-    unit = db.Column(db.String(50))
-    item = db.relationship('Item', backref=db.backref('request_items', lazy=True))
-
-    def to_dict(self):
-        return {
-            'id': self.id, 'item_id': self.item_id,
-            'item_name': self.item.name if self.item else None,
-            'quantity_requested': self.quantity_requested,
-            'quantity_dispatched': self.quantity_dispatched,
-            'quantity_distributed': self.quantity_distributed,
-            'remaining_to_distribute': max(0, self.quantity_dispatched - self.quantity_distributed),
-            'unit': self.unit or (self.item.unit if self.item else None)
-        }
-
-# ============ DISPATCH MODEL (Module 11) ============
-class Dispatch(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    dispatch_number = db.Column(db.String(50), unique=True, nullable=False, index=True)
-    date = db.Column(db.Date, nullable=False, default=date.today)
-    warehouse_id = db.Column(db.Integer, db.ForeignKey('warehouse.id'), nullable=True, index=True)
-    incident_id = db.Column(db.Integer, db.ForeignKey('incident.id'), nullable=False, index=True)
-    relief_request_id = db.Column(db.Integer, db.ForeignKey('relief_request.id'), nullable=True, index=True)
-    relief_request_ids = db.Column(db.Text, default='[]')
-    destination = db.Column(db.String(300))
-    receiver = db.Column(db.String(200))
-    phone = db.Column(db.String(50))
-    remarks = db.Column(db.Text)
-    created_by = db.Column(db.Integer)
-    created_at = db.Column(db.DateTime, default=utc_now)
-    status = db.Column(db.String(20), default='Active')
-    cancelled_at = db.Column(db.DateTime, nullable=True)
-    cancelled_by = db.Column(db.Integer, nullable=True)
-    cancel_reason = db.Column(db.Text, nullable=True)
-    warehouse = db.relationship('Warehouse', backref=db.backref('dispatches', lazy=True))
-    incident = db.relationship('Incident', backref=db.backref('dispatches', lazy=True))
-    relief_request = db.relationship('ReliefRequest', backref=db.backref('dispatches', lazy=True))
-    items = db.relationship('DispatchItem', backref='dispatch', lazy=True, cascade='all,delete-orphan')
-
-    def to_dict(self):
-        rr_ids = []
-        try:
-            rr_ids = json.loads(self.relief_request_ids) if self.relief_request_ids else []
-        except (json.JSONDecodeError, TypeError):
-            rr_ids = []
-        if not rr_ids and self.relief_request_id:
-            rr_ids = [self.relief_request_id]
-        rr_list = []
-        for rid in rr_ids:
-            rr = db_get(ReliefRequest, rid)
-            if rr:
-                rr_list.append({
-                    'id': rr.id,
-                    'request_number': rr.request_number,
-                    'requester_name': rr.requester_name,
-                    'organization': rr.organization,
-                    'items': [i.to_dict() for i in rr.items]
-                })
-        return {
-            'id': self.id, 'dispatch_number': self.dispatch_number,
-            'date': ad_to_bs_date(self.date),
-            'warehouse_id': self.warehouse_id, 'warehouse_name': self.warehouse.name if self.warehouse else None,
-            'incident_id': self.incident_id, 'incident_name': self.incident.incident_name if self.incident else None,
-            'relief_request_id': self.relief_request_id,
-            'relief_request_ids': rr_ids,
-            'relief_requests': rr_list,
-            'request_number': self.relief_request.request_number if self.relief_request else None,
-            'destination': self.destination, 'receiver': self.receiver,
-            'phone': self.phone, 'remarks': self.remarks,
-            'has_distribution': Distribution.query.filter_by(dispatch_id=self.id).first() is not None,
-            'status': self.status or 'Active',
-            'cancelled_at': self.cancelled_at.isoformat() if self.cancelled_at else None,
-            'cancelled_by': self.cancelled_by,
-            'cancel_reason': self.cancel_reason,
-            'items': [i.to_dict() for i in self.items]
-        }
-
-class DispatchItem(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    dispatch_id = db.Column(db.Integer, db.ForeignKey('dispatch.id'), nullable=False, index=True)
+    distribution_id = db.Column(db.Integer, db.ForeignKey('distribution.id'), nullable=False, index=True)
     item_id = db.Column(db.Integer, db.ForeignKey('item.id'), nullable=False)
     warehouse_id = db.Column(db.Integer, db.ForeignKey('warehouse.id'), nullable=True, index=True)
     quantity = db.Column(db.Integer, nullable=False)
     unit = db.Column(db.String(50))
     batch_no = db.Column(db.String(100))
     expiry_date = db.Column(db.Date)
-    item = db.relationship('Item', backref=db.backref('dispatch_items', lazy=True))
-    warehouse = db.relationship('Warehouse', backref=db.backref('dispatch_items', lazy=True))
-
-    @property
-    def available_qty(self):
-        wh_id = self.warehouse_id or (self.dispatch.warehouse_id if self.dispatch else None)
-        inv = Inventory.query.filter_by(item_id=self.item_id, warehouse_id=wh_id).first()
-        return inv.quantity if inv else 0
+    item = db.relationship('Item', backref=db.backref('distribution_items', lazy=True))
+    warehouse = db.relationship('Warehouse', backref=db.backref('distribution_items', lazy=True))
 
     def to_dict(self):
-        wh_id = self.warehouse_id or (self.dispatch.warehouse_id if self.dispatch else None)
+        wh_id = self.warehouse_id or (self.distribution.warehouse_id if self.distribution else None)
         inv = Inventory.query.filter_by(item_id=self.item_id, warehouse_id=wh_id).first() if wh_id else None
         return {
             'id': self.id, 'item_id': self.item_id,
@@ -1682,41 +1567,35 @@ class WeeklyForecast(db.Model):
 class Distribution(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     distribution_no = db.Column(db.String(50), unique=True, nullable=False, index=True)
-    dispatch_id = db.Column(db.Integer, db.ForeignKey('dispatch.id'), nullable=False, index=True)
+    distribution_date = db.Column(db.Date, nullable=False, default=date.today)
     incident_id = db.Column(db.Integer, db.ForeignKey('incident.id'), nullable=False, index=True)
+    warehouse_id = db.Column(db.Integer, db.ForeignKey('warehouse.id'), nullable=True, index=True)
+    fiscal_year = db.Column(db.String(20), index=True)
     location = db.Column(db.String(300))
     latitude = db.Column(db.Float)
     longitude = db.Column(db.Float)
-    fiscal_year = db.Column(db.String(20), index=True)
-    distribution_date = db.Column(db.Date, nullable=False, default=date.today)
     officer = db.Column(db.String(200))
+    destination = db.Column(db.String(300))
+    receiver = db.Column(db.String(200))
+    phone = db.Column(db.String(50))
+    requester_name = db.Column(db.String(200))
+    organization = db.Column(db.String(200))
     status = db.Column(db.String(20), default='Completed')
     remarks = db.Column(db.Text)
     created_by = db.Column(db.Integer)
     created_at = db.Column(db.DateTime, default=utc_now)
     files = db.Column(db.Text)
-    dispatch = db.relationship('Dispatch', backref=db.backref('distributions', lazy=True))
+    cancelled_at = db.Column(db.DateTime, nullable=True)
+    cancelled_by = db.Column(db.Integer, nullable=True)
+    cancel_reason = db.Column(db.Text, nullable=True)
     incident = db.relationship('Incident', backref=db.backref('distributions', lazy=True))
+    warehouse = db.relationship('Warehouse', backref=db.backref('distributions', lazy=True))
+    items = db.relationship('DistributionItem', backref='distribution', lazy=True, cascade='all,delete-orphan')
     beneficiaries = db.relationship('DistributionBeneficiary', backref='distribution', lazy=True, cascade='all,delete-orphan')
+    cash_distribution = db.relationship('CashDistribution', backref='distribution', lazy=True, uselist=False)
 
     def to_dict(self):
-        cash_info = None
-        if self.dispatch and self.dispatch.relief_request_id:
-            cd = CashDistribution.query.filter(
-                CashDistribution.relief_request_id == self.dispatch.relief_request_id
-            ).first()
-            if cd:
-                cash_info = {'distribution_no': cd.distribution_no, 'total_amount': cd.total_amount}
-
         incident_dict = self.incident.to_dict() if self.incident else None
-
-        dispatch_items = []
-        if self.dispatch:
-            dispatch_items = [{
-                'item_name': di.item.name if di.item else None,
-                'quantity': di.quantity,
-                'unit': di.unit or (di.item.unit if di.item else None)
-            } for di in self.dispatch.items]
 
         dist_files = {}
         if self.files:
@@ -1727,19 +1606,28 @@ class Distribution(db.Model):
 
         return {
             'id': self.id, 'distribution_no': self.distribution_no,
-            'dispatch_id': self.dispatch_id,
-            'dispatch_number': self.dispatch.dispatch_number if self.dispatch else None,
             'incident_id': self.incident_id,
             'incident': incident_dict,
+            'incident_name': self.incident.incident_name if self.incident else None,
+            'warehouse_id': self.warehouse_id,
+            'warehouse_name': self.warehouse.name if self.warehouse else None,
             'location': self.location,
             'latitude': self.latitude,
             'longitude': self.longitude,
             'fiscal_year': self.fiscal_year,
             'distribution_date': ad_to_bs_date(self.distribution_date),
-            'officer': self.officer, 'status': self.status, 'remarks': self.remarks,
+            'officer': self.officer,
+            'destination': self.destination, 'receiver': self.receiver,
+            'phone': self.phone, 'requester_name': self.requester_name,
+            'organization': self.organization,
+            'status': self.status, 'remarks': self.remarks,
             'beneficiaries': [b.to_dict() for b in self.beneficiaries],
-            'cash_distribution': cash_info,
-            'dispatch_items': dispatch_items,
+            'items': [i.to_dict() for i in self.items],
+            'items_summary': [{'item_name': i.item.name if i.item else None, 'quantity': i.quantity,
+                               'unit': i.unit or (i.item.unit if i.item else None)} for i in self.items],
+            'cancelled_at': self.cancelled_at.isoformat() if self.cancelled_at else None,
+            'cancelled_by': self.cancelled_by,
+            'cancel_reason': self.cancel_reason,
             'files': {
                 'photos': [{'filename': f, 'url': f'/uploads/{f}'} for f in dist_files.get('photos', [])],
                 'documents': [{'filename': f, 'url': f'/uploads/{f}'} for f in dist_files.get('documents', [])]
@@ -2001,7 +1889,7 @@ class CashDistribution(db.Model):
     incident_id = db.Column(db.Integer, db.ForeignKey('incident.id'), nullable=False, index=True)
     cash_request_id = db.Column(db.Integer, db.ForeignKey('cash_request.id'), nullable=True, index=True)
     cash_request_ids = db.Column(db.Text, default='[]')
-    relief_request_id = db.Column(db.Integer, db.ForeignKey('relief_request.id'), nullable=True, index=True)
+    distribution_id = db.Column(db.Integer, db.ForeignKey('distribution.id'), nullable=True, index=True)
     distribution_type = db.Column(db.String(50), default='Individual')
     total_amount = db.Column(db.Float, nullable=False, default=0)
     fiscal_year = db.Column(db.String(20), index=True)
@@ -2017,7 +1905,6 @@ class CashDistribution(db.Model):
     cancel_reason = db.Column(db.Text, nullable=True)
     incident = db.relationship('Incident', backref=db.backref('cash_distributions', lazy=True))
     cash_request = db.relationship('CashRequest', backref=db.backref('cash_distributions', lazy=True))
-    relief_request = db.relationship('ReliefRequest', backref=db.backref('cash_distributions_ref', lazy=True))
     beneficiaries = db.relationship('CashDistributionBeneficiary', backref='distribution', lazy=True, cascade='all,delete-orphan')
 
     def to_dict(self):
@@ -2037,8 +1924,7 @@ class CashDistribution(db.Model):
             'cash_request_ids': cids,
             'request_numbers': req_nums,
             'request_number': req_nums[0] if req_nums else (self.cash_request.request_number if self.cash_request else None),
-            'relief_request_id': self.relief_request_id,
-            'relief_request_number': self.relief_request.request_number if self.relief_request else None,
+            'distribution_id': self.distribution_id,
             'distribution_type': self.distribution_type, 'total_amount': self.total_amount,
             'fiscal_year': self.fiscal_year,
             'officer': self.officer, 'remarks': self.remarks,
@@ -2271,8 +2157,7 @@ VIEW_ENDPOINTS = {
     '/api/items': 'items',
     '/api/suppliers': 'suppliers',
     '/api/stock-receipts': 'stock_receipts',
-    '/api/relief-requests': 'relief_requests',
-    '/api/dispatch': 'dispatch',
+    '/api/distributions': 'distributions',
     '/api/adjustments': 'adjustments',
     '/api/beneficiaries/distributions': 'beneficiary_distributions',
     '/api/cash-funds': 'cash_funds',
@@ -2479,16 +2364,6 @@ def adjustments_page():
 @login_required
 def incidents_page():
     return render_template('incidents.html')
-
-@app.route('/relief-requests')
-@login_required
-def relief_requests_page():
-    return render_template('relief_requests.html')
-
-@app.route('/dispatch')
-@login_required
-def dispatch_page():
-    return render_template('dispatch.html')
 
 @app.route('/distributions')
 @login_required
@@ -3096,12 +2971,14 @@ def manage_warehouse(id):
             related_inventory = Inventory.query.filter_by(warehouse_id=wh.id).count()
             related_receipts = StockReceipt.query.filter_by(warehouse_id=wh.id).count()
             related_adjustments = ManualAdjustment.query.filter_by(warehouse_id=wh.id).count()
-            related_dispatches = Dispatch.query.filter_by(warehouse_id=wh.id).count()
+            related_distributions = DistributionItem.query.filter(
+                db.or_(DistributionItem.warehouse_id == wh.id, Distribution.warehouse_id == wh.id)
+            ).join(Distribution, DistributionItem.distribution_id == Distribution.id).count()
             related_transfers = StockTransfer.query.filter(
                 db.or_(StockTransfer.from_warehouse_id == wh.id, StockTransfer.to_warehouse_id == wh.id)
             ).count()
-            if any([related_zones, related_inventory, related_receipts, related_adjustments, related_dispatches, related_transfers]):
-                return jsonify({'success': False, 'message': f'Cannot delete: Warehouse has {related_inventory} inventory record(s), {related_receipts} receipt(s), {related_dispatches} dispatch(es), {related_adjustments} adjustment(s), {related_transfers} transfer(s), and {related_zones} zone(s). Remove all related records first.'}), 400
+            if any([related_zones, related_inventory, related_receipts, related_adjustments, related_distributions, related_transfers]):
+                return jsonify({'success': False, 'message': f'Cannot delete: Warehouse has {related_inventory} inventory record(s), {related_receipts} receipt(s), {related_distributions} distribution(s), {related_adjustments} adjustment(s), {related_transfers} transfer(s), and {related_zones} zone(s). Remove all related records first.'}), 400
             db.session.delete(wh)
             db.session.commit()
             return jsonify({'success': True, 'message': 'Warehouse deleted'})
@@ -3753,9 +3630,9 @@ def update_stock_receipt(id):
             transfer_count = StockTransferItem.query.filter_by(item_id=ri.item_id).join(
                 StockTransfer, StockTransferItem.transfer_id == StockTransfer.id
             ).filter(StockTransfer.from_warehouse_id == receipt.warehouse_id).count()
-            dispatch_count = DispatchItem.query.filter_by(item_id=ri.item_id, warehouse_id=receipt.warehouse_id).count()
+            dispatch_count = DistributionItem.query.filter_by(item_id=ri.item_id, warehouse_id=receipt.warehouse_id).count()
             if transfer_count > 0 or dispatch_count > 0:
-                return jsonify({'success': False, 'message': f'Cannot edit stock receipt: item "{ri.item.name}" has been transferred or dispatched from this warehouse. Reverse those transactions first.'}), 400
+                return jsonify({'success': False, 'message': f'Cannot edit stock receipt: item "{ri.item.name}" has been transferred or distributed from this warehouse. Reverse those transactions first.'}), 400
         for ri in receipt.items[:]:
             update_inventory(ri.item_id, receipt.warehouse_id, -ri.quantity)
             db.session.delete(ri)
@@ -4296,18 +4173,6 @@ def incident_history(id):
         if not incident:
             return jsonify({'success': False, 'message': 'Incident not found'}), 404
         timeline = []
-        for rr in ReliefRequest.query.filter_by(incident_id=id).order_by(ReliefRequest.created_at.desc()).all():
-            d = rr.to_dict()
-            d['_type'] = 'relief_request'
-            d['_label'] = d['request_number']
-            d['_date'] = d['request_date']
-            timeline.append(d)
-        for dsp in Dispatch.query.filter_by(incident_id=id).order_by(Dispatch.created_at.desc()).all():
-            d = dsp.to_dict()
-            d['_type'] = 'dispatch'
-            d['_label'] = d['dispatch_number']
-            d['_date'] = d['date']
-            timeline.append(d)
         for dist in Distribution.query.filter_by(incident_id=id).order_by(Distribution.created_at.desc()).all():
             d = dist.to_dict()
             d['_type'] = 'distribution'
@@ -4338,8 +4203,6 @@ def incident_history(id):
             'incident': incident.to_dict(),
             'timeline': timeline,
             'counts': {
-                'relief_requests': sum(1 for t in timeline if t['_type'] == 'relief_request'),
-                'dispatches': sum(1 for t in timeline if t['_type'] == 'dispatch'),
                 'distributions': sum(1 for t in timeline if t['_type'] == 'distribution'),
                 'cash_requests': sum(1 for t in timeline if t['_type'] == 'cash_request'),
                 'cash_distributions': sum(1 for t in timeline if t['_type'] == 'cash_distribution'),
@@ -4349,573 +4212,78 @@ def incident_history(id):
     except Exception as e:
         return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
-# ============ RELIEF REQUEST API ============
-def generate_request_no():
-    last = ReliefRequest.query.order_by(ReliefRequest.id.desc()).first()
-    num = (last.id + 1) if last else 1
-    return f"REQ-{num:04d}"
-
-@app.route('/api/relief-requests', methods=['GET', 'POST'])
-@permission_required('edit')
-def handle_relief_requests():
-    if request.method == 'GET':
-        query = ReliefRequest.query.order_by(ReliefRequest.request_date.desc())
-        incident_id = request.args.get('incident_id', type=int)
-        status = request.args.get('status')
-        if incident_id:
-            query = query.filter(ReliefRequest.incident_id == incident_id)
-        if status:
-            query = query.filter(ReliefRequest.status == status)
-        requests = query.all()
-        return jsonify({'success': True, 'relief_requests': [r.to_dict() for r in requests]})
-    try:
-        data = request.get_json()
-        if not isinstance(data, dict):
-            return jsonify({'success': False, 'message': 'Invalid JSON payload'}), 400
-        incident_id = data.get('incident_id')
-        incident = db_get(Incident, incident_id)
-        if not incident:
-            return jsonify({'success': False, 'message': 'Incident not found'}), 404
-        phone = data.get('phone')
-        if phone and not validate_phone(phone):
-            return jsonify({'success': False, 'message': 'Invalid phone number format'}), 400
-        if incident.affected_households is None or incident.affected_households < 1:
-            return jsonify({'success': False, 'message': 'Selected incident does not have any affected households. Please update the incident first.'}), 400
-        existing_count = ReliefRequest.query.filter(
-            ReliefRequest.incident_id == incident.id,
-            ReliefRequest.status != 'Cancelled'
-        ).count()
-        if existing_count >= incident.affected_households:
-            return jsonify({'success': False, 'message': f'This incident has only {incident.affected_households} affected households. Only {incident.affected_households} relief request(s) can be created.'}), 400
-        requester_name = data.get('requester_name')
-        if requester_name:
-            existing_req = ReliefRequest.query.filter(
-                ReliefRequest.incident_id == incident.id,
-                ReliefRequest.requester_name == requester_name,
-                ReliefRequest.status != 'Cancelled'
-            ).first()
-            if existing_req:
-                return jsonify({'success': False, 'message': f'Beneficiary "{requester_name}" already has a relief request for this incident (Request #{existing_req.request_number}). Each beneficiary can request only once per incident.'}), 400
-        items_payload = data.get('items', [])
-        requested_cash_amount = parse_float_field(data, 'requested_cash_amount', minimum=0, default=0)
-        if not items_payload and requested_cash_amount <= 0:
-            return jsonify({'success': False, 'message': 'At least one item or cash amount is required'}), 400
-        req = ReliefRequest(
-            request_number=data.get('request_number') or generate_request_no(),
-            request_date=parse_bs_date_field(data, 'request_date', default=date.today()),
-            incident_id=incident.id, organization=data.get('organization'),
-            requester_name=data.get('requester_name'), phone=data.get('phone'),
-            priority=data.get('priority', 'Medium'),
-            requested_cash_amount=requested_cash_amount,
-            cash_purpose=data.get('cash_purpose'),
-            remarks=data.get('remarks')
-        )
-        db.session.add(req)
-        db.session.flush()
-        for item_data in items_payload:
-            item = db_get(Item, item_data.get('item_id'))
-            if not item:
-                return jsonify({'success': False, 'message': 'One or more items were not found'}), 404
-            item_id = item_data.get('item_id')
-            if item_id is None:
-                return jsonify({'success': False, 'message': 'Each request item requires an item_id'}), 400
-            ri = ReliefRequestItem(
-                request_id=req.id, item_id=item_id,
-                quantity_requested=parse_int_field(item_data, 'quantity_requested', minimum=1),
-                unit=item_data.get('unit')
-            )
-            db.session.add(ri)
-        # Auto-create a CashRequest when relief request includes cash
-        if requested_cash_amount > 0:
-            cash_req = CashRequest(
-                request_number=generate_cash_request_no(),
-                request_date=req.request_date,
-                incident_id=incident.id,
-                requesting_office=data.get('organization'),
-                requester_name=data.get('requester_name'),
-                phone=data.get('phone'),
-                priority=data.get('priority', 'Medium'),
-                requested_amount=requested_cash_amount,
-                purpose=data.get('cash_purpose'),
-                remarks=f'Auto-created from Relief Request {req.request_number}'
-            )
-            db.session.add(cash_req)
-            create_notification(
-                title=f'Cash Request {cash_req.request_number}',
-                message=f'Cash request for {incident.incident_name} created from relief request {req.request_number}',
-                type_name='cash_request',
-                priority='High' if (data.get('priority') or 'Medium') in ('High', 'Urgent') else 'Medium',
-                resource_id=f'cashreq-{cash_req.request_number}',
-                url=url_for('cash_requests_page')
-            )
-        create_notification(
-            title=f'Relief Request {req.request_number}',
-            message=f'Relief request for {incident.incident_name} created for {req.requester_name or "beneficiary"}',
-            type_name='relief_request',
-            priority='High' if (req.priority or 'Medium') in ('High', 'Urgent') else 'Medium',
-            resource_id=req.id,
-            url=url_for('relief_requests_page')
-        )
-        log_activity('create', 'relief_request', resource_id=req.id, details=f'Relief request {req.request_number} created', user=current_user, ip=request.remote_addr)
-        db.session.commit()
-        return jsonify({'success': True, 'message': 'Relief request created', 'data': req.to_dict()}), 201
-    except ValueError as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'message': friendly_message(e)}), 400
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'message': friendly_message(e)}), 500
-
-@app.route('/api/relief-requests/<int:id>', methods=['GET', 'PUT', 'DELETE'])
-@login_required
-def manage_relief_request(id):
-    req = db_get(ReliefRequest, id)
-    if not req:
-        return jsonify({'success': False, 'message': 'Relief request not found'}), 404
-    if request.method in ('PUT',) and current_user.role not in ('admin', 'data_entry', 'warehouse_manager', 'editor', 'operator', 'finance'):
-        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
-    if request.method == 'DELETE' and current_user.role not in ('admin', 'warehouse_manager', 'operator'):
-        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
-    try:
-        if request.method == 'GET':
-            return jsonify({'success': True, 'relief_request': req.to_dict()})
-        if request.method == 'DELETE':
-            # Prevent deletion if linked to dispatches or distributed items
-            linked_dispatches = Dispatch.query.filter_by(relief_request_id=req.id).count()
-            if linked_dispatches > 0:
-                return jsonify({'success': False, 'message': 'Cannot delete: this relief request has linked dispatch records. Remove dispatches first.'}), 400
-            has_dispatched_items = any(item.quantity_dispatched > 0 or item.quantity_distributed > 0 for item in req.items)
-            if has_dispatched_items:
-                return jsonify({'success': False, 'message': 'Cannot delete: this relief request has items that have been dispatched or distributed.'}), 400
-            db.session.delete(req)
-            db.session.commit()
-            return jsonify({'success': True, 'message': 'Relief request deleted'})
-        if req.status in ('Completed', 'Cancelled'):
-            return jsonify({'success': False, 'message': 'Cannot edit a completed or cancelled relief request'}), 400
-        data = request.get_json()
-        if data.get('phone') and not validate_phone(data.get('phone')):
-            return jsonify({'success': False, 'message': 'Invalid phone number format'}), 400
-        if 'incident_id' in data:
-            incident = db_get(Incident, data.get('incident_id'))
-            if not incident:
-                return jsonify({'success': False, 'message': 'Incident not found'}), 404
-            if incident.affected_households is None or incident.affected_households < 1:
-                return jsonify({'success': False, 'message': 'Selected incident does not have any affected households. Please update the incident first.'}), 400
-            existing_count = ReliefRequest.query.filter(
-                ReliefRequest.incident_id == incident.id,
-                ReliefRequest.status != 'Cancelled',
-                ReliefRequest.id != id
-            ).count()
-            if existing_count >= incident.affected_households:
-                return jsonify({'success': False, 'message': f'This incident has only {incident.affected_households} affected households. Only {incident.affected_households} relief request(s) can be created.'}), 400
-            req.incident_id = incident.id
-        if 'requester_name' in data:
-            target_incident_id = data.get('incident_id', req.incident_id)
-            existing_req = ReliefRequest.query.filter(
-                ReliefRequest.incident_id == target_incident_id,
-                ReliefRequest.requester_name == data['requester_name'],
-                ReliefRequest.status != 'Cancelled',
-                ReliefRequest.id != id
-            ).first()
-            if existing_req:
-                return jsonify({'success': False, 'message': f'Beneficiary "{data["requester_name"]}" already has a relief request for this incident (Request #{existing_req.request_number}). Each beneficiary can request only once per incident.'}), 400
-        for field in ['organization', 'requester_name', 'phone', 'priority', 'remarks', 'status', 'cash_purpose']:
-            if field in data:
-                setattr(req, field, data[field])
-        if 'requested_cash_amount' in data:
-            req.requested_cash_amount = parse_float_field(data, 'requested_cash_amount', minimum=0, default=0)
-        if data.get('request_date'):
-            req.request_date = parse_bs_date_field(data, 'request_date', default=req.request_date)
-        if data.get('items') is not None:
-            ReliefRequestItem.query.filter_by(request_id=req.id).delete()
-            if not data['items'] and (req.requested_cash_amount or 0) <= 0:
-                return jsonify({'success': False, 'message': 'At least one item or cash amount is required'}), 400
-            for item_data in data['items']:
-                item = db_get(Item, item_data.get('item_id'))
-                if not item:
-                    return jsonify({'success': False, 'message': 'One or more items were not found'}), 404
-                ri = ReliefRequestItem(
-                    request_id=req.id, item_id=item.id,
-                    quantity_requested=parse_int_field(item_data, 'quantity_requested', minimum=1), unit=item_data.get('unit')
-                )
-                db.session.add(ri)
-        db.session.commit()
-        return jsonify({'success': True, 'message': 'Relief request updated', 'data': req.to_dict()})
-    except ValueError as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'message': friendly_message(e)}), 400
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'message': friendly_message(e)}), 500
-
-# ============ DISPATCH API ============
-def generate_dispatch_no():
-    last = Dispatch.query.order_by(Dispatch.id.desc()).first()
-    num = (last.id + 1) if last else 1
-    return f"DSP-{num:04d}"
-
-@app.route('/api/dispatch', methods=['GET', 'POST'])
-@permission_required('edit')
-def handle_dispatches():
-    if request.method == 'GET':
-        try:
-            query = Dispatch.query.order_by(Dispatch.date.desc())
-            incident_id = request.args.get('incident_id', type=int)
-            status = request.args.get('status')
-            if incident_id:
-                query = query.filter(Dispatch.incident_id == incident_id)
-            if status:
-                query = query.filter(Dispatch.status == status)
-            dispatches = query.all()
-            return jsonify({'success': True, 'dispatches': [d.to_dict() for d in dispatches]})
-        except Exception as e:
-            return jsonify({'success': False, 'message': friendly_message(e)}), 500
-    try:
-        data = request.get_json()
-        if not isinstance(data, dict):
-            return jsonify({'success': False, 'message': 'Invalid JSON payload'}), 400
-        incident_id = data.get('incident_id')
-        incident = db_get(Incident, incident_id)
-        if not incident:
-            return jsonify({'success': False, 'message': 'Incident not found'}), 404
-        force = data.get('force', False)
-        dispatch_date = parse_bs_date_field(data, 'date', default=date.today())
-        if dispatch_date > date.today():
-            return jsonify({'success': False, 'message': 'Dispatch date cannot be in the future'}), 400
-        phone = data.get('phone', '')
-        if phone and not re.match(r'^[\d\s\+\-\(\)]{7,20}$', phone):
-            return jsonify({'success': False, 'message': 'Phone number format is invalid'}), 400
-        items_payload = data.get('items', [])
-        if not items_payload:
-            return jsonify({'success': False, 'message': 'At least one dispatch item is required'}), 400
-
-        relief_request_ids = data.get('relief_request_ids') or (data.get('relief_request_id') and [data.get('relief_request_id')]) or []
-        primary_relief_request_id = relief_request_ids[0] if relief_request_ids else None
-
-        # Check for existing distributions for the same relief requests
-        if not force and relief_request_ids:
-            fiscal_year = incident.fiscal_year or AppSettings.get_setting('active_fiscal_year', '2081/82')
-            prior_dists = Distribution.query.join(
-                Dispatch, Distribution.dispatch_id == Dispatch.id
-            ).filter(
-                Distribution.fiscal_year == fiscal_year,
-                Distribution.dispatch_id.isnot(None),
-                db.or_(*(db.or_(
-                    Dispatch.relief_request_ids.like(f'%[{rid},%'),
-                    Dispatch.relief_request_ids.like(f'%, {rid},%'),
-                    Dispatch.relief_request_ids.like(f'%, {rid}]%'),
-                    Dispatch.relief_request_ids == f'[{rid}]'
-                ) for rid in relief_request_ids))
-            ).all()
-            if prior_dists:
-                dist_list = [{'no': d.distribution_no, 'date': str(d.distribution_date)} for d in prior_dists[:5]]
-                return jsonify({
-                    'success': False,
-                    'requires_confirmation': True,
-                    'message': f'{len(prior_dists)} distribution(s) already exist for these relief requests in fiscal year {fiscal_year}. Some beneficiaries may have already received relief items.',
-                    'distributions': dist_list,
-                    'total': len(prior_dists)
-                }), 409
-
-        # Pre-validate items, per-warehouse inventory, and combined relief request limits
-        validated_items = {}
-        total_qty_by_item = {}
-        for item_data in items_payload:
-            item_id = item_data.get('item_id')
-            qty = parse_int_field(item_data, 'quantity', minimum=1)
-            wh_id = item_data.get('warehouse_id') or data.get('warehouse_id')
-            if not wh_id:
-                return jsonify({'success': False, 'message': 'Each item must have a warehouse assigned'}), 400
-            item = db_get(Item, item_id)
-            if not item:
-                return jsonify({'success': False, 'message': 'One or more items were not found'}), 400
-            if item.is_distributable is False:
-                return jsonify({'success': False, 'message': f'{item.name} is non-distributable equipment and cannot be dispatched. Use stock transfer instead.'}), 400
-            validated_items[item_id] = item
-            total_qty_by_item[item_id] = total_qty_by_item.get(item_id, 0) + qty
-            wh = db_get(Warehouse, wh_id)
-            if not wh:
-                return jsonify({'success': False, 'message': f'Warehouse {wh_id} not found'}), 404
-            inv = Inventory.query.filter_by(item_id=item_id, warehouse_id=wh_id).with_for_update().first()
-            if not inv or inv.available_quantity < qty:
-                return jsonify({'success': False, 'message': f'Insufficient stock for {item.name} in {wh.name}. Available: {inv.available_quantity if inv else 0}, Required: {qty}'}), 400
-
-        for item_id, total_qty in total_qty_by_item.items():
-            item = validated_items[item_id]
-            total_remaining = 0
-            for rr_id in relief_request_ids:
-                rr_item = ReliefRequestItem.query.filter_by(request_id=rr_id, item_id=item_id).first()
-                if rr_item:
-                    total_remaining += rr_item.quantity_requested - (rr_item.quantity_dispatched or 0)
-            if total_qty > total_remaining:
-                return jsonify({'success': False, 'message': f'Cannot dispatch {total_qty} of "{item.name}". Only {total_remaining} remaining across the selected relief requests.'}), 400
-
-        # Create a single dispatch (warehouse_id is nullable — set to first item's warehouse for display)
-        first_wh_id = items_payload[0].get('warehouse_id') or data.get('warehouse_id')
-        dispatch = Dispatch(
-            dispatch_number=data.get('dispatch_number') or generate_dispatch_no(),
-            date=dispatch_date,
-            warehouse_id=first_wh_id, incident_id=incident.id,
-            relief_request_id=primary_relief_request_id,
-            relief_request_ids=json.dumps(relief_request_ids),
-            destination=data.get('destination'), receiver=data.get('receiver'),
-            phone=data.get('phone'), remarks=data.get('remarks'), created_by=current_user.id
-        )
-        db.session.add(dispatch)
-        db.session.flush()
-
-        for item_data in items_payload:
-            item_id = item_data.get('item_id')
-            qty = parse_int_field(item_data, 'quantity', minimum=1)
-            wh_id = item_data.get('warehouse_id') or data.get('warehouse_id')
-            item = validated_items[item_id]
-
-            inv = Inventory.query.filter_by(item_id=item_id, warehouse_id=wh_id).with_for_update().first()
-            di = DispatchItem(dispatch_id=dispatch.id, item_id=item_id, warehouse_id=wh_id,
-                              quantity=qty, unit=item_data.get('unit'),
-                              batch_no=item_data.get('batch_no') or '',
-                              expiry_date=parse_bs_date_field(item_data, 'expiry_date') if item_data.get('expiry_date') else None)
-            db.session.add(di)
-            inv.quantity -= qty
-
-            # Distribute quantity_dispatched across relief requests
-            remaining_qty = qty
-            for rr_id in relief_request_ids:
-                rr_item = ReliefRequestItem.query.filter_by(request_id=rr_id, item_id=item_id).first()
-                if rr_item and remaining_qty > 0:
-                    available = rr_item.quantity_requested - (rr_item.quantity_dispatched or 0)
-                    to_add = min(remaining_qty, available)
-                    if to_add > 0:
-                        rr_item.quantity_dispatched = (rr_item.quantity_dispatched or 0) + to_add
-                        remaining_qty -= to_add
-
-        # Update status for all linked relief requests
-        for rr_id in relief_request_ids:
-            req = db_get(ReliefRequest, rr_id)
-            if req and req.status != 'Cancelled':
-                anything_done = any(ri.quantity_dispatched > 0 for ri in req.items) if req.items else False
-                if anything_done or req.distributed_cash_amount > 0:
-                    req.status = 'Partial'
-
-        create_notification(
-            title=f'Dispatch {dispatch.dispatch_number}',
-            message=f'Dispatch to {dispatch.destination or "destination"} created for {incident.incident_name}',
-            type_name='dispatch',
-            priority='Medium',
-            resource_id=dispatch.id,
-            url=url_for('dispatch_page')
-        )
-        log_activity('create', 'dispatch', resource_id=dispatch.id, details=f'Dispatch {dispatch.dispatch_number} created', user=current_user, ip=request.remote_addr)
-        db.session.commit()
-        return jsonify({'success': True, 'message': 'Dispatch created successfully', 'data': dispatch.to_dict()}), 201
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'message': friendly_message(e)}), 500
-
-@app.route('/api/dispatch/<int:id>', methods=['GET', 'PUT'])
-@permission_required('edit')
-def handle_dispatch(id):
-    dispatch = db_get(Dispatch, id)
-    if not dispatch:
-        return jsonify({'success': False, 'message': 'Dispatch not found'}), 404
-    if request.method == 'GET':
-        return jsonify({'success': True, 'dispatch': dispatch.to_dict()})
-    if Distribution.query.filter_by(dispatch_id=dispatch.id).first():
-        return jsonify({'success': False, 'message': 'Cannot edit a dispatch that has been distributed'}), 400
-    try:
-        data = request.get_json()
-        if not isinstance(data, dict):
-            return jsonify({'success': False, 'message': 'Invalid JSON payload'}), 400
-        warehouse_id = data.get('warehouse_id')
-        incident_id = data.get('incident_id')
-        warehouse = db_get(Warehouse, warehouse_id)
-        incident = db_get(Incident, incident_id)
-        if not warehouse:
-            return jsonify({'success': False, 'message': 'Warehouse not found'}), 404
-        if not incident:
-            return jsonify({'success': False, 'message': 'Incident not found'}), 404
-        dispatch_date = parse_bs_date_field(data, 'date', default=date.today())
-        if dispatch_date > date.today():
-            return jsonify({'success': False, 'message': 'Dispatch date cannot be in the future'}), 400
-        phone = data.get('phone', '')
-        if phone and not re.match(r'^[\d\s\+\-\(\)]{7,20}$', phone):
-            return jsonify({'success': False, 'message': 'Phone number format is invalid'}), 400
-        items_payload = data.get('items', [])
-        if not items_payload:
-            return jsonify({'success': False, 'message': 'At least one dispatch item is required'}), 400
-
-        relief_request_ids = data.get('relief_request_ids') or (data.get('relief_request_id') and [data.get('relief_request_id')]) or []
-
-        # Reverse old inventory and relief request quantities from all linked requests
-        old_db_rr_ids = []
-        try:
-            old_db_rr_ids = json.loads(dispatch.relief_request_ids) if dispatch.relief_request_ids else []
-        except (json.JSONDecodeError, TypeError):
-            old_db_rr_ids = [dispatch.relief_request_id] if dispatch.relief_request_id else []
-        for old_item in dispatch.items:
-            old_wh_id = old_item.warehouse_id or (old_item.dispatch.warehouse_id if old_item.dispatch else None)
-            if old_wh_id:
-                inv = Inventory.query.filter_by(item_id=old_item.item_id, warehouse_id=old_wh_id).with_for_update().first()
-                if inv:
-                    inv.quantity += old_item.quantity
-            for rr_id in old_db_rr_ids:
-                rr_item = ReliefRequestItem.query.filter_by(request_id=rr_id, item_id=old_item.item_id).first()
-                if rr_item:
-                    rr_item.quantity_dispatched = max(0, (rr_item.quantity_dispatched or 0) - old_item.quantity)
-
-        # Reset relief request status for all linked requests
-        for rr_id in old_db_rr_ids:
-            old_req = db_get(ReliefRequest, rr_id)
-            if old_req and old_req.status != 'Cancelled':
-                old_req.status = 'Pending'
-
-        # Delete old items
-        DispatchItem.query.filter_by(dispatch_id=dispatch.id).delete()
-
-        # Create new items and deduct inventory
-        for item_data in items_payload:
-            item_id = item_data.get('item_id')
-            if item_id is None:
-                return jsonify({'success': False, 'message': 'Each dispatch item requires an item_id'}), 400
-            qty = parse_int_field(item_data, 'quantity', minimum=1)
-            item = db_get(Item, item_id)
-            if not item:
-                return jsonify({'success': False, 'message': 'One or more items were not found'}), 404
-            if item.is_distributable is False:
-                db.session.rollback()
-                return jsonify({'success': False, 'message': f'{item.name} is non-distributable equipment and cannot be dispatched. Use stock transfer instead.'}), 400
-
-            item_wh_id = item_data.get('warehouse_id') or warehouse.id
-            item_warehouse = db_get(Warehouse, item_wh_id)
-            if not item_warehouse:
-                db.session.rollback()
-                return jsonify({'success': False, 'message': f'Warehouse {item_wh_id} not found'}), 404
-
-            # Validate against combined remaining across all selected relief requests
-            total_remaining = 0
-            for rr_id in relief_request_ids:
-                rr_item = ReliefRequestItem.query.filter_by(request_id=rr_id, item_id=item_id).first()
-                if rr_item:
-                    total_remaining += rr_item.quantity_requested - (rr_item.quantity_dispatched or 0)
-            if qty > total_remaining:
-                db.session.rollback()
-                return jsonify({'success': False, 'message': f'Cannot dispatch {qty} of "{item.name}". Only {total_remaining} remaining across the selected relief requests.'}), 400
-
-            inv = Inventory.query.filter_by(item_id=item_id, warehouse_id=item_warehouse.id).with_for_update().first()
-            if not inv or inv.quantity < qty:
-                db.session.rollback()
-                return jsonify({'success': False, 'message': f'Insufficient stock for {item.name} in {item_warehouse.name}. Available: {inv.quantity if inv else 0}, Required: {qty}'}), 400
-
-            di = DispatchItem(dispatch_id=dispatch.id, item_id=item_id, warehouse_id=item_warehouse.id,
-                              quantity=qty, unit=item_data.get('unit'),
-                              batch_no=item_data.get('batch_no') or '',
-                              expiry_date=parse_bs_date_field(item_data, 'expiry_date') if item_data.get('expiry_date') else None)
-            db.session.add(di)
-            inv.quantity -= qty
-
-            # Distribute quantity_dispatched across relief requests
-            remaining_qty = qty
-            for rr_id in relief_request_ids:
-                rr_item_new = ReliefRequestItem.query.filter_by(request_id=rr_id, item_id=item_id).first()
-                if rr_item_new and remaining_qty > 0:
-                    available = rr_item_new.quantity_requested - (rr_item_new.quantity_dispatched or 0)
-                    to_add = min(remaining_qty, available)
-                    if to_add > 0:
-                        rr_item_new.quantity_dispatched = (rr_item_new.quantity_dispatched or 0) + to_add
-                        remaining_qty -= to_add
-
-        for rr_id in relief_request_ids:
-            req = db_get(ReliefRequest, rr_id)
-            if req and req.items and req.status != 'Cancelled':
-                anything_done = any(ri.quantity_dispatched > 0 for ri in req.items)
-                if anything_done or req.distributed_cash_amount > 0:
-                    req.status = 'Partial'
-
-        # Update dispatch fields
-        first_wh_id = items_payload[0].get('warehouse_id') or warehouse.id
-        dispatch.dispatch_number = data.get('dispatch_number') or dispatch.dispatch_number
-        dispatch.date = dispatch_date
-        dispatch.warehouse_id = first_wh_id
-        dispatch.incident_id = incident.id
-        dispatch.relief_request_id = relief_request_ids[0] if relief_request_ids else dispatch.relief_request_id
-        dispatch.relief_request_ids = json.dumps(relief_request_ids) if relief_request_ids else dispatch.relief_request_ids
-        dispatch.destination = data.get('destination')
-        dispatch.receiver = data.get('receiver')
-        dispatch.phone = phone
-        dispatch.remarks = data.get('remarks')
-        db.session.commit()
-        return jsonify({'success': True, 'message': 'Dispatch updated', 'data': dispatch.to_dict()}), 200
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'message': friendly_message(e)}), 500
-
-@app.route('/api/dispatch/<int:id>/cancel', methods=['POST'])
-@permission_required('edit')
-def cancel_dispatch(id):
-    dispatch = db_get(Dispatch, id)
-    if not dispatch:
-        return jsonify({'success': False, 'message': 'Dispatch not found'}), 404
-    if dispatch.status == 'Cancelled':
-        return jsonify({'success': False, 'message': 'Dispatch is already cancelled'}), 400
-    if Distribution.query.filter_by(dispatch_id=dispatch.id).first():
-        return jsonify({'success': False, 'message': 'Cannot cancel a dispatch that has been distributed'}), 400
-    try:
-        data = request.get_json()
-        reason = (data.get('cancel_reason') or '').strip()
-        if not reason:
-            return jsonify({'success': False, 'message': 'Cancellation reason is required'}), 400
-
-        # Reverse inventory: re-add items to their respective warehouses
-        for item in dispatch.items:
-            wh_id = item.warehouse_id or dispatch.warehouse_id
-            if wh_id:
-                inv = Inventory.query.filter_by(item_id=item.item_id, warehouse_id=wh_id).first()
-                if inv:
-                    inv.quantity += item.quantity
-                else:
-                    inv = Inventory(item_id=item.item_id, warehouse_id=wh_id, quantity=item.quantity)
-                    db.session.add(inv)
-
-        # Reverse relief request quantity_dispatched for all linked requests
-        rr_ids = []
-        try:
-            rr_ids = json.loads(dispatch.relief_request_ids) if dispatch.relief_request_ids else []
-        except (json.JSONDecodeError, TypeError):
-            pass
-        if not rr_ids and dispatch.relief_request_id:
-            rr_ids = [dispatch.relief_request_id]
-        for rr_id in rr_ids:
-            req = db_get(ReliefRequest, rr_id)
-            if req:
-                for item in dispatch.items:
-                    rr_item = ReliefRequestItem.query.filter_by(request_id=rr_id, item_id=item.item_id).first()
-                    if rr_item:
-                        rr_item.quantity_dispatched = max(0, (rr_item.quantity_dispatched or 0) - item.quantity)
-                # Cancel RR if nothing dispatched/cash-distributed remains
-                if req.items:
-                    anything_dispatched = any((ri.quantity_dispatched or 0) > 0 for ri in req.items)
-                    cash_distributed = (req.distributed_cash_amount or 0) > 0
-                    if not anything_dispatched and not cash_distributed:
-                        req.status = 'Cancelled'
-                    elif not anything_dispatched and cash_distributed:
-                        req.status = 'Pending'
-
-        # Update dispatch as cancelled
-        dispatch.status = 'Cancelled'
-        dispatch.cancelled_at = utc_now()
-        dispatch.cancelled_by = current_user.id
-        dispatch.cancel_reason = reason
-        db.session.commit()
-        return jsonify({'success': True, 'message': 'Dispatch cancelled successfully', 'dispatch': dispatch.to_dict()}), 200
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'message': friendly_message(e)}), 500
-
 # ============ DISTRIBUTION API ============
 def generate_distribution_no():
-    last = Distribution.query.order_by(Distribution.id.desc()).first()
-    num = (last.id + 1) if last else 1
+    existing = set(n for (n,) in db.session.query(Distribution.distribution_no).all())
+    num = 1
+    while f"DIST-{num:04d}" in existing:
+        num += 1
     return f"DIST-{num:04d}"
+
+
+def _validate_distribution_items(items_payload):
+    """Validate items and per-warehouse inventory. Returns list of validated item dicts."""
+    validated = []
+    for item_data in items_payload:
+        item_id = item_data.get('item_id')
+        if item_id is None:
+            raise ValueError('Each distribution item requires an item_id')
+        qty = parse_int_field(item_data, 'quantity', minimum=1)
+        wh_id = item_data.get('warehouse_id')
+        if not wh_id:
+            raise ValueError('Each item must have a warehouse assigned')
+        item = db_get(Item, item_id)
+        if not item:
+            raise ValueError('One or more items were not found')
+        if item.is_distributable is False:
+            raise ValueError(f'{item.name} is non-distributable equipment and cannot be distributed. Use stock transfer instead.')
+        wh = db_get(Warehouse, wh_id)
+        if not wh:
+            raise ValueError(f'Warehouse {wh_id} not found')
+        inv = Inventory.query.filter_by(item_id=item_id, warehouse_id=wh_id).with_for_update().first()
+        if not inv or inv.available_quantity < qty:
+            raise ValueError(f'Insufficient stock for {item.name} in {wh.name}. Available: {inv.available_quantity if inv else 0}, Required: {qty}')
+        validated.append({
+            'item_id': item_id, 'item': item, 'quantity': qty,
+            'warehouse_id': wh_id, 'warehouse': wh, 'unit': item_data.get('unit') or item.unit,
+            'batch_no': item_data.get('batch_no') or '', 'expiry_date': item_data.get('expiry_date')
+        })
+    return validated
+
+
+def _validate_distribution_beneficiaries(beneficiaries_payload, allowed_items, fiscal_year, exclude_distribution_id=None):
+    """Validate beneficiaries payload. Raises ValueError on any problem."""
+    if not beneficiaries_payload:
+        raise ValueError('At least one beneficiary is required')
+    seen = set()
+    for ben in beneficiaries_payload:
+        family_name = (ben.get('family_name') or '').strip()
+        if not family_name:
+            raise ValueError('Family name is required for each beneficiary')
+        item_name = (ben.get('item') or '').strip()
+        if item_name and item_name not in allowed_items:
+            raise ValueError(f'Item "{item_name}" is not part of the selected distribution items')
+        quantity = ben.get('quantity')
+        if item_name and quantity in (None, ''):
+            raise ValueError(f'Quantity is required for beneficiary "{family_name}" item "{item_name}".')
+        ben_id = ben.get('beneficiary_id')
+        key = (ben_id, item_name)
+        if ben_id and key in seen:
+            raise ValueError(f'Duplicate beneficiary "{family_name}" with item "{item_name}" in the same distribution request')
+        if ben_id:
+            seen.add(key)
+            existing_relief = db.session.query(DistributionBeneficiary).join(
+                Distribution, DistributionBeneficiary.distribution_id == Distribution.id
+            ).filter(
+                Distribution.fiscal_year == fiscal_year,
+                Distribution.status != 'Cancelled',
+                Distribution.id != exclude_distribution_id,
+                DistributionBeneficiary.beneficiary_id == ben_id
+            ).first()
+            if existing_relief:
+                raise ValueError(f'Beneficiary "{family_name}" already received relief items in fiscal year {fiscal_year}.')
+    return True
+
 
 @app.route('/api/distributions', methods=['GET', 'POST'])
 @permission_required('edit')
@@ -4943,93 +4311,43 @@ def handle_distributions():
         data = request.get_json()
         if not isinstance(data, dict):
             return jsonify({'success': False, 'message': 'Invalid JSON payload'}), 400
-        dispatch_ids = data.get('dispatch_ids') or (data.get('dispatch_id') and [data.get('dispatch_id')]) or []
-        if not dispatch_ids:
-            return jsonify({'success': False, 'message': 'At least one dispatch is required'}), 400
-        dispatches = [db_get(Dispatch, did) for did in dispatch_ids]
-        dispatches = [d for d in dispatches if d is not None]
-        if not dispatches:
-            return jsonify({'success': False, 'message': 'No valid dispatches found'}), 404
-        primary_dispatch = dispatches[0]
-        incident = dispatches[0].incident
+        incident_id = data.get('incident_id')
+        incident = db_get(Incident, incident_id)
         if not incident:
-            return jsonify({'success': False, 'message': 'Incident not found on dispatch'}), 404
-        # Collect all allowed items and qty maps from all dispatches
-        allowed_items = set()
-        dispatch_qty_maps = {}
-        for dp in dispatches:
-            for di in dp.items:
-                if di.item:
-                    allowed_items.add(di.item.name)
-                    dispatch_qty_maps[(dp.id, di.item.name)] = di.quantity
-        # Aggregate dispatched qty per item across all dispatches
-        total_dispatch_qty_map = {}
-        for dp in dispatches:
-            for di in dp.items:
-                if di.item:
-                    total_dispatch_qty_map[di.item.name] = total_dispatch_qty_map.get(di.item.name, 0) + di.quantity
+            return jsonify({'success': False, 'message': 'Incident not found'}), 404
+
+        items_payload = data.get('items', [])
+        if not items_payload:
+            return jsonify({'success': False, 'message': 'At least one distribution item is required'}), 400
+        validated_items = _validate_distribution_items(items_payload)
+
         beneficiaries_payload = data.get('beneficiaries', [])
-        if not beneficiaries_payload:
-            return jsonify({'success': False, 'message': 'At least one beneficiary is required'}), 400
+        allowed_items = set(v['item'].name for v in validated_items)
+        fiscal_year = incident.fiscal_year or AppSettings.get_setting('active_fiscal_year', '2081/82')
+        _validate_distribution_beneficiaries(beneficiaries_payload, allowed_items, fiscal_year)
+
         dist_date = parse_bs_date_field(data, 'distribution_date', default=date.today())
         if dist_date > date.today():
             return jsonify({'success': False, 'message': 'Distribution date cannot be in the future'}), 400
-        # Validate total distributed qty per item against aggregate dispatched qty
+        phone = data.get('phone') or ''
+        if phone and not re.match(r'^[\d\s\+\-\(\)]{7,20}$', phone):
+            return jsonify({'success': False, 'message': 'Phone number format is invalid'}), 400
+
+        # Validate total distributed qty per item (across all warehouses) against the quantity being distributed
         dist_totals = {}
         for ben_data in beneficiaries_payload:
             item_name = (ben_data.get('item') or '').strip()
-            qty = parse_int_field(ben_data, 'quantity', minimum=1)
+            qty = parse_int_field(ben_data, 'quantity', minimum=1, default=1)
             if item_name:
                 dist_totals[item_name] = dist_totals.get(item_name, 0) + qty
-        # Subtract already-distributed quantities for the same dispatches
-        already_distributed_map = {}
-        existing_dists = Distribution.query.filter(Distribution.dispatch_id.in_([d.id for d in dispatches])).all()
-        for ed in existing_dists:
-            for edb in ed.beneficiaries:
-                if edb.item:
-                    already_distributed_map[edb.item] = already_distributed_map.get(edb.item, 0) + edb.quantity
+        item_qty_by_name = {}
+        for v in validated_items:
+            item_qty_by_name[v['item'].name] = item_qty_by_name.get(v['item'].name, 0) + v['quantity']
         for item_name, total in dist_totals.items():
-            dispatched = total_dispatch_qty_map.get(item_name, 0)
-            already = already_distributed_map.get(item_name, 0)
-            remaining = dispatched - already
-            if total > remaining:
-                return jsonify({'success': False, 'message': f'Distributed quantity for "{item_name}" ({total}) exceeds remaining dispatched quantity ({remaining}) across {len(dispatches)} dispatch(es) (already distributed: {already})'}), 400
-        fiscal_year = AppSettings.get_setting('active_fiscal_year', '2081/82')
-        has_relief_req = any(
-            dp.relief_request_id or
-            (json.loads(dp.relief_request_ids) if dp.relief_request_ids else [])
-            for dp in dispatches
-        )
-        seen_beneficiaries = set()
-        for ben_data in beneficiaries_payload:
-            ben_id = ben_data.get('beneficiary_id')
-            item_name = (ben_data.get('item') or '').strip()
-            family_name = (ben_data.get('family_name') or '').strip()
-            dedup_key = (ben_id, item_name)
-            if ben_id and dedup_key in seen_beneficiaries:
-                return jsonify({'success': False, 'message': f'Duplicate beneficiary "{family_name}" with item "{item_name}" in the same distribution request'}), 400
-            if ben_id:
-                seen_beneficiaries.add(dedup_key)
-            existing_cash = db.session.query(CashDistributionBeneficiary).join(
-                CashDistribution, CashDistributionBeneficiary.distribution_id == CashDistribution.id
-            ).filter(
-                CashDistribution.fiscal_year == fiscal_year,
-                db.or_(
-                    CashDistributionBeneficiary.beneficiary_id == ben_id,
-                    CashDistributionBeneficiary.name.ilike(family_name)
-                ) if ben_id else CashDistributionBeneficiary.name.ilike(family_name)
-            ).first()
-            if existing_cash and not has_relief_req:
-                return jsonify({'success': False, 'message': f'Beneficiary "{family_name}" already received cash distribution in fiscal year {fiscal_year}. Cannot also receive relief items.'}), 400
-            if ben_id:
-                existing_relief = db.session.query(DistributionBeneficiary).join(
-                    Distribution, DistributionBeneficiary.distribution_id == Distribution.id
-                ).filter(
-                    Distribution.fiscal_year == fiscal_year,
-                    DistributionBeneficiary.beneficiary_id == ben_id
-                ).first()
-                if existing_relief:
-                    return jsonify({'success': False, 'message': f'Beneficiary "{family_name}" already received relief items in fiscal year {fiscal_year}.'}), 400
+            available = item_qty_by_name.get(item_name, 0)
+            if total > available:
+                return jsonify({'success': False, 'message': f'Distributed quantity for "{item_name}" ({total}) exceeds distribution quantity ({available}).'}), 400
+
         lat = None
         lon = None
         try:
@@ -5037,74 +4355,53 @@ def handle_distributions():
             lon = float(data.get('longitude')) if data.get('longitude') else None
         except (ValueError, TypeError):
             pass
+
+        dist_no = data.get('distribution_no') or generate_distribution_no()
+        if Distribution.query.filter_by(distribution_no=dist_no).first():
+            db.session.rollback()
+            return jsonify({'success': False, 'message': f'Distribution number "{dist_no}" is already in use. Please refresh and try again.'}), 400
         dist = Distribution(
-            distribution_no=data.get('distribution_no') or generate_distribution_no(),
-            dispatch_id=primary_dispatch.id, incident_id=incident.id,
+            distribution_no=dist_no,
+            distribution_date=dist_date,
+            incident_id=incident.id,
+            warehouse_id=data.get('warehouse_id'),
+            fiscal_year=fiscal_year,
             location=data.get('location'),
             latitude=lat, longitude=lon,
-            fiscal_year=fiscal_year,
-            distribution_date=dist_date,
-            officer=data.get('officer'), status=data.get('status', 'Completed'),
+            officer=data.get('officer'),
+            destination=data.get('destination'), receiver=data.get('receiver'),
+            phone=data.get('phone'), requester_name=data.get('requester_name'),
+            organization=data.get('organization'),
+            status=data.get('status', 'Completed'),
             remarks=data.get('remarks'), created_by=current_user.id
         )
         db.session.add(dist)
         db.session.flush()
+
+        for v in validated_items:
+            inv = Inventory.query.filter_by(item_id=v['item_id'], warehouse_id=v['warehouse_id']).with_for_update().first()
+            di = DistributionItem(
+                distribution_id=dist.id, item_id=v['item_id'], warehouse_id=v['warehouse_id'],
+                quantity=v['quantity'], unit=v['unit'], batch_no=v['batch_no'],
+                expiry_date=parse_bs_date_field({'expiry_date': v['expiry_date']}, 'expiry_date') if v['expiry_date'] else None
+            )
+            db.session.add(di)
+            if inv:
+                inv.quantity -= v['quantity']
+
         for ben_data in beneficiaries_payload:
-            family_name = (ben_data.get('family_name') or '').strip()
-            if not family_name:
-                return jsonify({'success': False, 'message': 'Family name is required for each beneficiary'}), 400
-            qty = parse_int_field(ben_data, 'quantity', minimum=1)
-            item_name = (ben_data.get('item') or '').strip()
-            if item_name and item_name not in allowed_items:
-                return jsonify({'success': False, 'message': f'Item "{item_name}" is not part of the selected dispatches'}), 400
             ben = DistributionBeneficiary(
-                distribution_id=dist.id, family_name=family_name,
+                distribution_id=dist.id,
+                family_name=(ben_data.get('family_name') or '').strip(),
                 beneficiary_id=ben_data.get('beneficiary_id'),
-                id_number=ben_data.get('id_number'), members=parse_int_field(ben_data, 'members', minimum=1, default=1),
-                item=item_name or None, quantity=qty,
+                id_number=ben_data.get('id_number'),
+                members=parse_int_field(ben_data, 'members', minimum=1, default=1),
+                item=(ben_data.get('item') or '').strip() or None,
+                quantity=parse_int_field(ben_data, 'quantity', minimum=1, default=1),
                 status=ben_data.get('status', 'Received')
             )
             db.session.add(ben)
-        db.session.flush()
-        # Update ReliefRequestItem.quantity_distributed for all linked dispatches' relief requests
-        updated_req_ids = set()
-        for dp in dispatches:
-            # Collect all linked RR IDs from the stored JSON field
-            dp_rr_ids = []
-            try:
-                dp_rr_ids = json.loads(dp.relief_request_ids) if dp.relief_request_ids else []
-            except (json.JSONDecodeError, TypeError):
-                dp_rr_ids = []
-            if not dp_rr_ids and dp.relief_request_id:
-                dp_rr_ids = [dp.relief_request_id]
-            for rr_id in dp_rr_ids:
-                req = db_get(ReliefRequest, rr_id)
-                if req and req.id not in updated_req_ids and req.status != 'Cancelled':
-                    updated_req_ids.add(req.id)
-                    for ben_data in beneficiaries_payload:
-                        item_name = (ben_data.get('item') or '').strip()
-                        qty_item = parse_int_field(ben_data, 'quantity', minimum=1)
-                        if item_name and qty_item:
-                            for rri in req.items:
-                                if rri.item and rri.item.name == item_name:
-                                    rri.quantity_distributed = (rri.quantity_distributed or 0) + qty_item
-                    # Update linked relief request status
-                    all_distributed = all(
-                        (ri.quantity_distributed or 0) >= (ri.quantity_dispatched or 0)
-                        for ri in req.items
-                    ) if req.items else True
-                    cash_done = (
-                        req.distributed_cash_amount >= req.requested_cash_amount
-                        if req.requested_cash_amount > 0 else True
-                    )
-                    anything_done = (
-                        any((ri.quantity_distributed or 0) > 0 for ri in req.items)
-                        if req.items else False
-                    ) or req.distributed_cash_amount > 0
-                    if all_distributed and cash_done:
-                        req.status = 'Completed'
-                    elif anything_done:
-                        req.status = 'Partial'
+
         create_notification(
             title=f'Distribution {dist.distribution_no}',
             message=f'Distribution recorded for {incident.incident_name} at {data.get("location") or "selected location"}',
@@ -5116,17 +4413,205 @@ def handle_distributions():
         log_activity('create', 'distribution', resource_id=dist.id, details=f'Distribution {dist.distribution_no} recorded', user=current_user, ip=request.remote_addr)
         db.session.commit()
         return jsonify({'success': True, 'message': 'Distribution recorded', 'data': dist.to_dict()}), 201
+    except ValueError as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': friendly_message(e)}), 400
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
-@app.route('/api/distributions/<int:id>', methods=['GET'])
-@login_required
-def get_distribution(id):
+
+@app.route('/api/distributions/<int:id>', methods=['GET', 'PUT'])
+@permission_required('edit')
+def manage_distribution(id):
     dist = db_get(Distribution, id)
     if not dist:
         return jsonify({'success': False, 'message': 'Distribution not found'}), 404
-    return jsonify({'success': True, 'distribution': dist.to_dict()})
+    if request.method == 'GET':
+        return jsonify({'success': True, 'distribution': dist.to_dict()})
+    if dist.status == 'Cancelled':
+        return jsonify({'success': False, 'message': 'Cannot edit a cancelled distribution'}), 400
+    try:
+        data = request.get_json()
+        if not isinstance(data, dict):
+            return jsonify({'success': False, 'message': 'Invalid JSON payload'}), 400
+        incident = db_get(Incident, data.get('incident_id'))
+        if not incident:
+            return jsonify({'success': False, 'message': 'Incident not found'}), 404
+
+        # Reverse old inventory before applying new items
+        for old_item in dist.items:
+            wh_id = old_item.warehouse_id or dist.warehouse_id
+            if wh_id:
+                inv = Inventory.query.filter_by(item_id=old_item.item_id, warehouse_id=wh_id).with_for_update().first()
+                if inv:
+                    inv.quantity += old_item.quantity
+                else:
+                    db.session.add(Inventory(item_id=old_item.item_id, warehouse_id=wh_id, quantity=old_item.quantity))
+
+        items_payload = data.get('items', [])
+        if not items_payload:
+            db.session.rollback()
+            return jsonify({'success': False, 'message': 'At least one distribution item is required'}), 400
+        validated_items = _validate_distribution_items(items_payload)
+
+        beneficiaries_payload = data.get('beneficiaries', [])
+        allowed_items = set(v['item'].name for v in validated_items)
+        fiscal_year = incident.fiscal_year or AppSettings.get_setting('active_fiscal_year', '2081/82')
+        _validate_distribution_beneficiaries(beneficiaries_payload, allowed_items, fiscal_year, exclude_distribution_id=dist.id)
+        dist_totals = {}
+        for ben_data in beneficiaries_payload:
+            item_name = (ben_data.get('item') or '').strip()
+            qty = parse_int_field(ben_data, 'quantity', minimum=1, default=1)
+            if item_name:
+                dist_totals[item_name] = dist_totals.get(item_name, 0) + qty
+        item_qty_by_name = {}
+        for v in validated_items:
+            item_qty_by_name[v['item'].name] = item_qty_by_name.get(v['item'].name, 0) + v['quantity']
+        for item_name, total in dist_totals.items():
+            available = item_qty_by_name.get(item_name, 0)
+            if total > available:
+                db.session.rollback()
+                return jsonify({'success': False, 'message': f'Distributed quantity for "{item_name}" ({total}) exceeds distribution quantity ({available}).'}), 400
+
+        dist_date = parse_bs_date_field(data, 'distribution_date', default=dist.distribution_date)
+        if dist_date > date.today():
+            db.session.rollback()
+            return jsonify({'success': False, 'message': 'Distribution date cannot be in the future'}), 400
+        phone = data.get('phone') or ''
+        if phone and not re.match(r'^[\d\s\+\-\(\)]{7,20}$', phone):
+            db.session.rollback()
+            return jsonify({'success': False, 'message': 'Phone number format is invalid'}), 400
+
+        # Replace items (no uploads attached to items)
+        DistributionItem.query.filter_by(distribution_id=dist.id).delete()
+
+        # Replace or update beneficiaries, preserving rows with a stable id (keeps photos/documents)
+        existing_bens = {b.id: b for b in dist.beneficiaries}
+        new_ben_ids = []
+        for ben_data in beneficiaries_payload:
+            ben_id = ben_data.get('id')
+            family_name = (ben_data.get('family_name') or '').strip()
+            if not family_name:
+                db.session.rollback()
+                return jsonify({'success': False, 'message': 'Family name is required for each beneficiary'}), 400
+            ben_obj = existing_bens.get(ben_id)
+            if ben_obj:
+                ben_obj.family_name = family_name
+                ben_obj.beneficiary_id = ben_data.get('beneficiary_id')
+                ben_obj.id_number = ben_data.get('id_number')
+                ben_obj.members = parse_int_field(ben_data, 'members', minimum=1, default=1)
+                ben_obj.item = (ben_data.get('item') or '').strip() or None
+                ben_obj.quantity = parse_int_field(ben_data, 'quantity', minimum=1, default=1)
+                ben_obj.status = ben_data.get('status', 'Received')
+                new_ben_ids.append(ben_obj.id)
+            else:
+                ben_obj = DistributionBeneficiary(
+                    distribution_id=dist.id,
+                    family_name=family_name,
+                    beneficiary_id=ben_data.get('beneficiary_id'),
+                    id_number=ben_data.get('id_number'),
+                    members=parse_int_field(ben_data, 'members', minimum=1, default=1),
+                    item=(ben_data.get('item') or '').strip() or None,
+                    quantity=parse_int_field(ben_data, 'quantity', minimum=1, default=1),
+                    status=ben_data.get('status', 'Received')
+                )
+                db.session.add(ben_obj)
+                db.session.flush()
+                new_ben_ids.append(ben_obj.id)
+        for bid, ben_obj in existing_bens.items():
+            if bid not in new_ben_ids:
+                db.session.delete(ben_obj)
+
+        # Apply new items and deduct inventory
+        for v in validated_items:
+            inv = Inventory.query.filter_by(item_id=v['item_id'], warehouse_id=v['warehouse_id']).with_for_update().first()
+            di = DistributionItem(
+                distribution_id=dist.id, item_id=v['item_id'], warehouse_id=v['warehouse_id'],
+                quantity=v['quantity'], unit=v['unit'], batch_no=v['batch_no'],
+                expiry_date=parse_bs_date_field({'expiry_date': v['expiry_date']}, 'expiry_date') if v['expiry_date'] else None
+            )
+            db.session.add(di)
+            if inv:
+                inv.quantity -= v['quantity']
+
+        lat = None
+        lon = None
+        try:
+            lat = float(data.get('latitude')) if data.get('latitude') else None
+            lon = float(data.get('longitude')) if data.get('longitude') else None
+        except (ValueError, TypeError):
+            pass
+
+        # Validate distribution_no uniqueness on edit (in case number was changed)
+        new_dist_no = data.get('distribution_no') or dist.distribution_no
+        dup = Distribution.query.filter(Distribution.distribution_no == new_dist_no, Distribution.id != dist.id).first()
+        if dup:
+            db.session.rollback()
+            return jsonify({'success': False, 'message': f'Distribution number "{new_dist_no}" is already in use.'}), 400
+
+        dist.distribution_no = new_dist_no
+        dist.distribution_date = dist_date
+        dist.incident_id = incident.id
+        dist.warehouse_id = data.get('warehouse_id')
+        dist.fiscal_year = fiscal_year
+        dist.location = data.get('location')
+        dist.latitude = lat
+        dist.longitude = lon
+        dist.officer = data.get('officer')
+        dist.destination = data.get('destination')
+        dist.receiver = data.get('receiver')
+        dist.phone = data.get('phone')
+        dist.requester_name = data.get('requester_name')
+        dist.organization = data.get('organization')
+        dist.status = data.get('status') or dist.status
+        dist.remarks = data.get('remarks')
+
+        log_activity('update', 'distribution', resource_id=dist.id, details=f'Distribution {dist.distribution_no} updated', user=current_user, ip=request.remote_addr)
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Distribution updated', 'data': dist.to_dict()}), 200
+    except ValueError as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': friendly_message(e)}), 400
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
+
+
+@app.route('/api/distributions/<int:id>/cancel', methods=['POST'])
+@permission_required('edit')
+def cancel_distribution(id):
+    dist = db_get(Distribution, id)
+    if not dist:
+        return jsonify({'success': False, 'message': 'Distribution not found'}), 404
+    if dist.status == 'Cancelled':
+        return jsonify({'success': False, 'message': 'Distribution is already cancelled'}), 400
+    try:
+        data = request.get_json()
+        reason = (data.get('cancel_reason') or '').strip()
+        if not reason:
+            return jsonify({'success': False, 'message': 'Cancellation reason is required'}), 400
+
+        # Reverse inventory: re-add items to their respective warehouses
+        for item in dist.items:
+            wh_id = item.warehouse_id or dist.warehouse_id
+            if wh_id:
+                inv = Inventory.query.filter_by(item_id=item.item_id, warehouse_id=wh_id).with_for_update().first()
+                if inv:
+                    inv.quantity += item.quantity
+                else:
+                    db.session.add(Inventory(item_id=item.item_id, warehouse_id=wh_id, quantity=item.quantity))
+
+        dist.status = 'Cancelled'
+        dist.cancelled_at = utc_now()
+        dist.cancelled_by = current_user.id
+        dist.cancel_reason = reason
+        log_activity('cancel', 'distribution', resource_id=dist.id, details=f'Distribution {dist.distribution_no} cancelled. Reason: {reason}', user=current_user, ip=request.remote_addr)
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Distribution cancelled successfully', 'distribution': dist.to_dict()}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 @app.route('/api/distributions/<int:id>/upload-files', methods=['POST'])
 @login_required
@@ -5799,8 +5284,10 @@ def manage_cash_request(id):
 
 # ============ CASH DISTRIBUTION API ============
 def generate_cash_distribution_no():
-    last = CashDistribution.query.order_by(CashDistribution.id.desc()).first()
-    num = (last.id + 1) if last else 1
+    existing = set(n for (n,) in db.session.query(CashDistribution.distribution_no).all())
+    num = 1
+    while f"CASH-DIST-{num:04d}" in existing:
+        num += 1
     return f"CASH-DIST-{num:04d}"
 
 @app.route('/api/cash-distributions', methods=['GET', 'POST'])
@@ -5811,7 +5298,6 @@ def handle_cash_distributions():
             query = CashDistribution.query.order_by(CashDistribution.distribution_date.desc())
             incident_id = request.args.get('incident_id', type=int)
             fund_id = request.args.get('fund_id', type=int)
-            relief_request_id = request.args.get('relief_request_id', type=int)
             fiscal_year = request.args.get('fiscal_year')
             hide_cancelled = request.args.get('hide_cancelled', type=int)
             if hide_cancelled:
@@ -5820,8 +5306,6 @@ def handle_cash_distributions():
                 query = query.filter(CashDistribution.incident_id == incident_id)
             if fund_id:
                 query = query.filter(CashDistribution.fund_id == fund_id)
-            if relief_request_id:
-                query = query.filter(CashDistribution.relief_request_id == relief_request_id)
             if fiscal_year:
                 query = query.filter(CashDistribution.fiscal_year == fiscal_year)
             dists = query.all()
@@ -5847,10 +5331,9 @@ def handle_cash_distributions():
             cash_request_ids.insert(0, int(data['cash_request_id']))
         cash_request_ids = [cid for cid in cash_request_ids if cid]
 
-        if not cash_request_ids and not data.get('relief_request_id'):
-            return jsonify({'success': False, 'message': 'At least one cash request or a relief request is required'}), 400
+        if not cash_request_ids:
+            return jsonify({'success': False, 'message': 'At least one cash request is required'}), 400
         cash_reqs = []
-        relief_req = None
         max_amount = 0
         for cid in cash_request_ids:
             cr = db_get(CashRequest, cid)
@@ -5874,15 +5357,6 @@ def handle_cash_distributions():
             max_amount += remaining
             cash_reqs.append(cr)
 
-        if data.get('relief_request_id'):
-            relief_req = db_get(ReliefRequest, data['relief_request_id'])
-            if not relief_req:
-                return jsonify({'success': False, 'message': 'Relief request not found'}), 404
-            if relief_req.status == 'Cancelled':
-                return jsonify({'success': False, 'message': 'Cannot distribute cash to a cancelled relief request'}), 400
-            if relief_req.incident_id != incident.id:
-                return jsonify({'success': False, 'message': 'Relief request does not match selected incident'}), 400
-            max_amount += relief_req.requested_cash_amount - relief_req.distributed_cash_amount
         beneficiaries_payload = data.get('beneficiaries', [])
         if not beneficiaries_payload:
             return jsonify({'success': False, 'message': 'At least one beneficiary is required'}), 400
@@ -5914,7 +5388,6 @@ def handle_cash_distributions():
             ).first()
             if existing:
                 return jsonify({'success': False, 'message': f'Beneficiary "{ben_name}" already received cash distribution in fiscal year {fiscal_year}.'}), 400
-            relief_request_id = data.get('relief_request_id')
             existing_relief = db.session.query(DistributionBeneficiary).join(
                 Distribution, DistributionBeneficiary.distribution_id == Distribution.id
             ).filter(
@@ -5926,27 +5399,15 @@ def handle_cash_distributions():
                 )
             ).first()
             if existing_relief:
-                if relief_request_id:
-                    relief_dist = existing_relief.distribution
-                    same_rr = False
-                    if relief_dist and relief_dist.dispatch:
-                        dp_rr_ids = json.loads(relief_dist.dispatch.relief_request_ids) if relief_dist.dispatch.relief_request_ids else []
-                        if not dp_rr_ids and relief_dist.dispatch.relief_request_id:
-                            dp_rr_ids = [relief_dist.dispatch.relief_request_id]
-                        if int(relief_request_id) in dp_rr_ids or relief_dist.dispatch.relief_request_id == int(relief_request_id):
-                            same_rr = True
-                    if not same_rr:
-                        return jsonify({'success': False, 'message': f'Beneficiary "{ben_name}" already received relief items in fiscal year {fiscal_year} via a different relief request. Cannot also receive cash.'}), 400
-                else:
-                    return jsonify({'success': False, 'message': f'Beneficiary "{ben_name}" already received relief items in fiscal year {fiscal_year}. Cannot also receive cash.'}), 400
+                return jsonify({'success': False, 'message': f'Beneficiary "{ben_name}" already received relief items in fiscal year {fiscal_year}. Cannot also receive cash.'}), 400
         dist = CashDistribution(
             distribution_no=data.get('distribution_no') or generate_cash_distribution_no(),
             distribution_date=parse_bs_date_field(data, 'distribution_date', default=date.today()),
             fund_id=fund.id, incident_id=incident.id,
             cash_request_id=cash_request_ids[0] if cash_request_ids else data.get('cash_request_id'),
             cash_request_ids=json.dumps(cash_request_ids),
-            relief_request_id=data.get('relief_request_id'),
             distribution_type=data.get('distribution_type', 'Individual'),
+            distribution_id=data.get('distribution_id'),
             total_amount=total, fiscal_year=fiscal_year,
             officer=data.get('officer'), remarks=data.get('remarks'),
             photo=data.get('photo'), document=data.get('document'),
@@ -5982,17 +5443,6 @@ def handle_cash_distributions():
                 cr.status = 'Completed'
             else:
                 cr.status = 'Partial'
-
-        if relief_req:
-            relief_req.distributed_cash_amount += total
-            all_items_done = all(
-                ri.quantity_dispatched >= ri.quantity_requested for ri in relief_req.items
-            ) if relief_req.items else True
-            cash_done = relief_req.distributed_cash_amount >= relief_req.requested_cash_amount if relief_req.requested_cash_amount > 0 else True
-            if all_items_done and cash_done:
-                relief_req.status = 'Completed'
-            elif relief_req.distributed_cash_amount > 0 or any(ri.quantity_dispatched > 0 for ri in relief_req.items):
-                relief_req.status = 'Partial'
 
         create_notification(
             title=f'Cash Distribution {dist.distribution_no}',
@@ -6042,16 +5492,6 @@ def cancel_cash_distribution(id):
             cr = db_get(CashRequest, cid)
             if cr and cr.status != 'Rejected':
                 cr.status = 'Rejected'
-
-        # Recalculate ReliefRequest cash status if linked
-        if dist.relief_request_id:
-            relief_req = dist.relief_request
-            if relief_req and relief_req.status != 'Cancelled':
-                relief_req.distributed_cash_amount = max(0, (relief_req.distributed_cash_amount or 0) - dist.total_amount)
-                if relief_req.distributed_cash_amount <= 0 and not any((ri.quantity_dispatched or 0) > 0 for ri in relief_req.items):
-                    relief_req.status = 'Pending'
-                elif relief_req.distributed_cash_amount > 0:
-                    relief_req.status = 'Partial'
 
         dist.status = 'Cancelled'
         dist.cancelled_at = utc_now()
@@ -7503,9 +6943,9 @@ def get_item_history(id):
         if warehouse_id:
             adjustments = [a for a in adjustments if a.warehouse_id == warehouse_id]
 
-        dispatches = DispatchItem.query.filter_by(item_id=id).all()
+        dist_items = DistributionItem.query.filter_by(item_id=id).all()
         if warehouse_id:
-            dispatches = [d for d in dispatches if d.warehouse_id == warehouse_id]
+            dist_items = [d for d in dist_items if d.warehouse_id == warehouse_id]
 
         transfers_out = []
         transfers_in = []
@@ -7525,7 +6965,7 @@ def get_item_history(id):
         transfers_in = list(set(transfers_in))
 
         total_received = sum(r.quantity for r in receipts)
-        total_dispatched = sum(d.quantity for d in dispatches)
+        total_dispatched = sum(d.quantity for d in dist_items)
         total_adjusted = sum(a.adjusted_quantity for a in adjustments if a.adjustment_type in ('Increase', 'Correction_Increase'))
         total_damaged = sum(a.adjusted_quantity for a in adjustments if a.adjustment_type == 'Damage')
         total_expired = sum(a.adjusted_quantity for a in adjustments if a.adjustment_type == 'Expired')
@@ -7564,15 +7004,15 @@ def get_item_history(id):
                 'sub_type': a.adjustment_type,
                 'icon': 'bi-sliders',
             })
-        for d in dispatches:
+        for d in dist_items:
             events.append({
-                'date': ad_to_bs_date(d.dispatch.date) or '',
-                'type': 'Dispatch', 'ref': d.dispatch.dispatch_number if d.dispatch else '',
-                'detail': f"Qty: {d.quantity} {d.unit or ''}" + (f" → {d.dispatch.destination}" if d.dispatch and d.dispatch.destination else ''),
+                'date': ad_to_bs_date(d.distribution.distribution_date) or '',
+                'type': 'Distribution', 'ref': d.distribution.distribution_no if d.distribution else '',
+                'detail': f"Qty: {d.quantity} {d.unit or ''}" + (f" → {d.distribution.destination}" if d.distribution and d.distribution.destination else ''),
                 'qty_change': f"-{d.quantity}",
-                'warehouse': d.warehouse.name if d.warehouse else (d.dispatch.warehouse.name if d.dispatch and d.dispatch.warehouse else ''),
-                'source': d.dispatch.incident.incident_name if d.dispatch and d.dispatch.incident else '',
-                'sub_type': 'Relief Dispatch',
+                'warehouse': d.warehouse.name if d.warehouse else (d.distribution.warehouse.name if d.distribution and d.distribution.warehouse else ''),
+                'source': d.distribution.incident.incident_name if d.distribution and d.distribution.incident else '',
+                'sub_type': 'Distribution',
                 'icon': 'bi-truck',
             })
         for ti in transfers_out:
@@ -7601,33 +7041,36 @@ def get_item_history(id):
         total_distributed_qty = 0
         total_distinct_beneficiaries = 0
         seen_beneficiaries = set()
-        for d in dispatches:
-            if not d.dispatch:
+        all_dists = Distribution.query.join(DistributionItem, DistributionItem.distribution_id == Distribution.id).filter(
+            DistributionItem.item_id == id).all()
+        if warehouse_id:
+            all_dists = [x for x in all_dists if any(di.warehouse_id == warehouse_id for di in x.items)]
+        for dist in all_dists:
+            if not dist or dist.status == 'Cancelled':
                 continue
-            for dist in d.dispatch.distributions:
-                for dbene in dist.beneficiaries:
-                    item_name_match = dbene.item and item.name and dbene.item.strip().lower() == item.name.strip().lower()
-                    if not item_name_match:
-                        continue
-                    ben_name = dbene.family_name or ''
-                    ben_id_no = dbene.id_number or ''
-                    identifier = f"{ben_name}|{ben_id_no}"
-                    if identifier not in seen_beneficiaries:
-                        seen_beneficiaries.add(identifier)
-                        total_distinct_beneficiaries += 1
-                    total_distributed_qty += dbene.quantity
-                    location_info = dist.location or ''
-                    events.append({
-                        'date': ad_to_bs_date(dist.distribution_date) or '',
-                        'type': 'Distribution',
-                        'ref': dist.distribution_no or '',
-                        'detail': f"{dbene.quantity} × {dbene.item}" + (f" at {location_info}" if location_info else ''),
-                        'qty_change': f"-{dbene.quantity}",
-                        'warehouse': d.warehouse.name if d.warehouse else (d.dispatch.warehouse.name if d.dispatch and d.dispatch.warehouse else ''),
-                        'source': f"Beneficiary: {ben_name}" + (f" ({ben_id_no})" if ben_id_no else "") + (f" | Family: {dbene.members}" if dbene.members else ''),
-                        'sub_type': 'Beneficiary Distribution',
-                        'icon': 'bi-people',
-                    })
+            for dbene in dist.beneficiaries:
+                item_name_match = dbene.item and item.name and dbene.item.strip().lower() == item.name.strip().lower()
+                if not item_name_match:
+                    continue
+                ben_name = dbene.family_name or ''
+                ben_id_no = dbene.id_number or ''
+                identifier = f"{ben_name}|{ben_id_no}"
+                if identifier not in seen_beneficiaries:
+                    seen_beneficiaries.add(identifier)
+                    total_distinct_beneficiaries += 1
+                total_distributed_qty += dbene.quantity
+                location_info = dist.location or ''
+                events.append({
+                    'date': ad_to_bs_date(dist.distribution_date) or '',
+                    'type': 'Distribution',
+                    'ref': dist.distribution_no or '',
+                    'detail': f"{dbene.quantity} × {dbene.item}" + (f" at {location_info}" if location_info else ''),
+                    'qty_change': f"-{dbene.quantity}",
+                    'warehouse': dist.warehouse.name if dist.warehouse else '',
+                    'source': f"Beneficiary: {ben_name}" + (f" ({ben_id_no})" if ben_id_no else "") + (f" | Family: {dbene.members}" if dbene.members else ''),
+                    'sub_type': 'Beneficiary Distribution',
+                    'icon': 'bi-people',
+                })
 
         events.sort(key=lambda e: e['date'], reverse=True)
 
@@ -7677,8 +7120,6 @@ def get_dashboard():
             elif inv.item and inv.item.minimum_stock > 0 and inv.available_quantity <= inv.item.minimum_stock:
                 low_stock_count += 1
         active_incidents = Incident.query.filter(Incident.status == 'Active').count()
-        pending_requests = ReliefRequest.query.filter(ReliefRequest.status.in_(['Pending', 'Partial'])).count()
-        todays_dispatch = Dispatch.query.filter(db.func.date(Dispatch.date) == today).count()
         todays_distribution = Distribution.query.filter(db.func.date(Distribution.distribution_date) == today).count()
         stock_by_category = db.session.query(
             Category.name, db.func.sum(Inventory.quantity)
@@ -7710,18 +7151,21 @@ def get_dashboard():
                 receipt_data['items'] += f' ... and {len(all_items) - 3} more items'
             recent_receipts.append(receipt_data)
 
-        recent_dispatches = []
-        for d in Dispatch.query.order_by(Dispatch.date.desc()).limit(5).all():
-            dispatch_data = d.to_dict()
-            dispatch_data['dispatch_no'] = dispatch_data.get('dispatch_number')
-            recent_dispatches.append(dispatch_data)
+        recent_distributions = []
+        for d in Distribution.query.order_by(Distribution.distribution_date.desc()).limit(5).all():
+            dist_data = d.to_dict()
+            recent_distributions.append(dist_data)
 
-        recent_requests = []
-        for r in ReliefRequest.query.order_by(ReliefRequest.request_date.desc()).limit(5).all():
-            request_data = r.to_dict()
-            request_data['request_no'] = request_data.get('request_number')
-            request_data['incident'] = request_data.get('incident_name')
-            recent_requests.append(request_data)
+        recent_cash_distributions = []
+        for cd in CashDistribution.query.order_by(CashDistribution.distribution_date.desc()).limit(5).all():
+            recent_cash_distributions.append({
+                'id': cd.id, 'distribution_no': cd.distribution_no,
+                'distribution_date': ad_to_bs_date(cd.distribution_date),
+                'total_amount': cd.total_amount,
+                'incident_name': cd.incident.incident_name if cd.incident else None,
+                'status': cd.status
+            })
+
         return jsonify({
             'success': True,
             'total_items': total_items,
@@ -7730,14 +7174,12 @@ def get_dashboard():
             'out_of_stock': out_of_stock_count,
             'expiring_count': expiring_count,
             'active_incidents': active_incidents,
-            'pending_requests': pending_requests,
-            'todays_dispatch': todays_dispatch,
             'todays_distribution': todays_distribution,
             'stock_by_category': [{'category': c[0], 'total': c[1]} for c in stock_by_category],
             'low_stock_items': low_stock_items[:10],
             'recent_receipts': recent_receipts,
-            'recent_dispatches': recent_dispatches,
-            'recent_requests': recent_requests,
+            'recent_distributions': recent_distributions,
+            'recent_cash_distributions': recent_cash_distributions,
             'cash_balance': db.session.query(db.func.coalesce(db.func.sum(CashFund.current_balance), 0)).scalar(),
             'total_cash_distributed': db.session.query(db.func.coalesce(db.func.sum(CashDistribution.total_amount), 0)).filter(
                 db.or_(CashDistribution.status != 'Cancelled', CashDistribution.status.is_(None))).scalar(),
@@ -8406,11 +7848,11 @@ def global_search():
         )).limit(3).all()
         for r in receipts:
             results.append({'title': f"Receipt: {r.receipt_no}", 'subtitle': f"{r.source_type} - {r.source_name or ''}", 'url': url_for('stock_receipts_page'), 'icon': 'bi bi-clipboard-check text-info'})
-        dispatches = Dispatch.query.filter(db.or_(
-            Dispatch.dispatch_number.ilike(q), Dispatch.destination.ilike(q)
+        dists = Distribution.query.filter(db.or_(
+            Distribution.distribution_no.ilike(q), Distribution.destination.ilike(q)
         )).limit(3).all()
-        for d in dispatches:
-            results.append({'title': f"Dispatch: {d.dispatch_number}", 'subtitle': f"To: {d.destination or ''}", 'url': url_for('dispatch_page'), 'icon': 'bi bi-truck text-warning'})
+        for d in dists:
+            results.append({'title': f"Distribution: {d.distribution_no}", 'subtitle': f"To: {d.destination or ''}", 'url': url_for('distributions_page'), 'icon': 'bi bi-truck text-warning'})
         return jsonify({'success': True, 'results': results})
     except Exception as e:
         return jsonify({'success': False, 'message': friendly_message(e), 'results': []}), 500
@@ -8477,9 +7919,13 @@ def get_form_data():
     try:
         inv_avail_rows = db.session.query(
             Inventory.item_id,
+            Inventory.warehouse_id,
             db.func.sum(Inventory.quantity - Inventory.reserved_quantity)
-        ).group_by(Inventory.item_id).all()
-        inventory_available = {row[0]: row[1] or 0 for row in inv_avail_rows}
+        ).group_by(Inventory.item_id, Inventory.warehouse_id).all()
+        inventory_available = [
+            {'item_id': row[0], 'warehouse_id': row[1], 'available_quantity': row[2] or 0}
+            for row in inv_avail_rows
+        ]
         total_fund_balance = db.session.query(
             db.func.coalesce(db.func.sum(CashFund.current_balance), 0)
         ).scalar()
@@ -8493,8 +7939,7 @@ def get_form_data():
             'inventory_available': inventory_available,
             'total_fund_balance': total_fund_balance,
             'incidents': [i.to_dict() for i in Incident.query.all()],
-            'requests': [r.to_dict() for r in ReliefRequest.query.all()],
-            'dispatches': [d.to_dict() for d in Dispatch.query.all()],
+            'distributions': [d.to_dict() for d in Distribution.query.all()],
             'assessments': [a.to_dict() for a in DisasterAssessment.query.all()],
             'source_types': ['Government Supply', 'Donation', 'NGO', 'Local Government', 'Purchase', 'Supplier', 'Transfer', 'Other'],
             'priorities': ['Low', 'Medium', 'High', 'Urgent'],
@@ -8688,25 +8133,25 @@ def make_pdf_report(title, headers, rows, col_widths, filter_summary=''):
 def report_dispatch():
     incident_id = request.args.get('incident_id', type=int)
     warehouse_id = request.args.get('warehouse_id', type=int)
-    q = Dispatch.query.order_by(Dispatch.date.desc())
+    q = Distribution.query.order_by(Distribution.distribution_date.desc())
     if incident_id:
-        q = q.filter(Dispatch.incident_id == incident_id)
+        q = q.filter(Distribution.incident_id == incident_id)
     if warehouse_id:
-        q = q.filter(Dispatch.warehouse_id == warehouse_id)
+        q = q.filter(Distribution.warehouse_id == warehouse_id)
     dispatches = q.all()
-    headers = ['#', 'Dispatch No', 'Date', 'Warehouse', 'Incident', 'Destination', 'Receiver', 'Item', 'Qty', 'Unit', 'Status']
+    headers = ['#', 'Dist No', 'Date', 'Warehouse', 'Incident', 'Destination', 'Receiver', 'Item', 'Qty', 'Unit', 'Status']
     rows = []
     for i, d in enumerate(dispatches, 1):
         items = d.items
         if items:
             for di in items:
-                rows.append([i, d.dispatch_number, ad_to_bs_date(d.date) or '',
-                            d.warehouse.name if d.warehouse else '', d.incident.incident_name if d.incident else '',
+                rows.append([i, d.distribution_no, ad_to_bs_date(d.distribution_date) or '',
+                            (di.warehouse.name if di.warehouse else (d.warehouse.name if d.warehouse else '')), d.incident.incident_name if d.incident else '',
                             d.destination or '', d.receiver or '',
                             di.item.name if di.item else '', di.quantity,
                             di.unit or (di.item.unit if di.item else ''), d.status or ''])
         else:
-            rows.append([i, d.dispatch_number, ad_to_bs_date(d.date) or '',
+            rows.append([i, d.distribution_no, ad_to_bs_date(d.distribution_date) or '',
                         d.warehouse.name if d.warehouse else '', d.incident.incident_name if d.incident else '',
                         d.destination or '', d.receiver or '', '', '', '', d.status or ''])
     pdf = make_pdf_report('Dispatch Report', headers, rows, [10*mm, 28*mm, 22*mm, 25*mm, 28*mm, 25*mm, 22*mm, 28*mm, 12*mm, 12*mm, 18*mm])
@@ -8752,37 +8197,6 @@ def report_incidents():
     pdf = make_pdf_report('Incident Report', headers, rows, [10*mm, 30*mm, 22*mm, 15*mm, 22*mm, 15*mm, 18*mm, 15*mm, 12*mm, 12*mm])
     return make_response(pdf.getvalue(), 200, {'Content-Type': 'application/pdf', 'Content-Disposition': 'attachment; filename=incidents_report.pdf'})
 
-@app.route('/api/reports/requests', methods=['GET'])
-@login_required
-def report_requests():
-    status = request.args.get('status')
-    incident_id = request.args.get('incident_id', type=int)
-    priority = request.args.get('priority')
-    q = ReliefRequest.query.order_by(ReliefRequest.request_date.desc())
-    if status:
-        q = q.filter(ReliefRequest.status == status)
-    if incident_id:
-        q = q.filter(ReliefRequest.incident_id == incident_id)
-    if priority:
-        q = q.filter(ReliefRequest.priority == priority)
-    reqs = q.all()
-    headers = ['#', 'Req No', 'Date', 'Incident', 'Organization', 'Requester', 'Priority', 'Status', 'Item', 'Qty Requested', 'Qty Dispatched']
-    rows = []
-    for i, r in enumerate(reqs, 1):
-        items = r.items
-        if items:
-            for ri in items:
-                rows.append([i, r.request_number, ad_to_bs_date(r.request_date) or '',
-                            r.incident.incident_name if r.incident else '', r.organization or '',
-                            r.requester_name or '', r.priority, r.status,
-                            ri.item.name if ri.item else '', ri.quantity_requested, ri.quantity_dispatched])
-        else:
-            rows.append([i, r.request_number, ad_to_bs_date(r.request_date) or '',
-                        r.incident.incident_name if r.incident else '', r.organization or '',
-                        r.requester_name or '', r.priority, r.status, '', '', ''])
-    pdf = make_pdf_report('Relief Request Report', headers, rows, [10*mm, 28*mm, 20*mm, 28*mm, 25*mm, 22*mm, 12*mm, 15*mm, 25*mm, 15*mm, 15*mm])
-    return make_response(pdf.getvalue(), 200, {'Content-Type': 'application/pdf', 'Content-Disposition': 'attachment; filename=requests_report.pdf'})
-
 @app.route('/api/reports/adjustments', methods=['GET'])
 @login_required
 def report_adjustments():
@@ -8825,12 +8239,11 @@ def report_monthly_summary():
     end = end - timedelta(days=1)
 
     receipts = StockReceipt.query.filter(db.func.date(StockReceipt.date) >= start, db.func.date(StockReceipt.date) <= end).count()
-    dispatches = Dispatch.query.filter(db.func.date(Dispatch.date) >= start, db.func.date(Dispatch.date) <= end).count()
     distributions = Distribution.query.filter(db.func.date(Distribution.distribution_date) >= start, db.func.date(Distribution.distribution_date) <= end).count()
     incidents = Incident.query.filter(db.func.date(Incident.start_date) >= start, db.func.date(Incident.start_date) <= end).count()
 
     headers = ['Metric', 'Count']
-    rows = [['Total Receipts', receipts], ['Total Dispatches', dispatches],
+    rows = [['Total Receipts', receipts],
             ['Total Distributions', distributions], ['New Incidents', incidents]]
     pdf = make_pdf_report(f'Monthly Summary - {month}', headers, rows, [80*mm, 40*mm])
     return make_response(pdf.getvalue(), 200, {'Content-Type': 'application/pdf', 'Content-Disposition': f'attachment; filename=monthly_summary_{month}.pdf'})
@@ -8913,23 +8326,24 @@ def get_report_data(report_type, args):
     elif report_type == 'dispatch':
         incident_id = args.get('incident_id', type=int)
         warehouse_id = args.get('warehouse_id', type=int)
-        q = Dispatch.query.order_by(Dispatch.date.desc())
-        if incident_id: q = q.filter(Dispatch.incident_id == incident_id)
-        if warehouse_id: q = q.filter(Dispatch.warehouse_id == warehouse_id)
-        q = apply_date_filter(q, Dispatch.date)
-        headers = ['Dispatch No', 'Date', 'Warehouse', 'Incident', 'Destination', 'Receiver', 'Item', 'Qty', 'Unit', 'Status']
+        q = Distribution.query.order_by(Distribution.distribution_date.desc())
+        if incident_id: q = q.filter(Distribution.incident_id == incident_id)
+        if warehouse_id: q = q.filter(Distribution.warehouse_id == warehouse_id)
+        q = apply_date_filter(q, Distribution.distribution_date)
+        headers = ['Dist No', 'Date', 'Warehouse', 'Incident', 'Destination', 'Receiver', 'Item', 'Qty', 'Unit', 'Status']
         rows = []
         for d in q.all():
             items = d.items
             if items:
                 for di in items:
-                    rows.append([d.dispatch_number, ad_to_bs_date(d.date) or '',
-                                d.warehouse.name if d.warehouse else '', d.incident.incident_name if d.incident else '',
+                    rows.append([d.distribution_no, ad_to_bs_date(d.distribution_date) or '',
+                                (di.warehouse.name if di.warehouse else (d.warehouse.name if d.warehouse else '')),
+                                d.incident.incident_name if d.incident else '',
                                 d.destination or '', d.receiver or '',
                                 di.item.name if di.item else '', di.quantity,
                                 di.unit or (di.item.unit if di.item else ''), d.status or ''])
             else:
-                rows.append([d.dispatch_number, ad_to_bs_date(d.date) or '',
+                rows.append([d.distribution_no, ad_to_bs_date(d.distribution_date) or '',
                             d.warehouse.name if d.warehouse else '', d.incident.incident_name if d.incident else '',
                             d.destination or '', d.receiver or '', '', '', '', d.status or ''])
     elif report_type == 'distribution':
@@ -9092,29 +8506,6 @@ def get_report_data(report_type, args):
                 ['Houses Destroyed', total['house_destroyed']],
                 ['Houses Damaged', total['house_damaged']],
                 ['Estimated Loss (NRs)', total['estimated_loss']]]
-    elif report_type == 'requests':
-        status = args.get('status')
-        incident_id = args.get('incident_id', type=int)
-        priority = args.get('priority')
-        q = ReliefRequest.query.order_by(ReliefRequest.request_date.desc())
-        if status: q = q.filter(ReliefRequest.status == status)
-        if incident_id: q = q.filter(ReliefRequest.incident_id == incident_id)
-        if priority: q = q.filter(ReliefRequest.priority == priority)
-        q = apply_date_filter(q, ReliefRequest.request_date)
-        headers = ['Req No', 'Date', 'Incident', 'Organization', 'Requester', 'Priority', 'Status', 'Item', 'Qty Requested', 'Qty Dispatched']
-        rows = []
-        for r in q.all():
-            items = r.items
-            if items:
-                for ri in items:
-                    rows.append([r.request_number, ad_to_bs_date(r.request_date) or '',
-                                r.incident.incident_name if r.incident else '', r.organization or '',
-                                r.requester_name or '', r.priority, r.status,
-                                ri.item.name if ri.item else '', ri.quantity_requested, ri.quantity_dispatched])
-            else:
-                rows.append([r.request_number, ad_to_bs_date(r.request_date) or '',
-                            r.incident.incident_name if r.incident else '', r.organization or '',
-                            r.requester_name or '', r.priority, r.status, '', '', ''])
     elif report_type == 'adjustments':
         q = ManualAdjustment.query.order_by(ManualAdjustment.date.desc())
         q = apply_date_filter(q, ManualAdjustment.date)
@@ -9150,11 +8541,10 @@ def get_report_data(report_type, args):
         from datetime import timedelta
         end = end - timedelta(days=1)
         receipts = StockReceipt.query.filter(db.func.date(StockReceipt.date) >= start, db.func.date(StockReceipt.date) <= end).count()
-        dispatches = Dispatch.query.filter(db.func.date(Dispatch.date) >= start, db.func.date(Dispatch.date) <= end).count()
         distributions = Distribution.query.filter(db.func.date(Distribution.distribution_date) >= start, db.func.date(Distribution.distribution_date) <= end).count()
         incidents = Incident.query.filter(db.func.date(Incident.start_date) >= start, db.func.date(Incident.start_date) <= end).count()
         headers = ['Metric', 'Count']
-        rows = [['Total Receipts', receipts], ['Total Dispatches', dispatches],
+        rows = [['Total Receipts', receipts],
                 ['Total Distributions', distributions], ['New Incidents', incidents]]
     elif report_type == 'stock-receipts':
         warehouse_id = args.get('warehouse_id', type=int)
@@ -9358,24 +8748,26 @@ def get_report_data(report_type, args):
                 StockReceiptItem.item_id == inv.item_id,
                 StockReceipt.warehouse_id == inv.warehouse_id
             )
-            dispatched_qty = db.session.query(db.func.coalesce(db.func.sum(DispatchItem.quantity), 0)).join(
-                Dispatch, DispatchItem.dispatch_id == Dispatch.id
-            ).filter(
-                DispatchItem.item_id == inv.item_id,
-                Dispatch.warehouse_id == inv.warehouse_id
+            dispatched_qty = db.session.query(db.func.coalesce(db.func.sum(DistributionItem.quantity), 0)).filter(
+                DistributionItem.item_id == inv.item_id,
+                DistributionItem.warehouse_id == inv.warehouse_id
             )
             if date_from:
                 ad_from = bs_to_ad(date_from)
                 if ad_from:
                     fd = datetime.strptime(ad_from, '%Y-%m-%d').date()
                     received_qty = received_qty.filter(StockReceipt.date >= fd)
-                    dispatched_qty = dispatched_qty.filter(Dispatch.date >= fd)
+                    dispatched_qty = dispatched_qty.join(
+                        Distribution, DistributionItem.distribution_id == Distribution.id
+                    ).filter(Distribution.distribution_date >= fd)
             if date_to:
                 ad_to_v = bs_to_ad(date_to)
                 if ad_to_v:
                     td = datetime.strptime(ad_to_v, '%Y-%m-%d').date()
                     received_qty = received_qty.filter(StockReceipt.date <= td)
-                    dispatched_qty = dispatched_qty.filter(Dispatch.date <= td)
+                    dispatched_qty = dispatched_qty.join(
+                        Distribution, DistributionItem.distribution_id == Distribution.id
+                    ).filter(Distribution.distribution_date <= td)
             received = received_qty.scalar() or 0
             dispatched = dispatched_qty.scalar() or 0
             opening = max(0, inv.quantity - received + dispatched)
@@ -9398,7 +8790,7 @@ def get_report_data(report_type, args):
             else:
                 receipts = [r for r in StockReceiptItem.query.filter_by(item_id=item_id).all()
                             if r.receipt and r.receipt.warehouse_id == warehouse_id]
-                dispatches = [d for d in DispatchItem.query.filter_by(item_id=item_id).all()
+                dist_items = [d for d in DistributionItem.query.filter_by(item_id=item_id).all()
                               if d.warehouse_id == warehouse_id]
                 adjustments = ManualAdjustment.query.filter_by(item_id=item_id, warehouse_id=warehouse_id).all()
                 transfers_out = [t for t in StockTransferItem.query.filter_by(item_id=item_id).all()
@@ -9410,10 +8802,10 @@ def get_report_data(report_type, args):
                     events.append({'date': ad_to_bs_date(r.receipt.date) or '', 'ref': r.receipt.receipt_no,
                                    'type': 'Receipt', 'party': r.receipt.source_name or '', 'in': r.quantity, 'out': 0,
                                    'sort_key': (r.receipt.date or date.min, r.receipt.id)})
-                for d in dispatches:
-                    events.append({'date': ad_to_bs_date(d.dispatch.date) or '', 'ref': d.dispatch.dispatch_number,
-                                   'type': 'Dispatch', 'party': d.dispatch.destination or d.dispatch.receiver or '', 'in': 0, 'out': d.quantity,
-                                   'sort_key': (d.dispatch.date or date.min, d.dispatch.id)})
+                for d in dist_items:
+                    events.append({'date': ad_to_bs_date(d.distribution.distribution_date) or '', 'ref': d.distribution.distribution_no,
+                                   'type': 'Distribution', 'party': d.distribution.destination or d.distribution.receiver or '', 'in': 0, 'out': d.quantity,
+                                   'sort_key': (d.distribution.distribution_date or date.min, d.distribution.id)})
                 for a in adjustments:
                     amt = a.adjusted_quantity
                     if a.adjustment_type in ('Increase', 'Correction_Increase'):
@@ -9497,15 +8889,15 @@ def get_report_data(report_type, args):
                 rows.append([ad_to_bs_date(r.receipt.date) or '', r.receipt.receipt_no,
                              r.item.name if r.item else '', 'Receipt', r.quantity, '-',
                              r.receipt.warehouse.name if r.receipt.warehouse else '', unit_val])
-        for d in DispatchItem.query.all():
-            if d.dispatch:
+        for d in DistributionItem.query.all():
+            if d.distribution:
                 if warehouse_id and d.warehouse_id != warehouse_id: continue
                 if item_id and d.item_id != item_id: continue
                 if category_id and d.item and d.item.category_id != category_id: continue
                 unit_val = d.unit or (d.item.unit if d.item else '')
-                rows.append([ad_to_bs_date(d.dispatch.date) or '', d.dispatch.dispatch_number,
-                             d.item.name if d.item else '', 'Dispatch', '-', d.quantity,
-                             d.warehouse.name if d.warehouse else (d.dispatch.warehouse.name if d.dispatch.warehouse else ''), unit_val])
+                rows.append([ad_to_bs_date(d.distribution.distribution_date) or '', d.distribution.distribution_no,
+                             d.item.name if d.item else '', 'Distribution', '-', d.quantity,
+                             d.warehouse.name if d.warehouse else (d.distribution.warehouse.name if d.distribution.warehouse else ''), unit_val])
         rows.sort(key=lambda x: x[0] or '', reverse=True)
         if not rows:
             rows = [['-', '-', '-', '-', '-', '-', '-', 'No movements found']]
@@ -9612,7 +9004,6 @@ def get_report_data(report_type, args):
         total_warehouses = Warehouse.query.count()
         total_incidents = Incident.query.count()
         total_beneficiaries = Beneficiary.query.count()
-        total_dispatches = Dispatch.query.count()
         total_distributions = Distribution.query.count()
         total_receipts = StockReceipt.query.count()
         total_cash_funds = CashFund.query.count()
@@ -9627,7 +9018,6 @@ def get_report_data(report_type, args):
         rows.append(['Total Warehouses', total_warehouses])
         rows.append(['Total Incidents', total_incidents])
         rows.append(['Total Beneficiaries', total_beneficiaries])
-        rows.append(['Total Dispatches', total_dispatches])
         rows.append(['Total Distributions', total_distributions])
         rows.append(['Total Stock Receipts', total_receipts])
         rows.append(['Total Cash Funds', total_cash_funds])
@@ -9671,7 +9061,7 @@ def print_report_preview(report_type):
         report_titles = {
             'inventory': 'Inventory Report', 'dispatch': 'Dispatch Report',
             'distribution': 'Distribution Report', 'incidents': 'Incident Report',
-            'requests': 'Relief Request Report', 'adjustments': 'Adjustment Report',
+            'adjustments': 'Adjustment Report',
             'low-stock': 'Low Stock Report', 'monthly-summary': 'Monthly Summary',
             'stock-receipts': 'Stock Receipt Report', 'cash-balance': 'Cash Balance Report',
             'cash-receipts': 'Cash Receipt Report', 'cash-requests': 'Cash Request Report',
@@ -9749,7 +9139,7 @@ def report_pdf_generic(report_type):
         report_titles = {
             'inventory': 'Inventory Report', 'dispatch': 'Dispatch Report',
             'distribution': 'Distribution Report', 'incidents': 'Incident Report',
-            'requests': 'Relief Request Report', 'adjustments': 'Adjustment Report',
+            'adjustments': 'Adjustment Report',
             'low-stock': 'Low Stock Report', 'monthly-summary': 'Monthly Summary',
             'stock-receipts': 'Stock Receipt Report', 'cash-balance': 'Cash Balance Report',
             'cash-receipts': 'Cash Receipt Report', 'cash-requests': 'Cash Request Report',
@@ -9983,17 +9373,6 @@ def print_distribution(id):
     report_header = AppSettings.get_setting('report_header', '')
     return render_template('print_distribution.html', dist=dist, office=office, address=address, grouped_bens=list(grouped_bens.values()), report_header=report_header)
 
-@app.route('/api/dispatch/<int:id>/print', methods=['GET'])
-@login_required
-def print_dispatch(id):
-    dispatch = db_get(Dispatch, id)
-    if not dispatch:
-        return jsonify({'success': False, 'message': 'Dispatch not found'}), 404
-    office = AppSettings.get_setting('office_name', 'LEOC')
-    address = AppSettings.get_setting('address', '')
-    report_header = AppSettings.get_setting('report_header', '')
-    return render_template('print_dispatch.html', dispatch=dispatch, office=office, address=address, report_header=report_header)
-
 @app.route('/api/stock-receipts/<int:id>/print', methods=['GET'])
 @login_required
 def print_receipt(id):
@@ -10004,17 +9383,6 @@ def print_receipt(id):
     address = AppSettings.get_setting('address', '')
     report_header = AppSettings.get_setting('report_header', '')
     return render_template('print_receipt.html', receipt=receipt, office=office, address=address, report_header=report_header)
-
-@app.route('/api/relief-requests/<int:id>/print', methods=['GET'])
-@login_required
-def print_request(id):
-    req = db_get(ReliefRequest, id)
-    if not req:
-        return jsonify({'success': False, 'message': 'Request not found'}), 404
-    office = AppSettings.get_setting('office_name', 'LEOC')
-    address = AppSettings.get_setting('address', '')
-    report_header = AppSettings.get_setting('report_header', '')
-    return render_template('print_request.html', req=req, office=office, address=address, report_header=report_header)
 
 @app.route('/api/incidents/<int:id>/print', methods=['GET'])
 @login_required
@@ -10043,8 +9411,8 @@ def print_bin_card():
     receipts = StockReceiptItem.query.filter_by(item_id=item_id).all()
     receipts = [r for r in receipts if r.receipt and r.receipt.warehouse_id == warehouse_id]
     adjustments = ManualAdjustment.query.filter_by(item_id=item_id, warehouse_id=warehouse_id).all()
-    dispatches = DispatchItem.query.filter_by(item_id=item_id).all()
-    dispatches = [d for d in dispatches if d.warehouse_id == warehouse_id]
+    dist_items = DistributionItem.query.filter_by(item_id=item_id).all()
+    dist_items = [d for d in dist_items if d.warehouse_id == warehouse_id]
     transfers_out = StockTransferItem.query.filter_by(item_id=item_id).all()
     transfers_out = [t for t in transfers_out if t.transfer and t.transfer.from_warehouse_id == warehouse_id]
     transfers_in = StockTransferItem.query.filter_by(item_id=item_id).all()
@@ -10071,13 +9439,13 @@ def print_bin_card():
                            'ref': a.adjustment_no, 'party': '',
                            'in': 0, 'out': a.adjusted_quantity, 'batch': '',
                            'remarks': a.reason or '', 'sort_key': (a.date or date.min, a.id)})
-    for d in dispatches:
-        events.append({'date': ad_to_bs_date(d.dispatch.date) or '',
-                       'type': 'Dispatch', 'ref': d.dispatch.dispatch_number,
-                       'party': d.dispatch.destination or d.dispatch.receiver or '',
+    for d in dist_items:
+        events.append({'date': ad_to_bs_date(d.distribution.distribution_date) or '',
+                       'type': 'Distribution', 'ref': d.distribution.distribution_no,
+                       'party': d.distribution.destination or d.distribution.receiver or '',
                        'in': 0, 'out': d.quantity,
                        'batch': d.batch_no or '', 'remarks': '',
-                       'sort_key': (d.dispatch.date or date.min, d.dispatch.id)})
+                       'sort_key': (d.distribution.distribution_date or date.min, d.distribution.id)})
     for t in transfers_out:
         events.append({'date': ad_to_bs_date(t.transfer.transfer_date) or '',
                        'type': 'Transfer Out', 'ref': t.transfer.transfer_no,
@@ -10102,7 +9470,7 @@ def print_bin_card():
         e['sno'] = seq
         if e['type'] in ('Receipt', 'Transfer In') or e['type'].startswith('Adjustment (+'):
             running += e['in']
-        elif e['type'] in ('Dispatch', 'Transfer Out') or e['type'].startswith('Adjustment (-'):
+        elif e['type'] in ('Distribution', 'Transfer Out') or e['type'].startswith('Adjustment (-'):
             running -= e['out']
         e['balance'] = running
 
@@ -10149,8 +9517,8 @@ def print_stock_book():
         all_receipts = StockReceiptItem.query.filter_by(item_id=item.id).all()
         all_receipts = [r for r in all_receipts if r.receipt and r.receipt.warehouse_id == warehouse_id]
 
-        all_dispatches = DispatchItem.query.filter_by(item_id=item.id).all()
-        all_dispatches = [d for d in all_dispatches if d.warehouse_id == warehouse_id]
+        all_dist_items = DistributionItem.query.filter_by(item_id=item.id).all()
+        all_dist_items = [d for d in all_dist_items if d.warehouse_id == warehouse_id]
 
         all_adjustments = ManualAdjustment.query.filter_by(item_id=item.id, warehouse_id=warehouse_id).all()
 
@@ -10164,7 +9532,7 @@ def print_stock_book():
             return sum(r.quantity for r in rcpts if r.receipt and (cutoff is None or r.receipt.date < cutoff))
 
         def sum_dispatches_before(dsps, cutoff):
-            return sum(d.quantity for d in dsps if d.dispatch and (cutoff is None or d.dispatch.date < cutoff))
+            return sum(d.quantity for d in dsps if d.distribution and (cutoff is None or d.distribution.distribution_date < cutoff))
 
         def sum_adjustments_before(adj, cutoff):
             total = 0
@@ -10199,10 +9567,10 @@ def print_stock_book():
         def sum_dispatches_in_range(dsps, frm, to):
             total = 0
             for d in dsps:
-                if d.dispatch and d.dispatch.date:
-                    if frm and d.dispatch.date < frm:
+                if d.distribution and d.distribution.distribution_date:
+                    if frm and d.distribution.distribution_date < frm:
                         continue
-                    if to and d.dispatch.date > to:
+                    if to and d.distribution.distribution_date > to:
                         continue
                     total += d.quantity
             return total
@@ -10237,7 +9605,7 @@ def print_stock_book():
         if from_date:
             opening = 0
             opening += sum_receipts_before(all_receipts, from_date)
-            opening -= sum_dispatches_before(all_dispatches, from_date)
+            opening -= sum_dispatches_before(all_dist_items, from_date)
             opening += sum_adjustments_before(all_adjustments, from_date)
             opening += sum_transfers_before(all_transfers_in, from_date)
             opening -= sum_transfers_before(all_transfers_out, from_date)
@@ -10250,7 +9618,7 @@ def print_stock_book():
         if adj_in > 0:
             received += adj_in
 
-        dispatched = sum_dispatches_in_range(all_dispatches, from_date, to_date)
+        dispatched = sum_dispatches_in_range(all_dist_items, from_date, to_date)
         dispatched += sum_transfers_in_range(all_transfers_out, from_date, to_date)
         if adj_in < 0:
             dispatched += abs(adj_in)
@@ -10343,11 +9711,21 @@ def init_db():
             if 'distribution' in inspector.get_table_names():
                 dist_cols = [c['name'] for c in inspector.get_columns('distribution')]
                 dist_mig = []
+                if 'warehouse_id' not in dist_cols: dist_mig.append("warehouse_id INTEGER REFERENCES warehouse(id)")
+                if 'location' not in dist_cols: dist_mig.append("location VARCHAR(300)")
                 if 'latitude' not in dist_cols: dist_mig.append("latitude FLOAT")
                 if 'longitude' not in dist_cols: dist_mig.append("longitude FLOAT")
                 if 'fiscal_year' not in dist_cols: dist_mig.append("fiscal_year VARCHAR(20)")
+                if 'destination' not in dist_cols: dist_mig.append("destination VARCHAR(300)")
+                if 'receiver' not in dist_cols: dist_mig.append("receiver VARCHAR(200)")
+                if 'phone' not in dist_cols: dist_mig.append("phone VARCHAR(50)")
+                if 'requester_name' not in dist_cols: dist_mig.append("requester_name VARCHAR(200)")
+                if 'organization' not in dist_cols: dist_mig.append("organization VARCHAR(200)")
                 if 'status' not in dist_cols: dist_mig.append("status VARCHAR(20) DEFAULT 'Completed'")
                 if 'files' not in dist_cols: dist_mig.append("files TEXT")
+                if 'cancelled_at' not in dist_cols: dist_mig.append("cancelled_at TIMESTAMP")
+                if 'cancelled_by' not in dist_cols: dist_mig.append("cancelled_by INTEGER")
+                if 'cancel_reason' not in dist_cols: dist_mig.append("cancel_reason TEXT")
                 for col in dist_mig:
                     try:
                         db.session.execute(db.text(f"ALTER TABLE distribution ADD COLUMN {col}"))
@@ -10355,6 +9733,31 @@ def init_db():
                         pass
                 if dist_mig:
                     db.session.commit()
+                if 'dispatch_id' in dist_cols:
+                    try:
+                        db.session.execute(db.text("ALTER TABLE distribution ALTER COLUMN dispatch_id DROP NOT NULL"))
+                        db.session.commit()
+                        print("[MIGRATE] Dropped NOT NULL constraint on distribution.dispatch_id")
+                    except Exception:
+                        try:
+                            db.session.execute(db.text("ALTER TABLE distribution DROP COLUMN dispatch_id"))
+                            db.session.commit()
+                            print("[MIGRATE] Dropped distribution.dispatch_id column")
+                        except Exception:
+                            db.session.rollback()
+            if 'distribution_item' in inspector.get_table_names():
+                di_mig_cols = [c['name'] for c in inspector.get_columns('distribution_item')]
+                di_mig = []
+                if 'warehouse_id' not in di_mig_cols: di_mig.append("warehouse_id INTEGER REFERENCES warehouse(id)")
+                if 'unit' not in di_mig_cols: di_mig.append("unit VARCHAR(50)")
+                if 'batch_no' not in di_mig_cols: di_mig.append("batch_no VARCHAR(100)")
+                if 'expiry_date' not in di_mig_cols: di_mig.append("expiry_date DATE")
+                for col in di_mig:
+                    try:
+                        db.session.execute(db.text(f"ALTER TABLE distribution_item ADD COLUMN {col}"))
+                        db.session.commit()
+                    except Exception:
+                        pass
             if 'distribution_beneficiary' in inspector.get_table_names():
                 dbencols = [c['name'] for c in inspector.get_columns('distribution_beneficiary')]
                 if 'status' not in dbencols:
@@ -10398,6 +9801,12 @@ def init_db():
                 if 'cash_request_ids' not in cdcols:
                     try:
                         db.session.execute(db.text("ALTER TABLE cash_distribution ADD COLUMN cash_request_ids TEXT DEFAULT '[]'"))
+                        db.session.commit()
+                    except Exception:
+                        pass
+                if 'distribution_id' not in cdcols:
+                    try:
+                        db.session.execute(db.text("ALTER TABLE cash_distribution ADD COLUMN distribution_id INTEGER REFERENCES distribution(id)"))
                         db.session.commit()
                     except Exception:
                         pass
@@ -10521,59 +9930,70 @@ def init_db():
                     db.session.rollback()
                     print(f"[WARN] Could not migrate mid_weather to sun_weather: {e}")
 
-            if 'dispatch_item' in inspector.get_table_names():
+            if 'dispatch' in inspector.get_table_names() and 'distribution_item' in inspector.get_table_names():
+                dialect = db.engine.dialect.name
+                dp_cols = [c['name'] for c in inspector.get_columns('dispatch')]
                 di_cols = [c['name'] for c in inspector.get_columns('dispatch_item')]
-                if 'warehouse_id' not in di_cols:
-                    try:
-                        db.session.execute(db.text("ALTER TABLE dispatch_item ADD COLUMN warehouse_id INTEGER REFERENCES warehouse(id)"))
-                        db.session.commit()
-                        print("[MIGRATE] Added 'warehouse_id' to dispatch_item")
-                    except Exception as e:
-                        db.session.rollback()
-                        print(f"[WARN] Could not add warehouse_id to dispatch_item: {e}")
-            if 'dispatch' in inspector.get_table_names():
-                d_cols = [c['name'] for c in inspector.get_columns('dispatch')]
-                if 'warehouse_id' in d_cols:
-                    col_info = next((c for c in inspector.get_columns('dispatch') if c['name'] == 'warehouse_id'), None)
-                    if col_info and not col_info.get('nullable', True):
-                        try:
-                            dialect = db.engine.dialect.name
-                            if dialect == 'postgresql':
-                                db.session.execute(db.text("ALTER TABLE dispatch ALTER COLUMN warehouse_id DROP NOT NULL"))
-                                db.session.commit()
-                                print("[MIGRATE] Made dispatch.warehouse_id nullable")
-                        except Exception as e:
-                            db.session.rollback()
-                            print(f"[WARN] Could not alter dispatch.warehouse_id: {e}")
-                if 'relief_request_ids' not in d_cols:
-                    try:
-                        dialect = db.engine.dialect.name
-                        if dialect == 'postgresql':
-                            db.session.execute(db.text("ALTER TABLE dispatch ADD COLUMN relief_request_ids TEXT DEFAULT '[]'"))
-                        else:
-                            db.session.execute(db.text("ALTER TABLE dispatch ADD COLUMN relief_request_ids TEXT DEFAULT '[]'"))
-                        db.session.commit()
-                        print("[MIGRATE] Added 'relief_request_ids' to dispatch")
-                    except Exception as e:
-                        db.session.rollback()
-                        print(f"[WARN] Could not add relief_request_ids to dispatch: {e}")
-                # Populate relief_request_ids for existing dispatches that have it empty
-                try:
-                    rows = db.session.execute(
-                        db.text("SELECT id, relief_request_id FROM dispatch WHERE (relief_request_ids IS NULL OR relief_request_ids = '[]') AND relief_request_id IS NOT NULL")
-                    ).fetchall()
-                    for row in rows:
-                        ids = json.dumps([row[1]])
-                        db.session.execute(
-                            db.text("UPDATE dispatch SET relief_request_ids = :ids WHERE id = :id"),
-                            {'ids': ids, 'id': row[0]}
-                        )
-                    if rows:
-                        db.session.commit()
-                        print(f"[MIGRATE] Populated relief_request_ids for {len(rows)} existing dispatch(es)")
-                except Exception as e:
-                    db.session.rollback()
-                    print(f"[WARN] Could not populate relief_request_ids: {e}")
+                dist_cols = [c['name'] for c in inspector.get_columns('distribution')]
+                # Migrate legacy dispatches into the unified distribution model
+                existing_dist_nos = {r[0] for r in db.session.execute(db.text("SELECT distribution_no FROM distribution")).fetchall()}
+                migrated = 0
+                for dp in db.session.execute(db.text(
+                    "SELECT id, dispatch_number, date, incident_id, warehouse_id, destination, receiver, status, "
+                    "cancelled_at, cancelled_by, cancel_reason FROM dispatch"
+                )).fetchall():
+                    d_no = dp[1]
+                    if d_no in existing_dist_nos:
+                        continue
+                    location_col = 'location' if 'location' in dist_cols else None
+                    officer_col = 'officer' if 'officer' in dist_cols else None
+                    cols = ['distribution_no', 'distribution_date', 'incident_id']
+                    vals = [d_no, dp[2], dp[3]]
+                    if 'warehouse_id' in dist_cols:
+                        cols.append('warehouse_id'); vals.append(dp[4])
+                    if 'destination' in dist_cols:
+                        cols.append('destination'); vals.append(dp[5])
+                    if 'receiver' in dist_cols:
+                        cols.append('receiver'); vals.append(dp[6])
+                    if 'status' in dist_cols:
+                        cols.append('status'); vals.append(dp[7] or 'Active')
+                    if 'cancelled_at' in dist_cols:
+                        cols.append('cancelled_at'); vals.append(dp[8])
+                    if 'cancelled_by' in dist_cols:
+                        cols.append('cancelled_by'); vals.append(dp[9])
+                    if 'cancel_reason' in dist_cols:
+                        cols.append('cancel_reason'); vals.append(dp[10])
+                    placeholders = ', '.join([':' + c for c in cols])
+                    db.session.execute(db.text(
+                        f"INSERT INTO distribution ({', '.join(cols)}) VALUES ({placeholders})"
+                    ), dict(zip(cols, vals)))
+                    new_dist_id = db.session.execute(db.text("SELECT last_insert_rowid()")).scalar() if dialect == 'sqlite' else None
+                    if new_dist_id is None and dialect != 'sqlite':
+                        new_dist_id = db.session.execute(db.text(
+                            "SELECT id FROM distribution WHERE distribution_no = :n"), {'n': d_no}).scalar()
+                    dp_id = dp[0]
+                    for di in db.session.execute(db.text(
+                        "SELECT id, item_id, quantity, unit, batch_no, expiry_date, warehouse_id FROM dispatch_item WHERE dispatch_id = :d"
+                    ), {'d': dp_id}).fetchall():
+                        icols = ['distribution_id', 'item_id', 'quantity']
+                        ivals = [new_dist_id, di[1], di[2]]
+                        if 'unit' in di_cols:
+                            icols.append('unit'); ivals.append(di[3])
+                        if 'batch_no' in di_cols:
+                            icols.append('batch_no'); ivals.append(di[4])
+                        if 'expiry_date' in di_cols:
+                            icols.append('expiry_date'); ivals.append(di[5])
+                        if 'warehouse_id' in di_cols:
+                            icols.append('warehouse_id'); ivals.append(di[6])
+                        iph = ', '.join([':' + c for c in icols])
+                        db.session.execute(db.text(
+                            f"INSERT INTO distribution_item ({', '.join(icols)}) VALUES ({iph})"
+                        ), dict(zip(icols, ivals)))
+                    migrated += 1
+                    existing_dist_nos.add(d_no)
+                if migrated:
+                    db.session.commit()
+                    print(f"[MIGRATE] Migrated {migrated} legacy dispatch(es) into distributions")
 
             if 'user' not in inspector.get_table_names():
                 dialect = db.engine.dialect.name
@@ -10734,14 +10154,6 @@ def init_db():
                     except Exception:
                         pass
                 db.session.commit()
-            if 'relief_request_item' in inspector.get_table_names():
-                rri_cols = [c['name'] for c in inspector.get_columns('relief_request_item')]
-                if 'quantity_distributed' not in rri_cols:
-                    try:
-                        db.session.execute(db.text("ALTER TABLE relief_request_item ADD COLUMN quantity_distributed INTEGER DEFAULT 0"))
-                        db.session.commit()
-                    except Exception:
-                        pass
             if 'stock_receipt' in inspector.get_table_names():
                 sr_cols = [c['name'] for c in inspector.get_columns('stock_receipt')]
                 if 'received_by' in sr_cols:
@@ -10778,36 +10190,6 @@ def init_db():
                     db.session.commit()
                 except Exception:
                     pass
-            if 'dispatch' in inspector.get_table_names():
-                db.session.rollback()  # clear any stale transaction state
-                dp_cols = [c['name'] for c in inspector.get_columns('dispatch')]
-                dialect = db.engine.dialect.name
-                ts_type = 'TIMESTAMP' if dialect == 'postgresql' else 'DATETIME'
-                print(f"[MIGRATE] Dispatch columns: {dp_cols}, dialect={dialect}")
-                if 'status' not in dp_cols:
-                    try:
-                        db.session.execute(db.text("ALTER TABLE dispatch ADD COLUMN status VARCHAR(20) DEFAULT 'Active'"))
-                        db.session.commit()
-                    except Exception:
-                        db.session.rollback()
-                if 'cancelled_at' not in dp_cols:
-                    try:
-                        db.session.execute(db.text(f"ALTER TABLE dispatch ADD COLUMN cancelled_at {ts_type}"))
-                        db.session.commit()
-                    except Exception:
-                        db.session.rollback()
-                if 'cancelled_by' not in dp_cols:
-                    try:
-                        db.session.execute(db.text("ALTER TABLE dispatch ADD COLUMN cancelled_by INTEGER"))
-                        db.session.commit()
-                    except Exception:
-                        db.session.rollback()
-                if 'cancel_reason' not in dp_cols:
-                    try:
-                        db.session.execute(db.text("ALTER TABLE dispatch ADD COLUMN cancel_reason TEXT"))
-                        db.session.commit()
-                    except Exception:
-                        db.session.rollback()
             if not AppSettings.get_setting('office_name'):
                 AppSettings.set_setting('office_name', 'थलारा गाउँपालिका')
             if not AppSettings.get_setting('fiscal_years'):

@@ -120,6 +120,8 @@ class AuthValidationTestCase(unittest.TestCase):
             'start_date': '2082-01-01',
             'status': 'Active',
             'description': 'Mock incident',
+            'coordinates': '28.5,81.5',
+            'affected_households': 200,
         }
         response = self.client.post('/api/incidents', json=payload)
         self.assertEqual(response.status_code, 201, response.get_json())
@@ -129,6 +131,7 @@ class AuthValidationTestCase(unittest.TestCase):
         payload = {
             'name': name or f'Beneficiary-{uuid.uuid4().hex[:8]}',
             'national_id': national_id or f'ID-{uuid.uuid4().hex[:8]}',
+            'father_name': 'Mock Father',
             'phone': phone,
             'ward': ward,
             'tole': tole,
@@ -388,7 +391,7 @@ class AuthValidationTestCase(unittest.TestCase):
         with app_module.app.app_context():
             self.assertIsNotNone(app_module.db.session.get(app_module.Warehouse, warehouse['id']))
 
-    def test_incident_relief_dispatch_distribution_workflow(self):
+    def test_incident_distribution_workflow(self):
         self.login()
 
         category = self.create_category()
@@ -399,99 +402,64 @@ class AuthValidationTestCase(unittest.TestCase):
 
         bad_incident = self.client.post(
             '/api/incidents',
-            json={'incident_name': 'Invalid ward case', 'incident_type': 'Flood', 'ward': 99},
+            json={'incident_name': 'Invalid ward case', 'incident_type': 'Flood', 'ward': 99, 'coordinates': '28.5,81.5'},
         )
         self.assertEqual(bad_incident.status_code, 400)
         self.assertEqual(bad_incident.get_json()['message'], 'Invalid ward selected')
 
-        relief = self.client.post(
-            '/api/relief-requests',
-            json={
-                'incident_id': incident['id'],
-                'organization': 'Mock Org',
-                'requester_name': 'Mock Requester',
-                'phone': '9800000000',
-                'priority': 'High',
-                'remarks': 'Relief request with cash and item',
-                'items': [{'item_id': item['id'], 'quantity_requested': 4, 'unit': 'Piece'}],
-            },
-        )
-        self.assertEqual(relief.status_code, 201, relief.get_json())
-        relief_data = relief.get_json()['data']
-
-        invalid_dispatch = self.client.post(
-            '/api/dispatch',
+        invalid_distribution = self.client.post(
+            '/api/distributions',
             json={
                 'warehouse_id': warehouse['id'],
                 'incident_id': incident['id'],
-                'relief_request_id': relief_data['id'],
                 'destination': 'Mock Destination',
                 'receiver': 'Mock Receiver',
                 'phone': '9800000000',
-                'date': '2099-01-01',
-                'items': [{'item_id': item['id'], 'quantity': 4, 'unit': 'Piece'}],
+                'distribution_date': '2099-01-01',
+                'items': [{'item_id': item['id'], 'warehouse_id': warehouse['id'], 'quantity': 4, 'unit': 'Piece'}],
+                'beneficiaries': [{'family_name': 'Family A', 'members': 3, 'item': None, 'quantity': 4}],
             },
         )
-        self.assertEqual(invalid_dispatch.status_code, 400)
-        self.assertEqual(invalid_dispatch.get_json()['message'], 'Dispatch date cannot be in the future')
-
-        dispatch = self.client.post(
-            '/api/dispatch',
-            json={
-                'warehouse_id': warehouse['id'],
-                'incident_id': incident['id'],
-                'relief_request_id': relief_data['id'],
-                'destination': 'Mock Destination',
-                'receiver': 'Mock Receiver',
-                'phone': '9800000000',
-                'date': '2082-03-02',
-                'items': [{'item_id': item['id'], 'quantity': 4, 'unit': 'Piece'}],
-            },
-        )
-        self.assertEqual(dispatch.status_code, 201, dispatch.get_json())
-        dispatch_data = dispatch.get_json()['data']
-
-        with app_module.app.app_context():
-            inv = app_module.Inventory.query.filter_by(item_id=item['id'], warehouse_id=warehouse['id']).first()
-            self.assertEqual(inv.quantity, 6)
-            rr = app_module.db.session.get(app_module.ReliefRequest, relief_data['id'])
-            self.assertEqual(rr.status, 'Partial')
-            rr_item = app_module.ReliefRequestItem.query.filter_by(request_id=rr.id, item_id=item['id']).first()
-            self.assertEqual(rr_item.quantity_dispatched, 4)
+        self.assertEqual(invalid_distribution.status_code, 400)
+        self.assertEqual(invalid_distribution.get_json()['message'], 'Distribution date cannot be in the future')
 
         distribution = self.client.post(
             '/api/distributions',
             json={
-                'dispatch_id': dispatch_data['id'],
-                'location': 'Ward 1',
-                'distribution_date': '2082-03-03',
-                'officer': 'Mock Officer',
-                'remarks': 'Mock distribution',
-                'beneficiaries': [
-                    {'family_name': 'Family A', 'members': 3, 'item': item['name'], 'quantity': 2},
-                    {'family_name': 'Family B', 'members': 4, 'item': item['name'], 'quantity': 2},
-                ],
+                'warehouse_id': warehouse['id'],
+                'incident_id': incident['id'],
+                'destination': 'Mock Destination',
+                'receiver': 'Mock Receiver',
+                'phone': '9800000000',
+                'distribution_date': '2082-03-02',
+                'items': [{'item_id': item['id'], 'warehouse_id': warehouse['id'], 'quantity': 4, 'unit': 'Piece'}],
+                'beneficiaries': [{'family_name': 'Family A', 'members': 3, 'item': None, 'quantity': 4}],
             },
         )
         self.assertEqual(distribution.status_code, 201, distribution.get_json())
+        distribution_data = distribution.get_json()['data']
 
         with app_module.app.app_context():
-            rr = app_module.db.session.get(app_module.ReliefRequest, relief_data['id'])
-            self.assertEqual(rr.status, 'Completed')
-            rr_item = app_module.ReliefRequestItem.query.filter_by(request_id=rr.id, item_id=item['id']).first()
-            self.assertEqual(rr_item.quantity_distributed, 4)
+            inv = app_module.Inventory.query.filter_by(item_id=item['id'], warehouse_id=warehouse['id']).first()
+            self.assertEqual(inv.quantity, 6)
+            dist_model = app_module.db.session.get(app_module.Distribution, distribution_data['id'])
+            self.assertEqual(dist_model.status, 'Completed')
+            di = app_module.DistributionItem.query.filter_by(distribution_id=dist_model.id).first()
+            self.assertEqual(di.quantity, 4)
 
+        # A second distribution exceeding remaining stock is rejected
         duplicate_distribution = self.client.post(
             '/api/distributions',
             json={
-                'dispatch_id': dispatch_data['id'],
-                'location': 'Ward 1',
-                'distribution_date': '2082-03-03',
-                'officer': 'Mock Officer',
-                'remarks': 'Excess distribution',
+                'warehouse_id': warehouse['id'],
+                'incident_id': incident['id'],
+                'destination': 'Mock Destination',
+                'receiver': 'Mock Receiver',
+                'phone': '9800000000',
+                'distribution_date': '2082-03-04',
+                'items': [{'item_id': item['id'], 'warehouse_id': warehouse['id'], 'quantity': 7, 'unit': 'Piece'}],
                 'beneficiaries': [
-                    {'family_name': 'Family C', 'members': 2, 'item': item['name'], 'quantity': 2},
-                    {'family_name': 'Family D', 'members': 2, 'item': item['name'], 'quantity': 3},
+                    {'family_name': 'Family B', 'members': 3, 'item': None, 'quantity': 7},
                 ],
             },
         )

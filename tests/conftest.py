@@ -153,6 +153,8 @@ class LeocTestCase(unittest.TestCase):
             'start_date': '2082-01-01',
             'status': 'Active',
             'description': 'Test incident',
+            'coordinates': '28.5,81.5',
+            'affected_households': 200,
         }
         response = self.client.post('/api/incidents', json=payload)
         self.assertEqual(response.status_code, 201, response.get_json())
@@ -179,47 +181,20 @@ class LeocTestCase(unittest.TestCase):
         self.assertEqual(response.status_code, 201, response.get_json())
         return response.get_json()['data']
 
-    def create_relief_request(self, incident_id, item_id, quantity=4, cash_amount=0):
+    def create_distribution(self, warehouse_id, incident_id, item_id, quantity=4,
+                            beneficiary_name='Family A', beneficiary_qty=2):
         payload = {
             'incident_id': incident_id,
-            'organization': 'Test Org',
-            'requester_name': 'Test Requester',
-            'phone': '9800000000',
-            'priority': 'High',
-            'requested_cash_amount': cash_amount,
-            'remarks': 'Test relief request',
-            'items': [{'item_id': item_id, 'quantity_requested': quantity, 'unit': 'Piece'}],
-        }
-        response = self.client.post('/api/relief-requests', json=payload)
-        self.assertEqual(response.status_code, 201, response.get_json())
-        return response.get_json()['data']
-
-    def create_dispatch(self, warehouse_id, incident_id, item_id, quantity=4, relief_request_id=None):
-        payload = {
             'warehouse_id': warehouse_id,
-            'incident_id': incident_id,
             'destination': 'Test Destination',
             'receiver': 'Test Receiver',
-            'phone': '9800000000',
-            'date': '2082-03-02',
-            'items': [{'item_id': item_id, 'quantity': quantity, 'unit': 'Piece', 'batch_no': 'BATCH-001', 'expiry_date': '2083-09-01'}],
-        }
-        if relief_request_id:
-            payload['relief_request_id'] = relief_request_id
-        response = self.client.post('/api/dispatch', json=payload)
-        self.assertEqual(response.status_code, 201, response.get_json())
-        return response.get_json()['data']
-
-    def create_distribution(self, dispatch_id, item_name, quantity=2):
-        payload = {
-            'dispatch_id': dispatch_id,
-            'location': 'Ward 1',
             'distribution_date': '2082-03-03',
             'officer': 'Test Officer',
             'remarks': 'Test distribution',
+            'items': [{'item_id': item_id, 'warehouse_id': warehouse_id, 'quantity': quantity,
+                       'unit': 'Piece', 'batch_no': 'BATCH-001', 'expiry_date': '2083-09-01'}],
             'beneficiaries': [
-                {'family_name': 'Family A', 'members': 3, 'item': item_name, 'quantity': quantity},
-                {'family_name': 'Family B', 'members': 4, 'item': item_name, 'quantity': quantity},
+                {'family_name': beneficiary_name, 'members': 3, 'item': None, 'quantity': beneficiary_qty},
             ],
         }
         response = self.client.post('/api/distributions', json=payload)
@@ -230,6 +205,7 @@ class LeocTestCase(unittest.TestCase):
         payload = {
             'name': name or f'Ben-{uuid.uuid4().hex[:8]}',
             'national_id': national_id or f'NID-{uuid.uuid4().hex[:8]}',
+            'father_name': 'Test Father',
             'phone': phone or f'98{uuid.uuid4().int % 100000000:08d}',
             'ward': ward,
             'tole': 'Test Tole',
@@ -263,8 +239,12 @@ class LeocTestCase(unittest.TestCase):
         return response.get_json()['data']
 
     def create_cash_request(self, incident_id, amount=300, beneficiary_id=None):
+        if beneficiary_id is None:
+            ben = self.create_beneficiary()
+            beneficiary_id = ben['id']
         payload = {
             'incident_id': incident_id,
+            'beneficiary_id': beneficiary_id,
             'requesting_office': 'Test Office',
             'requester_name': 'Test Requester',
             'phone': '9800000000',
@@ -274,8 +254,6 @@ class LeocTestCase(unittest.TestCase):
             'remarks': 'Test cash request',
             'request_date': '2082-03-01',
         }
-        if beneficiary_id:
-            payload['beneficiary_id'] = beneficiary_id
         response = self.client.post('/api/cash-requests', json=payload)
         self.assertEqual(response.status_code, 201, response.get_json())
         return response.get_json()['data']
