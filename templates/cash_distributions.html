@@ -39,17 +39,17 @@
                     <div class="row g-2">
                         <div class="col-md-4 mb-3"><label class="form-label">Fund <span class="text-danger">*</span></label><select class="form-select" name="fund_id" id="cdFund" required onchange="onFundChange()"></select></div>
                         <div class="col-md-4 mb-3"><label class="form-label">Incident <span class="text-danger">*</span></label><select class="form-select" name="incident_id" id="cdIncident" required onchange="onIncidentChange()"></select></div>
-                        <div class="col-md-4 mb-3"><label class="form-label">Source Request <span class="text-danger">*</span></label>
+                        <div class="col-md-4 mb-3"><label class="form-label">Source Request (Optional)</label>
                             <div class="d-flex gap-2 mb-1">
                                 <div class="btn-group btn-group-sm w-100" role="group">
                                     <input type="radio" class="btn-check" name="sourceType" id="srcCashReq" value="cash_request" checked onchange="toggleSourceType()">
                                     <label class="btn btn-outline-primary" for="srcCashReq">Cash Request</label>
                                 </div>
                             </div>
-                            <select class="form-select" name="cash_request_id" id="cdRequest"><option value="">Select Cash Request</option></select>
+                            <select class="form-select" name="cash_request_id" id="cdRequest"><option value="">No Cash Request (Direct Distribution)</option></select>
                             <div class="d-flex flex-wrap gap-1 mt-1" id="cdSelectedRequests"></div>
                             <button type="button" class="btn btn-sm btn-outline-primary mt-1" id="cdAddRequestBtn" onclick="addSelectedCashRequest()"><i class="bi bi-plus"></i> Add Request</button>
-                            <small class="text-muted d-block mt-1" id="cdRequestInfo">Select from dropdown and click "Add Request" to add more</small>
+                            <small class="text-muted d-block mt-1" id="cdRequestInfo">Optional: Select from dropdown to link cash requests</small>
                         </div>
                     </div>
                     <div class="row g-2">
@@ -395,11 +395,10 @@ document.getElementById('cdForm').addEventListener('submit', async function(e) {
         const cr = cashRequestsData.find(r => r.id === id);
         if (cr) requestRemaining += (cr.remaining || 0);
     });
-    if (total > requestRemaining) {
+    if (cashReqIds.length > 0 && total > requestRemaining) {
         showToast('danger', `Total amount (${Number(total).toLocaleString()}) exceeds available request amount (${Number(requestRemaining).toLocaleString()})`);
         return;
     }
-    if (cashReqIds.length === 0) { showToast('danger', 'Please select at least one cash request'); return; }
     const body = {
         distribution_date: document.getElementById('cdDate').value,
         fund_id: parseInt(document.getElementById('cdFund').value),

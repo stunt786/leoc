@@ -5321,7 +5321,7 @@ def handle_cash_distributions():
         if not fund or not incident:
             return jsonify({'success': False, 'message': 'Fund and incident are required'}), 400
 
-        # Collect all cash request IDs (single or multiple)
+        # Collect all cash request IDs (single or multiple) - optional
         cash_request_ids = data.get('cash_request_ids') or []
         if isinstance(cash_request_ids, (int, float)):
             cash_request_ids = [int(cash_request_ids)]
@@ -5331,31 +5331,32 @@ def handle_cash_distributions():
             cash_request_ids.insert(0, int(data['cash_request_id']))
         cash_request_ids = [cid for cid in cash_request_ids if cid]
 
-        if not cash_request_ids:
-            return jsonify({'success': False, 'message': 'At least one cash request is required'}), 400
         cash_reqs = []
         max_amount = 0
-        for cid in cash_request_ids:
-            cr = db_get(CashRequest, cid)
-            if not cr:
-                return jsonify({'success': False, 'message': f'Cash request #{cid} not found'}), 404
-            if cr.incident_id != incident.id:
-                return jsonify({'success': False, 'message': f'Cash request #{cr.request_number} does not match selected incident'}), 400
-            if cr.status in ('Completed', 'Cancelled', 'Rejected'):
-                return jsonify({'success': False, 'message': f'Cash request #{cr.request_number} is already {cr.status}'}), 400
-            already_distributed = db.session.query(
-                db.func.coalesce(db.func.sum(CashDistributionBeneficiary.amount), 0)
-            ).join(
-                CashDistribution, CashDistributionBeneficiary.distribution_id == CashDistribution.id
-            ).filter(
-                CashDistributionBeneficiary.cash_request_id == cr.id,
-                CashDistribution.status != 'Cancelled'
-            ).scalar()
-            remaining = cr.requested_amount - already_distributed
-            if remaining <= 0:
-                return jsonify({'success': False, 'message': f'Cash request #{cr.request_number} has no remaining amount'}), 400
-            max_amount += remaining
-            cash_reqs.append(cr)
+        if cash_request_ids:
+            for cid in cash_request_ids:
+                cr = db_get(CashRequest, cid)
+                if not cr:
+                    return jsonify({'success': False, 'message': f'Cash request #{cid} not found'}), 404
+                if cr.incident_id != incident.id:
+                    return jsonify({'success': False, 'message': f'Cash request #{cr.request_number} does not match selected incident'}), 400
+                if cr.status in ('Completed', 'Cancelled', 'Rejected'):
+                    return jsonify({'success': False, 'message': f'Cash request #{cr.request_number} is already {cr.status}'}), 400
+                already_distributed = db.session.query(
+                    db.func.coalesce(db.func.sum(CashDistributionBeneficiary.amount), 0)
+                ).join(
+                    CashDistribution, CashDistributionBeneficiary.distribution_id == CashDistribution.id
+                ).filter(
+                    CashDistributionBeneficiary.cash_request_id == cr.id,
+                    CashDistribution.status != 'Cancelled'
+                ).scalar()
+                remaining = cr.requested_amount - already_distributed
+                if remaining <= 0:
+                    return jsonify({'success': False, 'message': f'Cash request #{cr.request_number} has no remaining amount'}), 400
+                max_amount += remaining
+                cash_reqs.append(cr)
+        else:
+            max_amount = fund.current_balance
 
         beneficiaries_payload = data.get('beneficiaries', [])
         if not beneficiaries_payload:
@@ -5363,8 +5364,8 @@ def handle_cash_distributions():
         total = sum(parse_float_field(b, 'amount', minimum=0.01, default=0) or 0 for b in beneficiaries_payload)
         if total <= 0:
             return jsonify({'success': False, 'message': 'At least one beneficiary with amount > 0 is required'}), 400
-        if total > max_amount:
-            return jsonify({'success': False, 'message': f'Total amount ({total}) exceeds available amount ({max_amount})'}), 400
+        if cash_reqs and total > max_amount:
+            return jsonify({'success': False, 'message': f'Total amount ({total}) exceeds available amount from cash requests ({max_amount})'}), 400
         if total > fund.current_balance:
             return jsonify({'success': False, 'message': f'Insufficient fund balance. Available: {fund.current_balance}, Required: {total}'}), 400
         fiscal_year = AppSettings.get_setting('active_fiscal_year', '2081/82')
@@ -5476,6 +5477,8 @@ def cancel_cash_distribution(id):
     dist = db_get(CashDistribution, id)
     if not dist:
         return jsonify({'success': False, 'message': 'Cash distribution not found'}), 404
+    if dist.status == 'Cancelled':
+        return jsonify({'success': False, 'message': 'Cash distribution is already cancelled'}), 400
     try:
         data = request.get_json()
         reason = (data.get('cancel_reason') or '').strip()
