@@ -100,6 +100,21 @@
                     {% endfor %}
                 </tr>
                 {% endfor %}
+                {% if totals %}
+                <tr class="totals-row">
+                    <td></td>
+                    <td><strong>Total</strong></td>
+                    {% for t in totals %}
+                        {% if loop.index0 > 0 %}
+                            {% if t != '' %}
+                    <td class="text-end"><strong>{{ t }}</strong></td>
+                            {% else %}
+                    <td></td>
+                            {% endif %}
+                        {% endif %}
+                    {% endfor %}
+                </tr>
+                {% endif %}
             {% else %}
                 <tr>
                     <td colspan="{{ headers|length + 1 }}" class="text-center py-3 text-muted">No data found.</td>

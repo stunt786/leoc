@@ -3303,6 +3303,66 @@ def manage_supplier(id):
         db.session.rollback()
         return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
+@app.route('/api/supplier-items/<int:supplier_id>')
+@login_required
+def supplier_items(supplier_id):
+    supplier = db_get(Supplier, supplier_id)
+    if not supplier:
+        return jsonify({'success': False, 'message': 'Supplier not found'}), 404
+    items = db.session.query(
+        Item.name, db.func.sum(StockReceiptItem.quantity).label('total_qty'),
+        StockReceiptItem.unit, StockReceiptItem.batch_no,
+        StockReceipt.receipt_no, StockReceipt.date
+    ).join(
+        StockReceipt, StockReceiptItem.receipt_id == StockReceipt.id
+    ).join(
+        Item, StockReceiptItem.item_id == Item.id
+    ).filter(
+        StockReceipt.supplier_id == supplier_id
+    ).group_by(
+        Item.name, StockReceiptItem.unit, StockReceiptItem.batch_no,
+        StockReceipt.receipt_no, StockReceipt.date
+    ).order_by(StockReceipt.date.desc()).all()
+    rows = [[
+        r[0], r[1], r[2] or '', r[3] or '', r[4], ad_to_bs_date(r[5]) or ''
+    ] for r in items]
+    return jsonify({
+        'success': True,
+        'supplier': supplier.name,
+        'headers': ['Item', 'Total Qty', 'Unit', 'Batch No', 'Receipt No', 'Date'],
+        'rows': rows
+    })
+
+@app.route('/api/beneficiary-distributions/<family_name>')
+@login_required
+def beneficiary_distributions(family_name):
+    from urllib.parse import unquote
+    family_name = unquote(family_name)
+    items = db.session.query(
+        DistributionBeneficiary.item,
+        db.func.sum(DistributionBeneficiary.quantity).label('total_qty'),
+        db.func.string_agg(db.distinct(Incident.incident_name), ', ').label('incidents'),
+        db.func.min(Distribution.distribution_date).label('first_date'),
+        db.func.max(Distribution.distribution_date).label('last_date'),
+        DistributionBeneficiary.status
+    ).join(Distribution, DistributionBeneficiary.distribution_id == Distribution.id
+    ).outerjoin(Incident, Distribution.incident_id == Incident.id
+    ).filter(DistributionBeneficiary.family_name == family_name,
+             DistributionBeneficiary.item.isnot(None),
+             DistributionBeneficiary.item != ''
+    ).group_by(DistributionBeneficiary.item, DistributionBeneficiary.status
+    ).order_by(DistributionBeneficiary.item).all()
+    rows = [[
+        r[0] or '', r[1] or 0, r[2] or '-',
+        ad_to_bs_date(r[3]) or '', ad_to_bs_date(r[4]) or '', r[5] or ''
+    ] for r in items]
+    return jsonify({
+        'success': True,
+        'beneficiary': family_name,
+        'headers': ['Item', 'Total Qty', 'Incidents', 'First Date', 'Last Date', 'Status'],
+        'rows': rows
+    })
+
 # ============ WAREHOUSE ZONE API ============
 @app.route('/api/warehouse-zones', methods=['GET', 'POST'])
 @permission_required('edit')
@@ -8258,20 +8318,64 @@ def get_report_data(report_type, args):
         warehouse_id = args.get('warehouse_id', type=int)
         category_id = args.get('category_id', type=int)
         is_distributable = args.get('is_distributable')
-        q = Inventory.query.order_by(Inventory.updated_at.desc())
+        group_id = args.get('group_id', type=int)
+
+        # Get per-warehouse quantities for each item
+        wh_qty_query = db.session.query(
+            Inventory.item_id,
+            Warehouse.name.label('wh_name'),
+            Inventory.quantity,
+            Inventory.reserved_quantity
+        ).join(Warehouse, Inventory.warehouse_id == Warehouse.id)
+        if warehouse_id: wh_qty_query = wh_qty_query.filter(Inventory.warehouse_id == warehouse_id)
+        wh_qty_data = {}
+        for r in wh_qty_query.all():
+            if r.item_id not in wh_qty_data:
+                wh_qty_data[r.item_id] = []
+            wh_qty_data[r.item_id].append((r.wh_name, r.quantity, r.reserved_quantity))
+
+        q = db.session.query(
+            Item.id, Item.item_code, Item.name, Item.unit, Item.minimum_stock, Item.max_stock,
+            Item.is_distributable, Category.name.label('category_name'),
+            db.func.sum(Inventory.quantity).label('total_qty'),
+            db.func.sum(Inventory.reserved_quantity).label('total_reserved'),
+            db.func.max(Inventory.updated_at).label('last_updated')
+        ).join(Item, Inventory.item_id == Item.id).outerjoin(Category, Item.category_id == Category.id)
         if warehouse_id: q = q.filter(Inventory.warehouse_id == warehouse_id)
-        if category_id: q = q.join(Item).filter(Item.category_id == category_id)
-        if is_distributable == 'yes': q = q.join(Item).filter(Item.is_distributable == True)
-        elif is_distributable == 'no': q = q.join(Item).filter(Item.is_distributable == False)
-        headers = ['Item Code', 'Item Name', 'Category', 'Unit', 'Quantity', 'Reserved', 'Available', 'Min Stock', 'Max Stock', 'Status', 'Last Updated']
+        if category_id: q = q.filter(Item.category_id == category_id)
+        if is_distributable == 'yes': q = q.filter(Item.is_distributable == True)
+        elif is_distributable == 'no': q = q.filter(Item.is_distributable == False)
+        if group_id: q = q.filter(Item.group_id == group_id)
+        q = q.group_by(Item.id, Item.item_code, Item.name, Item.unit, Item.minimum_stock, Item.max_stock,
+                        Item.is_distributable, Category.name).order_by(Item.name)
+        headers = ['Item Code', 'Item Name', 'Category', 'Unit', 'Warehouses', 'Quantity', 'Reserved', 'Available', 'Min Stock', 'Max Stock', 'Status', 'Last Updated']
         rows = []
-        for inv in q.all():
-            d = inv.to_dict()
-            unit_val = d['unit'] or (inv.item.unit if inv.item else '')
-            rows.append([d['item_code'] or '', d['item_name'] or '', d['category_name'] or '',
-                         unit_val, d['quantity'], d['reserved_quantity'], d['available_quantity'],
-                         d['minimum_stock'], inv.item.max_stock if inv.item else 0,
-                         d['status'], ad_to_bs_date(inv.updated_at) if inv.updated_at else ''])
+        for r in q.all():
+            total_qty = r.total_qty or 0
+            total_reserved = r.total_reserved or 0
+            available = total_qty - total_reserved
+            if available <= 0:
+                status = 'out_of_stock'
+            elif r.minimum_stock and available <= r.minimum_stock:
+                status = 'low_stock'
+            elif r.minimum_stock and available <= r.minimum_stock * 2:
+                status = 'low_stock'
+            else:
+                status = 'available'
+            # Build warehouse breakdown: "A: 1, B: 2"
+            wh_list = wh_qty_data.get(r.id, [])
+            if warehouse_id:
+                wh_obj = db_get(Warehouse, warehouse_id)
+                wh_str = wh_obj.name if wh_obj else ''
+            elif wh_list:
+                wh_str = ', '.join([f'{name}: {qty - res}' for name, qty, res in wh_list])
+            else:
+                wh_str = ''
+            rows.append([r.item_code or '', r.name or '', r.category_name or '',
+                         r.unit or '', wh_str,
+                         total_qty, total_reserved, available,
+                         r.minimum_stock or 0, r.max_stock or 0,
+                         status, ad_to_bs_date(r.last_updated) if r.last_updated else ''])
     elif report_type == 'dispatch':
         incident_id = args.get('incident_id', type=int)
         warehouse_id = args.get('warehouse_id', type=int)
@@ -8298,20 +8402,29 @@ def get_report_data(report_type, args):
     elif report_type == 'distribution':
         incident_id = args.get('incident_id', type=int)
         distribution_type = args.get('distribution_type')
-        q = Distribution.query.order_by(Distribution.distribution_date.desc())
+        q = db.session.query(
+            DistributionBeneficiary.family_name,
+            db.func.count(db.distinct(Distribution.id)).label('dist_count'),
+            db.func.sum(DistributionBeneficiary.quantity).label('total_qty'),
+            db.func.min(Distribution.distribution_date).label('first_date'),
+            db.func.max(Distribution.distribution_date).label('last_date'),
+            db.func.string_agg(db.distinct(Incident.incident_name), ', ').label('incident_names')
+        ).join(Distribution, DistributionBeneficiary.distribution_id == Distribution.id
+        ).outerjoin(Incident, Distribution.incident_id == Incident.id)
         if incident_id: q = q.filter(Distribution.incident_id == incident_id)
-        q = apply_date_filter(q, Distribution.distribution_date)
-        headers = ['Dist No', 'Date', 'Beneficiary', 'Location', 'Incident', 'Officer', 'Families', 'Items Distributed', 'Fiscal Year']
+        if distribution_type:
+            ben_ids = db.session.query(DistributionBeneficiary.beneficiary_id).join(
+                Distribution
+            ).filter(Distribution.distribution_type == distribution_type).subquery()
+            q = q.filter(DistributionBeneficiary.beneficiary_id.in_(ben_ids))
+        q = q.group_by(DistributionBeneficiary.family_name
+        ).order_by(DistributionBeneficiary.family_name)
+        headers = ['Beneficiary', 'Disaster', 'First Date', 'Last Date', 'Total Qty', 'Distributions']
         rows = []
-        for d in q.all():
-            items_list = list(set(b.item for b in d.beneficiaries if b.item))
-            unique_families = list({b.family_name for b in d.beneficiaries if b.family_name})
-            first_ben = d.beneficiaries[0].family_name if d.beneficiaries else '-'
-            rows.append([d.distribution_no, ad_to_bs_date(d.distribution_date) or '',
-                        first_ben, d.location or '', d.incident.incident_name if d.incident else '',
-                        d.officer or '', len(unique_families),
-                        ', '.join(items_list) if items_list else '',
-                        d.fiscal_year or ''])
+        for r in q.all():
+            rows.append([r.family_name or '', r.incident_names or '-',
+                         ad_to_bs_date(r.first_date) or '', ad_to_bs_date(r.last_date) or '',
+                         r.total_qty or 0, r.dist_count or 0, r.family_name])
     elif report_type == 'incidents':
         status = args.get('status')
         severity = args.get('severity')
@@ -8632,7 +8745,7 @@ def get_report_data(report_type, args):
                 StockReceipt, StockReceiptItem.receipt_id == StockReceipt.id
             ).filter(StockReceipt.supplier_id == s.id).scalar() or 0
             rows.append([s.name, s.contact_person or '', s.phone or '', s.email or '',
-                         s.supplier_type or '', s.status or '', items_count])
+                         s.supplier_type or '', s.status or '', items_count, s.id])
     elif report_type == 'warehouses':
         q = Warehouse.query.order_by(Warehouse.name)
         headers = ['Name', 'Code', 'Address', 'Contact Person', 'Phone', 'Capacity', 'Available Items', 'Total Stock Qty']
@@ -8683,48 +8796,85 @@ def get_report_data(report_type, args):
     elif report_type == 'stock-book':
         warehouse_id = args.get('warehouse_id', type=int)
         item_id = args.get('item_id', type=int)
-        headers = ['Item Code', 'Item Name', 'Category', 'Unit', 'Opening', 'Received', 'Dispatched', 'Balance', 'Warehouse']
+        category_id = args.get('category_id', type=int)
+        group_id = args.get('group_id', type=int)
+        headers = ['Item Code', 'Item Name', 'Category', 'Group', 'Unit', 'Opening', 'Received', 'Last Received', 'Dispatched', 'Last Dispatched', 'Balance', 'Warehouse']
         rows = []
-        q = Inventory.query
+        q = db.session.query(Inventory).join(Item, Inventory.item_id == Item.id)
         if warehouse_id: q = q.filter(Inventory.warehouse_id == warehouse_id)
         if item_id: q = q.filter(Inventory.item_id == item_id)
+        if category_id: q = q.filter(Item.category_id == category_id)
+        if group_id: q = q.filter(Item.group_id == group_id)
         for inv in q.all():
             if not inv.item: continue
             d = inv.to_dict()
-            received_qty = db.session.query(db.func.coalesce(db.func.sum(StockReceiptItem.quantity), 0)).join(
+            # Received qty and last received date
+            received_q = db.session.query(
+                db.func.coalesce(db.func.sum(StockReceiptItem.quantity), 0),
+                db.func.max(StockReceipt.date)
+            ).join(
                 StockReceipt, StockReceiptItem.receipt_id == StockReceipt.id
             ).filter(
                 StockReceiptItem.item_id == inv.item_id,
                 StockReceipt.warehouse_id == inv.warehouse_id
             )
-            dispatched_qty = db.session.query(db.func.coalesce(db.func.sum(DistributionItem.quantity), 0)).filter(
+            # Dispatched qty and last dispatched date (exclude cancelled)
+            dispatched_q = db.session.query(
+                db.func.coalesce(db.func.sum(DistributionItem.quantity), 0),
+                db.func.max(Distribution.distribution_date)
+            ).join(
+                Distribution, DistributionItem.distribution_id == Distribution.id
+            ).filter(
                 DistributionItem.item_id == inv.item_id,
-                DistributionItem.warehouse_id == inv.warehouse_id
+                DistributionItem.warehouse_id == inv.warehouse_id,
+                Distribution.status != 'Cancelled'
+            )
+            # Stock transfers out
+            transfer_out_q = db.session.query(
+                db.func.coalesce(db.func.sum(StockTransferItem.quantity), 0),
+                db.func.max(StockTransfer.transfer_date)
+            ).join(
+                StockTransfer, StockTransferItem.transfer_id == StockTransfer.id
+            ).filter(
+                StockTransferItem.item_id == inv.item_id,
+                StockTransfer.from_warehouse_id == inv.warehouse_id,
+                StockTransfer.status == 'Completed'
             )
             if date_from:
                 ad_from = bs_to_ad(date_from)
                 if ad_from:
                     fd = datetime.strptime(ad_from, '%Y-%m-%d').date()
-                    received_qty = received_qty.filter(StockReceipt.date >= fd)
-                    dispatched_qty = dispatched_qty.join(
-                        Distribution, DistributionItem.distribution_id == Distribution.id
-                    ).filter(Distribution.distribution_date >= fd)
+                    received_q = received_q.filter(StockReceipt.date >= fd)
+                    dispatched_q = dispatched_q.filter(Distribution.distribution_date >= fd)
+                    transfer_out_q = transfer_out_q.filter(StockTransfer.transfer_date >= fd)
             if date_to:
                 ad_to_v = bs_to_ad(date_to)
                 if ad_to_v:
                     td = datetime.strptime(ad_to_v, '%Y-%m-%d').date()
-                    received_qty = received_qty.filter(StockReceipt.date <= td)
-                    dispatched_qty = dispatched_qty.join(
-                        Distribution, DistributionItem.distribution_id == Distribution.id
-                    ).filter(Distribution.distribution_date <= td)
-            received = received_qty.scalar() or 0
-            dispatched = dispatched_qty.scalar() or 0
-            opening = max(0, inv.quantity - received + dispatched)
+                    received_q = received_q.filter(StockReceipt.date <= td)
+                    dispatched_q = dispatched_q.filter(Distribution.distribution_date <= td)
+                    transfer_out_q = transfer_out_q.filter(StockTransfer.transfer_date <= td)
+            recv_result = received_q.first()
+            received = recv_result[0] or 0
+            last_received = ad_to_bs_date(recv_result[1]) if recv_result[1] else '-'
+            dist_result = dispatched_q.first()
+            dispatched = dist_result[0] or 0
+            last_dispatched = ad_to_bs_date(dist_result[1]) if dist_result[1] else '-'
+            trans_result = transfer_out_q.first()
+            transfer_out = trans_result[0] or 0
+            if trans_result[1]:
+                trans_last = ad_to_bs_date(trans_result[1])
+                if last_dispatched == '-' or trans_last > last_dispatched:
+                    last_dispatched = trans_last
+            total_dispatched = dispatched + transfer_out
+            opening = max(0, inv.quantity - received + total_dispatched)
             unit_val = d['unit'] or (inv.item.unit if inv.item else '')
-            rows.append([d['item_code'] or '', d['item_name'] or '', d['category_name'] or '', unit_val,
-                         opening, received, dispatched, d['quantity'], d['warehouse_name'] or ''])
+            group_name = inv.item.group.name if inv.item and inv.item.group else ''
+            rows.append([d['item_code'] or '', d['item_name'] or '', d['category_name'] or '', group_name,
+                         unit_val, opening, received, last_received, total_dispatched, last_dispatched,
+                         d['quantity'], d['warehouse_name'] or ''])
         if not rows:
-            rows = [['-', 'No stock data found', '-', '-', 0, 0, 0, 0, '-']]
+            rows = [['-', 'No stock data found', '-', '-', '-', 0, 0, '-', 0, '-', 0, '-']]
     elif report_type == 'bin-card':
         item_id = args.get('item_id', type=int)
         warehouse_id = args.get('warehouse_id', type=int)
@@ -8737,15 +8887,19 @@ def get_report_data(report_type, args):
             if not item or not wh:
                 rows = [['-', '-', 'Item or warehouse not found', '-', '-', '-', '-']]
             else:
+                # Receipts
                 receipts = [r for r in StockReceiptItem.query.filter_by(item_id=item_id).all()
                             if r.receipt and r.receipt.warehouse_id == warehouse_id]
+                # Distributions - exclude cancelled
                 dist_items = [d for d in DistributionItem.query.filter_by(item_id=item_id).all()
-                              if d.warehouse_id == warehouse_id]
+                              if d.warehouse_id == warehouse_id and d.distribution and d.distribution.status != 'Cancelled']
                 adjustments = ManualAdjustment.query.filter_by(item_id=item_id, warehouse_id=warehouse_id).all()
+                # Transfers out - only completed
                 transfers_out = [t for t in StockTransferItem.query.filter_by(item_id=item_id).all()
-                                 if t.transfer and t.transfer.from_warehouse_id == warehouse_id]
+                                 if t.transfer and t.transfer.from_warehouse_id == warehouse_id and t.transfer.status == 'Completed']
+                # Transfers in - only completed
                 transfers_in = [t for t in StockTransferItem.query.filter_by(item_id=item_id).all()
-                                if t.transfer and t.transfer.to_warehouse_id == warehouse_id]
+                                if t.transfer and t.transfer.to_warehouse_id == warehouse_id and t.transfer.status == 'Completed']
                 events = []
                 for r in receipts:
                     events.append({'date': ad_to_bs_date(r.receipt.date) or '', 'ref': r.receipt.receipt_no,
@@ -8774,14 +8928,34 @@ def get_report_data(report_type, args):
                                    'type': 'Transfer In', 'party': t.transfer.from_warehouse.name if t.transfer.from_warehouse else '',
                                    'in': t.quantity, 'out': 0, 'sort_key': (t.transfer.transfer_date or date.min, t.transfer.id)})
                 events.sort(key=lambda e: e['sort_key'])
-                running = 0
+                # Calculate opening balance from ALL events (before date filter)
+                total_in_all = sum(e['in'] for e in events)
+                total_out_all = sum(e['out'] for e in events)
+                current_qty = db.session.query(db.func.coalesce(Inventory.quantity, 0)).filter(
+                    Inventory.item_id == item_id, Inventory.warehouse_id == warehouse_id
+                ).scalar() or 0
+                opening_balance = current_qty - (total_in_all - total_out_all)
+                # Now apply date filters to events for display
+                if date_from:
+                    ad_from = bs_to_ad(date_from)
+                    if ad_from:
+                        fd = datetime.strptime(ad_from, '%Y-%m-%d').date()
+                        events = [e for e in events if e['sort_key'][0] >= fd]
+                if date_to:
+                    ad_to_v = bs_to_ad(date_to)
+                    if ad_to_v:
+                        td = datetime.strptime(ad_to_v, '%Y-%m-%d').date()
+                        events = [e for e in events if e['sort_key'][0] <= td]
+                # Recalculate running balance from opening
+                running = opening_balance
                 for e in events:
                     if e['type'] in ('Receipt', 'Transfer In') or e['type'] == 'Adj (+)':
                         running += e['in']
                     else:
                         running -= e['out']
                     e['balance'] = running
-                rows = [[e['date'], e['ref'], e['type'], e['party'], e['in'] if e['in'] else '-',
+                rows = [['-', '-', 'Opening Balance', '-', '-', '-', opening_balance]] if opening_balance or not events else []
+                rows += [[e['date'], e['ref'], e['type'], e['party'], e['in'] if e['in'] else '-',
                          e['out'] if e['out'] else '-', e['balance']] for e in events]
                 if not rows:
                     rows = [['-', '-', 'No transactions', '-', '-', '-', '-']]
@@ -8876,23 +9050,31 @@ def get_report_data(report_type, args):
                          b.bank_account or '', b.status or ''])
     elif report_type == 'beneficiary-history':
         ward_id = args.get('ward_id', type=int)
-        q = db.session.query(DistributionBeneficiary).join(Distribution).order_by(Distribution.distribution_date.desc())
+        q = db.session.query(
+            DistributionBeneficiary.family_name,
+            DistributionBeneficiary.id_number,
+            db.func.sum(DistributionBeneficiary.quantity).label('total_qty'),
+            db.func.string_agg(db.distinct(DistributionBeneficiary.item), ', ').label('items'),
+            db.func.string_agg(db.distinct(Incident.incident_name), ', ').label('incidents'),
+            db.func.min(Distribution.distribution_date).label('first_date'),
+            db.func.max(Distribution.distribution_date).label('last_date'),
+            db.func.count(db.distinct(Distribution.id)).label('dist_count')
+        ).join(Distribution, DistributionBeneficiary.distribution_id == Distribution.id
+        ).outerjoin(Incident, Distribution.incident_id == Incident.id)
         if ward_id:
             q = q.join(Beneficiary, DistributionBeneficiary.beneficiary_id == Beneficiary.id).filter(Beneficiary.ward == ward_id)
-        headers = ['Family Name', 'ID Number', 'Distribution Date', 'Location', 'Items', 'Qty', 'Status', 'Incident']
+        q = q.filter(DistributionBeneficiary.item.isnot(None), DistributionBeneficiary.item != ''
+        ).group_by(DistributionBeneficiary.family_name, DistributionBeneficiary.id_number
+        ).order_by(DistributionBeneficiary.family_name)
+        headers = ['Family Name', 'ID Number', 'Items', 'Total Qty', 'Incidents', 'First Date', 'Last Date', 'Distributions']
         rows = []
-        for db_ben in q.all():
-            dist = db_ben.distribution
-            ben = db_ben.beneficiary
-            incident_name = dist.incident.incident_name if dist and dist.incident else ''
-            rows.append([db_ben.family_name or (ben.family_name if ben else ''),
-                         db_ben.id_number or (ben.id_number if ben else ''),
-                         ad_to_bs_date(dist.distribution_date) if dist else '',
-                         dist.location if dist else '',
-                         db_ben.item or '', db_ben.quantity or 0, db_ben.status or '',
-                         incident_name])
+        for r in q.all():
+            rows.append([r.family_name or '', r.id_number or '', r.items or '',
+                         r.total_qty or 0, r.incidents or '-',
+                         ad_to_bs_date(r.first_date) or '', ad_to_bs_date(r.last_date) or '',
+                         r.dist_count or 0, r.family_name])
         if not rows:
-            rows = [['-', '-', '-', '-', '-', '-', '-', 'No distribution history found']]
+            rows = [['-', '-', '-', 0, '-', '-', '-', 0]]
     elif report_type == 'beneficiary-demographics':
         headers = ['Ward', 'Total Families', 'Total Members', 'Male', 'Female', 'Children', 'Senior Citizens']
         rows = []
@@ -9053,6 +9235,10 @@ def print_report_preview(report_type):
         if category_id:
             cat = db_get(Category, category_id)
             if cat: filter_parts.append(f'Category: {cat.name}')
+        item_id = request.args.get('item_id', type=int)
+        if item_id:
+            itm = db_get(Item, item_id)
+            if itm: filter_parts.append(f'Item: {itm.name}')
         ward_id = request.args.get('ward_id', type=int)
         if ward_id:
             w = db_get(Ward, ward_id)
@@ -9065,9 +9251,21 @@ def print_report_preview(report_type):
 
         now_val = datetime.now()
         report_header = AppSettings.get_setting('report_header', '')
+        # Compute totals for numeric columns
+        totals = []
+        if rows and rows[0] and rows[0][0] != 'No data found':
+            first_numeric = -1
+            for col_idx in range(len(rows[0])):
+                if isinstance(rows[0][col_idx], (int, float)):
+                    if first_numeric == -1:
+                        first_numeric = col_idx
+                    total = sum(row[col_idx] for row in rows if isinstance(row[col_idx], (int, float)))
+                    totals.append(total)
+                else:
+                    totals.append('')
         return render_template('print_report.html', title=title, headers=headers, rows=rows,
                                office=office, address=address, filter_summary=filter_summary,
-                               report_header=report_header,
+                               report_header=report_header, totals=totals, first_numeric=first_numeric,
                                generated_at=f"{today_bs()} {now_val.strftime('%H:%M')}")
     except ValueError as e:
         return jsonify({'success': False, 'message': str(e)}), 400
@@ -9130,6 +9328,10 @@ def report_pdf_generic(report_type):
         if category_id:
             cat = db_get(Category, category_id)
             if cat: filter_parts.append(f'Category: {cat.name}')
+        item_id = request.args.get('item_id', type=int)
+        if item_id:
+            itm = db_get(Item, item_id)
+            if itm: filter_parts.append(f'Item: {itm.name}')
         ward_id = request.args.get('ward_id', type=int)
         if ward_id:
             wd = db_get(Ward, ward_id)

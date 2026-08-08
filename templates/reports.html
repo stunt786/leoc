@@ -79,7 +79,7 @@
                 <label class="form-label small">Warehouse</label>
                 <select class="form-select form-select-sm" id="filterWarehouse" onchange="loadReportData()"><option value="">All</option></select>
             </div>
-            <div class="col-auto filter-optional" data-types="inventory,dispatch,items-master,stock-receipts,expiry-tracking,stock-movement,low-stock">
+            <div class="col-auto filter-optional" data-types="inventory,dispatch,items-master,stock-receipts,expiry-tracking,stock-movement,low-stock,stock-book">
                 <label class="form-label small">Category</label>
                 <select class="form-select form-select-sm" id="filterCategory" onchange="loadReportData()"><option value="">All</option></select>
             </div>
@@ -159,6 +159,10 @@
                     <option value="no">Non-Distributable</option>
                 </select>
             </div>
+            <div class="col-auto filter-optional" data-types="inventory,stock-book">
+                <label class="form-label small">Group</label>
+                <select class="form-select form-select-sm" id="filterGroup" onchange="loadReportData()"><option value="">All</option></select>
+            </div>
             <div class="col-auto filter-optional" data-types="inventory,dispatch,distribution,incidents,incident-summary,adjustments,low-stock,stock-receipts,stock-transfers,stock-book,expiry-tracking,cash-balance,cash-receipts,cash-requests,cash-distributions,cash-yearly">
                 <label class="form-label small">Fiscal Year</label>
                 <select class="form-select form-select-sm" id="filterFiscalYear" onchange="loadReportData()"><option value="">All</option></select>
@@ -198,6 +202,53 @@
         </div>
     </div>
 </div>
+<div class="modal fade" id="supplierItemsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-box-seam me-2"></i>Items Supplied by <span id="supplierItemsName"></span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0" id="supplierItemsTable">
+                        <thead><tr id="supplierItemsHeaders"></tr></thead>
+                        <tbody id="supplierItemsBody">
+                            <tr><td colspan="6" class="text-center py-4 text-muted">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="beneficiaryDistModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-person-check me-2"></i>Distributions for <span id="beneficiaryDistName"></span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead><tr id="beneficiaryDistHeaders"></tr></thead>
+                        <tbody id="beneficiaryDistBody">
+                            <tr><td colspan="6" class="text-center py-4 text-muted">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 {% block extra_js %}
 <script>
@@ -217,6 +268,7 @@ async function loadFormData() {
         populateSelect('filterSupplier', data.suppliers || [], 'id', 'name');
         populateSelect('filterItem', data.items || [], 'id', 'name');
         populateSelect('filterUser', data.users || [], 'id', 'username');
+        populateSelect('filterGroup', data.item_groups || [], 'id', 'name');
         document.getElementById('filterMonth').value = new Date().toISOString().slice(0, 7);
         document.getElementById('filterYear').value = new Date().getFullYear();
     } catch(e) { console.error(e); }
@@ -263,6 +315,7 @@ function getFilterParams() {
     const user = document.getElementById('filterUser').value;
     const resource = document.getElementById('filterResource').value;
     const distributable = document.getElementById('filterDistributable').value;
+    const groupFilter = document.getElementById('filterGroup').value;
 
     if (dateFrom) params.set('date_from', dateFrom);
     if (dateTo) params.set('date_to', dateTo);
@@ -284,6 +337,7 @@ function getFilterParams() {
     if (user) params.set('user_id', user);
     if (resource) params.set('resource', resource);
     if (distributable) params.set('is_distributable', distributable);
+    if (groupFilter) params.set('group_id', groupFilter);
     return params.toString();
 }
 
@@ -322,17 +376,32 @@ async function loadReportData() {
                 tbody.innerHTML = '<tr><td colspan="' + (data.headers.length + 1) + '" class="text-center text-muted py-4">No data found</td></tr>';
             } else {
                 const statusCol = type === 'expiry-tracking' ? 8 : -1;
-                tbody.innerHTML = data.rows.map((row, i) =>
-                    '<tr><td class="text-center">' + (i + 1) + '</td>' + row.map((c, j) => {
+                const isSuppliers = type === 'suppliers';
+                const isDistribution = type === 'distribution';
+                const isBenHistory = type === 'beneficiary-history';
+                tbody.innerHTML = data.rows.map((row, i) => {
+                    const supplierId = isSuppliers ? row[row.length - 1] : null;
+                    const beneficiaryName = (isDistribution || isBenHistory) ? row[row.length - 1] : null;
+                    const cols = (isSuppliers || isDistribution || isBenHistory) ? row.slice(0, -1) : row;
+                    return '<tr><td class="text-center">' + (i + 1) + '</td>' + cols.map((c, j) => {
                         if (j === statusCol) {
                             const cls = c.startsWith('Expired') ? 'danger' :
                                 c.includes('d left') && parseInt(c) <= 30 ? 'danger' :
                                 c.includes('d left') ? 'warning' : 'success';
                             return `<td><span class="badge bg-${cls}">${c ?? ''}</span></td>`;
                         }
+                        if (isSuppliers && j === 6) {
+                            return `<td><span class="badge bg-info me-1">${c ?? 0}</span> <button class="btn btn-outline-primary btn-sm" onclick="viewSupplierItems(${supplierId})"><i class="bi bi-eye me-1"></i>View</button></td>`;
+                        }
+                        if (isDistribution && j === 5) {
+                            return `<td><span class="badge bg-info me-1">${c ?? 0}</span> <button class="btn btn-outline-primary btn-sm" onclick="viewBeneficiaryDist('${encodeURIComponent(beneficiaryName)}')"><i class="bi bi-eye me-1"></i>View</button></td>`;
+                        }
+                        if (isBenHistory && j === 7) {
+                            return `<td><span class="badge bg-info me-1">${c ?? 0}</span> <button class="btn btn-outline-primary btn-sm" onclick="viewBeneficiaryDist('${encodeURIComponent(beneficiaryName)}')"><i class="bi bi-eye me-1"></i>View</button></td>`;
+                        }
                         return '<td>' + (c ?? '') + '</td>';
-                    }).join('') + '</tr>'
-                ).join('');
+                    }).join('') + '</tr>';
+                }).join('');
             }
         } else {
             tbody.innerHTML = '<tr><td colspan="20" class="text-center text-danger py-4">Error: ' + (data.message || 'Failed to load data') + '</td></tr>';
@@ -356,6 +425,60 @@ function printPreview() {
     const qs = params || '';
     const auto = type !== 'incident-summary' ? (qs ? '&auto=1' : 'auto=1') : '';
     window.open(`/print-report/${type}${qs ? '?' + qs + auto : auto ? '?' + auto : ''}`, '_blank');
+}
+
+async function viewSupplierItems(supplierId) {
+    const modal = new bootstrap.Modal(document.getElementById('supplierItemsModal'));
+    document.getElementById('supplierItemsName').textContent = '';
+    document.getElementById('supplierItemsHeaders').innerHTML = '';
+    document.getElementById('supplierItemsBody').innerHTML = '<tr><td colspan="6" class="text-center py-4"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div></td></tr>';
+    modal.show();
+    try {
+        const resp = await fetch(`/api/supplier-items/${supplierId}`);
+        const data = await resp.json();
+        if (data.success) {
+            document.getElementById('supplierItemsName').textContent = data.supplier;
+            document.getElementById('supplierItemsHeaders').innerHTML = data.headers.map(h => `<th>${h}</th>`).join('');
+            if (data.rows.length === 0) {
+                document.getElementById('supplierItemsBody').innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">No items found for this supplier</td></tr>';
+            } else {
+                document.getElementById('supplierItemsBody').innerHTML = data.rows.map((row, i) =>
+                    '<tr><td class="text-center">' + (i + 1) + '</td>' + row.map(c => '<td>' + (c ?? '') + '</td>').join('') + '</tr>'
+                ).join('');
+            }
+        } else {
+            document.getElementById('supplierItemsBody').innerHTML = '<tr><td colspan="6" class="text-center text-danger py-4">Error: ' + (data.message || 'Failed to load') + '</td></tr>';
+        }
+    } catch(e) {
+        document.getElementById('supplierItemsBody').innerHTML = '<tr><td colspan="6" class="text-center text-danger py-4">Error loading supplier items</td></tr>';
+    }
+}
+
+async function viewBeneficiaryDist(familyName) {
+    const modal = new bootstrap.Modal(document.getElementById('beneficiaryDistModal'));
+    document.getElementById('beneficiaryDistName').textContent = '';
+    document.getElementById('beneficiaryDistHeaders').innerHTML = '';
+    document.getElementById('beneficiaryDistBody').innerHTML = '<tr><td colspan="6" class="text-center py-4"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div></td></tr>';
+    modal.show();
+    try {
+        const resp = await fetch(`/api/beneficiary-distributions/${familyName}`);
+        const data = await resp.json();
+        if (data.success) {
+            document.getElementById('beneficiaryDistName').textContent = data.beneficiary;
+            document.getElementById('beneficiaryDistHeaders').innerHTML = data.headers.map(h => `<th>${h}</th>`).join('');
+            if (data.rows.length === 0) {
+                document.getElementById('beneficiaryDistBody').innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">No distributions found</td></tr>';
+            } else {
+                document.getElementById('beneficiaryDistBody').innerHTML = data.rows.map((row, i) =>
+                    '<tr><td class="text-center">' + (i + 1) + '</td>' + row.map(c => '<td>' + (c ?? '') + '</td>').join('') + '</tr>'
+                ).join('');
+            }
+        } else {
+            document.getElementById('beneficiaryDistBody').innerHTML = '<tr><td colspan="6" class="text-center text-danger py-4">Error: ' + (data.message || 'Failed to load') + '</td></tr>';
+        }
+    } catch(e) {
+        document.getElementById('beneficiaryDistBody').innerHTML = '<tr><td colspan="6" class="text-center text-danger py-4">Error loading distributions</td></tr>';
+    }
 }
 
 document.addEventListener('DOMContentLoaded', async function() {
