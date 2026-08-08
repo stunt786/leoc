@@ -27,9 +27,10 @@
                 </div>
                 <div class="col-md-3">
                     <label class="form-label">Incident <span class="text-danger">*</span></label>
-                    <select class="form-select" id="dist_incident_id">
+                    <select class="form-select" id="dist_incident_id" onchange="onIncidentChange()">
                         <option value="">Select Incident</option>
                     </select>
+                    <small class="text-muted" id="incidentHHInfo"></small>
                 </div>
                 <div class="col-md-3">
                     <label class="form-label">Distribution Date</label>
@@ -90,8 +91,42 @@
             <div class="d-flex justify-content-between align-items-center mb-2">
                 <label class="form-label mb-0 fw-bold"><i class="bi bi-people me-1"></i>Beneficiaries</label>
                 <div>
-                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="addBeneficiaryRow()"><i class="bi bi-plus-lg"></i> Add Beneficiary</button>
+                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="openNewBenModal()"><i class="bi bi-plus-lg"></i> Add Beneficiary</button>
                     <button type="button" class="btn btn-sm btn-outline-info" onclick="openBeneficiaryPicker()"><i class="bi bi-person-lines-fill"></i> Select from Registry</button>
+                </div>
+            </div>
+
+            <div class="card border-primary mb-3" id="groupQuickAddCard">
+                <div class="card-header bg-primary bg-opacity-10 py-2">
+                    <span class="fw-semibold"><i class="bi bi-collection me-1 text-primary"></i>Quick Add Items by Group</span>
+                </div>
+                <div class="card-body py-2">
+                    <div class="row g-2 align-items-end">
+                        <div class="col-md-3">
+                            <label class="form-label small mb-1">Item Group</label>
+                            <select class="form-select form-select-sm" id="dist_group_filter" onchange="onGroupFilterChange()">
+                                <option value="">All Groups</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3" id="groupItemsPreview" style="display:none">
+                            <label class="form-label small mb-1">Items in Group</label>
+                            <div id="groupItemsList" class="small text-muted" style="max-height:60px;overflow-y:auto"></div>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label small mb-1">Qty per Item</label>
+                            <input type="number" class="form-control form-control-sm" id="groupQty" value="1" min="1">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label small mb-1">Warehouse</label>
+                            <select class="form-select form-select-sm" id="groupWarehouse">
+                                <option value="">Default</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <button type="button" class="btn btn-sm btn-primary w-100" onclick="addGroupItemsToAll()"><i class="bi bi-plus-circle me-1"></i>Add All Group Items</button>
+                        </div>
+                    </div>
+                    <div class="small text-muted mt-1" id="groupHint">Select a group to quickly add all its items to every beneficiary row</div>
                 </div>
             </div>
             <div class="table-responsive">
@@ -215,6 +250,155 @@
         </div>
     </div>
 </div>
+
+<!-- New Beneficiary Modal -->
+<div class="modal fade" id="newBenModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="bi bi-person-plus me-2"></i>Add New Beneficiary</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="newBenForm">
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <div class="card border-primary">
+                                <div class="card-header bg-light py-2"><h6 class="mb-0 fw-bold"><i class="bi bi-person-vcard text-primary me-2"></i>Beneficiary Details</h6></div>
+                                <div class="card-body">
+                                    <div class="row g-3">
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-medium">Full Name <span class="text-danger">*</span></label>
+                                            <input type="text" class="form-control" id="nbName" required placeholder="Full name">
+                                            <small class="text-danger" id="nbNameError"></small>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-medium">National ID <span class="text-danger">*</span></label>
+                                            <input type="text" class="form-control" id="nbNid" required placeholder="e.g. BEN-001">
+                                            <small class="text-danger" id="nbNidError"></small>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-medium">Father's Name <span class="text-danger">*</span></label>
+                                            <input type="text" class="form-control" id="nbFatherName" required placeholder="Father's name">
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-medium">Phone <span class="text-danger">*</span></label>
+                                            <input type="text" class="form-control" id="nbPhone" placeholder="Phone number">
+                                            <small class="text-danger" id="nbPhoneError"></small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <div class="card border-secondary">
+                                <div class="card-header bg-light py-2"><h6 class="mb-0 fw-bold"><i class="bi bi-geo-alt text-secondary me-2"></i>Address</h6></div>
+                                <div class="card-body">
+                                    <div class="row g-3">
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-medium">Address</label>
+                                            <input type="text" class="form-control" id="nbAddress" placeholder="Address">
+                                        </div>
+                                        <div class="col-md-2">
+                                            <label class="form-label fw-medium">Ward <span class="text-danger">*</span></label>
+                                            <select class="form-select" id="nbWard" required><option value="">Select</option></select>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label fw-medium">Tole <span class="text-danger">*</span></label>
+                                            <input type="text" class="form-control" id="nbTole" required placeholder="Tole">
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-medium">Current Shelter</label>
+                                            <input type="text" class="form-control" id="nbShelter" placeholder="Current shelter location">
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-medium">Coordinates</label>
+                                            <input type="text" class="form-control" id="nbCoordinates" placeholder="Latitude, Longitude">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <div class="card border-success">
+                                <div class="card-header bg-light py-2 d-flex justify-content-between align-items-center">
+                                    <h6 class="mb-0 fw-bold"><i class="bi bi-people text-success me-2"></i>Family Members</h6>
+                                    <span class="badge bg-success rounded-pill" id="nbFamilyCountBadge">0 members</span>
+                                </div>
+                                <div class="card-body">
+                                    <div id="nbFamilyMembersContainer">
+                                        <p class="text-muted text-center py-3 mb-0" id="nbNoFamilyMsg"><i class="bi bi-info-circle me-1"></i>No family members added. Click "Add Member" below.</p>
+                                    </div>
+                                    <button type="button" class="btn btn-outline-success btn-sm mt-2" onclick="nbAddFamilyMember()"><i class="bi bi-plus-circle"></i> Add Family Member</button>
+                                    <input type="hidden" id="nbFamilyMembersJson" value="[]">
+                                    <input type="hidden" id="nbFamilyCount" value="0">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <div class="card border-warning">
+                                <div class="card-header bg-light py-2"><h6 class="mb-0 fw-bold"><i class="bi bi-shield-check text-warning me-2"></i>Social Security & Status</h6></div>
+                                <div class="card-body">
+                                    <div class="row g-3 align-items-end">
+                                        <div class="col-md-4">
+                                            <div class="form-check form-switch">
+                                                <input class="form-check-input" type="checkbox" id="nbSocialSecurity">
+                                                <label class="form-check-label fw-medium" for="nbSocialSecurity">Social Security Fund</label>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4" id="nbSsfTypeDiv" style="display:none;">
+                                            <label class="form-label fw-medium">SSF Type</label>
+                                            <select class="form-select" id="nbSsfType"><option value="">Select</option></select>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="form-check form-switch">
+                                                <input class="form-check-input" type="checkbox" id="nbPovertyCard">
+                                                <label class="form-check-label fw-medium" for="nbPovertyCard">Poverty Card Holder</label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <div class="card border-info">
+                                <div class="card-header bg-light py-2"><h6 class="mb-0 fw-bold"><i class="bi bi-bank text-info me-2"></i>Bank Account</h6></div>
+                                <div class="card-body">
+                                    <div class="row g-3">
+                                        <div class="col-md-4">
+                                            <label class="form-label fw-medium">Account Holder Name</label>
+                                            <input type="text" class="form-control" id="nbBankHolder" placeholder="Name on bank account">
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label fw-medium">Account Number</label>
+                                            <input type="text" class="form-control" id="nbBank" placeholder="Account number">
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label fw-medium">Bank Name</label>
+                                            <input type="text" class="form-control" id="nbBankName" placeholder="Bank name">
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label fw-medium">Wallet (esewa/khalti)</label>
+                                            <input type="text" class="form-control" id="nbWallet" placeholder="Wallet number">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-medium">Remarks</label>
+                            <textarea class="form-control" id="nbRemarks" rows="2" placeholder="Remarks..."></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary px-4" id="nbSaveBtn"><i class="bi bi-check-lg me-1"></i> Save & Select</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
@@ -228,6 +412,12 @@ let isSaving = false;
 let warehouseList = [];
 let itemsList = [];
 let itemAvailMap = {};
+let itemGroupsList = [];
+let incidentsList = [];
+let activeFiscalYear = '';
+let alreadyBenificiatedIds = new Set();
+let sameIncidentBenIds = new Set();
+let beneficiaryDistHistory = {};
 let pendingPhotoFiles = [];
 let pendingDocFiles = [];
 let editingId = null;
@@ -241,18 +431,31 @@ async function loadFormData() {
 
         itemsList = d.items || [];
         warehouseList = d.warehouses || [];
+        itemGroupsList = d.item_groups || [];
+        incidentsList = (d.incidents || []).filter(i => i.status === 'Active');
+        activeFiscalYear = d.active_fiscal_year || '';
         itemAvailMap = {};
         (d.inventory_available || []).forEach(inv => {
             itemAvailMap[inv.item_id + '|' + inv.warehouse_id] = inv.available_quantity;
         });
 
         const incSel = document.getElementById('dist_incident_id');
-        incSel.innerHTML = '<option value="">Select Incident</option>' + (d.incidents || []).map(i =>
+        incSel.innerHTML = '<option value="">Select Incident</option>' + incidentsList.map(i =>
             `<option value="${i.id}">${i.incident_name}</option>`
         ).join('');
 
         const whSel = document.getElementById('dist_warehouse_id');
         whSel.innerHTML = '<option value="">Select Warehouse</option>' + warehouseList.map(w =>
+            `<option value="${w.id}">${w.name}</option>`
+        ).join('');
+
+        const grpSel = document.getElementById('dist_group_filter');
+        grpSel.innerHTML = '<option value="">All Groups</option>' + itemGroupsList.map(g =>
+            `<option value="${g.id}">${g.name}</option>`
+        ).join('');
+
+        const grpWhSel = document.getElementById('groupWarehouse');
+        grpWhSel.innerHTML = '<option value="">Default</option>' + warehouseList.map(w =>
             `<option value="${w.id}">${w.name}</option>`
         ).join('');
 
@@ -433,7 +636,9 @@ function warehouseOptionsHtml(selectedWh) {
 
 function itemOptionsHtml(disabledNames, excludeSel) {
     disabledNames = disabledNames || [];
-    return itemsList.map(i => {
+    const groupId = document.getElementById('dist_group_filter')?.value || '';
+    const filteredItems = groupId ? itemsList.filter(i => String(i.group_id) === String(groupId)) : itemsList;
+    return filteredItems.map(i => {
         const remaining = benItemRemaining(i.name, excludeSel);
         const isCurrent = excludeSel && excludeSel.value === i.name;
         const disabled = (!isCurrent && (disabledNames.indexOf(i.name) !== -1 || remaining <= 0)) ? ' disabled' : '';
@@ -534,8 +739,122 @@ function fillBenRow(input, ben) {
     tr.querySelector('.ben-members').value = ben.family_members || 1;
 }
 
+function onIncidentChange() {
+    const incidentId = parseInt(document.getElementById('dist_incident_id').value);
+    const infoEl = document.getElementById('incidentHHInfo');
+    if (!incidentId) { infoEl.textContent = ''; alreadyBenificiatedIds = new Set(); return; }
+    const inc = incidentsList.find(i => i.id === incidentId);
+    if (!inc) { infoEl.textContent = ''; return; }
+    const limit = inc.affected_households || 0;
+    loadAlreadyBeneficiated().then(() => {
+        const currentCount = getRegistryBenCount();
+        const alreadyCount = alreadyBenificiatedIds.size;
+        if (limit < 1) {
+            infoEl.innerHTML = `<span class="text-danger">Affected households: 0</span>`;
+        } else {
+            const remaining = Math.max(0, limit - currentCount);
+            let html = `Affected households: ${limit} | Selected: ${currentCount} | Remaining: ${remaining}`;
+            if (alreadyCount > 0) html += ` | <span class="text-warning">${alreadyCount} already beneficiated</span>`;
+            infoEl.innerHTML = html;
+        }
+    });
+}
+
+function getRegistryBenCount() {
+    return Array.from(document.querySelectorAll('#beneficiaryBody tr')).filter(tr => {
+        if (tr.querySelector('td[colspan]')) return false;
+        const benId = tr.querySelector('.ben-beneficiary-id');
+        return benId && benId.value;
+    }).length;
+}
+
+function getAffectedHouseholdLimit() {
+    const incidentId = parseInt(document.getElementById('dist_incident_id').value);
+    if (!incidentId) return 0;
+    const inc = incidentsList.find(i => i.id === incidentId);
+    return inc ? (inc.affected_households || 0) : 0;
+}
+
+function validateBeneficiaryCount() {
+    const limit = getAffectedHouseholdLimit();
+    if (limit < 1) return true;
+    const currentCount = getRegistryBenCount();
+    if (currentCount >= limit) {
+        showToast('danger', `This incident has only ${limit} affected households. You have already selected ${currentCount} beneficiary(ies).`);
+        return false;
+    }
+    return true;
+}
+
+async function loadAlreadyBeneficiated() {
+    alreadyBenificiatedIds = new Set();
+    sameIncidentBenIds = new Set();
+    beneficiaryDistHistory = {};
+    const currentIncidentId = document.getElementById('dist_incident_id').value;
+    if (!currentIncidentId || !activeFiscalYear) return;
+    try {
+        const r = await fetch(`/api/distributions?fiscal_year=${encodeURIComponent(activeFiscalYear)}`);
+        const d = await r.json();
+        if (d.success && d.distributions) {
+            d.distributions.forEach(dist => {
+                if (dist.status !== 'Cancelled') {
+                    const isSameIncident = String(dist.incident_id) === String(currentIncidentId);
+                    (dist.beneficiaries || []).forEach(b => {
+                        if (b.beneficiary_id) {
+                            alreadyBenificiatedIds.add(b.beneficiary_id);
+                            if (isSameIncident) sameIncidentBenIds.add(b.beneficiary_id);
+                            if (!beneficiaryDistHistory[b.beneficiary_id]) beneficiaryDistHistory[b.beneficiary_id] = [];
+                            beneficiaryDistHistory[b.beneficiary_id].push({
+                                type: 'Material', incident: dist.incident_name, date: dist.distribution_date, dist_no: dist.distribution_no
+                            });
+                        }
+                    });
+                }
+            });
+        }
+        const cr = await fetch(`/api/cash-distributions?fiscal_year=${encodeURIComponent(activeFiscalYear)}`);
+        const cd = await cr.json();
+        if (cd.success && cd.distributions) {
+            cd.distributions.forEach(cdist => {
+                if (cdist.status !== 'Cancelled') {
+                    const isSameIncident = String(cdist.incident_id) === String(currentIncidentId);
+                    (cdist.beneficiaries || []).forEach(b => {
+                        if (b.beneficiary_id) {
+                            alreadyBenificiatedIds.add(b.beneficiary_id);
+                            if (isSameIncident) sameIncidentBenIds.add(b.beneficiary_id);
+                            if (!beneficiaryDistHistory[b.beneficiary_id]) beneficiaryDistHistory[b.beneficiary_id] = [];
+                            beneficiaryDistHistory[b.beneficiary_id].push({
+                                type: 'Cash', incident: cdist.incident_name, date: cdist.distribution_date, dist_no: cdist.distribution_no, amount: b.amount
+                            });
+                        }
+                    });
+                }
+            });
+        }
+    } catch(e) { /* ignore */ }
+}
+
+function getBeneficiaryHistory(benId) {
+    return beneficiaryDistHistory[benId] || [];
+}
+
+function isAlreadyBeneficiated(benId) {
+    return alreadyBenificiatedIds.has(benId);
+}
+
+function isBeneficiatedInSameIncident(benId) {
+    return sameIncidentBenIds.has(benId);
+}
+
+function isBeneficiatedInOtherIncident(benId) {
+    return alreadyBenificiatedIds.has(benId) && !sameIncidentBenIds.has(benId);
+}
+
 async function openBeneficiaryPicker() {
+    const incidentId = document.getElementById('dist_incident_id').value;
+    if (!incidentId) { showToast('danger', 'Please select an incident first before selecting beneficiaries'); return; }
     await loadBeneficiaries();
+    await loadAlreadyBeneficiated();
     renderBenPicker(beneficiaries);
     if (!benPickerModal) {
         benPickerModal = new bootstrap.Modal(document.getElementById('benPickerModal'));
@@ -554,6 +873,14 @@ function filterBenPicker() {
     renderBenPicker(filtered);
 }
 
+function isAlreadySelectedInDist(benId) {
+    return Array.from(document.querySelectorAll('#beneficiaryBody tr')).some(tr => {
+        if (tr.querySelector('td[colspan]')) return false;
+        const benIdEl = tr.querySelector('.ben-beneficiary-id');
+        return benIdEl && benIdEl.value && String(benIdEl.value) === String(benId);
+    });
+}
+
 function renderBenPicker(list) {
     const tbody = document.getElementById('benPickerBody');
     if (list.length === 0) {
@@ -562,22 +889,132 @@ function renderBenPicker(list) {
         return;
     }
     DataTableManager.destroy('dataTable');
-    tbody.innerHTML = list.map(b => `<tr>
-        <td>${b.name}</td>
-        <td>${b.father_name || '-'}</td>
-        <td>${b.national_id || '-'}</td>
-        <td>${b.ward_name || b.ward || '-'}</td>
-        <td>${b.family_members || 1}</td>
-        <td><button class="btn btn-sm btn-outline-primary" onclick="selectBeneficiaryFromPicker(${b.id})"><i class="bi bi-plus-lg"></i></button></td>
-    </tr>`).join('');
+    tbody.innerHTML = list.map(b => {
+        const isSameInc = isBeneficiatedInSameIncident(b.id);
+        const isOtherInc = isBeneficiatedInOtherIncident(b.id);
+        const isSelected = isAlreadySelectedInDist(b.id);
+        const history = getBeneficiaryHistory(b.id);
+        let rowClass = '';
+        let btn;
+        if (isSameInc) {
+            rowClass = 'table-secondary text-muted';
+            btn = '<span class="badge bg-danger"><i class="bi bi-x-circle me-1"></i>Already Beneficiated (Same Incident)</span>';
+        } else if (isOtherInc) {
+            rowClass = 'table-warning';
+            const incNames = [...new Set(history.map(h => h.incident))].join(', ');
+            btn = `<button class="btn btn-sm btn-outline-warning" onclick="selectBeneficiaryFromPicker(${b.id})" title="Beneficiated in: ${incNames}"><i class="bi bi-exclamation-triangle me-1"></i><i class="bi bi-plus-lg"></i></button>`;
+        } else if (isSelected) {
+            rowClass = 'table-info';
+            btn = '<span class="badge bg-info"><i class="bi bi-check2-all me-1"></i>Already Selected</span>';
+        } else {
+            btn = `<button class="btn btn-sm btn-outline-primary" onclick="selectBeneficiaryFromPicker(${b.id})"><i class="bi bi-plus-lg"></i></button>`;
+        }
+        let histBadge = '';
+        if (isOtherInc) {
+            histBadge = `<small class="text-danger d-block"><i class="bi bi-exclamation-triangle me-1"></i>Beneficiated in other incident(s) this FY</small>`;
+        } else if (history.length > 0 && !isSameInc && !isSelected) {
+            histBadge = `<small class="text-warning d-block"><i class="bi bi-clock-history me-1"></i>${history.length} prior dist.</small>`;
+        }
+        return `<tr class="${rowClass}">
+            <td>${b.name}${histBadge}</td>
+            <td>${b.father_name || '-'}</td>
+            <td>${b.national_id || '-'}</td>
+            <td>${b.ward_name || b.ward || '-'}</td>
+            <td>${b.family_members || 1}</td>
+            <td>${btn}</td>
+        </tr>`;
+    }).join('');
 }
 
-function selectBeneficiaryFromPicker(id) {
-    const ben = beneficiaries.find(b => b.id === id);
-    if (ben) {
-        addBeneficiaryRow(ben);
-        benPickerModal.hide();
+function showBenHistoryWarning(benId, benName) {
+    const history = getBeneficiaryHistory(benId);
+    if (history.length === 0) return true;
+    const rows = history.map(h => {
+        const icon = h.type === 'Cash' ? 'bi-cash text-success' : 'bi-box text-primary';
+        return `<tr><td><i class="bi ${icon} me-1"></i>${h.type}</td><td>${h.incident || '-'}</td><td>${h.date || '-'}</td><td>${h.dist_no || '-'}${h.amount ? ' (' + Number(h.amount).toLocaleString() + ')' : ''}</td></tr>`;
+    }).join('');
+    const modal = document.createElement('div');
+    modal.className = 'modal fade';
+    modal.innerHTML = `<div class="modal-dialog modal-dialog-centered"><div class="modal-content">
+        <div class="modal-header bg-warning text-dark">
+            <h5 class="modal-title"><i class="bi bi-exclamation-triangle me-2"></i>Prior Distribution History</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+            <p><strong>${benName}</strong> has received distributions in other incidents:</p>
+            <table class="table table-sm table-bordered"><thead class="table-light"><tr><th>Type</th><th>Incident</th><th>Date</th><th>Reference</th></tr></thead><tbody>${rows}</tbody></table>
+            <div class="alert alert-info mb-0"><i class="bi bi-info-circle me-1"></i>This beneficiary has prior distribution history. Do you want to add them to this distribution?</div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="button" class="btn btn-primary" id="confirmBenSelect"><i class="bi bi-check-lg me-1"></i>Yes, Add Beneficiary</button>
+        </div>
+    </div></div>`;
+    document.body.appendChild(modal);
+    modal.addEventListener('hidden.bs.modal', () => modal.remove());
+    const bsModal = new bootstrap.Modal(modal);
+    bsModal.show();
+    return new Promise(resolve => {
+        document.getElementById('confirmBenSelect').onclick = () => { bsModal.hide(); resolve(true); };
+        modal.querySelector('[data-bs-dismiss="modal"]').onclick = () => { bsModal.hide(); resolve(false); };
+    });
+}
+
+function showCrossIncidentWarning(benId, benName) {
+    const history = getBeneficiaryHistory(benId);
+    if (history.length === 0) return true;
+    const rows = history.map(h => {
+        const icon = h.type === 'Cash' ? 'bi-cash text-success' : 'bi-box text-primary';
+        return `<tr><td><i class="bi ${icon} me-1"></i>${h.type}</td><td>${h.incident || '-'}</td><td>${h.date || '-'}</td><td>${h.dist_no || '-'}${h.amount ? ' (NPR ' + Number(h.amount).toLocaleString() + ')' : ''}</td></tr>`;
+    }).join('');
+    const currentInc = document.getElementById('dist_incident_id');
+    const currentIncName = currentInc.options[currentInc.selectedIndex]?.text || 'current incident';
+    const modal = document.createElement('div');
+    modal.className = 'modal fade';
+    modal.innerHTML = `<div class="modal-dialog modal-dialog-centered"><div class="modal-content">
+        <div class="modal-header bg-warning text-dark">
+            <h5 class="modal-title"><i class="bi bi-exclamation-triangle me-2"></i>Cross-Incident Distribution Warning</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+            <p><strong>${benName}</strong> has already received distributions in <strong>other incident(s)</strong> during this fiscal year (${activeFiscalYear}):</p>
+            <table class="table table-sm table-bordered"><thead class="table-light"><tr><th>Type</th><th>Incident</th><th>Date</th><th>Reference</th></tr></thead><tbody>${rows}</tbody></table>
+            <div class="alert alert-warning mb-0"><i class="bi bi-exclamation-triangle me-1"></i><strong>Warning:</strong> This beneficiary already received relief from a different incident. Adding them to <strong>${currentIncName}</strong> means they will receive aid from multiple incidents in the same fiscal year. Do you want to proceed?</div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="button" class="btn btn-warning" id="confirmCrossIncSelect"><i class="bi bi-check-lg me-1"></i>Yes, Add Anyway</button>
+        </div>
+    </div></div>`;
+    document.body.appendChild(modal);
+    modal.addEventListener('hidden.bs.modal', () => modal.remove());
+    const bsModal = new bootstrap.Modal(modal);
+    bsModal.show();
+    return new Promise(resolve => {
+        document.getElementById('confirmCrossIncSelect').onclick = () => { bsModal.hide(); resolve(true); };
+        modal.querySelector('[data-bs-dismiss="modal"]').onclick = () => { bsModal.hide(); resolve(false); };
+    });
+}
+
+async function selectBeneficiaryFromPicker(id) {
+    if (isBeneficiatedInSameIncident(id)) {
+        showToast('danger', 'This beneficiary has already received distribution for this incident in the current fiscal year.');
+        return;
     }
+    if (isAlreadySelectedInDist(id)) {
+        showToast('danger', 'This beneficiary is already selected in the current distribution.');
+        return;
+    }
+    const ben = beneficiaries.find(b => b.id === id);
+    if (!ben) return;
+    if (isBeneficiatedInOtherIncident(id)) {
+        const confirmed = await showCrossIncidentWarning(id, ben.name);
+        if (!confirmed) return;
+    }
+    if (!validateBeneficiaryCount()) return;
+    addBeneficiaryRow(ben);
+    benPickerModal.hide();
+    onIncidentChange();
 }
 
 async function loadDistributions() {
@@ -1038,6 +1475,13 @@ async function saveDistribution() {
     const incidentId = parseInt(document.getElementById('dist_incident_id').value);
     if (!incidentId) { showToast('danger', 'Please select an incident'); return; }
 
+    const hhLimit = getAffectedHouseholdLimit();
+    const regCount = getRegistryBenCount();
+    if (hhLimit > 0 && regCount > hhLimit) {
+        showToast('danger', `This incident has only ${hhLimit} affected households. You have selected ${regCount} beneficiary(ies). Please remove ${regCount - hhLimit} beneficiary(ies).`);
+        return;
+    }
+
     const items = collectDistItems();
     if (items.length === 0) { showToast('danger', 'Please add at least one distribution item with quantity and warehouse'); return; }
 
@@ -1308,6 +1752,252 @@ function uploadViewBenFile(benId, type, btn) {
         }
     };
     input.click();
+}
+
+function openNewBenModal() {
+    const incidentId = document.getElementById('dist_incident_id').value;
+    if (!incidentId) { showToast('danger', 'Please select an incident first before adding a beneficiary'); return; }
+    if (!validateBeneficiaryCount()) return;
+    document.getElementById('newBenForm').reset();
+    document.getElementById('nbFamilyMembersContainer').innerHTML = '<p class="text-muted text-center py-3 mb-0" id="nbNoFamilyMsg"><i class="bi bi-info-circle me-1"></i>No family members added. Click "Add Member" below.</p>';
+    document.getElementById('nbFamilyMembersJson').value = '[]';
+    document.getElementById('nbFamilyCount').value = 0;
+    document.getElementById('nbFamilyCountBadge').textContent = '0 members';
+    document.getElementById('nbSocialSecurity').checked = false;
+    document.getElementById('nbSsfTypeDiv').style.display = 'none';
+    document.getElementById('nbPovertyCard').checked = false;
+    document.getElementById('nbNameError').textContent = '';
+    document.getElementById('nbNidError').textContent = '';
+    document.getElementById('nbPhoneError').textContent = '';
+    const wardSel = document.getElementById('nbWard');
+    if (wardSel.options.length <= 1) {
+        fetch('/api/data').then(r => r.json()).then(d => {
+            const wards = d.wards || [];
+            wardSel.innerHTML = '<option value="">Select</option>' + wards.map(w => `<option value="${w.id}">${w.name}</option>`).join('');
+            const ssfSel = document.getElementById('nbSsfType');
+            if (d.ssf_types) ssfSel.innerHTML = '<option value="">Select</option>' + d.ssf_types.map(t => `<option value="${t}">${t}</option>`).join('');
+        });
+    }
+    new bootstrap.Modal(document.getElementById('newBenModal')).show();
+}
+
+function nbAddFamilyMember(data) {
+    data = data || {};
+    const container = document.getElementById('nbFamilyMembersContainer');
+    const noMsg = document.getElementById('nbNoFamilyMsg');
+    if (noMsg) noMsg.remove();
+    const row = document.createElement('div');
+    row.className = 'family-member-row card bg-light p-3 mb-2';
+    row.innerHTML = `
+        <div class="row g-2 align-items-center">
+            <div class="col-md-3"><label class="form-label small fw-medium">Name <span class="text-danger">*</span></label><input type="text" class="form-control form-control-sm fm-name" placeholder="Name" value="${data.name || ''}"></div>
+            <div class="col-md-2"><label class="form-label small fw-medium">ID</label><input type="text" class="form-control form-control-sm fm-id" placeholder="ID" value="${data.id || ''}"></div>
+            <div class="col-md-2"><label class="form-label small fw-medium">Relation</label>
+                <select class="form-select form-select-sm fm-relation"><option value="">Select</option>
+                <option value="Self" ${data.relation==='Self'?'selected':''}>Self</option><option value="Spouse" ${data.relation==='Spouse'?'selected':''}>Spouse</option>
+                <option value="Son" ${data.relation==='Son'?'selected':''}>Son</option><option value="Daughter" ${data.relation==='Daughter'?'selected':''}>Daughter</option>
+                <option value="Father" ${data.relation==='Father'?'selected':''}>Father</option><option value="Mother" ${data.relation==='Mother'?'selected':''}>Mother</option>
+                <option value="Brother" ${data.relation==='Brother'?'selected':''}>Brother</option><option value="Sister" ${data.relation==='Sister'?'selected':''}>Sister</option>
+                <option value="Other" ${data.relation==='Other'?'selected':''}>Other</option></select>
+            </div>
+            <div class="col-md-1"><label class="form-label small fw-medium">Age</label><input type="number" class="form-control form-control-sm fm-age" min="0" max="150" placeholder="0" value="${data.age || ''}"></div>
+            <div class="col-md-2"><label class="form-label small fw-medium">Gender</label>
+                <select class="form-select form-select-sm fm-gender"><option value="">Select</option>
+                <option value="Male" ${data.gender==='Male'?'selected':''}>Male</option><option value="Female" ${data.gender==='Female'?'selected':''}>Female</option></select>
+            </div>
+            <div class="col-md-1"><div class="form-check mt-3"><input type="checkbox" class="form-check-input fm-disabled" ${data.is_disabled?'checked':''}><label class="form-check-label small">Disabled</label></div></div>
+            <div class="col-md-1 text-end"><button type="button" class="btn btn-outline-danger btn-sm mt-3" onclick="nbRemoveFamilyMember(this)" title="Remove"><i class="bi bi-x-lg"></i></button></div>
+        </div>`;
+    container.appendChild(row);
+    nbUpdateFamilyCount();
+}
+
+function nbRemoveFamilyMember(btn) {
+    btn.closest('.family-member-row').remove();
+    nbUpdateFamilyCount();
+}
+
+function nbUpdateFamilyCount() {
+    const names = document.querySelectorAll('#nbFamilyMembersContainer .family-member-row .fm-name');
+    let count = 0;
+    names.forEach(el => { if (el.value.trim()) count++; });
+    document.getElementById('nbFamilyCountBadge').textContent = count + ' member' + (count !== 1 ? 's' : '');
+    document.getElementById('nbFamilyCount').value = count;
+    nbUpdateFamilyJson();
+}
+
+function nbUpdateFamilyJson() {
+    const members = [];
+    document.querySelectorAll('#nbFamilyMembersContainer .family-member-row').forEach(row => {
+        const name = row.querySelector('.fm-name').value.trim();
+        if (!name) return;
+        members.push({
+            name: name, id: row.querySelector('.fm-id').value.trim(),
+            relation: row.querySelector('.fm-relation').value,
+            age: parseInt(row.querySelector('.fm-age').value) || null,
+            gender: row.querySelector('.fm-gender').value,
+            is_disabled: row.querySelector('.fm-disabled').checked
+        });
+    });
+    document.getElementById('nbFamilyMembersJson').value = JSON.stringify(members);
+}
+
+document.getElementById('nbFamilyMembersContainer').addEventListener('input', function(e) {
+    if (e.target.classList.contains('fm-name')) nbUpdateFamilyCount();
+});
+
+document.getElementById('nbSocialSecurity').addEventListener('change', function() {
+    document.getElementById('nbSsfTypeDiv').style.display = this.checked ? '' : 'none';
+});
+
+document.getElementById('newBenForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    nbUpdateFamilyJson();
+    const saveBtn = document.getElementById('nbSaveBtn');
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving...';
+    document.getElementById('nbNameError').textContent = '';
+    document.getElementById('nbNidError').textContent = '';
+    document.getElementById('nbPhoneError').textContent = '';
+    const fmJson = JSON.parse(document.getElementById('nbFamilyMembersJson').value || '[]');
+    let fmCount = fmJson.length;
+    if (fmCount === 0 && document.getElementById('nbName').value.trim()) fmCount = 1;
+    const body = {
+        name: document.getElementById('nbName').value.trim(),
+        national_id: document.getElementById('nbNid').value.trim(),
+        father_name: document.getElementById('nbFatherName').value.trim(),
+        phone: document.getElementById('nbPhone').value.trim(),
+        address: document.getElementById('nbAddress').value.trim(),
+        ward: document.getElementById('nbWard').value ? parseInt(document.getElementById('nbWard').value) : null,
+        tole: document.getElementById('nbTole').value.trim(),
+        current_shelter_location: document.getElementById('nbShelter').value.trim(),
+        coordinates: document.getElementById('nbCoordinates').value.trim(),
+        family_members: fmCount,
+        family_members_json: fmJson,
+        in_social_security_fund: document.getElementById('nbSocialSecurity').checked,
+        ssf_type: document.getElementById('nbSsfType').value,
+        poverty_card_holder: document.getElementById('nbPovertyCard').checked,
+        bank_account_holder_name: document.getElementById('nbBankHolder').value.trim(),
+        bank_account: document.getElementById('nbBank').value.trim(),
+        bank_name: document.getElementById('nbBankName').value.trim(),
+        mobile_wallet: document.getElementById('nbWallet').value.trim(),
+        remarks: document.getElementById('nbRemarks').value.trim()
+    };
+    try {
+        const r = await fetch('/api/beneficiaries', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrf},
+            body: JSON.stringify(body)
+        });
+        const d = await r.json();
+        if (d.success) {
+            const newBen = d.data;
+            beneficiaries.push(newBen);
+            addBeneficiaryRow(newBen);
+            onIncidentChange();
+            bootstrap.Modal.getInstance(document.getElementById('newBenModal')).hide();
+            showToast('success', 'Beneficiary created and added to distribution');
+        } else {
+            const msg = d.message || '';
+            if (msg.toLowerCase().includes('name')) document.getElementById('nbNameError').textContent = msg;
+            else if (msg.toLowerCase().includes('national id')) document.getElementById('nbNidError').textContent = msg;
+            else if (msg.toLowerCase().includes('phone')) document.getElementById('nbPhoneError').textContent = msg;
+            else showToast('danger', msg);
+        }
+    } catch(e) {
+        showToast('danger', 'Error creating beneficiary: ' + e.message);
+    } finally {
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = '<i class="bi bi-check-lg me-1"></i> Save & Select';
+    }
+});
+
+function onGroupFilterChange() {
+    const groupId = document.getElementById('dist_group_filter').value;
+    const preview = document.getElementById('groupItemsPreview');
+    const listEl = document.getElementById('groupItemsList');
+    if (!groupId) {
+        preview.style.display = 'none';
+        refreshAllBenItemOptions();
+        return;
+    }
+    const groupItems = itemsList.filter(i => String(i.group_id) === String(groupId));
+    if (groupItems.length === 0) {
+        listEl.innerHTML = '<em>No items in this group</em>';
+    } else {
+        listEl.innerHTML = groupItems.map(i => `<span class="badge bg-light text-dark me-1 mb-1">${i.name}</span>`).join('');
+    }
+    preview.style.display = '';
+    refreshAllBenItemOptions();
+}
+
+function getItemsForGroup(groupId) {
+    if (!groupId) return itemsList;
+    return itemsList.filter(i => String(i.group_id) === String(groupId));
+}
+
+function addGroupItemsToAll() {
+    const incidentId = document.getElementById('dist_incident_id').value;
+    if (!incidentId) { showToast('danger', 'Please select an incident first'); return; }
+    const groupId = document.getElementById('dist_group_filter').value;
+    const groupItems = getItemsForGroup(groupId);
+    if (groupItems.length === 0) { showToast('danger', 'No items found in the selected group'); return; }
+
+    const qty = parseInt(document.getElementById('groupQty').value) || 1;
+    const whId = document.getElementById('groupWarehouse').value || document.getElementById('dist_warehouse_id').value || '';
+
+    const beneficiaryRows = document.querySelectorAll('#beneficiaryBody tr');
+    const registryRows = Array.from(beneficiaryRows).filter(tr => {
+        if (tr.querySelector('td[colspan]')) return false;
+        const benId = tr.querySelector('.ben-beneficiary-id');
+        return benId && benId.value;
+    });
+
+    if (registryRows.length === 0) {
+        showToast('danger', 'Please select beneficiaries from the registry first before adding group items');
+        return;
+    }
+
+    let addedCount = 0;
+    registryRows.forEach(tr => {
+        const container = tr.querySelector('.ben-items-container');
+        if (!container) return;
+        const addItemBtn = container.querySelector(':scope > button');
+        const existingItems = new Set();
+        container.querySelectorAll('.ben-item').forEach(sel => {
+            if (sel.value) existingItems.add(sel.value);
+        });
+        groupItems.forEach(item => {
+            if (existingItems.has(item.name)) return;
+            const row = document.createElement('div');
+            row.className = 'ben-item-row mb-1';
+            row.innerHTML = `
+                <div class="d-flex gap-1 align-items-center">
+                    <select class="form-select form-select-sm ben-item" onchange="refreshRowItemOptions(this)">
+                        <option value="">Select Item</option>
+                        ${itemOptionsHtml()}
+                    </select>
+                    <select class="form-select form-select-sm ben-item-wh" style="min-width:120px" onchange="refreshRowItemOptions(this.closest('.ben-item-row').querySelector('.ben-item'))">
+                        <option value="">Warehouse</option>
+                        ${warehouseOptionsHtml(whId)}
+                    </select>
+                    <input type="number" class="form-control form-control-sm ben-qty" style="width:80px" value="${qty}" min="1" oninput="refreshRowItemOptions(this.closest('.ben-item-row').querySelector('.ben-item'))">
+                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeBeneficiaryItem(this)"><i class="bi bi-x"></i></button>
+                </div>
+            `;
+            container.insertBefore(row, addItemBtn);
+            row.querySelector('.ben-item').value = item.name;
+            addedCount++;
+        });
+        container.querySelectorAll('.ben-item-row').forEach(row => {
+            const sel = row.querySelector('.ben-item');
+            if (sel && !sel.value) row.remove();
+        });
+    });
+    refreshAllBenItemOptions();
+    updateCashTotal();
+    const groupName = itemGroupsList.find(g => String(g.id) === String(groupId))?.name || 'group';
+    showToast('success', `Added ${groupItems.length} item(s) from "${groupName}" group to ${registryRows.length} beneficiary(ies)`);
 }
 
 document.addEventListener('DOMContentLoaded', function() {
