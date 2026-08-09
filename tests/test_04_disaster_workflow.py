@@ -270,6 +270,63 @@ class DisasterWorkflowTest(LeocTestCase):
         timeline = resp.get_json()['timeline']
         self.assertTrue(any(d['_type'] == 'distribution' for d in timeline))
 
+    def test_rainfall_stations_allow_blank_codes(self):
+        self.login()
+        name1 = f'Station-{uuid.uuid4().hex[:6]}'
+        resp = self.client.post('/api/rainfall-stations', json={
+            'station_name': name1,
+            'station_code': '',
+            'place': 'Ward 1',
+        })
+        self.assertEqual(resp.status_code, 201, resp.get_json())
+
+        name2 = f'Station-{uuid.uuid4().hex[:6]}'
+        resp = self.client.post('/api/rainfall-stations', json={
+            'station_name': name2,
+            'station_code': '  ',
+            'place': 'Ward 2',
+        })
+        self.assertEqual(resp.status_code, 201, resp.get_json())
+
+        resp = self.client.get('/api/rainfall-stations')
+        self.assertEqual(resp.status_code, 200)
+        stations = resp.get_json()['stations']
+        names = [s['station_name'] for s in stations]
+        self.assertIn(name1, names)
+        self.assertIn(name2, names)
+
+    def test_rainfall_stations_reject_duplicate_code(self):
+        self.login()
+        code = f'THL-{uuid.uuid4().hex[:4].upper()}'
+        resp = self.client.post('/api/rainfall-stations', json={
+            'station_name': f'Station-{uuid.uuid4().hex[:6]}',
+            'station_code': code,
+        })
+        self.assertEqual(resp.status_code, 201, resp.get_json())
+
+        resp = self.client.post('/api/rainfall-stations', json={
+            'station_name': f'Station-{uuid.uuid4().hex[:6]}',
+            'station_code': code,
+        })
+        self.assertEqual(resp.status_code, 409)
+        self.assertIn(code, resp.get_json()['message'])
+
+    def test_rainfall_station_update_allows_blanking_code(self):
+        self.login()
+        resp = self.client.post('/api/rainfall-stations', json={
+            'station_name': f'Station-{uuid.uuid4().hex[:6]}',
+            'station_code': 'ABC-123',
+        })
+        self.assertEqual(resp.status_code, 201, resp.get_json())
+        sid = resp.get_json()['data']['id']
+
+        resp = self.client.put(f'/api/rainfall-stations/{sid}', json={'station_code': ''})
+        self.assertEqual(resp.status_code, 200, resp.get_json())
+        self.assertEqual(resp.get_json()['data']['station_code'], '')
+        with app_module.app.app_context():
+            from app import RainfallStation
+            self.assertIsNone(RainfallStation.query.get(sid).station_code)
+
 
 # Add io import for in-memory file uploads
 import io

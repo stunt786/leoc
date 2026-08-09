@@ -4607,6 +4607,8 @@ def manage_distribution(id):
         return jsonify({'success': True, 'distribution': dist.to_dict()})
     if dist.status == 'Cancelled':
         return jsonify({'success': False, 'message': 'Cannot edit a cancelled distribution'}), 400
+    if dist.status == 'Completed':
+        return jsonify({'success': False, 'message': 'Cannot edit a completed distribution. Only file uploads are allowed.'}), 400
     try:
         data = request.get_json()
         if not isinstance(data, dict):
@@ -6924,9 +6926,15 @@ def handle_rainfall_stations():
         if not data or not data.get('station_name'):
             return jsonify({'success': False, 'message': 'Station name is required'}), 400
 
+        station_code = (data.get('station_code') or '').strip()
+        if station_code:
+            existing = RainfallStation.query.filter_by(station_code=station_code).first()
+            if existing:
+                return jsonify({'success': False, 'message': f'Station code "{station_code}" already exists. Please use a different code or leave it blank.'}), 409
+
         station = RainfallStation(
             station_name=data['station_name'],
-            station_code=data.get('station_code', ''),
+            station_code=station_code or None,
             latitude=parse_float_field(data, 'latitude'),
             longitude=parse_float_field(data, 'longitude'),
             place=data.get('place', ''),
@@ -6967,8 +6975,13 @@ def manage_rainfall_station(id):
 
     try:
         data = request.get_json()
+        station_code = (data.get('station_code') or '').strip()
+        if station_code:
+            existing = RainfallStation.query.filter(RainfallStation.station_code == station_code, RainfallStation.id != id).first()
+            if existing:
+                return jsonify({'success': False, 'message': f'Station code "{station_code}" already exists. Please use a different code or leave it blank.'}), 409
         station.station_name = data.get('station_name', station.station_name)
-        station.station_code = data.get('station_code', station.station_code)
+        station.station_code = station_code or None
         station.latitude = parse_float_field(data, 'latitude', default=station.latitude)
         station.longitude = parse_float_field(data, 'longitude', default=station.longitude)
         station.place = data.get('place', station.place)

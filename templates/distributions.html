@@ -416,6 +416,37 @@
         </div>
     </div>
 </div>
+
+<!-- Upload Files to Distribution Modal -->
+<div class="modal fade" id="distUploadModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="bi bi-paperclip me-2"></i>Upload Photos & Documents</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info small" id="distUploadInfo"><i class="bi bi-info-circle me-1"></i>Add supporting photos and documents to this distribution. Distribution details cannot be edited after completion.</div>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold"><i class="bi bi-images me-1"></i>Upload Photos</label>
+                        <input type="file" class="form-control" id="distUploadPhotos" accept="image/jpeg,image/png,image/gif" multiple onchange="previewDistUploadPhotos(this)">
+                        <div id="distUploadPhotoPreview" class="d-flex flex-wrap gap-2 mt-2"></div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold"><i class="bi bi-file-earmark-pdf me-1"></i>Upload Documents (PDF)</label>
+                        <input type="file" class="form-control" id="distUploadDocs" accept="application/pdf" multiple onchange="previewDistUploadDocs(this)">
+                        <div id="distUploadDocPreview" class="d-flex flex-wrap gap-2 mt-2"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="distUploadBtn" onclick="uploadDistributionFiles()"><i class="bi bi-upload me-1"></i>Upload Files</button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
@@ -1149,7 +1180,9 @@ function renderDistributions(data) {
             <td><span class="badge bg-dark">${benCount} family${benCount !== 1 ? 's' : ''}</span></td>
             <td class="text-end">
                 <button class="btn btn-sm btn-primary" onclick="viewDistribution(${dist.id})" title="View"><i class="bi bi-eye me-1"></i>View</button>
-                <button class="btn btn-sm btn-outline-warning" onclick="editDistribution(${dist.id})" title="Edit"><i class="bi bi-pencil"></i></button>
+                ${dist.status === 'Completed'
+                    ? `<button class="btn btn-sm btn-outline-primary" onclick="openDistributionUploadModal(${dist.id})" title="Upload Photos/Documents"><i class="bi bi-paperclip me-1"></i>Upload</button>`
+                    : `<button class="btn btn-sm btn-outline-warning" onclick="editDistribution(${dist.id})" title="Edit"><i class="bi bi-pencil"></i></button>`}
                 <button class="btn btn-sm btn-outline-secondary" onclick="window.open('/api/distributions/${dist.id}/print','_blank')" title="Print"><i class="bi bi-printer"></i></button>
                 ${dist.status !== 'Cancelled' ? `<button class="btn btn-sm btn-outline-danger" onclick="cancelDistribution(${dist.id})" title="Cancel"><i class="bi bi-x-lg"></i></button>` : ''}
             </td>
@@ -1356,8 +1389,9 @@ async function viewDistribution(id) {
             </div>
 
             <div class="card border-0 bg-light mt-3">
-                <div class="card-header bg-white py-2">
+                <div class="card-header bg-white py-2 d-flex justify-content-between align-items-center">
                     <span class="fw-semibold"><i class="bi bi-images me-1 text-primary"></i>Distribution Attachments</span>
+                    ${dist.status !== 'Cancelled' ? `<button class="btn btn-sm btn-outline-primary" onclick="openDistributionUploadModal(${dist.id})"><i class="bi bi-paperclip me-1"></i>Add Files</button>` : ''}
                 </div>
                 <div class="card-body py-2">
                     ${!dist.files || (!dist.files.photos.length && !dist.files.documents.length) ? '<span class="text-muted small">None</span>' : ''}
@@ -1539,6 +1573,122 @@ function removeDistDoc(index) {
     const container = document.getElementById('distDocPreview');
     const badges = container.querySelectorAll('.badge');
     if (badges[index]) badges[index].remove();
+}
+
+let distUploadModal = null;
+let distUploadId = null;
+let distUploadPhotoFiles = [];
+let distUploadDocFiles = [];
+
+function openDistributionUploadModal(id) {
+    distUploadId = id;
+    distUploadPhotoFiles = [];
+    distUploadDocFiles = [];
+    const photoInput = document.getElementById('distUploadPhotos');
+    const docInput = document.getElementById('distUploadDocs');
+    if (photoInput) photoInput.value = '';
+    if (docInput) docInput.value = '';
+    document.getElementById('distUploadPhotoPreview').innerHTML = '';
+    document.getElementById('distUploadDocPreview').innerHTML = '';
+    const btn = document.getElementById('distUploadBtn');
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-upload me-1"></i>Upload Files';
+    if (!distUploadModal) distUploadModal = new bootstrap.Modal(document.getElementById('distUploadModal'));
+    distUploadModal.show();
+}
+
+function previewDistUploadPhotos(input) {
+    distUploadPhotoFiles = Array.from(input.files);
+    const container = document.getElementById('distUploadPhotoPreview');
+    container.innerHTML = '';
+    distUploadPhotoFiles.forEach((f, i) => {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'position-relative';
+        wrapper.style.width = '80px';
+        const img = document.createElement('img');
+        img.className = 'img-thumbnail';
+        img.style.width = '80px';
+        img.style.height = '80px';
+        img.style.objectFit = 'cover';
+        const reader = new FileReader();
+        reader.onload = e => { img.src = e.target.result; };
+        reader.readAsDataURL(f);
+        wrapper.appendChild(img);
+        const rmBtn = document.createElement('button');
+        rmBtn.className = 'btn btn-sm btn-outline-danger p-0 position-absolute top-0 end-0';
+        rmBtn.style.fontSize = '0.6rem';
+        rmBtn.innerHTML = '<i class="bi bi-x"></i>';
+        rmBtn.onclick = () => { distUploadPhotoFiles.splice(i, 1); previewDistUploadPhotos(input); };
+        wrapper.appendChild(rmBtn);
+        container.appendChild(wrapper);
+    });
+}
+
+function previewDistUploadDocs(input) {
+    distUploadDocFiles = Array.from(input.files);
+    const container = document.getElementById('distUploadDocPreview');
+    container.innerHTML = '';
+    distUploadDocFiles.forEach((f, i) => {
+        const badge = document.createElement('span');
+        badge.className = 'badge bg-secondary d-inline-flex align-items-center gap-1';
+        badge.innerHTML = `<i class="bi bi-file-pdf"></i> ${f.name} <button class="btn btn-sm btn-outline-light p-0 ms-1" style="font-size:0.6rem;line-height:1" onclick="removeDistUploadDoc(${i})"><i class="bi bi-x"></i></button>`;
+        container.appendChild(badge);
+    });
+}
+
+function removeDistUploadDoc(index) {
+    distUploadDocFiles.splice(index, 1);
+    const container = document.getElementById('distUploadDocPreview');
+    const badges = container.querySelectorAll('.badge');
+    if (badges[index]) badges[index].remove();
+}
+
+async function uploadDistributionFiles() {
+    const btn = document.getElementById('distUploadBtn');
+    if (!distUploadId) return;
+    if (distUploadPhotoFiles.length === 0 && distUploadDocFiles.length === 0) {
+        showToast('warning', 'Please select at least one photo or document to upload');
+        return;
+    }
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Uploading...';
+    try {
+        let uploaded = 0;
+        if (distUploadPhotoFiles.length > 0) {
+            const fd = new FormData();
+            fd.append('type', 'photo');
+            distUploadPhotoFiles.forEach(f => fd.append('files', f));
+            const pr = await fetch(`/api/distributions/${distUploadId}/upload-files`, {
+                method: 'POST', headers: {'X-CSRFToken': csrf}, body: fd
+            });
+            const pd = await pr.json();
+            if (pd.success) uploaded += (pd.data.files || []).length;
+            else showToast('warning', 'Photo upload: ' + pd.message);
+        }
+        if (distUploadDocFiles.length > 0) {
+            const fd = new FormData();
+            fd.append('type', 'document');
+            distUploadDocFiles.forEach(f => fd.append('files', f));
+            const dr = await fetch(`/api/distributions/${distUploadId}/upload-files`, {
+                method: 'POST', headers: {'X-CSRFToken': csrf}, body: fd
+            });
+            const dd = await dr.json();
+            if (dd.success) uploaded += (dd.data.files || []).length;
+            else showToast('warning', 'Document upload: ' + dd.message);
+        }
+        if (uploaded > 0) {
+            showToast('success', `${uploaded} file(s) uploaded successfully`);
+            if (distUploadModal) distUploadModal.hide();
+            loadDistributions();
+        } else {
+            showToast('danger', 'No files were uploaded');
+        }
+    } catch(e) {
+        showToast('danger', 'Upload error: ' + e.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-upload me-1"></i>Upload Files';
+    }
 }
 
 function resetDistributionForm() {
