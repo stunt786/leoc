@@ -543,7 +543,7 @@ function renderDistModeBanner() {
     const el = document.getElementById('distModeBanner');
     if (!el) return;
     const mode = distributionMode;
-    const repsNote = ` Each beneficiary may receive up to <strong>${distributionReps}</strong> distribution(s) this fiscal year.`;
+    const repsNote = ` Each beneficiary may receive <strong>one</strong> distribution per incident; they may receive aid for up to <strong>${distributionReps}</strong> different incident(s) this fiscal year.`;
     const cashSection = document.getElementById('cashFundSection');
     if (mode === 'cash_only') {
         el.className = 'alert alert-danger d-flex align-items-center gap-2';
@@ -781,11 +781,9 @@ function toggleCashField(checkbox) {
     const amtInput = checkbox.closest('tr').querySelector('.ben-cash-amount');
     const benId = parseInt(checkbox.closest('tr').querySelector('.ben-beneficiary-id').value);
     if (checkbox.checked && benId) {
-        const cashCount = getCashDistCount(benId);
-        if (cashCount >= distributionReps) {
-            showToast('warning', `This beneficiary has already received cash ${cashCount}/${distributionReps} time(s) this fiscal year. Cash distribution will be blocked on save.`);
-        } else if (cashCount > 0) {
-            showToast('warning', `This beneficiary has already received cash ${cashCount}/${distributionReps} time(s) this fiscal year.`);
+        const distCount = getIncidentDistCount(benId);
+        if (distCount >= 1) {
+            showToast('warning', `This beneficiary has already received relief for this incident. Cash distribution will be blocked on save.`);
         }
     }
     amtInput.disabled = !checkbox.checked;
@@ -846,7 +844,7 @@ function onIncidentChange() {
             let html = `Affected Households: <strong>${limit}</strong> | Already Beneficiated (this incident): <strong>${sameIncCount}</strong> | Selected: <strong>${currentCount}</strong> | Remaining: <strong class="${remaining === 0 ? 'text-success' : 'text-warning'}">${remaining}</strong>`;
             const otherIncCount = alreadyBenificiatedIds.size - sameIncCount;
             if (otherIncCount > 0) html += ` | <span class="text-info"><i class="bi bi-info-circle me-1"></i>${otherIncCount} beneficated in other incident(s) this FY</span>`;
-            if (cashModuleBeneficiaryIds.size > 0) html += ` | <span class="text-warning"><i class="bi bi-cash me-1"></i>${cashModuleBeneficiaryIds.size} received cash from Cash Module this FY (cash limit ${distributionReps}/beneficiary)</span>`;
+            if (cashModuleBeneficiaryIds.size > 0) html += ` | <span class="text-warning"><i class="bi bi-cash me-1"></i>${cashModuleBeneficiaryIds.size} received cash from Cash Module this FY</span>`;
             infoEl.innerHTML = html;
         }
     });
@@ -894,13 +892,16 @@ async function loadAlreadyBeneficiated() {
             d.distributions.forEach(dist => {
                 if (dist.status === 'Completed') {
                     const isSameIncident = String(dist.incident_id) === String(currentIncidentId);
+                    const seenPerDist = new Set();
                     (dist.beneficiaries || []).forEach(b => {
-                        if (b.beneficiary_id) {
+                        if (b.beneficiary_id && !seenPerDist.has(b.beneficiary_id)) {
+                            seenPerDist.add(b.beneficiary_id);
                             alreadyBenificiatedIds.add(b.beneficiary_id);
                             if (isSameIncident) sameIncidentBenIds.add(b.beneficiary_id);
                             if (!beneficiaryDistHistory[b.beneficiary_id]) beneficiaryDistHistory[b.beneficiary_id] = [];
                             beneficiaryDistHistory[b.beneficiary_id].push({
-                                type: 'Material', incident: dist.incident_name, date: dist.distribution_date, dist_no: dist.distribution_no
+                                type: 'Material', incident: dist.incident_name, incident_id: dist.incident_id,
+                                date: dist.distribution_date, dist_no: dist.distribution_no, distribution_id: dist.id
                             });
                         }
                     });
@@ -913,8 +914,10 @@ async function loadAlreadyBeneficiated() {
             cd.distributions.forEach(cdist => {
                 if (cdist.status === 'Completed') {
                     const isSameIncident = String(cdist.incident_id) === String(currentIncidentId);
+                    const seenPerDist = new Set();
                     (cdist.beneficiaries || []).forEach(b => {
-                        if (b.beneficiary_id) {
+                        if (b.beneficiary_id && !seenPerDist.has(b.beneficiary_id)) {
+                            seenPerDist.add(b.beneficiary_id);
                             cashModuleBeneficiaryIds.add(b.beneficiary_id);
                             if (!isSameIncident) {
                                 alreadyBenificiatedIds.add(b.beneficiary_id);
@@ -922,7 +925,9 @@ async function loadAlreadyBeneficiated() {
                             if (isSameIncident) sameIncidentBenIds.add(b.beneficiary_id);
                             if (!beneficiaryDistHistory[b.beneficiary_id]) beneficiaryDistHistory[b.beneficiary_id] = [];
                             beneficiaryDistHistory[b.beneficiary_id].push({
-                                type: 'Cash', incident: cdist.incident_name, date: cdist.distribution_date, dist_no: cdist.distribution_no, amount: b.amount
+                                type: 'Cash', incident: cdist.incident_name, incident_id: cdist.incident_id,
+                                date: cdist.distribution_date, dist_no: cdist.distribution_no, amount: b.amount,
+                                distribution_id: cdist.distribution_id || cdist.id
                             });
                         }
                     });
@@ -936,12 +941,40 @@ function getBeneficiaryHistory(benId) {
     return beneficiaryDistHistory[benId] || [];
 }
 
+function getCurrentIncidentId() {
+    const el = document.getElementById('dist_incident_id');
+    return el ? el.value : '';
+}
+
 function getItemsDistCount(benId) {
-    return getBeneficiaryHistory(benId).filter(h => h.type === 'Material').length;
+    const incidentId = getCurrentIncidentId();
+    return getBeneficiaryHistory(benId).filter(h => h.type === 'Material' && (!incidentId || String(h.incident_id) === String(incidentId))).length;
 }
 
 function getCashDistCount(benId) {
-    return getBeneficiaryHistory(benId).filter(h => h.type === 'Cash').length;
+    const incidentId = getCurrentIncidentId();
+    return getBeneficiaryHistory(benId).filter(h => h.type === 'Cash' && (!incidentId || String(h.incident_id) === String(incidentId))).length;
+}
+
+function getIncidentDistCount(benId) {
+    const incidentId = getCurrentIncidentId();
+    const seen = new Set();
+    return getBeneficiaryHistory(benId).filter(h => {
+        if (incidentId && String(h.incident_id) !== String(incidentId)) return false;
+        const key = (h.distribution_id != null && h.distribution_id !== '') ? h.distribution_id : (h.dist_no || h.incident_id + '|' + h.dist_no);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    }).length;
+}
+
+function getTotalIncidentsCount(benId) {
+    const incidents = new Set();
+    getBeneficiaryHistory(benId).forEach(h => {
+        if (h.incident_id) incidents.add(String(h.incident_id));
+    });
+    const currentIncidentId = getCurrentIncidentId();
+    return incidents.size + (currentIncidentId && !incidents.has(String(currentIncidentId)) ? 1 : 0);
 }
 
 function isAlreadyBeneficiated(benId) {
@@ -1046,34 +1079,45 @@ function renderBenPicker(list) {
     DataTableManager.destroy('dataTable');
     tbody.innerHTML = list.map(b => {
         const isSelected = isAlreadySelectedInDist(b.id);
+        const distCount = getIncidentDistCount(b.id);
         const itemsCount = getItemsDistCount(b.id);
         const cashCount = getCashDistCount(b.id);
-        const limitReached = itemsCount >= distributionReps;
-        const hasPrior = itemsCount > 0;
+        const totalIncidents = getTotalIncidentsCount(b.id);
+        const sameIncidentLimit = distCount >= 1;
+        const acrossIncidentLimit = totalIncidents > distributionReps;
+        const limitReached = sameIncidentLimit || acrossIncidentLimit;
+        const hasPrior = distCount > 0;
         const history = getBeneficiaryHistory(b.id);
         let rowClass = '';
         let btn;
-        if (limitReached) {
+        if (sameIncidentLimit) {
             rowClass = 'table-secondary text-muted';
-            btn = `<span class="badge bg-danger"><i class="bi bi-x-circle me-1"></i>Limit reached (${itemsCount}/${distributionReps})</span>`;
+            btn = `<span class="badge bg-danger"><i class="bi bi-x-circle me-1"></i>Already received for this incident</span>`;
+        } else if (acrossIncidentLimit) {
+            rowClass = 'table-secondary text-muted';
+            btn = `<span class="badge bg-danger"><i class="bi bi-x-circle me-1"></i>Aid limit reached (${totalIncidents}/${distributionReps} incidents)</span>`;
         } else if (isSelected) {
             rowClass = 'table-info';
             btn = '<span class="badge bg-info"><i class="bi bi-check2-all me-1"></i>Already Selected</span>';
         } else if (hasPrior) {
             rowClass = 'table-warning';
-            const incNames = [...new Set(history.filter(h => h.type === 'Material').map(h => h.incident))].join(', ');
-            btn = `<button class="btn btn-sm btn-outline-warning" onclick="selectBeneficiaryFromPicker(${b.id})" title="Items received in: ${incNames}"><i class="bi bi-exclamation-triangle me-1"></i><i class="bi bi-plus-lg"></i></button>`;
+            const incNames = [...new Set(history.filter(h => String(h.incident_id) === String(getCurrentIncidentId()) || getCurrentIncidentId() === '').map(h => h.incident))].join(', ');
+            btn = `<button class="btn btn-sm btn-outline-warning" onclick="selectBeneficiaryFromPicker(${b.id})" title="Distributions received in: ${incNames}"><i class="bi bi-exclamation-triangle me-1"></i><i class="bi bi-plus-lg"></i></button>`;
         } else {
             btn = `<button class="btn btn-sm btn-outline-primary" onclick="selectBeneficiaryFromPicker(${b.id})"><i class="bi bi-plus-lg"></i></button>`;
         }
         let histBadge = '';
-        if (limitReached) {
-            histBadge += `<small class="text-danger d-block"><i class="bi bi-exclamation-triangle me-1"></i>Item distribution limit reached (${itemsCount}/${distributionReps}) this FY</small>`;
-        } else if (hasPrior) {
-            histBadge += `<small class="text-warning d-block"><i class="bi bi-clock-history me-1"></i>Received items ${itemsCount}/${distributionReps} time(s) this FY</small>`;
+        if (sameIncidentLimit) {
+            histBadge += `<small class="text-danger d-block"><i class="bi bi-exclamation-triangle me-1"></i>Already received for this incident (1/1 per incident)</small>`;
+        }
+        if (acrossIncidentLimit) {
+            histBadge += `<small class="text-danger d-block"><i class="bi bi-exclamation-triangle me-1"></i>Aid limit reached: ${totalIncidents}/${distributionReps} incident(s) this fiscal year</small>`;
+        }
+        if (!sameIncidentLimit && !acrossIncidentLimit && hasPrior) {
+            histBadge += `<small class="text-warning d-block"><i class="bi bi-clock-history me-1"></i>Received aid for ${totalIncidents - 1} other incident(s)</small>`;
         }
         if (cashCount > 0) {
-            histBadge += `<small class="text-warning d-block"><i class="bi bi-cash me-1"></i>Received cash ${cashCount}/${distributionReps} this FY</small>`;
+            histBadge += `<small class="text-warning d-block"><i class="bi bi-cash me-1"></i>Also received cash ${cashCount} time(s) for this incident</small>`;
         }
         return `<tr class="${rowClass}">
             <td>${b.name}${histBadge}</td>
@@ -1089,8 +1133,10 @@ function renderBenPicker(list) {
 function showBenHistoryWarning(benId, benName) {
     const history = getBeneficiaryHistory(benId);
     if (history.length === 0) return true;
+    const distCount = getIncidentDistCount(benId);
     const itemsCount = getItemsDistCount(benId);
     const cashCount = getCashDistCount(benId);
+    const totalIncidents = getTotalIncidentsCount(benId);
     const rows = history.map(h => {
         const icon = h.type === 'Cash' ? 'bi-cash text-success' : 'bi-box text-primary';
         return `<tr><td><i class="bi ${icon} me-1"></i>${h.type}</td><td>${h.incident || '-'}</td><td>${h.date || '-'}</td><td>${h.dist_no || '-'}${h.amount ? ' (' + Number(h.amount).toLocaleString() + ')' : ''}</td></tr>`;
@@ -1105,7 +1151,7 @@ function showBenHistoryWarning(benId, benName) {
         <div class="modal-body">
             <p><strong>${benName}</strong> has prior distribution history in fiscal year ${activeFiscalYear}:</p>
             <table class="table table-sm table-bordered"><thead class="table-light"><tr><th>Type</th><th>Incident</th><th>Date</th><th>Reference</th></tr></thead><tbody>${rows}</tbody></table>
-            <div class="alert alert-info mb-0"><i class="bi bi-info-circle me-1"></i>This beneficiary has received <strong>items ${itemsCount}/${distributionReps}</strong> time(s) and <strong>cash ${cashCount}/${distributionReps}</strong> time(s) this fiscal year. ${distributionReps} is the yearly limit per type. Do you want to add them to this distribution?</div>
+            <div class="alert alert-info mb-0"><i class="bi bi-info-circle me-1"></i>This beneficiary has already received aid for <strong>${totalIncidents}</strong> other incident(s) this fiscal year (limit: ${distributionReps} incident(s)). Do you want to add them to this distribution?</div>
         </div>
         <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -1125,6 +1171,7 @@ function showBenHistoryWarning(benId, benName) {
 function showCrossIncidentWarning(benId, benName) {
     const history = getBeneficiaryHistory(benId);
     if (history.length === 0) return true;
+    const totalIncidents = getTotalIncidentsCount(benId);
     const rows = history.map(h => {
         const icon = h.type === 'Cash' ? 'bi-cash text-success' : 'bi-box text-primary';
         return `<tr><td><i class="bi ${icon} me-1"></i>${h.type}</td><td>${h.incident || '-'}</td><td>${h.date || '-'}</td><td>${h.dist_no || '-'}${h.amount ? ' (NPR ' + Number(h.amount).toLocaleString() + ')' : ''}</td></tr>`;
@@ -1141,7 +1188,7 @@ function showCrossIncidentWarning(benId, benName) {
         <div class="modal-body">
             <p><strong>${benName}</strong> has already received distributions in <strong>other incident(s)</strong> during this fiscal year (${activeFiscalYear}):</p>
             <table class="table table-sm table-bordered"><thead class="table-light"><tr><th>Type</th><th>Incident</th><th>Date</th><th>Reference</th></tr></thead><tbody>${rows}</tbody></table>
-            <div class="alert alert-warning mb-0"><i class="bi bi-exclamation-triangle me-1"></i><strong>Warning:</strong> This beneficiary already received relief from a different incident. Adding them to <strong>${currentIncName}</strong> means they will receive aid from multiple incidents in the same fiscal year. Do you want to proceed?</div>
+            <div class="alert alert-warning mb-0"><i class="bi bi-exclamation-triangle me-1"></i><strong>Warning:</strong> This beneficiary has already received aid for ${totalIncidents - 1} other incident(s) this fiscal year (limit: ${distributionReps} incident(s)). Adding them to <strong>${currentIncName}</strong> will use one of their remaining incident slots. Do you want to proceed?</div>
         </div>
         <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -1159,9 +1206,14 @@ function showCrossIncidentWarning(benId, benName) {
 }
 
 async function selectBeneficiaryFromPicker(id) {
-    const itemsCount = getItemsDistCount(id);
-    if (itemsCount >= distributionReps) {
-        showToast('danger', `This beneficiary has already received relief items ${itemsCount}/${distributionReps} time(s) — the maximum allowed for this fiscal year.`);
+    const distCount = getIncidentDistCount(id);
+    const totalIncidents = getTotalIncidentsCount(id);
+    if (distCount >= 1) {
+        showToast('danger', `This beneficiary has already received relief for this incident — a beneficiary may receive only ONE distribution per incident.`);
+        return;
+    }
+    if (totalIncidents > distributionReps) {
+        showToast('danger', `This beneficiary has already received aid for ${totalIncidents} different incident(s) — the maximum allowed is ${distributionReps} incident(s) this fiscal year.`);
         return;
     }
     if (isAlreadySelectedInDist(id)) {
@@ -1170,7 +1222,7 @@ async function selectBeneficiaryFromPicker(id) {
     }
     const ben = beneficiaries.find(b => b.id === id);
     if (!ben) return;
-    if (itemsCount > 0) {
+    if (distCount > 0) {
         const confirmed = await showBenHistoryWarning(id, ben.name);
         if (!confirmed) return;
     }
@@ -1765,6 +1817,10 @@ async function saveDistribution() {
     if (!incidentId) { showToast('danger', 'Please select an incident'); return; }
 
     const hhLimit = getAffectedHouseholdLimit();
+    if (hhLimit < 1) {
+        showToast('danger', 'Distribution cannot be recorded: This incident has no affected households.');
+        return;
+    }
     const regCount = getRegistryBenCount();
     const sameIncCount = sameIncidentBenIds ? sameIncidentBenIds.size : 0;
     if (hhLimit > 0 && (sameIncCount + regCount) > hhLimit) {
@@ -1861,8 +1917,8 @@ async function saveDistribution() {
             const benId = parseInt(tr.querySelector('.ben-beneficiary-id').value);
             const name = nameInput.value.trim();
             const amount = parseFloat(amtInput.value);
-            if (benId && getCashDistCount(benId) >= distributionReps) {
-                showToast('danger', `Beneficiary "${name}" has already received cash ${getCashDistCount(benId)}/${distributionReps} time(s) from the Cash Distribution module this fiscal year. Please remove cash for this beneficiary.`);
+            if (benId && getIncidentDistCount(benId) >= 1) {
+                showToast('danger', `Beneficiary "${name}" has already received relief for this incident. Please remove cash for this beneficiary.`);
                 cashBlocked = true;
                 return;
             }

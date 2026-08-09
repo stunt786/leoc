@@ -145,7 +145,7 @@ class LeocTestCase(unittest.TestCase):
         self.assertEqual(response.status_code, 201, response.get_json())
         return response.get_json()['data']
 
-    def create_incident(self, name=None, incident_type='Flood', ward=1):
+    def create_incident(self, name=None, incident_type='Flood', ward=1, affected_households=200):
         payload = {
             'incident_name': name or f'Incident-{uuid.uuid4().hex[:8]}',
             'incident_type': incident_type,
@@ -154,7 +154,7 @@ class LeocTestCase(unittest.TestCase):
             'status': 'Active',
             'description': 'Test incident',
             'coordinates': '28.5,81.5',
-            'affected_households': 200,
+            'affected_households': affected_households,
         }
         response = self.client.post('/api/incidents', json=payload)
         self.assertEqual(response.status_code, 201, response.get_json())

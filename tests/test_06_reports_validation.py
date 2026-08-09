@@ -145,6 +145,16 @@ class ValidationEdgeCaseTest(LeocTestCase):
         })
         self.assertEqual(resp.status_code, 400)
 
+    def test_same_name_different_identifiers_accepted(self):
+        self.login()
+        ben = self.create_beneficiary()
+        resp = self.client.post('/api/beneficiaries', json={
+            'name': ben['name'], 'national_id': 'DIFFERENT-ID',
+            'father_name': 'Different Father', 'phone': '9800000002',
+            'ward': 2, 'tole': 'Different Tole',
+        })
+        self.assertEqual(resp.status_code, 201, resp.get_json())
+
     def test_distribution_cancel_without_reason(self):
         self.login()
         cat = self.create_category()
@@ -188,6 +198,39 @@ class ValidationEdgeCaseTest(LeocTestCase):
             'name': 'NoCat', 'unit': 'Piece', 'category_id': 999999,
         })
         self.assertEqual(resp.status_code, 404)
+
+    def test_item_distribution_blocked_when_incident_has_no_affected_households(self):
+        self.login()
+        cat = self.create_category()
+        wh = self.create_warehouse()
+        item = self.create_item(cat['id'])
+        inc = self.create_incident(affected_households=0)
+        self.create_stock_receipt(wh['id'], item['id'], quantity=10)
+        resp = self.client.post('/api/distributions', json={
+            'incident_id': inc['id'], 'warehouse_id': wh['id'],
+            'destination': 'Test', 'receiver': 'Test',
+            'distribution_date': '2082-03-03', 'officer': 'Test',
+            'items': [{'item_id': item['id'], 'warehouse_id': wh['id'], 'quantity': 2, 'unit': 'Piece'}],
+            'beneficiaries': [
+                {'family_name': 'Family A', 'members': 3, 'item': None, 'quantity': 2},
+            ],
+        })
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn('no affected households', resp.get_json()['message'])
+
+    def test_cash_distribution_blocked_when_incident_has_no_affected_households(self):
+        self.login()
+        inc = self.create_incident(affected_households=0)
+        fund = self.create_fund()
+        resp = self.client.post('/api/cash-distributions', json={
+            'fund_id': fund['id'], 'incident_id': inc['id'],
+            'distribution_date': '2082-03-03', 'officer': 'Test',
+            'beneficiaries': [
+                {'name': 'Ben A', 'national_id': 'N-1', 'amount': 100},
+            ],
+        })
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn('no affected households', resp.get_json()['message'])
 
 
 class ReportGenerationTest(LeocTestCase):

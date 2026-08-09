@@ -201,10 +201,10 @@
         <div class="card mt-3">
             <div class="card-header"><span><i class="bi bi-arrow-repeat me-2"></i>Distribution Repetitions</span></div>
             <div class="card-body">
-                <p class="small text-muted">Maximum number of times a beneficiary may receive distributions during the current active fiscal year. The limit applies independently to the Cash module and the Items (Distribution) module. Set to 1 to keep the current once-only behaviour.</p>
+                <p class="small text-muted">Maximum number of <strong>different incidents</strong> a beneficiary may receive aid for during the current active fiscal year. Within each incident a beneficiary may receive at most <strong>one</strong> distribution (items and cash combined). Distributions for different incidents are allowed up to this limit. Set to 1 so each beneficiary receives aid for at most one incident.</p>
                 <div class="row g-3">
                     <div class="col-md-4">
-                        <label class="form-label fw-medium">Distributions per Beneficiary for Active Fiscal Year (<span id="drActiveFy"></span>)</label>
+                        <label class="form-label fw-medium">Distributions per Beneficiary per Incident (<span id="drActiveFy"></span>)</label>
                         <input type="number" class="form-control" id="distribution_repetitions" data-key="distribution_repetitions" min="1" step="1" value="1">
                     </div>
                     <div class="col-md-8">
@@ -212,8 +212,8 @@
                             <div class="card-body">
                                 <h6 class="fw-medium mb-2">How it works</h6>
                                 <ul class="small text-muted mb-0">
-                                    <li><strong>1</strong> — each beneficiary can be distributed to at most once per fiscal year (current behaviour).</li>
-                                    <li><strong>N</strong> — each beneficiary can receive up to N item distributions and up to N cash distributions during the fiscal year.</li>
+                                    <li><strong>1</strong> — a beneficiary may receive aid for at most 1 incident during the fiscal year (one distribution per incident).</li>
+                                    <li><strong>N</strong> — a beneficiary may receive aid for up to N different incidents during the fiscal year (one distribution per incident).</li>
                                 </ul>
                             </div>
                         </div>

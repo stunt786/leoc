@@ -273,22 +273,21 @@ def friendly_message(e):
 
 
 def find_beneficiary_duplicates(name=None, national_id=None, phone=None, family_members=None, exclude_id=None):
-    """Check if a person (name/national_id/phone) or their family members
+    """Check if a person (national_id/phone) or their family members
     already exist across all beneficiaries and their family member lists.
-    Returns list of dicts with match details."""
+    Only national_id and phone are treated as unique identifiers; a matching
+    name alone does NOT count as a duplicate (same name with different
+    national_id/phone is accepted). Returns list of dicts with match details."""
     duplicates = []
-    name = (name or '').strip().lower()
     national_id = (national_id or '').strip()
     phone = (phone or '').strip()
-    if not any([name, national_id, phone, family_members]):
+    if not any([national_id, phone, family_members]):
         return duplicates
     all_bens = Beneficiary.query.all()
     for ben in all_bens:
         if exclude_id and ben.id == exclude_id:
             continue
-        # --- Check main beneficiary fields ---
-        if name and name == (ben.name or '').strip().lower():
-            duplicates.append({'type': 'main', 'beneficiary_id': ben.id, 'beneficiary_name': ben.name, 'match_type': 'name', 'matched_value': name})
+        # --- Check main beneficiary fields (national_id / phone unique) ---
         if national_id and national_id == (ben.national_id or '').strip():
             duplicates.append({'type': 'main', 'beneficiary_id': ben.id, 'beneficiary_name': ben.name, 'match_type': 'national_id', 'matched_value': national_id})
         if phone and phone == (ben.phone or '').strip():
@@ -299,34 +298,22 @@ def find_beneficiary_duplicates(name=None, national_id=None, phone=None, family_
         except (json.JSONDecodeError, TypeError):
             ben_family = []
         for fm in ben_family:
-            fm_name = (fm.get('name') or '').strip().lower()
             fm_id = (fm.get('id') or '').strip()
-            fm_age = fm.get('age')
-            # New beneficiary matches existing family member
-            if name and fm_name and name == fm_name:
-                duplicates.append({'type': 'family_member', 'beneficiary_id': ben.id, 'beneficiary_name': ben.name, 'match_type': 'name', 'matched_value': name})
+            # New beneficiary matches existing family member by national id
             if national_id and fm_id and national_id == fm_id:
                 duplicates.append({'type': 'family_member', 'beneficiary_id': ben.id, 'beneficiary_name': ben.name, 'match_type': 'national_id', 'matched_value': national_id})
-            if phone and fm_name and phone == fm_name:  # phone might match a family member name
-                pass  # phone matching against names is too loose
         # --- Check if any NEW family members match existing records ---
         if family_members:
             for new_fm in family_members:
-                new_fm_name = (new_fm.get('name') or '').strip().lower()
                 new_fm_id = (new_fm.get('id') or '').strip()
-                if not new_fm_name and not new_fm_id:
+                if not new_fm_id:
                     continue
-                # New family member matches existing main beneficiary
-                if new_fm_name and new_fm_name == (ben.name or '').strip().lower():
-                    duplicates.append({'type': 'family_member_match', 'beneficiary_id': ben.id, 'beneficiary_name': ben.name, 'match_type': 'name', 'matched_value': new_fm_name})
-                if new_fm_id and new_fm_id == (ben.national_id or '').strip():
+                # New family member matches existing main beneficiary by national id
+                if new_fm_id == (ben.national_id or '').strip():
                     duplicates.append({'type': 'family_member_match', 'beneficiary_id': ben.id, 'beneficiary_name': ben.name, 'match_type': 'national_id', 'matched_value': new_fm_id})
-                # New family member matches existing family member
+                # New family member matches existing family member by national id
                 for existing_fm in ben_family:
-                    efm_name = (existing_fm.get('name') or '').strip().lower()
                     efm_id = (existing_fm.get('id') or '').strip()
-                    if new_fm_name and efm_name and new_fm_name == efm_name:
-                        duplicates.append({'type': 'family_member_match', 'beneficiary_id': ben.id, 'beneficiary_name': ben.name, 'match_type': 'name', 'matched_value': new_fm_name})
                     if new_fm_id and efm_id and new_fm_id == efm_id:
                         duplicates.append({'type': 'family_member_match', 'beneficiary_id': ben.id, 'beneficiary_name': ben.name, 'match_type': 'national_id', 'matched_value': new_fm_id})
     return duplicates
@@ -4434,10 +4421,11 @@ def validate_distribution_mode_allowed(fiscal_year, kind):
     return mode
 
 def get_distribution_repetitions(fiscal_year=None):
-    """Return the max number of times a beneficiary may receive distributions
-    per fiscal year (default 1 = current once-only behaviour). Applies to the
-    current active fiscal year and is used independently by the Cash module and
-    the Items (Distribution) module.
+    """Return the maximum number of DIFFERENT incidents a beneficiary may
+    receive aid for within the active fiscal year (default 1 = once only).
+    Within each incident a beneficiary may receive at most ONE distribution
+    (items and cash combined).  Used independently by the Cash module and the
+    Items (Distribution) module.
     """
     val = AppSettings.get_setting('distribution_repetitions')
     try:
@@ -4485,11 +4473,17 @@ def _validate_distribution_items(items_payload):
     return validated
 
 
-def _validate_distribution_beneficiaries(beneficiaries_payload, allowed_items, fiscal_year, exclude_distribution_id=None):
-    """Validate beneficiaries payload. Raises ValueError on any problem."""
+def _validate_distribution_beneficiaries(beneficiaries_payload, allowed_items, fiscal_year, incident_id=None, exclude_distribution_id=None):
+    """Validate beneficiaries payload. Raises ValueError on any problem.
+
+    A beneficiary may receive at most ONE distribution per incident (items and
+    cash combined). The ``distribution_repetitions`` setting controls how many
+    DIFFERENT incidents a beneficiary may receive aid for within the fiscal year.
+    Distributions for different incidents are allowed up to that limit.
+    """
     if not beneficiaries_payload:
         raise ValueError('At least one beneficiary is required')
-    reps = get_distribution_repetitions(fiscal_year)
+    max_incidents = get_distribution_repetitions(fiscal_year)
     seen = set()
     for ben in beneficiaries_payload:
         family_name = (ben.get('family_name') or '').strip()
@@ -4507,19 +4501,60 @@ def _validate_distribution_beneficiaries(beneficiaries_payload, allowed_items, f
             raise ValueError(f'Duplicate beneficiary "{family_name}" with item "{item_name}" in the same distribution request')
         if ben_id:
             seen.add(key)
-            prior_count = db.session.query(db.func.count(db.distinct(Distribution.id))).join(
+            # --- Per-incident check: always limited to 1 ---
+            if incident_id:
+                same_inc_count = db.session.query(db.func.count(db.distinct(Distribution.id))).join(
+                    DistributionBeneficiary, DistributionBeneficiary.distribution_id == Distribution.id
+                ).filter(
+                    Distribution.fiscal_year == fiscal_year,
+                    Distribution.status != 'Cancelled',
+                    Distribution.id != exclude_distribution_id,
+                    Distribution.incident_id == incident_id,
+                    DistributionBeneficiary.beneficiary_id == ben_id
+                ).scalar() or 0
+                cash_same_inc = db.session.query(db.func.count(db.distinct(CashDistribution.id))).join(
+                    CashDistributionBeneficiary, CashDistributionBeneficiary.distribution_id == CashDistribution.id
+                ).filter(
+                    CashDistribution.fiscal_year == fiscal_year,
+                    CashDistribution.status != 'Cancelled',
+                    CashDistribution.incident_id == incident_id,
+                    CashDistributionBeneficiary.beneficiary_id == ben_id
+                )
+                if exclude_distribution_id:
+                    cash_same_inc = cash_same_inc.filter(db.or_(
+                        CashDistribution.distribution_id.is_(None),
+                        CashDistribution.distribution_id != exclude_distribution_id
+                    ))
+                same_inc_count += cash_same_inc.scalar() or 0
+                if same_inc_count >= 1:
+                    raise ValueError(
+                        f'Beneficiary "{family_name}" has already received relief for this incident '
+                        f'in fiscal year {fiscal_year}. A beneficiary may receive only ONE distribution per incident.'
+                    )
+            # --- Across-incidents check: limited by distribution_repetitions ---
+            item_incidents = set(r[0] for r in db.session.query(Distribution.incident_id).join(
                 DistributionBeneficiary, DistributionBeneficiary.distribution_id == Distribution.id
             ).filter(
                 Distribution.fiscal_year == fiscal_year,
                 Distribution.status != 'Cancelled',
-                Distribution.id != exclude_distribution_id,
                 DistributionBeneficiary.beneficiary_id == ben_id
-            ).scalar() or 0
-            if prior_count >= reps:
+            ).distinct().all())
+            cash_incidents = set(r[0] for r in db.session.query(CashDistribution.incident_id).join(
+                CashDistributionBeneficiary, CashDistributionBeneficiary.distribution_id == CashDistribution.id
+            ).filter(
+                CashDistribution.fiscal_year == fiscal_year,
+                CashDistribution.status != 'Cancelled',
+                CashDistributionBeneficiary.beneficiary_id == ben_id
+            ).distinct().all())
+            all_incidents = item_incidents | cash_incidents
+            total_incidents = len(all_incidents)
+            if incident_id and incident_id not in all_incidents:
+                total_incidents += 1
+            if total_incidents > max_incidents:
                 raise ValueError(
-                    f'Beneficiary "{family_name}" has already received relief items {prior_count} time(s) '
-                    f'in fiscal year {fiscal_year}. This fiscal year allows a maximum of {reps} '
-                    f'distribution(s) per beneficiary.'
+                    f'Beneficiary "{family_name}" has already received relief for {len(all_incidents)} '
+                    f'different incident(s) in fiscal year {fiscal_year}. A beneficiary may receive aid '
+                    f'for a maximum of {max_incidents} incident(s).'
                 )
     return True
 
@@ -4554,6 +4589,8 @@ def handle_distributions():
         incident = db_get(Incident, incident_id)
         if not incident:
             return jsonify({'success': False, 'message': 'Incident not found'}), 404
+        if incident.affected_households is None or incident.affected_households < 1:
+            return jsonify({'success': False, 'message': f'Distribution cannot be recorded: Incident "{incident.incident_name}" has no affected households.'}), 400
 
         items_payload = data.get('items', [])
         if not items_payload:
@@ -4564,7 +4601,7 @@ def handle_distributions():
         allowed_items = set(v['item'].name for v in validated_items)
         fiscal_year = incident.fiscal_year or AppSettings.get_setting('active_fiscal_year', '2081/82')
         validate_distribution_mode_allowed(fiscal_year, 'items')
-        _validate_distribution_beneficiaries(beneficiaries_payload, allowed_items, fiscal_year)
+        _validate_distribution_beneficiaries(beneficiaries_payload, allowed_items, fiscal_year, incident_id=incident.id)
 
         dist_date = parse_bs_date_field(data, 'distribution_date', default=date.today())
         if dist_date > date.today():
@@ -4680,6 +4717,8 @@ def manage_distribution(id):
         incident = db_get(Incident, data.get('incident_id'))
         if not incident:
             return jsonify({'success': False, 'message': 'Incident not found'}), 404
+        if incident.affected_households is None or incident.affected_households < 1:
+            return jsonify({'success': False, 'message': f'Distribution cannot be edited: Incident "{incident.incident_name}" has no affected households.'}), 400
 
         # Reverse old inventory before applying new items
         for old_item in dist.items:
@@ -4701,7 +4740,7 @@ def manage_distribution(id):
         allowed_items = set(v['item'].name for v in validated_items)
         fiscal_year = incident.fiscal_year or AppSettings.get_setting('active_fiscal_year', '2081/82')
         validate_distribution_mode_allowed(fiscal_year, 'items')
-        _validate_distribution_beneficiaries(beneficiaries_payload, allowed_items, fiscal_year, exclude_distribution_id=dist.id)
+        _validate_distribution_beneficiaries(beneficiaries_payload, allowed_items, fiscal_year, incident_id=incident.id, exclude_distribution_id=dist.id)
         dist_totals = {}
         for ben_data in beneficiaries_payload:
             item_name = (ben_data.get('item') or '').strip()
@@ -5567,6 +5606,8 @@ def handle_cash_distributions():
         incident = db_get(Incident, data.get('incident_id'))
         if not fund or not incident:
             return jsonify({'success': False, 'message': 'Fund and incident are required'}), 400
+        if incident.affected_households is None or incident.affected_households < 1:
+            return jsonify({'success': False, 'message': f'Cash distribution cannot be recorded: Incident "{incident.incident_name}" has no affected households.'}), 400
 
         beneficiaries_payload = data.get('beneficiaries', [])
         if not beneficiaries_payload:
@@ -5578,7 +5619,7 @@ def handle_cash_distributions():
             return jsonify({'success': False, 'message': f'Insufficient fund balance. Available: {fund.current_balance}, Required: {total}'}), 400
         fiscal_year = AppSettings.get_setting('active_fiscal_year', '2081/82')
         validate_distribution_mode_allowed(fiscal_year, 'cash')
-        reps = get_distribution_repetitions(fiscal_year)
+        max_incidents = get_distribution_repetitions(fiscal_year)
         seen_beneficiaries = set()
         for ben_data in beneficiaries_payload:
             ben_name = (ben_data.get('name') or '').strip()
@@ -5587,18 +5628,56 @@ def handle_cash_distributions():
                 return jsonify({'success': False, 'message': f'Duplicate beneficiary "{ben_name}" in the same distribution request'}), 400
             if ben_id:
                 seen_beneficiaries.add(ben_id)
-            prior_count = db.session.query(db.func.count(db.distinct(CashDistribution.id))).join(
+
+            # --- Per-incident check: always limited to 1 ---
+            same_inc_count = db.session.query(db.func.count(db.distinct(CashDistribution.id))).join(
                 CashDistributionBeneficiary, CashDistributionBeneficiary.distribution_id == CashDistribution.id
             ).filter(
                 CashDistribution.fiscal_year == fiscal_year,
                 CashDistribution.status != 'Cancelled',
+                CashDistribution.incident_id == incident.id,
                 db.or_(
                     CashDistributionBeneficiary.beneficiary_id == ben_id,
                     CashDistributionBeneficiary.name.ilike(ben_name)
                 )
             ).scalar() or 0
-            if prior_count >= reps:
-                return jsonify({'success': False, 'message': f'Beneficiary "{ben_name}" has already received cash distribution {prior_count} time(s) in fiscal year {fiscal_year}. This fiscal year allows a maximum of {reps} distribution(s) per beneficiary.'}), 400
+            if ben_id:
+                edit_dist_id = data.get('distribution_id')
+                item_same_inc = db.session.query(db.func.count(db.distinct(Distribution.id))).join(
+                    DistributionBeneficiary, DistributionBeneficiary.distribution_id == Distribution.id
+                ).filter(
+                    Distribution.fiscal_year == fiscal_year,
+                    Distribution.status != 'Cancelled',
+                    Distribution.incident_id == incident.id,
+                    DistributionBeneficiary.beneficiary_id == ben_id
+                )
+                if edit_dist_id:
+                    item_same_inc = item_same_inc.filter(Distribution.id != edit_dist_id)
+                same_inc_count += item_same_inc.scalar() or 0
+            if same_inc_count >= 1:
+                return jsonify({'success': False, 'message': f'Beneficiary "{ben_name}" has already received relief for this incident in fiscal year {fiscal_year}. A beneficiary may receive only ONE distribution per incident.'}), 400
+
+            # --- Across-incidents check: limited by distribution_repetitions ---
+            if ben_id:
+                all_incident_ids_cash = set(r[0] for r in db.session.query(CashDistribution.incident_id).join(
+                    CashDistributionBeneficiary, CashDistributionBeneficiary.distribution_id == CashDistribution.id
+                ).filter(
+                    CashDistribution.fiscal_year == fiscal_year,
+                    CashDistribution.status != 'Cancelled',
+                    CashDistributionBeneficiary.beneficiary_id == ben_id
+                ).distinct().all())
+                all_incident_ids_item = set(r[0] for r in db.session.query(Distribution.incident_id).join(
+                    DistributionBeneficiary, DistributionBeneficiary.distribution_id == Distribution.id
+                ).filter(
+                    Distribution.fiscal_year == fiscal_year,
+                    Distribution.status != 'Cancelled',
+                    DistributionBeneficiary.beneficiary_id == ben_id
+                ).distinct().all())
+                total_incidents = len(all_incident_ids_cash | all_incident_ids_item)
+                if incident.id not in (all_incident_ids_cash | all_incident_ids_item):
+                    total_incidents += 1
+                if total_incidents > max_incidents:
+                    return jsonify({'success': False, 'message': f'Beneficiary "{ben_name}" has already received relief for {total_incidents} different incident(s) in fiscal year {fiscal_year}. A beneficiary may receive aid for a maximum of {max_incidents} incident(s).'}), 400
         dist = CashDistribution(
             distribution_no=data.get('distribution_no') or generate_cash_distribution_no(),
             distribution_date=parse_bs_date_field(data, 'distribution_date', default=date.today()),
