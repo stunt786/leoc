@@ -168,6 +168,59 @@
                 </div>
             </div>
         </div>
+
+        <div class="card mt-3">
+            <div class="card-header"><span><i class="bi bi-boxes me-2"></i>Distribution Mode</span></div>
+            <div class="card-body">
+                <p class="small text-muted">Choose what beneficiaries can receive during the current active fiscal year. Applies to both the Cash module and the Items (Distribution) module.</p>
+                <div class="row g-3">
+                    <div class="col-md-7">
+                        <label class="form-label fw-medium">Mode for Active Fiscal Year (<span id="dmActiveFy"></span>)</label>
+                        <select class="form-select" id="distribution_mode" data-key="distribution_mode">
+                            <option value="cash_and_items">Cash + Items</option>
+                            <option value="cash_only">Cash Only</option>
+                            <option value="items_only">Items Only</option>
+                        </select>
+                    </div>
+                    <div class="col-md-5">
+                        <div class="card bg-light h-100">
+                            <div class="card-body">
+                                <h6 class="fw-medium mb-2">Mode meanings</h6>
+                                <ul class="small text-muted mb-0">
+                                    <li><strong>Cash + Items</strong> — both modules active; a beneficiary may receive cash and/or items.</li>
+                                    <li><strong>Cash Only</strong> — only cash distributions allowed; item distributions are blocked.</li>
+                                    <li><strong>Items Only</strong> — only item distributions allowed; cash distributions are blocked.</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-header"><span><i class="bi bi-arrow-repeat me-2"></i>Distribution Repetitions</span></div>
+            <div class="card-body">
+                <p class="small text-muted">Maximum number of times a beneficiary may receive distributions during the current active fiscal year. The limit applies independently to the Cash module and the Items (Distribution) module. Set to 1 to keep the current once-only behaviour.</p>
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label fw-medium">Distributions per Beneficiary for Active Fiscal Year (<span id="drActiveFy"></span>)</label>
+                        <input type="number" class="form-control" id="distribution_repetitions" data-key="distribution_repetitions" min="1" step="1" value="1">
+                    </div>
+                    <div class="col-md-8">
+                        <div class="card bg-light h-100">
+                            <div class="card-body">
+                                <h6 class="fw-medium mb-2">How it works</h6>
+                                <ul class="small text-muted mb-0">
+                                    <li><strong>1</strong> — each beneficiary can be distributed to at most once per fiscal year (current behaviour).</li>
+                                    <li><strong>N</strong> — each beneficiary can receive up to N item distributions and up to N cash distributions during the fiscal year.</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- ============ SYSTEM TAB ============ -->
@@ -245,6 +298,8 @@ async function loadSettings() {
             renderList('ssf_types', 'ssf_types_list');
             renderList('cluster_types', 'cluster_types_list');
             renderActiveFiscalYear();
+            renderDistributionModeFy();
+            renderDistributionRepetitionsFy();
         }
     } catch(e) { console.error('Failed to load settings:', e); }
 }
@@ -311,7 +366,51 @@ async function renderActiveFiscalYear() {
             body: JSON.stringify({value: this.value})
         });
         showToast('success', 'Active fiscal year updated');
+        renderDistributionModeFy();
+        renderDistributionRepetitionsFy();
     });
+}
+
+async function renderDistributionModeFy() {
+    const active = await getSetting('active_fiscal_year');
+    const el = document.getElementById('dmActiveFy');
+    if (el) el.textContent = active || '—';
+    const sel = document.getElementById('distribution_mode');
+    if (sel && !sel.dataset.bound) {
+        sel.dataset.bound = '1';
+        sel.addEventListener('change', async function() {
+            const resp = await fetch(`/api/settings/distribution_mode`, {
+                method: 'POST',
+                headers: {'Content-Type':'application/json','X-CSRFToken':document.querySelector('meta[name="csrf-token"]').getAttribute('content')},
+                body: JSON.stringify({value: this.value})
+            });
+            const d = await resp.json();
+            if (!d.success) { showToast('danger', d.message); await loadSettings(); return; }
+            showToast('success', 'Distribution mode updated');
+        });
+    }
+}
+
+async function renderDistributionRepetitionsFy() {
+    const active = await getSetting('active_fiscal_year');
+    const el = document.getElementById('drActiveFy');
+    if (el) el.textContent = active || '—';
+    const inp = document.getElementById('distribution_repetitions');
+    if (inp && !inp.dataset.bound) {
+        inp.dataset.bound = '1';
+        inp.addEventListener('change', async function() {
+            let val = parseInt(this.value, 10);
+            if (isNaN(val) || val < 1) { val = 1; this.value = 1; }
+            const resp = await fetch(`/api/settings/distribution_repetitions`, {
+                method: 'POST',
+                headers: {'Content-Type':'application/json','X-CSRFToken':document.querySelector('meta[name="csrf-token"]').getAttribute('content')},
+                body: JSON.stringify({value: val})
+            });
+            const d = await resp.json();
+            if (!d.success) { showToast('danger', d.message); await loadSettings(); return; }
+            showToast('success', 'Distribution repetitions updated');
+        });
+    }
 }
 
 async function addListItem(key, inputId, containerId) {
@@ -327,7 +426,7 @@ async function addListItem(key, inputId, containerId) {
     });
     input.value = '';
     renderList(key, containerId);
-    if (key === 'fiscal_years') renderActiveFiscalYear();
+    if (key === 'fiscal_years') { renderActiveFiscalYear(); renderDistributionModeFy(); }
     showToast('success', `${key} updated`);
 }
 
@@ -343,7 +442,7 @@ async function removeListItem(key, index, containerId) {
     const data = await resp.json();
     if (!data.success) { showToast('danger', data.message); return; }
     renderList(key, containerId);
-    if (key === 'fiscal_years') renderActiveFiscalYear();
+    if (key === 'fiscal_years') { renderActiveFiscalYear(); renderDistributionModeFy(); }
     showToast('success', `"${removedItem}" deleted`);
 }
 

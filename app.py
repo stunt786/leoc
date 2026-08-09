@@ -4388,6 +4388,64 @@ def incident_history(id):
     except Exception as e:
         return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
+# ============ DISTRIBUTION MODE CONTROLLER ============
+DISTRIBUTION_MODES = ('cash_only', 'items_only', 'cash_and_items')
+DISTRIBUTION_MODE_LABELS = {
+    'cash_only': 'Cash Only',
+    'items_only': 'Items Only',
+    'cash_and_items': 'Cash + Items',
+}
+
+def get_distribution_mode(fiscal_year=None):
+    """Return the single distribution mode for the current active fiscal year.
+
+    Modes: 'cash_only' (items module disabled), 'items_only' (cash module
+    disabled), 'cash_and_items' (both enabled). The mode is set once in
+    Settings → Fiscal Year and applies to the active fiscal year. Falls back
+    to 'cash_and_items' when no mode is configured.
+    """
+    mode = AppSettings.get_setting('distribution_mode')
+    if mode not in DISTRIBUTION_MODES:
+        modes = AppSettings.get_setting('distribution_modes', {})
+        if isinstance(modes, dict):
+            active = fiscal_year or AppSettings.get_setting('active_fiscal_year')
+            if active and modes.get(active) in DISTRIBUTION_MODES:
+                mode = modes.get(active)
+    if mode not in DISTRIBUTION_MODES:
+        mode = 'cash_and_items'
+    return mode
+
+def validate_distribution_mode_allowed(fiscal_year, kind):
+    """Raise ValueError if the given distribution kind is disabled for the fiscal year."""
+    mode = get_distribution_mode(fiscal_year)
+    label = DISTRIBUTION_MODE_LABELS.get(mode, mode)
+    if kind == 'cash' and mode == 'items_only':
+        raise ValueError(
+            f'Cash distribution is not allowed in fiscal year {fiscal_year}. '
+            f'The distribution mode is set to "{label}". Change the mode in '
+            f'Settings → Fiscal Year to enable cash distributions.'
+        )
+    if kind == 'items' and mode == 'cash_only':
+        raise ValueError(
+            f'Relief item distribution is not allowed in fiscal year {fiscal_year}. '
+            f'The distribution mode is set to "{label}". Change the mode in '
+            f'Settings → Fiscal Year to enable item distributions.'
+        )
+    return mode
+
+def get_distribution_repetitions(fiscal_year=None):
+    """Return the max number of times a beneficiary may receive distributions
+    per fiscal year (default 1 = current once-only behaviour). Applies to the
+    current active fiscal year and is used independently by the Cash module and
+    the Items (Distribution) module.
+    """
+    val = AppSettings.get_setting('distribution_repetitions')
+    try:
+        reps = int(float(val))
+    except (TypeError, ValueError):
+        reps = 1
+    return max(1, reps)
+
 # ============ DISTRIBUTION API ============
 def generate_distribution_no():
     existing = set(n for (n,) in db.session.query(Distribution.distribution_no).all())
@@ -4431,6 +4489,7 @@ def _validate_distribution_beneficiaries(beneficiaries_payload, allowed_items, f
     """Validate beneficiaries payload. Raises ValueError on any problem."""
     if not beneficiaries_payload:
         raise ValueError('At least one beneficiary is required')
+    reps = get_distribution_repetitions(fiscal_year)
     seen = set()
     for ben in beneficiaries_payload:
         family_name = (ben.get('family_name') or '').strip()
@@ -4448,16 +4507,20 @@ def _validate_distribution_beneficiaries(beneficiaries_payload, allowed_items, f
             raise ValueError(f'Duplicate beneficiary "{family_name}" with item "{item_name}" in the same distribution request')
         if ben_id:
             seen.add(key)
-            existing_relief = db.session.query(DistributionBeneficiary).join(
-                Distribution, DistributionBeneficiary.distribution_id == Distribution.id
+            prior_count = db.session.query(db.func.count(db.distinct(Distribution.id))).join(
+                DistributionBeneficiary, DistributionBeneficiary.distribution_id == Distribution.id
             ).filter(
                 Distribution.fiscal_year == fiscal_year,
                 Distribution.status != 'Cancelled',
                 Distribution.id != exclude_distribution_id,
                 DistributionBeneficiary.beneficiary_id == ben_id
-            ).first()
-            if existing_relief:
-                raise ValueError(f'Beneficiary "{family_name}" already received relief items in fiscal year {fiscal_year}.')
+            ).scalar() or 0
+            if prior_count >= reps:
+                raise ValueError(
+                    f'Beneficiary "{family_name}" has already received relief items {prior_count} time(s) '
+                    f'in fiscal year {fiscal_year}. This fiscal year allows a maximum of {reps} '
+                    f'distribution(s) per beneficiary.'
+                )
     return True
 
 
@@ -4500,6 +4563,7 @@ def handle_distributions():
         beneficiaries_payload = data.get('beneficiaries', [])
         allowed_items = set(v['item'].name for v in validated_items)
         fiscal_year = incident.fiscal_year or AppSettings.get_setting('active_fiscal_year', '2081/82')
+        validate_distribution_mode_allowed(fiscal_year, 'items')
         _validate_distribution_beneficiaries(beneficiaries_payload, allowed_items, fiscal_year)
 
         dist_date = parse_bs_date_field(data, 'distribution_date', default=date.today())
@@ -4636,6 +4700,7 @@ def manage_distribution(id):
         beneficiaries_payload = data.get('beneficiaries', [])
         allowed_items = set(v['item'].name for v in validated_items)
         fiscal_year = incident.fiscal_year or AppSettings.get_setting('active_fiscal_year', '2081/82')
+        validate_distribution_mode_allowed(fiscal_year, 'items')
         _validate_distribution_beneficiaries(beneficiaries_payload, allowed_items, fiscal_year, exclude_distribution_id=dist.id)
         dist_totals = {}
         for ben_data in beneficiaries_payload:
@@ -5512,6 +5577,8 @@ def handle_cash_distributions():
         if total > fund.current_balance:
             return jsonify({'success': False, 'message': f'Insufficient fund balance. Available: {fund.current_balance}, Required: {total}'}), 400
         fiscal_year = AppSettings.get_setting('active_fiscal_year', '2081/82')
+        validate_distribution_mode_allowed(fiscal_year, 'cash')
+        reps = get_distribution_repetitions(fiscal_year)
         seen_beneficiaries = set()
         for ben_data in beneficiaries_payload:
             ben_name = (ben_data.get('name') or '').strip()
@@ -5520,8 +5587,8 @@ def handle_cash_distributions():
                 return jsonify({'success': False, 'message': f'Duplicate beneficiary "{ben_name}" in the same distribution request'}), 400
             if ben_id:
                 seen_beneficiaries.add(ben_id)
-            existing = db.session.query(CashDistributionBeneficiary).join(
-                CashDistribution
+            prior_count = db.session.query(db.func.count(db.distinct(CashDistribution.id))).join(
+                CashDistributionBeneficiary, CashDistributionBeneficiary.distribution_id == CashDistribution.id
             ).filter(
                 CashDistribution.fiscal_year == fiscal_year,
                 CashDistribution.status != 'Cancelled',
@@ -5529,21 +5596,9 @@ def handle_cash_distributions():
                     CashDistributionBeneficiary.beneficiary_id == ben_id,
                     CashDistributionBeneficiary.name.ilike(ben_name)
                 )
-            ).first()
-            if existing:
-                return jsonify({'success': False, 'message': f'Beneficiary "{ben_name}" already received cash distribution in fiscal year {fiscal_year}.'}), 400
-            existing_relief = db.session.query(DistributionBeneficiary).join(
-                Distribution, DistributionBeneficiary.distribution_id == Distribution.id
-            ).filter(
-                Distribution.fiscal_year == fiscal_year,
-                Distribution.status != 'Cancelled',
-                db.or_(
-                    DistributionBeneficiary.beneficiary_id == ben_id,
-                    DistributionBeneficiary.family_name.ilike(ben_name)
-                )
-            ).first()
-            if existing_relief:
-                return jsonify({'success': False, 'message': f'Beneficiary "{ben_name}" already received relief items in fiscal year {fiscal_year}. Cannot also receive cash.'}), 400
+            ).scalar() or 0
+            if prior_count >= reps:
+                return jsonify({'success': False, 'message': f'Beneficiary "{ben_name}" has already received cash distribution {prior_count} time(s) in fiscal year {fiscal_year}. This fiscal year allows a maximum of {reps} distribution(s) per beneficiary.'}), 400
         dist = CashDistribution(
             distribution_no=data.get('distribution_no') or generate_cash_distribution_no(),
             distribution_date=parse_bs_date_field(data, 'distribution_date', default=date.today()),
@@ -8379,6 +8434,10 @@ def get_form_data():
             'incident_types': AppSettings.get_setting('disaster_types', ['Flood', 'Earthquake', 'Landslide', 'Fire', 'Storm', 'Epidemic', 'Other']),
             'fiscal_years': AppSettings.get_setting('fiscal_years', ['2080/81', '2081/82', '2082/83', '2083/84', '2084/85']),
             'active_fiscal_year': AppSettings.get_setting('active_fiscal_year', '2081/82'),
+            'distribution_mode': AppSettings.get_setting('distribution_mode', 'cash_and_items'),
+            'active_distribution_mode': get_distribution_mode(),
+            'distribution_repetitions': AppSettings.get_setting('distribution_repetitions', 1),
+            'active_distribution_repetitions': get_distribution_repetitions(),
             'disaster_types': AppSettings.get_setting('disaster_types', ['Flood', 'Earthquake', 'Landslide', 'Fire', 'Storm', 'Epidemic', 'Other']),
             'ssf_types': AppSettings.get_setting('ssf_types', ['OAS (बर्षा पेन्सन)', 'विधवा (Widow)', 'अपाङ्गता (Disabled)', 'कोही नभएको (Endangered)', 'बाल भत्ता (Child Grant)', 'अन्य (Other)']),
             'wards': [w.to_dict() for w in get_ward_list()],
