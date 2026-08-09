@@ -22,7 +22,7 @@
 </div>
 
 <div id="overviewDashboard">
-<div class="row g-3 mb-4" id="statCards">
+<div class="row g-3 mb-4 overview-card-grid dashboard-reference-cards" id="statCards">
     <div class="col-md-3 col-6">
         <div class="stat-card stat-card-primary">
             <div class="stat-icon"><i class="bi bi-box-seam"></i></div>
@@ -88,7 +88,7 @@
     </div>
 </div>
 
-<div class="row g-3 mb-4">
+<div class="row g-3 mb-4 overview-card-grid overview-cash-grid dashboard-reference-cards">
     <div class="col-md-3 col-6">
         <div class="stat-card stat-card-info">
             <div class="stat-icon"><i class="bi bi-wallet2"></i></div>
@@ -236,7 +236,7 @@
             </div>
         </div>
     </div>
-    <div class="row g-3 mb-4" id="reliefStatCards">
+    <div class="row g-3 mb-4 relief-card-grid dashboard-reference-cards" id="reliefStatCards">
         <div class="col-md-3 col-6">
             <div class="stat-card stat-card-primary">
                 <div class="stat-icon"><i class="bi bi-box-seam"></i></div>
@@ -370,248 +370,203 @@
         </div>
     </div>
 
-    <div class="row g-3 mb-4">
-        <div class="col-12">
-            <h6 class="section-label"><i class="bi bi-clipboard-data me-2"></i>Overview</h6>
-        </div>
-        <div class="col-md-2 col-4 col-6">
-            <div class="stat-card stat-card-primary">
-                <div class="stat-icon"><i class="bi bi-lightning-charge"></i></div>
-                <div class="stat-content">
-                    <div class="stat-label">Total Incidents</div>
-                    <div class="stat-value" id="incTotalIncidents">0</div>
+    <div class="incident-card-section mb-4">
+        <h6 class="incident-section-title">Overview</h6>
+        <div class="incident-overview-grid">
+            <div class="incident-overview-card incident-overview-blue">
+                <div class="incident-overview-icon"><i class="bi bi-lightning-charge"></i></div>
+                <div>
+                    <div class="incident-card-label">Total Incidents</div>
+                    <div class="incident-card-value" id="incTotalIncidents">0</div>
+                </div>
+            </div>
+            <div class="incident-overview-card incident-overview-amber">
+                <div class="incident-overview-icon"><i class="bi bi-exclamation-triangle"></i></div>
+                <div>
+                    <div class="incident-card-label">Active</div>
+                    <div class="incident-card-value" id="incActiveIncidents">0</div>
+                </div>
+            </div>
+            <div class="incident-overview-card incident-overview-slate">
+                <div class="incident-overview-icon"><i class="bi bi-geo-alt"></i></div>
+                <div>
+                    <div class="incident-card-label">Affected Wards</div>
+                    <div class="incident-card-value" id="incAffectedWards">0</div>
+                </div>
+            </div>
+            <div class="incident-overview-card incident-overview-gold">
+                <div class="incident-overview-icon"><i class="bi bi-people"></i></div>
+                <div>
+                    <div class="incident-card-label">Affected People</div>
+                    <div class="incident-card-value" id="incAffectedPeople">0</div>
+                </div>
+            </div>
+            <div class="incident-overview-card incident-overview-purple">
+                <div class="incident-overview-icon"><i class="bi bi-house-door"></i></div>
+                <div>
+                    <div class="incident-card-label">Households</div>
+                    <div class="incident-card-value" id="incHouseholds">0</div>
                 </div>
             </div>
         </div>
-        <div class="col-md-2 col-4 col-6">
-            <div class="stat-card stat-card-danger">
-                <div class="stat-icon"><i class="bi bi-exclamation-triangle"></i></div>
-                <div class="stat-content">
-                    <div class="stat-label">Active</div>
-                    <div class="stat-value" id="incActiveIncidents">0</div>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-2 col-4 col-6">
-            <div class="stat-card stat-card-info">
-                <div class="stat-icon"><i class="bi bi-geo-alt"></i></div>
-                <div class="stat-content">
-                    <div class="stat-label">Affected Wards</div>
-                    <div class="stat-value" id="incAffectedWards">0</div>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3 col-6">
-            <div class="stat-card stat-card-warning">
-                <div class="stat-icon"><i class="bi bi-people"></i></div>
-                <div class="stat-content">
-                    <div class="stat-label">Affected People</div>
-                    <div class="stat-value" id="incAffectedPeople">0</div>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3 col-6">
-            <div class="stat-card" style="border-left:4px solid #8b5cf6">
-                <div class="stat-icon" style="background:rgba(139,92,246,0.1);color:#8b5cf6"><i class="bi bi-house-door"></i></div>
-                <div class="stat-content">
-                    <div class="stat-label">Households</div>
-                    <div class="stat-value" id="incHouseholds">0</div>
-                </div>
-            </div>
-        </div>
-    </div>
 
-    <div class="row g-3 mb-4">
-        <div class="col-12">
-            <h6 class="section-label"><i class="bi bi-heart-pulse me-2"></i>Human Impact</h6>
-        </div>
-        <div class="col-md-4 col-6">
-            <div class="stat-card stat-card-danger">
-                <div class="stat-icon"><i class="bi bi-x-circle"></i></div>
-                <div class="stat-content">
-                    <div class="stat-label">Deaths</div>
-                    <div class="stat-value" id="incDeaths">0</div>
+        <div class="incident-impact-grid">
+            <section class="incident-impact-panel incident-panel-human">
+                <h6 class="incident-section-title">Human Impact</h6>
+                <div class="incident-panel-stack">
+                    <div class="incident-metric-row">
+                        <div class="incident-metric-icon"><i class="bi bi-x-circle"></i></div>
+                        <div>
+                            <div class="incident-card-label">Deaths</div>
+                            <div class="incident-card-value" id="incDeaths">0</div>
+                        </div>
+                    </div>
+                    <div class="incident-metric-row">
+                        <div class="incident-metric-icon"><i class="bi bi-person-walking"></i></div>
+                        <div>
+                            <div class="incident-card-label">Injured</div>
+                            <div class="incident-card-value" id="incInjured">0</div>
+                        </div>
+                    </div>
+                    <div class="incident-metric-row">
+                        <div class="incident-metric-icon"><i class="bi bi-person-x"></i></div>
+                        <div>
+                            <div class="incident-card-label">Missing</div>
+                            <div class="incident-card-value" id="incMissing">0</div>
+                        </div>
+                    </div>
                 </div>
-            </div>
-        </div>
-        <div class="col-md-4 col-6">
-            <div class="stat-card stat-card-warning">
-                <div class="stat-icon"><i class="bi bi-bandage"></i></div>
-                <div class="stat-content">
-                    <div class="stat-label">Injured</div>
-                    <div class="stat-value" id="incInjured">0</div>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4 col-6">
-            <div class="stat-card stat-card-info">
-                <div class="stat-icon"><i class="bi bi-person-x"></i></div>
-                <div class="stat-content">
-                    <div class="stat-label">Missing</div>
-                    <div class="stat-value" id="incMissing">0</div>
-                </div>
-            </div>
-        </div>
-    </div>
+            </section>
 
-    <div class="row g-3 mb-4">
-        <div class="col-12">
-            <h6 class="section-label"><i class="bi bi-building me-2"></i>Houses &amp; Buildings</h6>
-        </div>
-        <div class="col-md-3 col-6">
-            <div class="stat-card stat-card-danger">
-                <div class="stat-icon"><i class="bi bi-house-x"></i></div>
-                <div class="stat-content">
-                    <div class="stat-label">Houses Destroyed</div>
-                    <div class="stat-value" id="incHousesDestroyed">0</div>
+            <section class="incident-impact-panel incident-panel-property">
+                <h6 class="incident-section-title">Houses &amp; Buildings</h6>
+                <div class="incident-property-card">
+                    <div class="incident-property-heading">Houses</div>
+                    <div class="incident-property-grid">
+                        <div class="incident-property-item">
+                            <div class="incident-metric-icon"><i class="bi bi-house-x"></i></div>
+                            <div>
+                                <div class="incident-card-label">Destroyed</div>
+                                <div class="incident-card-value" id="incHousesDestroyed">0</div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="incident-card-label">Damaged</div>
+                            <div class="incident-card-value" id="incHousesDamaged">0</div>
+                        </div>
+                    </div>
+                    <div class="incident-divider"></div>
+                    <div class="incident-property-heading">Pub. Bldgs</div>
+                    <div class="incident-property-grid">
+                        <div class="incident-property-item">
+                            <div class="incident-metric-icon"><i class="bi bi-bank"></i></div>
+                            <div>
+                                <div class="incident-card-label">Destroyed</div>
+                                <div class="incident-card-value" id="incPubBldgDestroyed">0</div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="incident-card-label">Damaged</div>
+                            <div class="incident-card-value" id="incPubBldgDamaged">0</div>
+                        </div>
+                    </div>
                 </div>
-            </div>
-        </div>
-        <div class="col-md-3 col-6">
-            <div class="stat-card stat-card-warning">
-                <div class="stat-icon"><i class="bi bi-house-damage"></i></div>
-                <div class="stat-content">
-                    <div class="stat-label">Houses Damaged</div>
-                    <div class="stat-value" id="incHousesDamaged">0</div>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3 col-6">
-            <div class="stat-card stat-card-danger">
-                <div class="stat-icon"><i class="bi bi-bank"></i></div>
-                <div class="stat-content">
-                    <div class="stat-label">Pub. Bldgs Destroyed</div>
-                    <div class="stat-value" id="incPubBldgDestroyed">0</div>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3 col-6">
-            <div class="stat-card stat-card-warning">
-                <div class="stat-icon"><i class="bi bi-bank"></i></div>
-                <div class="stat-content">
-                    <div class="stat-label">Pub. Bldgs Damaged</div>
-                    <div class="stat-value" id="incPubBldgDamaged">0</div>
-                </div>
-            </div>
-        </div>
-    </div>
+            </section>
 
-    <div class="row g-3 mb-4">
-        <div class="col-12">
-            <h6 class="section-label"><i class="bi bi-piggy-bank me-2"></i>Fund &amp; Estimated Loss</h6>
-        </div>
-        <div class="col-md-6">
-            <div class="stat-card stat-card-info">
-                <div class="stat-icon"><i class="bi bi-currency-rupee"></i></div>
-                <div class="stat-content">
-                    <div class="stat-label">Estimated Loss (NPR)</div>
-                    <div class="stat-value" id="incEstimatedLoss">0</div>
+            <section class="incident-impact-panel incident-panel-loss">
+                <h6 class="incident-section-title">Loss &amp; Agriculture</h6>
+                <div class="incident-panel-stack">
+                    <div class="incident-metric-row incident-loss-feature">
+                        <div>
+                            <div class="incident-card-label">Estimated Loss</div>
+                            <div class="incident-currency-label">NPR</div>
+                            <div class="incident-card-value incident-loss-value" id="incEstimatedLoss">0</div>
+                        </div>
+                        <i class="bi bi-arrow-up-right"></i>
+                    </div>
+                    <div class="incident-metric-row">
+                        <div class="incident-metric-icon"><i class="bi bi-flower1"></i></div>
+                        <div>
+                            <div class="incident-card-label">Crop Damage</div>
+                            <div class="incident-card-value" id="incCropDamage">0</div>
+                        </div>
+                    </div>
+                    <div class="incident-metric-row">
+                        <div class="incident-metric-icon"><i class="bi bi-leaf"></i></div>
+                        <div>
+                            <div class="incident-card-label">Agriculture Impact</div>
+                            <div class="incident-card-value incident-text-value" id="incAgricultureImpact">0</div>
+                        </div>
+                    </div>
                 </div>
-            </div>
-        </div>
-        <div class="col-md-3 col-6">
-            <div class="stat-card stat-card-warning">
-                <div class="stat-icon"><i class="bi bi-tree"></i></div>
-                <div class="stat-content">
-                    <div class="stat-label">Crop Damage</div>
-                    <div class="stat-value" id="incCropDamage">0</div>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3 col-6">
-            <div class="stat-card" style="border-left:4px solid #14b8a6">
-                <div class="stat-icon" style="background:rgba(20,184,166,0.1);color:#14b8a6"><i class="bi bi-water"></i></div>
-                <div class="stat-content">
-                    <div class="stat-label">Agriculture Impact</div>
-                    <div class="stat-value" id="incAgricultureImpact">0</div>
-                </div>
-            </div>
-        </div>
-    </div>
+            </section>
 
-    <div class="row g-3 mb-4">
-        <div class="col-12">
-            <h6 class="section-label"><i class="bi bi-github me-2"></i>Livestock Impact</h6>
-        </div>
-        <div class="col-md-3 col-6">
-            <div class="stat-card stat-card-warning">
-                <div class="stat-icon"><i class="bi bi-github"></i></div>
-                <div class="stat-content">
-                    <div class="stat-label">Cattle</div>
-                    <div class="stat-value" id="incCattleTotal">0</div>
-                    <div class="stat-sub small text-muted mt-1">Lost: <span id="incCattleLost">0</span> | Injured: <span id="incCattleInjured">0</span></div>
+            <section class="incident-impact-panel incident-panel-livestock">
+                <h6 class="incident-section-title">Livestock Impact</h6>
+                <div class="incident-livestock-list">
+                    <div class="incident-livestock-row">
+                        <div class="incident-metric-icon"><i class="bi bi-record-circle"></i></div>
+                        <div>
+                            <div class="incident-card-label">Cattle</div>
+                            <div class="incident-card-value" id="incCattleTotal">0</div>
+                            <div class="incident-detail-text">Lost: <span id="incCattleLost">0</span> | Injured: <span id="incCattleInjured">0</span></div>
+                        </div>
+                    </div>
+                    <div class="incident-livestock-row">
+                        <div class="incident-metric-icon"><i class="bi bi-egg"></i></div>
+                        <div>
+                            <div class="incident-card-label">Poultry</div>
+                            <div class="incident-card-value" id="incPoultryTotal">0</div>
+                            <div class="incident-detail-text">Lost: <span id="incPoultryLost">0</span> | Injured: <span id="incPoultryInjured">0</span></div>
+                        </div>
+                    </div>
+                    <div class="incident-livestock-row">
+                        <div class="incident-metric-icon"><i class="bi bi-gitlab"></i></div>
+                        <div>
+                            <div class="incident-card-label">Goats/Sheep</div>
+                            <div class="incident-card-value" id="incGoatsTotal">0</div>
+                            <div class="incident-detail-text">Lost: <span id="incGoatsLost">0</span> | Injured: <span id="incGoatsInjured">0</span></div>
+                        </div>
+                    </div>
+                    <div class="incident-livestock-row">
+                        <div class="incident-metric-icon"><i class="bi bi-archive"></i></div>
+                        <div>
+                            <div class="incident-card-label">Other Livestock</div>
+                            <div class="incident-card-value" id="incOtherTotal">0</div>
+                            <div class="incident-detail-text">Lost: <span id="incOtherLost">0</span> | Injured: <span id="incOtherInjured">0</span></div>
+                        </div>
+                    </div>
                 </div>
-            </div>
+            </section>
         </div>
-        <div class="col-md-3 col-6">
-            <div class="stat-card" style="border-left:4px solid #f97316">
-                <div class="stat-icon" style="background:rgba(249,115,22,0.1);color:#f97316"><i class="bi bi-egg"></i></div>
-                <div class="stat-content">
-                    <div class="stat-label">Poultry</div>
-                    <div class="stat-value" id="incPoultryTotal">0</div>
-                    <div class="stat-sub small text-muted mt-1">Lost: <span id="incPoultryLost">0</span> | Injured: <span id="incPoultryInjured">0</span></div>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3 col-6">
-            <div class="stat-card" style="border-left:4px solid #14b8a6">
-                <div class="stat-icon" style="background:rgba(20,184,166,0.1);color:#14b8a6"><i class="bi bi-gitlab"></i></div>
-                <div class="stat-content">
-                    <div class="stat-label">Goats/Sheep</div>
-                    <div class="stat-value" id="incGoatsTotal">0</div>
-                    <div class="stat-sub small text-muted mt-1">Lost: <span id="incGoatsLost">0</span> | Injured: <span id="incGoatsInjured">0</span></div>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3 col-6">
-            <div class="stat-card" style="border-left:4px solid #8b5cf6">
-                <div class="stat-icon" style="background:rgba(139,92,246,0.1);color:#8b5cf6"><i class="bi bi-archive"></i></div>
-                <div class="stat-content">
-                    <div class="stat-label">Other Livestock</div>
-                    <div class="stat-value" id="incOtherTotal">0</div>
-                    <div class="stat-sub small text-muted mt-1">Lost: <span id="incOtherLost">0</span> | Injured: <span id="incOtherInjured">0</span></div>
-                </div>
-            </div>
-        </div>
-    </div>
 
-    <div class="row g-3 mb-4">
-        <div class="col-12">
-            <h6 class="section-label"><i class="bi bi-diagram-3 me-2"></i>Infrastructure Impact</h6>
-        </div>
-        <div class="col-md-3 col-6">
-            <div class="stat-card stat-card-danger">
-                <div class="stat-icon"><i class="bi bi-signpost-2"></i></div>
-                <div class="stat-content">
-                    <div class="stat-label">Road Blocked</div>
-                    <div class="stat-value" id="incRoadBlocked">0</div>
+        <div class="incident-infra-grid">
+            <div class="incident-infra-card">
+                <div class="incident-metric-icon"><i class="bi bi-signpost-2"></i></div>
+                <div>
+                    <div class="incident-card-label">Road Blocked</div>
+                    <div class="incident-card-value" id="incRoadBlocked">0</div>
                 </div>
             </div>
-        </div>
-        <div class="col-md-3 col-6">
-            <div class="stat-card stat-card-warning">
-                <div class="stat-icon"><i class="bi bi-lightbulb"></i></div>
-                <div class="stat-content">
-                    <div class="stat-label">Electricity Blocked</div>
-                    <div class="stat-value" id="incElectricity">0</div>
+            <div class="incident-infra-card">
+                <div class="incident-metric-icon"><i class="bi bi-lightbulb"></i></div>
+                <div>
+                    <div class="incident-card-label">Electricity Blocked</div>
+                    <div class="incident-card-value" id="incElectricity">0</div>
                 </div>
             </div>
-        </div>
-        <div class="col-md-3 col-6">
-            <div class="stat-card stat-card-info">
-                <div class="stat-icon"><i class="bi bi-wifi"></i></div>
-                <div class="stat-content">
-                    <div class="stat-label">Communication Blocked</div>
-                    <div class="stat-value" id="incCommunication">0</div>
+            <div class="incident-infra-card">
+                <div class="incident-metric-icon"><i class="bi bi-wifi"></i></div>
+                <div>
+                    <div class="incident-card-label">Communication Blocked</div>
+                    <div class="incident-card-value" id="incCommunication">0</div>
                 </div>
             </div>
-        </div>
-        <div class="col-md-3 col-6">
-            <div class="stat-card" style="border-left:4px solid #06b6d4">
-                <div class="stat-icon" style="background:rgba(6,182,212,0.1);color:#06b6d4"><i class="bi bi-droplet"></i></div>
-                <div class="stat-content">
-                    <div class="stat-label">Water Disrupted</div>
-                    <div class="stat-value" id="incWater">0</div>
+            <div class="incident-infra-card">
+                <div class="incident-metric-icon"><i class="bi bi-droplet"></i></div>
+                <div>
+                    <div class="incident-card-label">Water Disrupted</div>
+                    <div class="incident-card-value" id="incWater">0</div>
                 </div>
             </div>
         </div>
