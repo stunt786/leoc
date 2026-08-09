@@ -1108,16 +1108,17 @@ function renderBenPicker(list) {
         }
         let histBadge = '';
         if (sameIncidentLimit) {
-            histBadge += `<small class="text-danger d-block"><i class="bi bi-exclamation-triangle me-1"></i>Already received for this incident (1/1 per incident)</small>`;
+            const distTypes = [];
+            if (itemsCount > 0) distTypes.push(`${itemsCount} item`);
+            if (cashCount > 0) distTypes.push(`${cashCount} cash`);
+            const distTypeStr = distTypes.length > 0 ? ` (${distTypes.join(', ')})` : '';
+            histBadge += `<small class="text-danger d-block"><i class="bi bi-exclamation-triangle me-1"></i>Already distributed for this incident${distTypeStr} — 1 per incident max</small>`;
         }
         if (acrossIncidentLimit) {
             histBadge += `<small class="text-danger d-block"><i class="bi bi-exclamation-triangle me-1"></i>Aid limit reached: ${totalIncidents}/${distributionReps} incident(s) this fiscal year</small>`;
         }
         if (!sameIncidentLimit && !acrossIncidentLimit && hasPrior) {
-            histBadge += `<small class="text-warning d-block"><i class="bi bi-clock-history me-1"></i>Received aid for ${totalIncidents - 1} other incident(s)</small>`;
-        }
-        if (cashCount > 0) {
-            histBadge += `<small class="text-warning d-block"><i class="bi bi-cash me-1"></i>Also received cash ${cashCount} time(s) for this incident</small>`;
+            histBadge += `<small class="text-warning d-block"><i class="bi bi-clock-history me-1"></i>Prior aid for ${totalIncidents - 1} other incident(s) this fiscal year</small>`;
         }
         return `<tr class="${rowClass}">
             <td>${b.name}${histBadge}</td>
