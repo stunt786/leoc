@@ -2188,6 +2188,70 @@ def ward_name_filter(ward_id):
     ward = db.session.get(Ward, int(ward_id))
     return ward.name if ward else str(ward_id)
 
+def compute_family_demographics(beneficiaries):
+    child_count = 0
+    pregnant_count = 0
+    old_age_count = 0
+    male_count = 0
+    female_count = 0
+    for ben in beneficiaries:
+        if not ben:
+            continue
+        fm_json = []
+        if ben.family_members_json:
+            try:
+                fm_json = json.loads(ben.family_members_json) if isinstance(ben.family_members_json, str) else ben.family_members_json
+            except (json.JSONDecodeError, TypeError):
+                fm_json = []
+        for m in fm_json:
+            age = m.get('age')
+            if age is not None:
+                try:
+                    age = int(age)
+                except (ValueError, TypeError):
+                    age = 0
+            gender = (m.get('gender') or '').lower()
+            if gender in ('m', 'male'):
+                male_count += 1
+            elif gender in ('f', 'female'):
+                female_count += 1
+            if age and 0 < age < 13:
+                child_count += 1
+            if age and age >= 60:
+                old_age_count += 1
+            if m.get('is_pregnant'):
+                pregnant_count += 1
+    return {
+        'child_count': child_count,
+        'pregnant_count': pregnant_count,
+        'old_age_count': old_age_count,
+        'male_count': male_count,
+        'female_count': female_count,
+    }
+
+def collect_incident_beneficiaries(incident):
+    seen = set()
+    result = []
+    if not incident:
+        return result
+    for dist in incident.distributions:
+        if (dist.status or '').lower() == 'cancelled':
+            continue
+        for db_ in (dist.beneficiaries or []):
+            b = getattr(db_, 'beneficiary', None)
+            if b and b.id not in seen:
+                seen.add(b.id)
+                result.append(b)
+    for cd in incident.cash_distributions:
+        if (cd.status or '').lower() == 'cancelled':
+            continue
+        for cb in (cd.beneficiaries or []):
+            b = getattr(cb, 'beneficiary', None)
+            if b and b.id not in seen:
+                seen.add(b.id)
+                result.append(b)
+    return result
+
 # ============ PAGINATION HELPERS ============
 def paginate(query, page=1, per_page=50, max_per_page=200):
     per_page = min(per_page, max_per_page)
@@ -9333,19 +9397,93 @@ def get_report_data(report_type, args):
             rows = [['-', '-', '-', '-', '-', '-', '-', 'No movements found']]
     elif report_type == 'disaster-assessments':
         incident_id = args.get('incident_id', type=int)
+        ward_id = args.get('ward_id', type=int)
+        status = args.get('status')
+        severity = args.get('severity')
+        fiscal_year = args.get('fiscal_year')
+
         q = DisasterAssessment.query.order_by(DisasterAssessment.disaster_date_bs.desc())
         if incident_id: q = q.filter(DisasterAssessment.incident_id == incident_id)
+        if ward_id: q = q.join(Incident).filter(Incident.ward == ward_id)
+        if status: q = q.join(Incident).filter(Incident.status == status)
+        if severity: q = q.join(Incident).filter(Incident.severity == severity)
+        if fiscal_year: q = q.filter(DisasterAssessment.fiscal_year == fiscal_year)
+        if date_from or date_to:
+            from sqlalchemy import or_
+            bs_filters = []
+            ad_filters = []
+            if date_from and is_valid_nepali_date(date_from):
+                bs_filters.append(DisasterAssessment.disaster_date_bs >= date_from)
+                try:
+                    ad_date = datetime.strptime(bs_to_ad(date_from), '%Y-%m-%d').date()
+                    ad_filters.append(DisasterAssessment.created_at >= datetime.combine(ad_date, datetime.min.time()))
+                except Exception: pass
+            if date_to and is_valid_nepali_date(date_to):
+                bs_filters.append(DisasterAssessment.disaster_date_bs <= date_to)
+                try:
+                    ad_date = datetime.strptime(bs_to_ad(date_to), '%Y-%m-%d').date()
+                    ad_filters.append(DisasterAssessment.created_at <= datetime.combine(ad_date, datetime.max.time()))
+                except Exception: pass
+            conditions = []
+            if bs_filters: conditions.append(db.and_(*bs_filters))
+            if ad_filters: conditions.append(db.and_(*ad_filters))
+            if conditions:
+                q = q.filter(or_(*conditions))
+
+        assessment_ids = set()
         headers = ['Date (BS)', 'Incident', 'Type', 'Affected HH', 'Deaths', 'Injured', 'Missing', 'Est. Loss', 'Remarks']
         rows = []
         for a in q.all():
             try:
-                inc_name = a.incident.incident_name if a.incident else '-'
+                inc = a.incident
+                inc_name = inc.incident_name if inc else '-'
             except Exception:
+                inc = None
                 inc_name = '-'
+            all_bens = collect_incident_beneficiaries(inc)
+            demo = compute_family_demographics(all_bens)
             rows.append([a.disaster_date_bs or '', inc_name,
                          a.disaster_type or '', a.affected_households or 0, a.deaths or 0,
                          a.injured or 0, a.missing_persons or 0, a.estimated_loss or 0,
                          (a.remarks or '')[:50] + ('...' if len(a.remarks or '') > 50 else '')])
+            assessment_ids.add(a.incident_id)
+
+        iq = Incident.query.order_by(Incident.start_date.desc())
+        if incident_id: iq = iq.filter(Incident.id == incident_id)
+        if ward_id: iq = iq.filter(Incident.ward == ward_id)
+        if status: iq = iq.filter(Incident.status == status)
+        if severity: iq = iq.filter(Incident.severity == severity)
+        if fiscal_year: iq = iq.filter(Incident.fiscal_year == fiscal_year)
+        if date_from or date_to:
+            from sqlalchemy import or_
+            bs_filters = []
+            ad_filters = []
+            if date_from and is_valid_nepali_date(date_from):
+                bs_filters.append(Incident.disaster_date_bs >= date_from)
+                try:
+                    ad_filters.append(Incident.start_date >= datetime.strptime(bs_to_ad(date_from), '%Y-%m-%d').date())
+                except Exception: pass
+            if date_to and is_valid_nepali_date(date_to):
+                bs_filters.append(Incident.disaster_date_bs <= date_to)
+                try:
+                    ad_filters.append(Incident.start_date <= datetime.strptime(bs_to_ad(date_to), '%Y-%m-%d').date())
+                except Exception: pass
+            conditions = []
+            if bs_filters: conditions.append(db.and_(*bs_filters))
+            if ad_filters: conditions.append(db.and_(*ad_filters))
+            if conditions:
+                iq = iq.filter(or_(*conditions))
+        for inc in iq.all():
+            if inc.id in assessment_ids:
+                continue
+            all_bens = collect_incident_beneficiaries(inc)
+            demo = compute_family_demographics(all_bens)
+            rows.append([inc.disaster_date_bs or ad_to_bs_date(inc.start_date) or '',
+                         inc.incident_name or '-',
+                         inc.incident_type or '',
+                         inc.affected_households or 0, inc.deaths or 0,
+                         inc.injured or 0, inc.missing_persons or 0, inc.estimated_loss or 0,
+                         (inc.description or '')[:50] + ('...' if len(inc.description or '') > 50 else '')])
     elif report_type == 'beneficiaries':
         ward_id = args.get('ward_id', type=int)
         status = args.get('status')
@@ -9808,18 +9946,22 @@ def print_report_preview(report_type):
                     totals.append('')
         if report_type == 'disaster-assessments':
             incident_id = request.args.get('incident_id', type=int)
+            ward_id = request.args.get('ward_id', type=int)
+            status = request.args.get('status')
+            severity = request.args.get('severity')
+            fiscal_year = request.args.get('fiscal_year')
+
             q = DisasterAssessment.query.order_by(DisasterAssessment.disaster_date_bs.desc())
             if incident_id: q = q.filter(DisasterAssessment.incident_id == incident_id)
             disaster_type = request.args.get('disaster_type')
             if disaster_type: q = q.filter(DisasterAssessment.disaster_type == disaster_type)
-            fiscal_year = request.args.get('fiscal_year')
             if fiscal_year: q = q.filter(DisasterAssessment.fiscal_year == fiscal_year)
-            ward_id = request.args.get('ward_id', type=int)
             if ward_id: q = q.join(Incident).filter(Incident.ward == ward_id)
             if from_: q = q.filter(DisasterAssessment.disaster_date_bs >= from_)
             if to_: q = q.filter(DisasterAssessment.disaster_date_bs <= to_)
 
             assessment_rows = []
+            assessment_incident_ids = set()
             for a in q.all():
                 try:
                     incident = a.incident
@@ -9828,55 +9970,12 @@ def print_report_preview(report_type):
                     incident = None
                     inc_name = '-'
 
-                relief_beneficiaries = []
-                cash_beneficiaries = []
-                if incident:
-                    for dist in incident.distributions:
-                        if (dist.status or '').lower() == 'cancelled':
-                            continue
-                        relief_beneficiaries.extend(dist.beneficiaries or [])
-                    for cash_dist in incident.cash_distributions:
-                        if (cash_dist.status or '').lower() == 'cancelled':
-                            continue
-                        cash_beneficiaries.extend(cash_dist.beneficiaries or [])
+                all_bens = collect_incident_beneficiaries(incident)
+                demo = compute_family_demographics(all_bens)
 
-                def beneficiary_key(item, name_attr, id_attr):
-                    ben_id = getattr(item, 'beneficiary_id', None)
-                    if ben_id:
-                        return f'id:{ben_id}'
-                    ident = getattr(item, id_attr, None) or ''
-                    name = getattr(item, name_attr, None) or ''
-                    return f'name:{name.strip().lower()}|{ident.strip().lower()}'
-
-                relief_keys = {beneficiary_key(b, 'family_name', 'id_number') for b in relief_beneficiaries}
-                cash_keys = {beneficiary_key(b, 'name', 'national_id') for b in cash_beneficiaries}
-
-                linked_beneficiaries = {}
-
-                def add_linked_beneficiary(beneficiary):
-                    if beneficiary:
-                        linked_beneficiaries[beneficiary.id] = beneficiary
-
-                def resolve_beneficiary(item, name_attr, id_attr):
-                    add_linked_beneficiary(getattr(item, 'beneficiary', None))
-                    ben_id = getattr(item, 'beneficiary_id', None)
-                    if ben_id:
-                        add_linked_beneficiary(db.session.get(Beneficiary, ben_id))
-                        return
-                    ident = (getattr(item, id_attr, None) or '').strip()
-                    if ident:
-                        ben = Beneficiary.query.filter(Beneficiary.national_id == ident).first()
-                        if ben:
-                            add_linked_beneficiary(ben)
-                            return
-                    name = (getattr(item, name_attr, None) or '').strip()
-                    if name:
-                        add_linked_beneficiary(Beneficiary.query.filter(db.func.lower(Beneficiary.name) == name.lower()).first())
-
-                for b in relief_beneficiaries:
-                    resolve_beneficiary(b, 'family_name', 'id_number')
-                for b in cash_beneficiaries:
-                    resolve_beneficiary(b, 'name', 'national_id')
+                relief_keys = {b.id for b in all_bens if b}
+                cash_keys = set()
+                linked_beneficiaries = {b.id: b for b in all_bens if b}
 
                 dynamic_ssf_family = sum(1 for ben in linked_beneficiaries.values() if ben.in_social_security_fund)
                 dynamic_poor_household = sum(1 for ben in linked_beneficiaries.values() if ben.poverty_card_holder)
@@ -9891,11 +9990,11 @@ def print_report_preview(report_type):
                     'fiscal_year': a.fiscal_year or '',
                     'affected_households': a.affected_households or 0,
                     'affected_people': a.affected_people or 0,
-                    'affected_people_male': a.affected_people_male or 0,
-                    'affected_people_female': a.affected_people_female or 0,
-                    'affected_people_child': a.affected_people_child or 0,
-                    'affected_people_pregnant': a.affected_people_pregnant or 0,
-                    'affected_people_old_age': a.affected_people_old_age or 0,
+                    'affected_people_male': demo['male_count'] or (a.affected_people_male or 0),
+                    'affected_people_female': demo['female_count'] or (a.affected_people_female or 0),
+                    'affected_people_child': demo['child_count'] or (a.affected_people_child or 0),
+                    'affected_people_pregnant': demo['pregnant_count'] or (a.affected_people_pregnant or 0),
+                    'affected_people_old_age': demo['old_age_count'] or (a.affected_people_old_age or 0),
                     'ssf_family': dynamic_ssf_family if linked_beneficiaries else (a.ssf_family or 0),
                     'poor_household': dynamic_poor_household if linked_beneficiaries else (a.poor_household or 0),
                     'deaths': a.deaths or 0,
@@ -9926,6 +10025,84 @@ def print_report_preview(report_type):
                     'cash_beneficiaries': len(cash_keys),
                     'total_beneficiaries': len(relief_keys | cash_keys),
                     'remarks': a.remarks or '',
+                })
+                if incident:
+                    assessment_incident_ids.add(incident.id)
+                if incident:
+                    assessment_incident_ids.add(incident.id)
+
+            iq = Incident.query.order_by(Incident.start_date.desc())
+            if incident_id: iq = iq.filter(Incident.id == incident_id)
+            if ward_id: iq = iq.filter(Incident.ward == ward_id)
+            if status: iq = iq.filter(Incident.status == status)
+            if severity: iq = iq.filter(Incident.severity == severity)
+            if fiscal_year: iq = iq.filter(Incident.fiscal_year == fiscal_year)
+            if from_:
+                try:
+                    iq = iq.filter(Incident.start_date >= datetime.strptime(from_, '%Y-%m-%d').date())
+                except Exception: pass
+            if to_:
+                try:
+                    iq = iq.filter(Incident.start_date <= datetime.strptime(to_, '%Y-%m-%d').date())
+                except Exception: pass
+            for inc in iq.all():
+                if inc.id in assessment_incident_ids:
+                    continue
+                all_bens = collect_incident_beneficiaries(inc)
+                demo = compute_family_demographics(all_bens)
+
+                _relief_keys = {b.id for b in all_bens if b}
+                _cash_keys = set()
+                _linked_beneficiaries = {b.id: b for b in all_bens if b}
+
+                _ssf = sum(1 for ben in _linked_beneficiaries.values() if ben.in_social_security_fund)
+                _poor = sum(1 for ben in _linked_beneficiaries.values() if ben.poverty_card_holder)
+                _lt_lost = (inc.cattle_lost or 0) + (inc.poultry_lost or 0) + (inc.goats_sheep_lost or 0) + (inc.other_livestock_lost or 0)
+                _lt_injured = (inc.cattle_injured or 0) + (inc.poultry_injured or 0) + (inc.goats_sheep_injured or 0) + (inc.other_livestock_injured or 0)
+                assessment_rows.append({
+                    'date': inc.disaster_date_bs or ad_to_bs_date(inc.start_date) or '',
+                    'incident': inc.incident_name or '-',
+                    'disaster_type': inc.incident_type or '',
+                    'ward': ward_name_filter(inc.ward) if inc.ward else '-',
+                    'tole': inc.tole or '-',
+                    'fiscal_year': inc.fiscal_year or '',
+                    'affected_households': inc.affected_households or 0,
+                    'affected_people': inc.affected_people or 0,
+                    'affected_people_male': demo['male_count'] or (inc.affected_people_male or 0),
+                    'affected_people_female': demo['female_count'] or (inc.affected_people_female or 0),
+                    'affected_people_child': demo['child_count'],
+                    'affected_people_pregnant': demo['pregnant_count'],
+                    'affected_people_old_age': demo['old_age_count'],
+                    'ssf_family': _ssf if _linked_beneficiaries else 0,
+                    'poor_household': _poor if _linked_beneficiaries else 0,
+                    'deaths': inc.deaths or 0,
+                    'injured': inc.injured or 0,
+                    'missing_persons': inc.missing_persons or 0,
+                    'house_destroyed': inc.house_destroyed or 0,
+                    'house_damaged': inc.house_damaged or 0,
+                    'public_building_destroyed': inc.public_building_destroyed or 0,
+                    'public_building_damaged': inc.public_building_damaged or 0,
+                    'estimated_loss': inc.estimated_loss or 0,
+                    'agriculture_crop_damage': inc.agriculture_crop_damage or '',
+                    'road_blocked': inc.road_blocked,
+                    'electricity_blocked': inc.electricity_blocked,
+                    'communication_blocked': inc.communication_blocked,
+                    'drinking_water_disrupted': inc.drinking_water_disrupted,
+                    'cattle_lost': inc.cattle_lost or 0,
+                    'cattle_injured': inc.cattle_injured or 0,
+                    'poultry_lost': inc.poultry_lost or 0,
+                    'poultry_injured': inc.poultry_injured or 0,
+                    'goats_sheep_lost': inc.goats_sheep_lost or 0,
+                    'goats_sheep_injured': inc.goats_sheep_injured or 0,
+                    'other_livestock_lost': inc.other_livestock_lost or 0,
+                    'other_livestock_injured': inc.other_livestock_injured or 0,
+                    'livestock_lost_total': _lt_lost,
+                    'livestock_injured_total': _lt_injured,
+                    'livestock_missing': 0,
+                    'relief_beneficiaries': len(_relief_keys),
+                    'cash_beneficiaries': len(_cash_keys),
+                    'total_beneficiaries': len(_relief_keys | _cash_keys),
+                    'remarks': inc.description or '',
                 })
 
             total_fields = [
