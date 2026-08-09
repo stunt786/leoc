@@ -1,0 +1,736 @@
+{% extends "base.html" %}
+{% block title %}वर्षा स्थिति - LEOC{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('index') }}"><i class="bi bi-house-fill"></i></a></li>
+<li class="breadcrumb-item active">वर्षा स्थिति</li>
+{% endblock %}
+{% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+<style>
+  .rainfall-form .card-header { font-weight: 600; }
+  .rainfall-form .form-label { font-weight: 500; font-size: 0.85rem; }
+  .stat-mini { text-align: center; padding: 8px; border-radius: 6px; background: #f8f9fa; }
+  .stat-mini .number { font-size: 1.25rem; font-weight: 700; }
+  .stat-mini .label { font-size: 0.7rem; color: #6c757d; text-transform: uppercase; letter-spacing: 0.5px; }
+  #rainfallMap { height: 450px; border-radius: 6px; border: 1px solid #dee2e6; }
+  .rain-marker {
+    display: flex; align-items: center; justify-content: center;
+    width: 36px; height: 36px; border-radius: 50%;
+    background: #2563eb; color: #fff; font-weight: bold; font-size: 11px;
+    border: 3px solid #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.35);
+  }
+  .rain-marker.dry { background: #6c757d; }
+  .rain-marker.light { background: #22c55e; }
+  .rain-marker.moderate { background: #eab308; }
+  .rain-marker.heavy { background: #f97316; }
+  .rain-marker.very-heavy { background: #dc3545; }
+  .entry-row { transition: background 0.15s; }
+  .entry-row:hover { background: #f0f7ff; }
+  .chart-container { position: relative; height: 320px; }
+  .rainfall-legend { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 8px; }
+  .rainfall-legend span { display: flex; align-items: center; gap: 4px; font-size: 12px; }
+  .rainfall-legend i { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+  <div>
+    <h4 class="mb-0"><i class="bi bi-cloud-rain-fill me-2"></i>वर्षा स्थिति</h4>
+    <p class="text-muted mb-0 small">वर्षा स्टेशन र दैनिक वर्षा प्रविष्टि व्यवस्थापन</p>
+  </div>
+</div>
+
+<ul class="nav nav-tabs mt-3" id="rainfallTabs" role="tablist">
+  <li class="nav-item" role="presentation">
+    <button class="nav-link active" id="stations-tab" data-bs-toggle="tab" data-bs-target="#stationsPane" type="button" role="tab">
+      <i class="bi bi-geo-alt-fill me-1"></i>वर्षा स्टेशनहरू
+    </button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" id="entry-tab" data-bs-toggle="tab" data-bs-target="#entryPane" type="button" role="tab">
+      <i class="bi bi-pencil-square me-1"></i>दैनिक वर्षा प्रविष्टि
+    </button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" id="mapchart-tab" data-bs-toggle="tab" data-bs-target="#mapchartPane" type="button" role="tab">
+      <i class="bi bi-map me-1"></i>नक्सा र चार्ट
+    </button>
+  </li>
+</ul>
+
+<div class="tab-content mt-3" id="rainfallTabContent">
+  <!-- ==================== TAB 1: STATIONS ==================== -->
+  <div class="tab-pane fade show active" id="stationsPane" role="tabpanel">
+    <form id="stationForm" class="rainfall-form">
+      <input type="hidden" id="station_id" value="">
+      <div class="card mb-3">
+        <div class="card-header py-2">
+          <i class="bi bi-geo-alt me-1 text-primary"></i> वर्षा स्टेशन जोड्नुहोस्
+        </div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-3">
+              <label class="form-label">स्टेशन नाम <span class="text-danger">*</span></label>
+              <input type="text" class="form-control" id="station_name" placeholder="जस्तै: थलारा स्टेशन" required>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">स्टेशन कोड</label>
+              <input type="text" class="form-control" id="station_code" placeholder="जस्तै: THL-01">
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">अक्षांश (Lat)</label>
+              <input type="number" step="any" class="form-control" id="station_lat" placeholder="29.1234">
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">देशान्तर (Lng)</label>
+              <input type="number" step="any" class="form-control" id="station_lng" placeholder="80.9876">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">स्थान</label>
+              <input type="text" class="form-control" id="station_place" placeholder="जस्तै: थलारा बजार">
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">वडा</label>
+              <select class="form-select" id="station_ward">
+                <option value="">-- वडा छान्नुहोस् --</option>
+                {% for ward in wards %}
+                <option value="{{ ward.id }}">{{ ward.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">विवरण</label>
+              <input type="text" class="form-control" id="station_desc" placeholder="स्टेशनको बारेमा जानकारी">
+            </div>
+            <div class="col-md-2 d-flex align-items-end gap-2">
+              <button type="submit" class="btn btn-primary flex-grow-1" id="stationSaveBtn">
+                <i class="bi bi-check-lg me-1"></i>सेभ गर्नुहोस्
+              </button>
+              <button type="button" class="btn btn-outline-secondary" onclick="resetStationForm()" title="रिसेट">
+                <i class="bi bi-x-lg"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </form>
+
+    <div class="card">
+      <div class="card-header py-2 d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-list-ul me-1 text-success"></i> वर्षा स्टेशनहरूको सूची</span>
+        <span class="badge bg-primary" id="stationCount">0</span>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover table-sm mb-0 align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>#</th>
+                <th>नाम</th>
+                <th>कोड</th>
+                <th>स्थान</th>
+                <th>वडा</th>
+                <th>Lat/Lng</th>
+                <th>स्थिति</th>
+                <th class="text-center">कार्य</th>
+              </tr>
+            </thead>
+            <tbody id="stationTableBody">
+              <tr><td colspan="8" class="text-center text-muted py-4">लोड हुँदैछ...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== TAB 2: DAILY ENTRY ==================== -->
+  <div class="tab-pane fade" id="entryPane" role="tabpanel">
+    <form id="entryForm" class="rainfall-form">
+      <div class="card mb-3">
+        <div class="card-header py-2">
+          <i class="bi bi-calendar-date me-1 text-warning"></i> दैनिक वर्षा प्रविष्टि
+        </div>
+        <div class="card-body">
+          <div class="row g-3 mb-3">
+            <div class="col-md-3">
+              <label class="form-label">मिति <span class="text-danger">*</span></label>
+              <input type="text" class="form-control nepali-date" id="entry_date" placeholder="२०८१-१२-२५" required>
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+              <button type="button" class="btn btn-outline-primary" onclick="loadEntryStations()">
+                <i class="bi bi-arrow-clockwise me-1"></i>स्टेशन लोड गर्नुहोस्
+              </button>
+            </div>
+          </div>
+
+          <div id="entryRows">
+            <div class="text-center text-muted py-4">
+              <i class="bi bi-info-circle me-1"></i>मिति छानेर स्टेशन लोड गर्नुहोस्
+            </div>
+          </div>
+
+          <div class="d-flex justify-content-between align-items-center mt-3" id="entryActions" style="display:none !important">
+            <div class="text-muted small">
+              <i class="bi bi-info-circle me-1"></i>प्रत्येक स्टेशनको बिहान र बेलुका वर्षा दर्ज गर्नुहोस् (मिमी)
+            </div>
+            <button type="button" class="btn btn-success" onclick="saveAllEntries()">
+              <i class="bi bi-check-all me-1"></i>सबै प्रविष्टि सेभ गर्नुहोस्
+            </button>
+          </div>
+        </div>
+      </div>
+    </form>
+
+    <div class="card">
+      <div class="card-header py-2 d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-table me-1 text-info"></i> हालैका प्रविष्टिहरू</span>
+        <div class="d-flex gap-2">
+          <input type="text" class="form-control form-control-sm nepali-date" id="filterDateFrom" placeholder="बाट मिति" style="width:130px">
+          <input type="text" class="form-control form-control-sm nepali-date" id="filterDateTo" placeholder="सम्म मिति" style="width:130px">
+          <button class="btn btn-outline-primary btn-sm" onclick="loadRecentEntries()">
+            <i class="bi bi-search"></i>
+          </button>
+        </div>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover table-sm mb-0 align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>मिति</th>
+                <th>स्टेशन</th>
+                <th>बिहान (मिमी)</th>
+                <th>बेलुका (मिमी)</th>
+                <th>जम्मा (मिमी)</th>
+                <th>टिप्पणी</th>
+                <th class="text-center">कार्य</th>
+              </tr>
+            </thead>
+            <tbody id="entryTableBody">
+              <tr><td colspan="7" class="text-center text-muted py-4">लोड हुँदैछ...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== TAB 3: MAP & CHART ==================== -->
+  <div class="tab-pane fade" id="mapchartPane" role="tabpanel">
+    <div class="row g-3">
+      <div class="col-lg-8">
+        <div class="card mb-3">
+          <div class="card-header py-2 d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-map me-1 text-primary"></i> वर्षा स्टेशन नक्सा</span>
+            <div class="d-flex gap-2 align-items-center">
+              <label class="form-label mb-0 me-1 small">मिति:</label>
+              <input type="text" class="form-control form-control-sm nepali-date" id="mapDate" placeholder="२०८१-१२-२५" style="width:130px">
+              <button class="btn btn-outline-primary btn-sm" onclick="loadMapData()">
+                <i class="bi bi-arrow-clockwise"></i>
+              </button>
+            </div>
+          </div>
+          <div class="card-body p-0">
+            <div id="rainfallMap"></div>
+            <div class="rainfall-legend p-2">
+              <span><i style="background:#6c757d"></i> ० मिमी</span>
+              <span><i style="background:#22c55e"></i> १-१० मिमी</span>
+              <span><i style="background:#eab308"></i> ११-२५ मिमी</span>
+              <span><i style="background:#f97316"></i> २६-५० मिमी</span>
+              <span><i style="background:#dc3545"></i> ५०+ मिमी</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-lg-4">
+        <div class="card mb-3">
+          <div class="card-header py-2">
+            <i class="bi bi-graph-up me-1 text-success"></i> दैनिक वर्षा चार्ट
+          </div>
+          <div class="card-body">
+            <div class="row g-2 mb-3">
+              <div class="col-6">
+                <label class="form-label small">बाट मिति</label>
+                <input type="text" class="form-control form-control-sm nepali-date" id="chartDateFrom" placeholder="२०८१-१२-२०">
+              </div>
+              <div class="col-6">
+                <label class="form-label small">सम्म मिति</label>
+                <input type="text" class="form-control form-control-sm nepali-date" id="chartDateTo" placeholder="२०८१-१२-२५">
+              </div>
+              <div class="col-12">
+                <button class="btn btn-primary btn-sm w-100" onclick="loadChartData()">
+                  <i class="bi bi-bar-chart me-1"></i>चार्ट लोड गर्नुहोस्
+                </button>
+              </div>
+            </div>
+            <div class="chart-container">
+              <canvas id="rainfallChart"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header py-2">
+            <i class="bi bi-info-circle me-1 text-info"></i> सारांश
+          </div>
+          <div class="card-body">
+            <div class="row g-2" id="summaryCards">
+              <div class="col-6">
+                <div class="stat-mini">
+                  <div class="number text-primary" id="totalStations">0</div>
+                  <div class="label">स्टेशनहरू</div>
+                </div>
+              </div>
+              <div class="col-6">
+                <div class="stat-mini">
+                  <div class="number text-success" id="totalEntries">0</div>
+                  <div class="label">प्रविष्टिहरू</div>
+                </div>
+              </div>
+              <div class="col-6">
+                <div class="stat-mini">
+                  <div class="number text-warning" id="avgRainfall">0</div>
+                  <div class="label">औसत वर्षा (मिमी)</div>
+                </div>
+              </div>
+              <div class="col-6">
+                <div class="stat-mini">
+                  <div class="number text-danger" id="maxRainfall">0</div>
+                  <div class="label">अधिकतम वर्षा (मिमी)</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script>
+let rainfallMap = null;
+let rainLayerGroup = null;
+let rainfallChart = null;
+let allStations = [];
+
+// ============ STATIONS TAB ============
+function loadStations() {
+  fetch('/api/rainfall-stations')
+    .then(r => r.json())
+    .then(d => {
+      if (!d.success) { showToast('danger', d.message); return; }
+      allStations = d.stations;
+      renderStationTable(d.stations);
+    })
+    .catch(e => showToast('danger', 'Error: ' + e.message));
+}
+
+function renderStationTable(stations) {
+  const tbody = document.getElementById('stationTableBody');
+  document.getElementById('stationCount').textContent = stations.length;
+  if (!stations.length) {
+    tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">कुनै स्टेशन छैन</td></tr>';
+    return;
+  }
+  tbody.innerHTML = stations.map((s, i) => `
+    <tr>
+      <td>${i + 1}</td>
+      <td><strong>${esc(s.station_name)}</strong></td>
+      <td>${esc(s.station_code)}</td>
+      <td>${esc(s.place)}</td>
+      <td>${esc(s.ward_name || '-')}</td>
+      <td><small>${s.latitude || '-'}, ${s.longitude || '-'}</small></td>
+      <td><span class="badge ${s.is_active ? 'bg-success' : 'bg-secondary'}">${s.is_active ? 'सक्रिय' : 'निष्क्रिय'}</span></td>
+      <td class="text-center">
+        <button class="btn btn-outline-primary btn-sm me-1" onclick="editStation(${s.id})" title="सम्पादन"><i class="bi bi-pencil"></i></button>
+        <button class="btn btn-outline-danger btn-sm" onclick="deleteStation(${s.id}, '${esc(s.station_name)}')" title="मेटाउनुहोस्"><i class="bi bi-trash"></i></button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+document.getElementById('stationForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+  const id = document.getElementById('station_id').value;
+  const data = {
+    station_name: document.getElementById('station_name').value.trim(),
+    station_code: document.getElementById('station_code').value.trim(),
+    latitude: document.getElementById('station_lat').value || null,
+    longitude: document.getElementById('station_lng').value || null,
+    place: document.getElementById('station_place').value.trim(),
+    ward_id: document.getElementById('station_ward').value || null,
+    description: document.getElementById('station_desc').value.trim(),
+    is_active: true,
+  };
+  if (!data.station_name) { showToast('warning', 'स्टेशन नाम आवश्यक छ'); return; }
+
+  const url = id ? `/api/rainfall-stations/${id}` : '/api/rainfall-stations';
+  const method = id ? 'PUT' : 'POST';
+  fetch(url, {
+    method: method,
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
+    body: JSON.stringify(data)
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (d.success) {
+      showToast('success', d.message);
+      resetStationForm();
+      loadStations();
+    } else {
+      showToast('danger', d.message);
+    }
+  })
+  .catch(e => showToast('danger', 'Error: ' + e.message));
+});
+
+function editStation(id) {
+  fetch(`/api/rainfall-stations/${id}`)
+    .then(r => r.json())
+    .then(d => {
+      if (!d.success) { showToast('danger', d.message); return; }
+      const s = d.data;
+      document.getElementById('station_id').value = s.id;
+      document.getElementById('station_name').value = s.station_name;
+      document.getElementById('station_code').value = s.station_code;
+      document.getElementById('station_lat').value = s.latitude || '';
+      document.getElementById('station_lng').value = s.longitude || '';
+      document.getElementById('station_place').value = s.place;
+      document.getElementById('station_ward').value = s.ward_id || '';
+      document.getElementById('station_desc').value = s.description;
+      document.getElementById('stationSaveBtn').innerHTML = '<i class="bi bi-check-lg me-1"></i>अपडेट गर्नुहोस्';
+      document.getElementById('stationForm').scrollIntoView({ behavior: 'smooth' });
+    });
+}
+
+function deleteStation(id, name) {
+  if (!confirm(`के तपाईं "${name}" मेटाउन चाहनुहुन्छ?`)) return;
+  fetch(`/api/rainfall-stations/${id}`, {
+    method: 'DELETE',
+    headers: { 'X-CSRFToken': getCsrfToken() }
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (d.success) { showToast('success', d.message); loadStations(); }
+    else { showToast('danger', d.message); }
+  });
+}
+
+function resetStationForm() {
+  document.getElementById('stationForm').reset();
+  document.getElementById('station_id').value = '';
+  document.getElementById('stationSaveBtn').innerHTML = '<i class="bi bi-check-lg me-1"></i>सेभ गर्नुहोस्';
+}
+
+// ============ DAILY ENTRY TAB ============
+function loadEntryStations() {
+  const dateVal = document.getElementById('entry_date').value;
+  if (!dateVal) { showToast('warning', 'मिति छान्नुहोस्'); return; }
+
+  fetch(`/api/rainfall-entries?date_from=${dateVal}&date_to=${dateVal}`)
+    .then(r => r.json())
+    .then(d => {
+      if (!d.success) { showToast('danger', d.message); return; }
+      const existing = {};
+      d.entries.forEach(e => { existing[e.station_id] = e; });
+
+      const container = document.getElementById('entryRows');
+      const active = allStations.filter(s => s.is_active);
+      if (!active.length) {
+        container.innerHTML = '<div class="text-center text-muted py-4">कुनै सक्रिय स्टेशन छैन। पहिले स्टेशन जोड्नुहोस्।</div>';
+        return;
+      }
+
+      container.innerHTML = `
+        <div class="table-responsive">
+          <table class="table table-sm align-middle">
+            <thead class="table-light">
+              <tr>
+                <th style="width:30px">#</th>
+                <th>स्टेशन</th>
+                <th style="width:140px">बिहान वर्षा (मिमी)</th>
+                <th style="width:140px">बेलुका वर्षा (मिमी)</th>
+                <th style="width:100px">जम्मा</th>
+                <th>टिप्पणी</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${active.map((s, i) => {
+                const ex = existing[s.id] || {};
+                const m = ex.morning_reading || '';
+                const e = ex.evening_reading || '';
+                return `
+                  <tr class="entry-row">
+                    <td>${i + 1}</td>
+                    <td>
+                      <strong>${esc(s.station_name)}</strong>
+                      ${s.station_code ? '<br><small class="text-muted">' + esc(s.station_code) + '</small>' : ''}
+                      <input type="hidden" class="entry-station-id" value="${s.id}">
+                    </td>
+                    <td><input type="number" step="0.1" min="0" class="form-control form-control-sm entry-morning" value="${m}" placeholder="0.0"></td>
+                    <td><input type="number" step="0.1" min="0" class="form-control form-control-sm entry-evening" value="${e}" placeholder="0.0"></td>
+                    <td class="entry-total fw-bold text-primary">0</td>
+                    <td><input type="text" class="form-control form-control-sm entry-remarks" value="${esc(ex.remarks || '')}" placeholder="टिप्पणी"></td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+
+      document.getElementById('entryActions').style.display = 'flex';
+
+      container.querySelectorAll('.entry-row').forEach(row => {
+        const m = row.querySelector('.entry-morning');
+        const e = row.querySelector('.entry-evening');
+        const t = row.querySelector('.entry-total');
+        const calc = () => {
+          const mv = parseFloat(m.value) || 0;
+          const ev = parseFloat(e.value) || 0;
+          t.textContent = (mv + ev).toFixed(1);
+        };
+        m.addEventListener('input', calc);
+        e.addEventListener('input', calc);
+        calc();
+      });
+    });
+}
+
+function saveAllEntries() {
+  const dateVal = document.getElementById('entry_date').value;
+  if (!dateVal) { showToast('warning', 'मिति छान्नुहोस्'); return; }
+
+  const rows = document.querySelectorAll('#entryRows .entry-row');
+  if (!rows.length) { showToast('warning', 'कुनै स्टेशन छैन'); return; }
+
+  const entries = [];
+  rows.forEach(row => {
+    const sid = row.querySelector('.entry-station-id').value;
+    const morning = row.querySelector('.entry-morning').value;
+    const evening = row.querySelector('.entry-evening').value;
+    const remarks = row.querySelector('.entry-remarks').value;
+    entries.push({
+      station_id: parseInt(sid),
+      morning_reading: morning ? parseFloat(morning) : null,
+      evening_reading: evening ? parseFloat(evening) : null,
+      remarks: remarks,
+    });
+  });
+
+  fetch('/api/rainfall-entries', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
+    body: JSON.stringify({ entry_date: dateVal, entries: entries })
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (d.success) {
+      showToast('success', d.message);
+      loadRecentEntries();
+    } else {
+      showToast('danger', d.message);
+    }
+  })
+  .catch(e => showToast('danger', 'Error: ' + e.message));
+}
+
+function loadRecentEntries() {
+  const from = document.getElementById('filterDateFrom').value || '';
+  const to = document.getElementById('filterDateTo').value || '';
+  let url = '/api/rainfall-entries?';
+  if (from) url += `date_from=${from}&`;
+  if (to) url += `date_to=${to}&`;
+
+  fetch(url)
+    .then(r => r.json())
+    .then(d => {
+      if (!d.success) { showToast('danger', d.message); return; }
+      renderEntryTable(d.entries);
+    });
+}
+
+function renderEntryTable(entries) {
+  const tbody = document.getElementById('entryTableBody');
+  if (!entries.length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4">कुनै प्रविष्टि छैन</td></tr>';
+    return;
+  }
+  tbody.innerHTML = entries.map(e => `
+    <tr>
+      <td>${esc(e.entry_date)}</td>
+      <td><strong>${esc(e.station_name || '-')}</strong><br><small class="text-muted">${esc(e.station_code || '')}</small></td>
+      <td>${e.morning_reading != null ? e.morning_reading.toFixed(1) : '-'}</td>
+      <td>${e.evening_reading != null ? e.evening_reading.toFixed(1) : '-'}</td>
+      <td class="fw-bold text-primary">${e.total_day_rainfall != null ? e.total_day_rainfall.toFixed(1) : '-'}</td>
+      <td><small>${esc(e.remarks)}</small></td>
+      <td class="text-center">
+        <button class="btn btn-outline-danger btn-sm" onclick="deleteEntry(${e.id})" title="मेटाउनुहोस्"><i class="bi bi-trash"></i></button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function deleteEntry(id) {
+  if (!confirm('के तपाईं यो प्रविष्टि मेटाउन चाहनुहुन्छ?')) return;
+  fetch(`/api/rainfall-entries/${id}`, {
+    method: 'DELETE',
+    headers: { 'X-CSRFToken': getCsrfToken() }
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (d.success) { showToast('success', d.message); loadRecentEntries(); }
+    else { showToast('danger', d.message); }
+  });
+}
+
+// ============ MAP & CHART TAB ============
+function initRainfallMap() {
+  if (rainfallMap) return;
+  rainfallMap = L.map('rainfallMap', { zoomControl: true, scrollWheelZoom: true });
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 18, minZoom: 10,
+    attribution: '&copy; OpenStreetMap contributors'
+  }).addTo(rainfallMap);
+  L.control.scale({ position: 'bottomleft', imperial: false }).addTo(rainfallMap);
+  rainLayerGroup = L.layerGroup().addTo(rainfallMap);
+  loadMapData();
+}
+
+function getRainClass(total) {
+  if (!total || total === 0) return 'dry';
+  if (total <= 10) return 'light';
+  if (total <= 25) return 'moderate';
+  if (total <= 50) return 'heavy';
+  return 'very-heavy';
+}
+
+function loadMapData() {
+  if (!rainfallMap) return;
+  const dateVal = document.getElementById('mapDate').value || '';
+  fetch(`/api/rainfall/map-data?date=${dateVal}`)
+    .then(r => r.json())
+    .then(d => {
+      if (!d.success) { showToast('danger', d.message); return; }
+      rainLayerGroup.clearLayers();
+      const stations = d.stations;
+      let bounds = [];
+      let totalR = 0, maxR = 0, withData = 0;
+
+      stations.forEach(s => {
+        if (s.lat == null || s.lng == null) return;
+        bounds.push([s.lat, s.lng]);
+        const cls = getRainClass(s.total);
+        const mk = L.marker([s.lat, s.lng], {
+          icon: L.divIcon({
+            className: 'rain-marker ' + cls,
+            html: s.total.toFixed(0),
+            iconSize: [36, 36],
+            iconAnchor: [18, 18],
+            popupAnchor: [0, -18]
+          })
+        }).addTo(rainLayerGroup);
+
+        const popup = `
+          <div style="min-width:180px">
+            <strong style="font-size:14px">${esc(s.name)}</strong>
+            ${s.code ? '<br><small class="text-muted">' + esc(s.code) + '</small>' : ''}
+            <hr class="my-1">
+            <div><strong>स्थान:</strong> ${esc(s.place || '-')}</div>
+            <div><strong>वडा:</strong> ${esc(s.ward || '-')}</div>
+            <hr class="my-1">
+            <div><strong>बिहान:</strong> ${s.morning.toFixed(1)} मिमी</div>
+            <div><strong>बेलुका:</strong> ${s.evening.toFixed(1)} मिमी</div>
+            <div class="text-primary fw-bold"><strong>जम्मा:</strong> ${s.total.toFixed(1)} मिमी</div>
+          </div>
+        `;
+        mk.bindPopup(popup);
+
+        if (s.total > 0) { totalR += s.total; withData++; }
+        if (s.total > maxR) maxR = s.total;
+      });
+
+      if (bounds.length) {
+        rainfallMap.fitBounds(bounds, { padding: [30, 30] });
+      }
+
+      document.getElementById('totalStations').textContent = stations.length;
+      document.getElementById('avgRainfall').textContent = withData > 0 ? (totalR / withData).toFixed(1) : '0';
+      document.getElementById('maxRainfall').textContent = maxR.toFixed(1);
+    });
+}
+
+function loadChartData() {
+  const from = document.getElementById('chartDateFrom').value || '';
+  const to = document.getElementById('chartDateTo').value || '';
+  let url = '/api/rainfall/chart-data?';
+  if (from) url += `date_from=${from}&`;
+  if (to) url += `date_to=${to}&`;
+
+  fetch(url)
+    .then(r => r.json())
+    .then(d => {
+      if (!d.success) { showToast('danger', d.message); return; }
+      document.getElementById('totalEntries').textContent = d.datasets.reduce((sum, ds) => sum + ds.data.reduce((a, b) => a + b, 0), 0).toFixed(0);
+      renderChart(d);
+    });
+}
+
+function renderChart(data) {
+  const ctx = document.getElementById('rainfallChart').getContext('2d');
+  if (rainfallChart) rainfallChart.destroy();
+  rainfallChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: data.labels,
+      datasets: data.datasets
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } },
+        tooltip: { mode: 'index', intersect: false }
+      },
+      scales: {
+        x: { title: { display: true, text: 'मिति', font: { size: 12 } } },
+        y: { title: { display: true, text: 'वर्षा (मिमी)', font: { size: 12 } }, beginAtZero: true }
+      },
+      interaction: { mode: 'nearest', axis: 'x', intersect: false }
+    }
+  });
+}
+
+// ============ UTILITY ============
+function getCsrfToken() {
+  const meta = document.querySelector('meta[name="csrf-token"]');
+  return meta ? meta.getAttribute('content') : '';
+}
+
+function esc(str) {
+  if (!str) return '';
+  const d = document.createElement('div');
+  d.textContent = str;
+  return d.innerHTML;
+}
+
+// ============ INIT ============
+document.addEventListener('DOMContentLoaded', function() {
+  loadStations();
+  loadRecentEntries();
+
+  document.querySelector('#mapchart-tab').addEventListener('shown.bs.tab', function() {
+    setTimeout(() => {
+      initRainfallMap();
+      if (rainfallMap) rainfallMap.invalidateSize();
+    }, 100);
+  });
+});
+</script>
+{% endblock %}

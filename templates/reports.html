@@ -159,7 +159,7 @@
                     <option value="no">Non-Distributable</option>
                 </select>
             </div>
-            <div class="col-auto filter-optional" data-types="inventory,stock-book">
+            <div class="col-auto filter-optional" data-types="inventory,stock-book,bin-card">
                 <label class="form-label small">Group</label>
                 <select class="form-select form-select-sm" id="filterGroup" onchange="loadReportData()"><option value="">All</option></select>
             </div>
@@ -249,10 +249,43 @@
     </div>
 </div>
 
+<div class="modal fade" id="analyticsDetailsModal" tabindex="-1">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-bar-chart me-2"></i><span id="analyticsDetailsTitle">Details</span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-0">
+                <div class="table-responsive" style="max-height: 60vh; overflow-y: auto;">
+                    <table class="table table-hover table-striped mb-0">
+                        <thead class="table-light" style="position: sticky; top: 0; z-index: 10;">
+                            <tr id="analyticsDetailsHeaders"></tr>
+                        </thead>
+                        <tbody id="analyticsDetailsBody">
+                            <tr><td colspan="6" class="text-center py-4 text-muted">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer d-flex justify-content-between align-items-center">
+                <small class="text-muted" id="analyticsDetailsInfo"></small>
+                <div class="d-flex align-items-center gap-2">
+                    <nav>
+                        <ul class="pagination pagination-sm mb-0" id="analyticsDetailsPagination"></ul>
+                    </nav>
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 {% block extra_js %}
 <script>
 let formData = {};
+const ANALYTICS_PAGE_SIZE = 50;
 
 async function loadFormData() {
     try {
@@ -379,6 +412,22 @@ async function loadReportData() {
                 const isSuppliers = type === 'suppliers';
                 const isDistribution = type === 'distribution';
                 const isBenHistory = type === 'beneficiary-history';
+                const isAnalytics = type === 'analytics-summary';
+                const isMonthly = type === 'monthly-summary';
+                const isIncidentSummary = type === 'incident-summary';
+                const analyticsMetricMap = {
+                    0: 'items', 2: 'suppliers', 3: 'warehouses', 4: 'incidents',
+                    5: 'beneficiaries', 6: 'distributions', 7: 'receipts',
+                    8: 'cash_funds', 9: 'cash_received', 10: 'cash_distributed', 11: 'low_stock'
+                };
+                const monthlyMetricMap = {
+                    0: 'receipts', 1: 'distributions', 2: 'incidents'
+                };
+                const incidentSummaryMetricMap = {
+                    0: 'all', 1: 'deaths', 2: 'injured', 3: 'missing',
+                    4: 'affected_households', 5: 'affected_people',
+                    6: 'houses_destroyed', 7: 'houses_damaged', 8: 'estimated_loss'
+                };
                 tbody.innerHTML = data.rows.map((row, i) => {
                     const supplierId = isSuppliers ? row[row.length - 1] : null;
                     const beneficiaryName = (isDistribution || isBenHistory) ? row[row.length - 1] : null;
@@ -389,6 +438,17 @@ async function loadReportData() {
                                 c.includes('d left') && parseInt(c) <= 30 ? 'danger' :
                                 c.includes('d left') ? 'warning' : 'success';
                             return `<td><span class="badge bg-${cls}">${c ?? ''}</span></td>`;
+                        }
+                        if (isAnalytics && j === 1 && analyticsMetricMap[i]) {
+                            return `<td><strong>${c ?? 0}</strong> <button class="btn btn-outline-info btn-sm ms-2" onclick="viewAnalyticsDetails('${analyticsMetricMap[i]}', '${cols[0]}')"><i class="bi bi-eye me-1"></i>View</button></td>`;
+                        }
+                        if (isMonthly && j === 1 && monthlyMetricMap[i]) {
+                            const monthVal = document.getElementById('filterMonth').value || new Date().toISOString().slice(0, 7);
+                            return `<td><strong>${c ?? 0}</strong> <button class="btn btn-outline-info btn-sm ms-2" onclick="viewMonthlyDetails('${monthlyMetricMap[i]}', '${cols[0]}', '${monthVal}')"><i class="bi bi-eye me-1"></i>View</button></td>`;
+                        }
+                        if (isIncidentSummary && j === 1 && incidentSummaryMetricMap[i]) {
+                            const params = getFilterParams();
+                            return `<td><strong>${c ?? 0}</strong> <button class="btn btn-outline-info btn-sm ms-2" onclick="viewIncidentSummaryDetails('${incidentSummaryMetricMap[i]}', '${cols[0]}', '${encodeURIComponent(params)}')"><i class="bi bi-eye me-1"></i>View</button></td>`;
                         }
                         if (isSuppliers && j === 6) {
                             return `<td><span class="badge bg-info me-1">${c ?? 0}</span> <button class="btn btn-outline-primary btn-sm" onclick="viewSupplierItems(${supplierId})"><i class="bi bi-eye me-1"></i>View</button></td>`;
@@ -422,6 +482,30 @@ function printPreview() {
     const type = document.getElementById('reportType').value;
     if (!type) return;
     const params = getFilterParams();
+    if (type === 'bin-card') {
+        const itemId = document.getElementById('filterItem').value;
+        const groupId = document.getElementById('filterGroup').value;
+        const warehouseId = document.getElementById('filterWarehouse').value;
+        if (!warehouseId) {
+            showToast('warning', 'Please select Warehouse to print Bin Card');
+            return;
+        }
+        if (!itemId && !groupId) {
+            showToast('warning', 'Please select an Item or a Group to print Bin Card');
+            return;
+        }
+        window.open(`/api/inventory/bin-card${params ? '?' + params : ''}`, '_blank');
+        return;
+    }
+    if (type === 'stock-book') {
+        const warehouseId = document.getElementById('filterWarehouse').value;
+        if (!warehouseId) {
+            showToast('warning', 'Please select Warehouse to print Stock Book');
+            return;
+        }
+        window.open(`/api/inventory/stock-book${params ? '?' + params : ''}`, '_blank');
+        return;
+    }
     const qs = params || '';
     const auto = type !== 'incident-summary' ? (qs ? '&auto=1' : 'auto=1') : '';
     window.open(`/print-report/${type}${qs ? '?' + qs + auto : auto ? '?' + auto : ''}`, '_blank');
@@ -478,6 +562,125 @@ async function viewBeneficiaryDist(familyName) {
         }
     } catch(e) {
         document.getElementById('beneficiaryDistBody').innerHTML = '<tr><td colspan="6" class="text-center text-danger py-4">Error loading distributions</td></tr>';
+    }
+}
+
+async function viewAnalyticsDetails(metricType, title) {
+    const modal = new bootstrap.Modal(document.getElementById('analyticsDetailsModal'));
+    document.getElementById('analyticsDetailsTitle').textContent = title + ' Details';
+    document.getElementById('analyticsDetailsHeaders').innerHTML = '';
+    document.getElementById('analyticsDetailsBody').innerHTML = '<tr><td colspan="6" class="text-center py-4"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div></td></tr>';
+    document.getElementById('analyticsDetailsPagination').innerHTML = '';
+    document.getElementById('analyticsDetailsInfo').textContent = '';
+    modal.show();
+    try {
+        const resp = await fetch(`/api/analytics-details/${metricType}`);
+        const data = await resp.json();
+        if (data.success) {
+            document.getElementById('analyticsDetailsTitle').textContent = data.title;
+            window._analyticsData = data;
+            window._analyticsPage = 1;
+            renderAnalyticsPage();
+        } else {
+            document.getElementById('analyticsDetailsBody').innerHTML = '<tr><td colspan="' + (data.headers ? data.headers.length + 1 : 6) + '" class="text-center text-danger py-4">Error: ' + (data.message || 'Failed to load') + '</td></tr>';
+        }
+    } catch(e) {
+        document.getElementById('analyticsDetailsBody').innerHTML = '<tr><td colspan="6" class="text-center text-danger py-4">Error loading details</td></tr>';
+    }
+}
+
+function renderAnalyticsPage() {
+    const data = window._analyticsData;
+    const page = window._analyticsPage || 1;
+    const total = data.rows.length;
+    const totalPages = Math.ceil(total / ANALYTICS_PAGE_SIZE);
+    const start = (page - 1) * ANALYTICS_PAGE_SIZE;
+    const end = Math.min(start + ANALYTICS_PAGE_SIZE, total);
+    const pageRows = data.rows.slice(start, end);
+    const colCount = data.headers.length + 1;
+    const thead = document.getElementById('analyticsDetailsHeaders');
+    const tbody = document.getElementById('analyticsDetailsBody');
+    thead.innerHTML = '<th style="width:50px">#</th>' + data.headers.map(h => `<th>${h}</th>`).join('');
+    if (total === 0) {
+        tbody.innerHTML = '<tr><td colspan="' + colCount + '" class="text-center text-muted py-4">No data found</td></tr>';
+    } else {
+        tbody.innerHTML = pageRows.map((row, i) =>
+            '<tr><td class="text-center text-muted">' + (start + i + 1) + '</td>' + row.map(c => '<td>' + (c ?? '') + '</td>').join('') + '</tr>'
+        ).join('');
+    }
+    document.getElementById('analyticsDetailsInfo').textContent = total > 0 ? `Showing ${start + 1}-${end} of ${total}` : '';
+    const pag = document.getElementById('analyticsDetailsPagination');
+    if (totalPages <= 1) { pag.innerHTML = ''; return; }
+    let html = '<li class="page-item' + (page <= 1 ? ' disabled' : '') + '"><a class="page-link" href="#" onclick="analyticsGoPage(' + (page - 1) + ');return false;">&laquo;</a></li>';
+    const maxShow = 7;
+    let pStart = Math.max(1, page - Math.floor(maxShow / 2));
+    let pEnd = Math.min(totalPages, pStart + maxShow - 1);
+    if (pEnd - pStart < maxShow - 1) pStart = Math.max(1, pEnd - maxShow + 1);
+    if (pStart > 1) html += '<li class="page-item"><a class="page-link" href="#" onclick="analyticsGoPage(1);return false;">1</a></li>';
+    if (pStart > 2) html += '<li class="page-item disabled"><span class="page-link">...</span></li>';
+    for (let p = pStart; p <= pEnd; p++) {
+        html += '<li class="page-item' + (p === page ? ' active' : '') + '"><a class="page-link" href="#" onclick="analyticsGoPage(' + p + ');return false;">' + p + '</a></li>';
+    }
+    if (pEnd < totalPages - 1) html += '<li class="page-item disabled"><span class="page-link">...</span></li>';
+    if (pEnd < totalPages) html += '<li class="page-item"><a class="page-link" href="#" onclick="analyticsGoPage(' + totalPages + ');return false;">' + totalPages + '</a></li>';
+    html += '<li class="page-item' + (page >= totalPages ? ' disabled' : '') + '"><a class="page-link" href="#" onclick="analyticsGoPage(' + (page + 1) + ');return false;">&raquo;</a></li>';
+    pag.innerHTML = html;
+}
+
+function analyticsGoPage(p) {
+    const totalPages = Math.ceil(window._analyticsData.rows.length / ANALYTICS_PAGE_SIZE);
+    if (p < 1 || p > totalPages) return;
+    window._analyticsPage = p;
+    renderAnalyticsPage();
+    document.querySelector('#analyticsDetailsModal .table-responsive').scrollTop = 0;
+}
+
+async function viewMonthlyDetails(metricType, title, month) {
+    const modal = new bootstrap.Modal(document.getElementById('analyticsDetailsModal'));
+    document.getElementById('analyticsDetailsTitle').textContent = title + ' Details';
+    document.getElementById('analyticsDetailsHeaders').innerHTML = '';
+    document.getElementById('analyticsDetailsBody').innerHTML = '<tr><td colspan="6" class="text-center py-4"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div></td></tr>';
+    document.getElementById('analyticsDetailsPagination').innerHTML = '';
+    document.getElementById('analyticsDetailsInfo').textContent = '';
+    modal.show();
+    try {
+        const resp = await fetch(`/api/monthly-details/${metricType}?month=${encodeURIComponent(month)}`);
+        const data = await resp.json();
+        if (data.success) {
+            document.getElementById('analyticsDetailsTitle').textContent = data.title;
+            window._analyticsData = data;
+            window._analyticsPage = 1;
+            renderAnalyticsPage();
+        } else {
+            document.getElementById('analyticsDetailsBody').innerHTML = '<tr><td colspan="' + (data.headers ? data.headers.length + 1 : 6) + '" class="text-center text-danger py-4">Error: ' + (data.message || 'Failed to load') + '</td></tr>';
+        }
+    } catch(e) {
+        document.getElementById('analyticsDetailsBody').innerHTML = '<tr><td colspan="6" class="text-center text-danger py-4">Error loading details</td></tr>';
+    }
+}
+
+async function viewIncidentSummaryDetails(metricType, title, filterParams) {
+    const modal = new bootstrap.Modal(document.getElementById('analyticsDetailsModal'));
+    document.getElementById('analyticsDetailsTitle').textContent = title + ' Details';
+    document.getElementById('analyticsDetailsHeaders').innerHTML = '';
+    document.getElementById('analyticsDetailsBody').innerHTML = '<tr><td colspan="6" class="text-center py-4"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div></td></tr>';
+    document.getElementById('analyticsDetailsPagination').innerHTML = '';
+    document.getElementById('analyticsDetailsInfo').textContent = '';
+    modal.show();
+    try {
+        const qs = filterParams ? '?' + decodeURIComponent(filterParams) : '';
+        const resp = await fetch(`/api/incident-summary-details/${metricType}${qs}`);
+        const data = await resp.json();
+        if (data.success) {
+            document.getElementById('analyticsDetailsTitle').textContent = data.title;
+            window._analyticsData = data;
+            window._analyticsPage = 1;
+            renderAnalyticsPage();
+        } else {
+            document.getElementById('analyticsDetailsBody').innerHTML = '<tr><td colspan="' + (data.headers ? data.headers.length + 1 : 6) + '" class="text-center text-danger py-4">Error: ' + (data.message || 'Failed to load') + '</td></tr>';
+        }
+    } catch(e) {
+        document.getElementById('analyticsDetailsBody').innerHTML = '<tr><td colspan="6" class="text-center text-danger py-4">Error loading details</td></tr>';
     }
 }
 

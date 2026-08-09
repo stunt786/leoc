@@ -1,13 +1,13 @@
 <!DOCTYPE html>
-<html lang="ne">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bin Card - LEOC</title>
+    <title>Bin Card - {{ group.name if group else item.name }} - LEOC</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
     <style>
-        @page { size: A4; margin: 8mm 10mm; }
+        @page { size: A4 portrait; margin: 10mm; }
         @font-face {
             font-family: 'Noto Sans';
             src: url('/static/fonts/NotoSans-Regular.ttf') format('truetype');
@@ -22,151 +22,278 @@
             font-style: normal;
             font-display: swap;
         }
-        @font-face {
-            font-family: 'Kokila';
-            src: url('/static/fonts/Kokila-Regular.ttf') format('truetype');
-            font-weight: 400;
-            font-style: normal;
-            font-display: swap;
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            padding: 18px 20px;
+            background: #fff;
+            color: #000;
+            font-family: 'Noto Sans', Arial, sans-serif;
+            font-size: 12px;
         }
-        @font-face {
-            font-family: 'Kokila';
-            src: url('/static/fonts/Kokila-Regular.ttf') format('truetype');
+        @media print {
+            body { padding: 0; }
+            .no-print { display: none !important; }
+            .sheet { width: 100%; min-height: auto; }
+        }
+        .no-print { margin-bottom: 12px; }
+        .sheet {
+            width: 100%;
+            min-height: 270mm;
+            margin: 0 auto;
+            background: #fff;
+        }
+        .top-grid {
+            display: grid;
+            grid-template-columns: 1fr 298px;
+            gap: 28px;
+            align-items: start;
+        }
+        .brand {
+            text-align: center;
+            color: #c70043;
+            padding-top: 6px;
+        }
+        .brand .office {
+            font-size: 20px;
+            line-height: 1.08;
             font-weight: 700;
-            font-style: normal;
-            font-display: swap;
+            text-transform: uppercase;
+            letter-spacing: 0;
         }
-        body { font-family: 'Noto Sans', 'Kokila', 'Noto Sans Devanagari', 'Inter', sans-serif; padding: 10px; font-size: 9px; }
-        @media print { body { padding: 0; } .no-print { display: none !important; } }
-        .header { text-align: center; margin-bottom: 4px; border-bottom: 2px solid #2c5282; padding-bottom: 6px; }
-        .header h4 { margin-bottom: 1px; font-weight: 700; color: #1a365d; font-size: 14px; }
-        .header h5 { color: #2c5282; font-weight: 600; font-size: 12px; margin-bottom: 1px; }
-        .header h6 { color: #4a5568; font-weight: 600; font-size: 11px; }
-        table { font-size: 8px; }
-        table th { white-space: nowrap; font-size: 8px; vertical-align: middle; text-align: center; }
-        table td { vertical-align: middle; }
-        .footer { margin-top: 15px; }
-        .field-label { font-weight: 600; color: #495057; }
-        .signature-line { border-top: 1px solid #000; width: 160px; display: inline-block; margin-top: 4px; }
-        .totals-row { font-weight: 700; background-color: #e9ecef; }
-        .page-break { page-break-after: always; }
-        .striped tbody tr:nth-of-type(even) { background-color: #f8f9fa; }
-        .info-table { font-size: 8px; }
-        .info-table td { padding: 1px 4px; }
+        .brand .leoc {
+            font-size: 11px;
+            line-height: 1.2;
+            font-weight: 700;
+        }
+        .brand .place {
+            font-size: 16px;
+            line-height: 1.18;
+            font-weight: 700;
+        }
+        .emblem {
+            display: block;
+            width: 86px;
+            height: 86px;
+            object-fit: contain;
+            margin: 12px auto 8px;
+        }
+        .title {
+            margin: 0;
+            color: #c70043;
+            font-size: 45px;
+            line-height: 1;
+            font-weight: 700;
+            letter-spacing: 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
+        th, td {
+            border: 1px solid #000;
+            padding: 3px 5px;
+            vertical-align: middle;
+            word-break: break-word;
+        }
+        .info-table th, .location-table th {
+            border-color: #6fa3ff;
+            font-size: 13px;
+            line-height: 1.1;
+            text-align: center;
+            font-weight: 700;
+        }
+        .info-table td, .location-table td {
+            border-color: #6fa3ff;
+            height: 31px;
+            font-size: 12px;
+        }
+        .info-table .label {
+            text-transform: uppercase;
+        }
+        .info-table .value, .location-table .value {
+            text-align: center;
+            font-weight: 500;
+        }
+        .location-wrap {
+            width: 272px;
+            margin-top: 14px;
+        }
+        .location-table th { height: 18px; padding: 1px 4px; }
+        .location-table td {
+            height: 18px;
+            padding: 1px 4px;
+            text-align: center;
+            line-height: 1.2;
+        }
+        .location-table .sub-location { font-style: italic; }
+        .meta {
+            display: flex;
+            justify-content: space-between;
+            gap: 16px;
+            margin: 8px 0 8px;
+            font-size: 10px;
+            color: #333;
+        }
+        .ledger th {
+            text-align: center;
+            font-size: 12px;
+            line-height: 1.12;
+            font-weight: 700;
+            padding: 2px 4px;
+            height: 26px;
+        }
+        .ledger td {
+            height: 28px;
+            font-size: 11px;
+            padding: 3px 5px;
+        }
+        .ledger .num { text-align: right; }
+        .ledger .center { text-align: center; }
+        .ledger .small { font-size: 10px; }
+        .ledger .blank td { color: transparent; }
+        .footer {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+            margin-top: 34px;
+            font-size: 11px;
+            text-align: center;
+        }
+        .signature-line {
+            display: block;
+            border-top: 1px solid #000;
+            width: 150px;
+            margin: 0 auto 5px;
+        }
     </style>
 </head>
 <body>
-    <div class="no-print mb-3">
+    <div class="no-print">
         <button class="btn btn-primary btn-sm" onclick="window.print()"><i class="bi bi-printer"></i> Print</button>
         <button class="btn btn-outline-secondary btn-sm" onclick="window.close()"><i class="bi bi-x-lg"></i> Close</button>
     </div>
 
-    <div class="header">
-        {% if report_header %}
-        {% for line in report_header.strip().split('\n') %}
-        {% set l = line.strip() %}
-        {% if l %}
-        {% if loop.first %}<h4>{{ l }}</h4>{% else %}<h5>{{ l }}</h5>{% endif %}
-        {% endif %}
-        {% endfor %}
-        {% else %}
-        <h4>{{ office or 'थलारा गाउँपालिका' }}</h4>
-        <h5>स्थानीय आपतकालिन कार्यसञ्चालन केन्द्र (LEOC)</h5>
-        {% endif %}
-        {% if address %}<small class="text-muted">{{ address }}</small>{% endif %}
-        <h6 class="mt-1">बिन कार्ड (Bin Card)</h6>
-    </div>
+    <main class="sheet">
+        <section class="top-grid">
+            <div>
+                <div class="brand">
+                    {% if report_header %}
+                        {% for line in report_header.strip().split('\n') %}
+                            {% set l = line.strip() %}
+                            {% if l %}
+                                {% if loop.first %}
+                                    <div class="office">{{ l }}</div>
+                                {% elif loop.index == 2 %}
+                                    <div class="leoc">{{ l }}</div>
+                                {% else %}
+                                    <div class="place">{{ l }}</div>
+                                {% endif %}
+                            {% endif %}
+                        {% endfor %}
+                    {% else %}
+                        <div class="office">{{ office or 'THALARA RURAL MUNICIPALITY' }}</div>
+                        <div class="leoc">Local Emergency Operating Centre(LEOC)</div>
+                        <div class="place">{{ address or 'Kholi, Bajhang' }}</div>
+                    {% endif %}
+                    <img class="emblem" src="{{ url_for('static', filename='Emblem_of_Nepal.png') }}" alt="Nepal Emblem">
+                    <h1 class="title">BIN CARD</h1>
+                </div>
 
-    <div class="row mb-1">
-        <div class="col-6">
-            <table class="info-table table table-sm table-borderless mb-0">
-                <tr><td class="field-label" style="width:100px;">Item Name / सामानको नाम:</td><td>{{ item.name }}{% if item.local_name %} ({{ item.local_name }}){% endif %}</td></tr>
-                <tr><td class="field-label">Item Code / कोड:</td><td>{{ item.item_code or '-' }}</td></tr>
-                <tr><td class="field-label">Unit / एकाइ:</td><td>{{ item.unit }}</td></tr>
-                <tr><td class="field-label">Category / वर्ग:</td><td>{{ item.category.name if item.category else '-' }}</td></tr>
-                <tr><td class="field-label">Min Stock / न्यूनतम:</td><td>{{ item.minimum_stock }}</td></tr>
-                <tr><td class="field-label">Location / स्थान:</td><td>{{ warehouse.name }}</td></tr>
-            </table>
-        </div>
-        <div class="col-6">
-            <table class="info-table table table-sm table-borderless mb-0">
-                <tr><td class="field-label" style="width:100px;">Current Stock / मौज्दात:</td><td class="fw-bold">{{ current_balance }} {{ item.unit }}</td></tr>
-                <tr><td class="field-label">Max Stock / अधिकतम:</td><td>{{ item.max_stock or '-' }}</td></tr>
-                <tr><td class="field-label">Batch Tracking:</td><td>{% if item.batch_tracking %}Yes{% else %}No{% endif %}</td></tr>
-                <tr><td class="field-label">Expiry Tracking:</td><td>{% if item.expiry_tracking %}Yes{% else %}No{% endif %}</td></tr>
-                <tr><td class="field-label">Storage:</td><td>{{ item.storage_requirement or 'Normal' }}</td></tr>
-            </table>
-        </div>
-    </div>
+                <div class="location-wrap">
+                    <table class="location-table">
+                        <tr><th>STOCK LOCATION</th></tr>
+                        <tr><td class="value">{{ warehouse.name|upper }}</td></tr>
+                        <tr><td class="sub-location">{{ warehouse.address or warehouse.code or 'LEOC Godam' }}</td></tr>
+                    </table>
+                </div>
+            </div>
 
-    <table class="table table-bordered table-sm striped mb-0">
-        <thead class="table-dark">
-            <tr>
-                <th style="width:22px;">S.No</th>
-                <th style="width:60px;">Date / मिति</th>
-                <th style="width:60px;">Ref No / रेफ नं</th>
-                <th style="width:90px;">Transaction / कारोबार</th>
-                <th style="width:70px;">Party / दिने/लिने</th>
-                <th style="width:35px;">In / आयात</th>
-                <th style="width:35px;">Out / जायक</th>
-                <th style="width:40px;">Balance / मौज्दात</th>
-                <th style="width:50px;">Batch/Lot</th>
-                <th style="width:60px;">Inspection By / निरीक्षण गर्ने</th>
-                <th style="width:50px;">Signature / हस्ताक्षर</th>
-                <th style="width:50px;">Date / मिति</th>
-                <th>Remarks / टिप्पणी</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% if events %}
-                {% set ns = namespace(first_opening=True) %}
+            <table class="info-table">
+                <tr><th colspan="2">ITEM INFORMATION</th></tr>
+                <tr>
+                    <td class="label">COMMODITY TRACKING NUMBER</td>
+                    <td class="value">UNIT</td>
+                </tr>
+                <tr>
+                    <td class="value">{{ tracking_no or '—' }}</td>
+                    <td class="value">{{ unit_label or '' }}</td>
+                </tr>
+                <tr><td colspan="2"><span class="label">ITEM CODE :</span> {{ item_code or '—' }}</td></tr>
+                <tr><td colspan="2"><span class="label">ITEM DESCRIPTION :</span> {{ desc_label }}{% if not group %}{% if item.local_name %} / {{ item.local_name }}{% endif %}{% if item.description %} - {{ item.description }}{% endif %}{% endif %}{% if group %} - {% for gitem in group.items %}{{ gitem.name }}{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}</td></tr>
+                <tr><td colspan="2"><span class="label">EXP. DATE:</span> {{ next_expiry or '' }}</td></tr>
+            </table>
+        </section>
+
+        <div class="meta">
+            <span>Current Stock: <strong>{{ current_balance }}{% if not group %} {{ item.unit }}{% endif %}</strong></span>
+            {% if filter_from or filter_to %}
+            <span>Period: {{ filter_from or '-' }} to {{ filter_to or '-' }}</span>
+            {% endif %}
+            <span>Generated: {{ generated_at }}</span>
+        </div>
+
+        <table class="ledger">
+            <colgroup>
+                <col style="width: 14%;">
+                <col style="width: 17%;">
+                <col style="width: 11%;">
+                <col style="width: 10%;">
+                <col style="width: 9%;">
+                <col style="width: 11%;">
+                <col style="width: 13%;">
+                <col style="width: 12%;">
+            </colgroup>
+            <thead>
+                <tr>
+                    <th rowspan="2">DATE</th>
+                    <th rowspan="2">FROM/TO</th>
+                    <th rowspan="2">GRN<br>NO/WB NO</th>
+                    <th colspan="3">QUANTITY</th>
+                    <th colspan="2">INSPECTED BY</th>
+                </tr>
+                <tr>
+                    <th>IN(+)</th>
+                    <th>OUT(-)</th>
+                    <th>BALANCE(=)</th>
+                    <th>SIGNATURE</th>
+                    <th>DATE</th>
+                </tr>
+            </thead>
+            <tbody>
                 {% for e in events %}
                 <tr>
-                    <td class="text-center">{{ e.sno }}</td>
-                    <td>{{ e.date }}</td>
-                    <td><small>{{ e.ref }}</small></td>
-                    <td>{{ e.type }}</td>
-                    <td><small>{{ e.party }}</small></td>
-                    <td class="text-end">{{ e.in if e.in > 0 else '-' }}</td>
-                    <td class="text-end">{{ e.out if e.out > 0 else '-' }}</td>
-                    <td class="text-end fw-bold">{{ e.balance }}</td>
-                    <td><small>{{ e.batch }}</small></td>
+                    <td class="center">{{ e.date }}</td>
+                    <td>
+                        {{ e.party or e.type }}
+                        {% if group and e.item_name %}<br><span class="small">Item: {{ e.item_name }}</span>{% endif %}
+                        {% if e.remarks %}<br><span class="small">{{ e.remarks }}</span>{% endif %}
+                    </td>
+                    <td class="center">{{ e.ref }}</td>
+                    <td class="num">{{ e.in if e.in > 0 else '' }}</td>
+                    <td class="num">{{ e.out if e.out > 0 else '' }}</td>
+                    <td class="num">{{ e.balance }}</td>
                     <td></td>
                     <td></td>
-                    <td></td>
-                    <td><small>{{ e.remarks }}</small></td>
                 </tr>
                 {% endfor %}
-            {% else %}
-                <tr>
-                    <td colspan="13" class="text-center py-3 text-muted">No transactions found for this item in this warehouse.</td>
-                </tr>
-            {% endif %}
-        </tbody>
-    </table>
+                {% set blank_rows = 16 - (events|length) %}
+                {% if blank_rows > 0 %}
+                    {% for _ in range(blank_rows) %}
+                    <tr class="blank">
+                        <td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+                    </tr>
+                    {% endfor %}
+                {% endif %}
+            </tbody>
+        </table>
 
-    <div class="footer">
-        <div class="row mt-2">
-            <div class="col-4 text-center">
-                <div class="signature-line"></div>
-                <div class="mt-1"><strong>Prepared By / तयार गर्ने</strong></div>
-                <small class="text-muted">(Name & Signature)</small>
-            </div>
-            <div class="col-4 text-center">
-                <div class="signature-line"></div>
-                <div class="mt-1"><strong>Checked By / जाँच गर्ने</strong></div>
-                <small class="text-muted">(Name & Signature)</small>
-            </div>
-            <div class="col-4 text-center">
-                <div class="signature-line"></div>
-                <div class="mt-1"><strong>Store Keeper / भण्डारपाल</strong></div>
-                <small class="text-muted">(Name & Signature)</small>
-            </div>
-        </div>
-        <div class="text-center mt-2">
-            <small class="text-muted">Generated on {{ generated_at }} | {{ office or 'थलारा गाउँपालिका' }} - LEOC</small>
-        </div>
-    </div>
-
+        <section class="footer">
+            <div><span class="signature-line"></span>Prepared By</div>
+            <div><span class="signature-line"></span>Checked By</div>
+            <div><span class="signature-line"></span>Store Keeper</div>
+        </section>
+    </main>
 </body>
 </html>

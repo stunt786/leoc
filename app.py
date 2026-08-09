@@ -1408,6 +1408,11 @@ class DisasterAssessment(db.Model):
     affected_people = db.Column(db.Integer, default=0)
     affected_people_male = db.Column(db.Integer, default=0)
     affected_people_female = db.Column(db.Integer, default=0)
+    affected_people_child = db.Column(db.Integer, default=0)
+    affected_people_pregnant = db.Column(db.Integer, default=0)
+    affected_people_old_age = db.Column(db.Integer, default=0)
+    ssf_family = db.Column(db.Integer, default=0)
+    poor_household = db.Column(db.Integer, default=0)
     house_destroyed = db.Column(db.Integer, default=0)
     house_damaged = db.Column(db.Integer, default=0)
     public_building_destroyed = db.Column(db.Integer, default=0)
@@ -1443,6 +1448,11 @@ class DisasterAssessment(db.Model):
             'affected_people': self.affected_people,
             'affected_people_male': self.affected_people_male,
             'affected_people_female': self.affected_people_female,
+            'affected_people_child': self.affected_people_child,
+            'affected_people_pregnant': self.affected_people_pregnant,
+            'affected_people_old_age': self.affected_people_old_age,
+            'ssf_family': self.ssf_family,
+            'poor_household': self.poor_household,
             'house_destroyed': self.house_destroyed, 'house_damaged': self.house_damaged,
             'public_building_destroyed': self.public_building_destroyed,
             'public_building_damaged': self.public_building_damaged,
@@ -1562,6 +1572,67 @@ class WeeklyForecast(db.Model):
             'created_at': ad_to_bs_date(self.created_at),
             'updated_at': ad_to_bs_date(self.updated_at),
         }
+
+# ============ RAINFALL STATION & ENTRY MODELS ============
+class RainfallStation(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    station_name = db.Column(db.String(200), nullable=False)
+    station_code = db.Column(db.String(50), unique=True, index=True)
+    latitude = db.Column(db.Float)
+    longitude = db.Column(db.Float)
+    place = db.Column(db.String(200))
+    ward_id = db.Column(db.Integer, db.ForeignKey('ward.id'))
+    description = db.Column(db.Text)
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=utc_now)
+    updated_at = db.Column(db.DateTime, default=utc_now, onupdate=utc_now)
+
+    ward = db.relationship('Ward', backref='rainfall_stations', lazy=True)
+    entries = db.relationship('RainfallEntry', backref='station', lazy=True, cascade='all,delete-orphan')
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'station_name': self.station_name,
+            'station_code': self.station_code or '',
+            'latitude': self.latitude,
+            'longitude': self.longitude,
+            'place': self.place or '',
+            'ward_id': self.ward_id,
+            'ward_name': self.ward.name if self.ward else None,
+            'description': self.description or '',
+            'is_active': self.is_active,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+
+class RainfallEntry(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    station_id = db.Column(db.Integer, db.ForeignKey('rainfall_station.id'), nullable=False, index=True)
+    entry_date = db.Column(db.String(20), nullable=False, index=True)
+    morning_reading = db.Column(db.Float)
+    evening_reading = db.Column(db.Float)
+    total_day_rainfall = db.Column(db.Float)
+    remarks = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=utc_now)
+    updated_at = db.Column(db.DateTime, default=utc_now, onupdate=utc_now)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'station_id': self.station_id,
+            'station_name': self.station.station_name if self.station else None,
+            'station_code': self.station.station_code if self.station else None,
+            'entry_date': self.entry_date,
+            'morning_reading': self.morning_reading,
+            'evening_reading': self.evening_reading,
+            'total_day_rainfall': self.total_day_rainfall,
+            'remarks': self.remarks or '',
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+        }
+
 
 # ============ DISTRIBUTION MODEL (Module 12) ============
 class Distribution(db.Model):
@@ -4839,6 +4910,11 @@ def handle_disaster_assessments():
             affected_people=parse_int_field(data, 'affected_people', minimum=0, default=0),
             affected_people_male=parse_int_field(data, 'affected_people_male', minimum=0, default=0),
             affected_people_female=parse_int_field(data, 'affected_people_female', minimum=0, default=0),
+            affected_people_child=parse_int_field(data, 'affected_people_child', minimum=0, default=0),
+            affected_people_pregnant=parse_int_field(data, 'affected_people_pregnant', minimum=0, default=0),
+            affected_people_old_age=parse_int_field(data, 'affected_people_old_age', minimum=0, default=0),
+            ssf_family=parse_int_field(data, 'ssf_family', minimum=0, default=0),
+            poor_household=parse_int_field(data, 'poor_household', minimum=0, default=0),
             house_destroyed=parse_int_field(data, 'house_destroyed', minimum=0, default=0),
             house_damaged=parse_int_field(data, 'house_damaged', minimum=0, default=0),
             public_building_destroyed=parse_int_field(data, 'public_building_destroyed', minimum=0, default=0),
@@ -4894,7 +4970,9 @@ def manage_disaster_assessment(id):
             if field in data:
                 setattr(assessment, field, data[field])
         int_fields = ['deaths', 'missing_persons', 'injured', 'affected_households', 'affected_people',
-                      'affected_people_male', 'affected_people_female', 'house_destroyed', 'house_damaged',
+                      'affected_people_male', 'affected_people_female', 'affected_people_child',
+                      'affected_people_pregnant', 'affected_people_old_age', 'ssf_family', 'poor_household',
+                      'house_destroyed', 'house_damaged',
                       'public_building_destroyed', 'public_building_damaged', 'cattle_lost', 'cattle_injured',
                       'poultry_lost', 'poultry_injured', 'goats_sheep_lost', 'goats_sheep_injured',
                       'other_livestock_lost', 'other_livestock_injured']
@@ -6755,6 +6833,268 @@ def weekly_forecast_print(id):
                            website=website,
                            report_header=report_header,
                            report_footer=report_footer)
+
+# ============ RAINFALL STATUS ============
+@app.route('/rainfall-status')
+@login_required
+def rainfall_status_page():
+    wards = Ward.query.order_by(Ward.sort_order).all()
+    return render_template('rainfall_status.html', wards=wards)
+
+# --- Rainfall Stations API ---
+@app.route('/api/rainfall-stations', methods=['GET', 'POST'])
+@login_required
+def handle_rainfall_stations():
+    if request.method == 'GET':
+        try:
+            stations = RainfallStation.query.order_by(RainfallStation.station_name).all()
+            return jsonify({'success': True, 'stations': [s.to_dict() for s in stations]})
+        except Exception as e:
+            return jsonify({'success': False, 'message': friendly_message(e)}), 500
+
+    if current_user.role == 'viewer':
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
+
+    try:
+        data = request.get_json()
+        if not data or not data.get('station_name'):
+            return jsonify({'success': False, 'message': 'Station name is required'}), 400
+
+        station = RainfallStation(
+            station_name=data['station_name'],
+            station_code=data.get('station_code', ''),
+            latitude=parse_float_field(data, 'latitude'),
+            longitude=parse_float_field(data, 'longitude'),
+            place=data.get('place', ''),
+            ward_id=parse_int_field(data, 'ward_id'),
+            description=data.get('description', ''),
+            is_active=data.get('is_active', True),
+        )
+        db.session.add(station)
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Station created successfully', 'data': station.to_dict()}), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
+
+@app.route('/api/rainfall-stations/<int:id>', methods=['GET', 'PUT', 'DELETE'])
+@login_required
+def manage_rainfall_station(id):
+    station = RainfallStation.query.get(id)
+    if not station:
+        return jsonify({'success': False, 'message': 'Station not found'}), 404
+
+    if request.method == 'GET':
+        return jsonify({'success': True, 'data': station.to_dict()})
+
+    if request.method in ('PUT',) and current_user.role not in ('admin', 'data_entry', 'warehouse_manager', 'editor', 'operator', 'finance'):
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
+    if request.method == 'DELETE' and current_user.role not in ('admin', 'warehouse_manager', 'operator'):
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
+
+    if request.method == 'DELETE':
+        try:
+            db.session.delete(station)
+            db.session.commit()
+            return jsonify({'success': True, 'message': 'Station deleted'})
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'success': False, 'message': friendly_message(e)}), 500
+
+    try:
+        data = request.get_json()
+        station.station_name = data.get('station_name', station.station_name)
+        station.station_code = data.get('station_code', station.station_code)
+        station.latitude = parse_float_field(data, 'latitude', default=station.latitude)
+        station.longitude = parse_float_field(data, 'longitude', default=station.longitude)
+        station.place = data.get('place', station.place)
+        station.ward_id = parse_int_field(data, 'ward_id', default=station.ward_id)
+        station.description = data.get('description', station.description)
+        station.is_active = data.get('is_active', station.is_active)
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Station updated', 'data': station.to_dict()})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
+
+# --- Rainfall Entries API ---
+@app.route('/api/rainfall-entries', methods=['GET', 'POST'])
+@login_required
+def handle_rainfall_entries():
+    if request.method == 'GET':
+        try:
+            date_from = request.args.get('date_from', '')
+            date_to = request.args.get('date_to', '')
+            station_id = request.args.get('station_id', '')
+            q = RainfallEntry.query
+            if date_from:
+                q = q.filter(RainfallEntry.entry_date >= date_from)
+            if date_to:
+                q = q.filter(RainfallEntry.entry_date <= date_to)
+            if station_id:
+                q = q.filter(RainfallEntry.station_id == int(station_id))
+            entries = q.order_by(RainfallEntry.entry_date.desc(), RainfallEntry.station_id).all()
+            return jsonify({'success': True, 'entries': [e.to_dict() for e in entries]})
+        except Exception as e:
+            return jsonify({'success': False, 'message': friendly_message(e)}), 500
+
+    if current_user.role == 'viewer':
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
+
+    try:
+        data = request.get_json()
+        if not data or not data.get('entry_date'):
+            return jsonify({'success': False, 'message': 'Entry date is required'}), 400
+        entries_data = data.get('entries', [])
+        if not entries_data:
+            return jsonify({'success': False, 'message': 'At least one station entry is required'}), 400
+
+        created = []
+        for item in entries_data:
+            station_id = item.get('station_id')
+            if not station_id:
+                continue
+            morning = parse_float_field(item, 'morning_reading')
+            evening = parse_float_field(item, 'evening_reading')
+            total = 0.0
+            if morning is not None:
+                total += morning
+            if evening is not None:
+                total += evening
+            entry = RainfallEntry(
+                station_id=int(station_id),
+                entry_date=data['entry_date'],
+                morning_reading=morning,
+                evening_reading=evening,
+                total_day_rainfall=total,
+                remarks=item.get('remarks', ''),
+            )
+            db.session.add(entry)
+            created.append(entry)
+        db.session.commit()
+        return jsonify({'success': True, 'message': f'{len(created)} entries saved successfully', 'count': len(created)}), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
+
+@app.route('/api/rainfall-entries/<int:id>', methods=['GET', 'PUT', 'DELETE'])
+@login_required
+def manage_rainfall_entry(id):
+    entry = RainfallEntry.query.get(id)
+    if not entry:
+        return jsonify({'success': False, 'message': 'Entry not found'}), 404
+
+    if request.method == 'GET':
+        return jsonify({'success': True, 'data': entry.to_dict()})
+
+    if request.method in ('PUT',) and current_user.role not in ('admin', 'data_entry', 'warehouse_manager', 'editor', 'operator', 'finance'):
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
+    if request.method == 'DELETE' and current_user.role not in ('admin', 'warehouse_manager', 'operator'):
+        return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
+
+    if request.method == 'DELETE':
+        try:
+            db.session.delete(entry)
+            db.session.commit()
+            return jsonify({'success': True, 'message': 'Entry deleted'})
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'success': False, 'message': friendly_message(e)}), 500
+
+    try:
+        data = request.get_json()
+        entry.entry_date = data.get('entry_date', entry.entry_date)
+        entry.morning_reading = parse_float_field(data, 'morning_reading', default=entry.morning_reading)
+        entry.evening_reading = parse_float_field(data, 'evening_reading', default=entry.evening_reading)
+        entry.remarks = data.get('remarks', entry.remarks)
+        total = 0.0
+        if entry.morning_reading is not None:
+            total += entry.morning_reading
+        if entry.evening_reading is not None:
+            total += entry.evening_reading
+        entry.total_day_rainfall = total
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Entry updated', 'data': entry.to_dict()})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
+
+# --- Rainfall Chart Data API ---
+@app.route('/api/rainfall/chart-data', methods=['GET'])
+@login_required
+def rainfall_chart_data():
+    try:
+        date_from = request.args.get('date_from', '')
+        date_to = request.args.get('date_to', '')
+        q = RainfallEntry.query
+        if date_from:
+            q = q.filter(RainfallEntry.entry_date >= date_from)
+        if date_to:
+            q = q.filter(RainfallEntry.entry_date <= date_to)
+        entries = q.order_by(RainfallEntry.entry_date).all()
+
+        dates = []
+        station_map = {}
+        for e in entries:
+            if e.entry_date not in dates:
+                dates.append(e.entry_date)
+            if e.station_id not in station_map:
+                station_map[e.station_id] = {
+                    'name': e.station.station_name if e.station else f'Station {e.station_id}',
+                    'code': e.station.station_code if e.station else '',
+                    'data': {}
+                }
+            station_map[e.station_id]['data'][e.entry_date] = e.total_day_rainfall or 0
+
+        datasets = []
+        colors = ['#2563eb','#dc3545','#15803d','#d97706','#7c3aed','#0891b2','#be185d','#ea580c']
+        for idx, (sid, info) in enumerate(station_map.items()):
+            color = colors[idx % len(colors)]
+            data_points = [info['data'].get(d, 0) for d in dates]
+            datasets.append({
+                'label': info['name'],
+                'data': data_points,
+                'borderColor': color,
+                'backgroundColor': color + '22',
+                'tension': 0.3,
+                'fill': False,
+            })
+
+        return jsonify({'success': True, 'labels': dates, 'datasets': datasets})
+    except Exception as e:
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
+
+# --- Rainfall Map Data API ---
+@app.route('/api/rainfall/map-data', methods=['GET'])
+@login_required
+def rainfall_map_data():
+    try:
+        target_date = request.args.get('date', '')
+        stations = RainfallStation.query.filter_by(is_active=True).all()
+        result = []
+        for s in stations:
+            item = {
+                'id': s.id,
+                'name': s.station_name,
+                'code': s.station_code or '',
+                'lat': s.latitude,
+                'lng': s.longitude,
+                'place': s.place or '',
+                'ward': s.ward.name if s.ward else None,
+                'morning': 0,
+                'evening': 0,
+                'total': 0,
+            }
+            if target_date:
+                entry = RainfallEntry.query.filter_by(station_id=s.id, entry_date=target_date).first()
+                if entry:
+                    item['morning'] = entry.morning_reading or 0
+                    item['evening'] = entry.evening_reading or 0
+                    item['total'] = entry.total_day_rainfall or 0
+            result.append(item)
+        return jsonify({'success': True, 'stations': result})
+    except Exception as e:
+        return jsonify({'success': False, 'message': friendly_message(e)}), 500
 
 # ============ FILE UPLOAD ============
 @app.route('/api/upload', methods=['POST'])
@@ -8877,62 +9217,32 @@ def get_report_data(report_type, args):
             rows = [['-', 'No stock data found', '-', '-', '-', 0, 0, '-', 0, '-', 0, '-']]
     elif report_type == 'bin-card':
         item_id = args.get('item_id', type=int)
+        group_id = args.get('group_id', type=int)
         warehouse_id = args.get('warehouse_id', type=int)
         headers = ['Date', 'Ref No', 'Transaction', 'Party', 'In', 'Out', 'Balance']
-        if not item_id or not warehouse_id:
-            rows = [['-', '-', 'Select item and warehouse filters', '-', '-', '-', '-']]
+        if not warehouse_id:
+            rows = [['-', '-', 'Select warehouse filter', '-', '-', '-', '-']]
+        elif not item_id and not group_id:
+            rows = [['-', '-', 'Select item (or group) and warehouse filters', '-', '-', '-', '-']]
         else:
-            item = db_get(Item, item_id)
-            wh = db_get(Warehouse, warehouse_id)
-            if not item or not wh:
-                rows = [['-', '-', 'Item or warehouse not found', '-', '-', '-', '-']]
+            item_ids = []
+            if group_id:
+                grp = db_get(ItemGroup, group_id)
+                if not grp:
+                    rows = [['-', '-', 'Group not found', '-', '-', '-', '-']]
+                else:
+                    item_ids = [i.id for i in grp.items]
             else:
-                # Receipts
-                receipts = [r for r in StockReceiptItem.query.filter_by(item_id=item_id).all()
-                            if r.receipt and r.receipt.warehouse_id == warehouse_id]
-                # Distributions - exclude cancelled
-                dist_items = [d for d in DistributionItem.query.filter_by(item_id=item_id).all()
-                              if d.warehouse_id == warehouse_id and d.distribution and d.distribution.status != 'Cancelled']
-                adjustments = ManualAdjustment.query.filter_by(item_id=item_id, warehouse_id=warehouse_id).all()
-                # Transfers out - only completed
-                transfers_out = [t for t in StockTransferItem.query.filter_by(item_id=item_id).all()
-                                 if t.transfer and t.transfer.from_warehouse_id == warehouse_id and t.transfer.status == 'Completed']
-                # Transfers in - only completed
-                transfers_in = [t for t in StockTransferItem.query.filter_by(item_id=item_id).all()
-                                if t.transfer and t.transfer.to_warehouse_id == warehouse_id and t.transfer.status == 'Completed']
-                events = []
-                for r in receipts:
-                    events.append({'date': ad_to_bs_date(r.receipt.date) or '', 'ref': r.receipt.receipt_no,
-                                   'type': 'Receipt', 'party': r.receipt.source_name or '', 'in': r.quantity, 'out': 0,
-                                   'sort_key': (r.receipt.date or date.min, r.receipt.id)})
-                for d in dist_items:
-                    events.append({'date': ad_to_bs_date(d.distribution.distribution_date) or '', 'ref': d.distribution.distribution_no,
-                                   'type': 'Distribution', 'party': d.distribution.destination or d.distribution.receiver or '', 'in': 0, 'out': d.quantity,
-                                   'sort_key': (d.distribution.distribution_date or date.min, d.distribution.id)})
-                for a in adjustments:
-                    amt = a.adjusted_quantity
-                    if a.adjustment_type in ('Increase', 'Correction_Increase'):
-                        events.append({'date': ad_to_bs_date(a.date) or '', 'ref': a.adjustment_no,
-                                       'type': 'Adj (+)', 'party': '', 'in': amt, 'out': 0,
-                                       'sort_key': (a.date or date.min, a.id)})
-                    else:
-                        events.append({'date': ad_to_bs_date(a.date) or '', 'ref': a.adjustment_no,
-                                       'type': 'Adj (-)', 'party': '', 'in': 0, 'out': amt,
-                                       'sort_key': (a.date or date.min, a.id)})
-                for t in transfers_out:
-                    events.append({'date': ad_to_bs_date(t.transfer.transfer_date) or '', 'ref': t.transfer.transfer_no,
-                                   'type': 'Transfer Out', 'party': t.transfer.to_warehouse.name if t.transfer.to_warehouse else '',
-                                   'in': 0, 'out': t.quantity, 'sort_key': (t.transfer.transfer_date or date.min, t.transfer.id)})
-                for t in transfers_in:
-                    events.append({'date': ad_to_bs_date(t.transfer.transfer_date) or '', 'ref': t.transfer.transfer_no,
-                                   'type': 'Transfer In', 'party': t.transfer.from_warehouse.name if t.transfer.from_warehouse else '',
-                                   'in': t.quantity, 'out': 0, 'sort_key': (t.transfer.transfer_date or date.min, t.transfer.id)})
-                events.sort(key=lambda e: e['sort_key'])
+                item_ids = [item_id]
+            if not item_ids:
+                rows = [['-', '-', 'No items found for selection', '-', '-', '-', '-']]
+            else:
+                events = _bin_card_events(item_ids, warehouse_id)
                 # Calculate opening balance from ALL events (before date filter)
                 total_in_all = sum(e['in'] for e in events)
                 total_out_all = sum(e['out'] for e in events)
-                current_qty = db.session.query(db.func.coalesce(Inventory.quantity, 0)).filter(
-                    Inventory.item_id == item_id, Inventory.warehouse_id == warehouse_id
+                current_qty = db.session.query(db.func.coalesce(db.func.sum(Inventory.quantity), 0)).filter(
+                    Inventory.item_id.in_(item_ids), Inventory.warehouse_id == warehouse_id
                 ).scalar() or 0
                 opening_balance = current_qty - (total_in_all - total_out_all)
                 # Now apply date filters to events for display
@@ -8949,10 +9259,7 @@ def get_report_data(report_type, args):
                 # Recalculate running balance from opening
                 running = opening_balance
                 for e in events:
-                    if e['type'] in ('Receipt', 'Transfer In') or e['type'] == 'Adj (+)':
-                        running += e['in']
-                    else:
-                        running -= e['out']
+                    running += e['in'] - e['out']
                     e['balance'] = running
                 rows = [['-', '-', 'Opening Balance', '-', '-', '-', opening_balance]] if opening_balance or not events else []
                 rows += [[e['date'], e['ref'], e['type'], e['party'], e['in'] if e['in'] else '-',
@@ -9028,11 +9335,17 @@ def get_report_data(report_type, args):
         incident_id = args.get('incident_id', type=int)
         q = DisasterAssessment.query.order_by(DisasterAssessment.disaster_date_bs.desc())
         if incident_id: q = q.filter(DisasterAssessment.incident_id == incident_id)
-        headers = ['Date (BS)', 'Incident', 'Disaster Type', 'Affected HH', 'Deaths', 'Injured', 'Missing', 'Est. Loss (NRs)', 'Assessor', 'Fiscal Year']
-        rows = [[a.disaster_date_bs or '', a.incident.incident_name if a.incident else '',
-                 a.disaster_type or '', a.affected_households or 0, a.deaths or 0,
-                 a.injured or 0, a.missing_persons or 0, a.estimated_loss or 0,
-                 '', a.fiscal_year or ''] for a in q.all()]
+        headers = ['Date (BS)', 'Incident', 'Type', 'Affected HH', 'Deaths', 'Injured', 'Missing', 'Est. Loss', 'Remarks']
+        rows = []
+        for a in q.all():
+            try:
+                inc_name = a.incident.incident_name if a.incident else '-'
+            except Exception:
+                inc_name = '-'
+            rows.append([a.disaster_date_bs or '', inc_name,
+                         a.disaster_type or '', a.affected_households or 0, a.deaths or 0,
+                         a.injured or 0, a.missing_persons or 0, a.estimated_loss or 0,
+                         (a.remarks or '')[:50] + ('...' if len(a.remarks or '') > 50 else '')])
     elif report_type == 'beneficiaries':
         ward_id = args.get('ward_id', type=int)
         status = args.get('status')
@@ -9140,8 +9453,8 @@ def get_report_data(report_type, args):
         total_cash_funds = CashFund.query.count()
         total_cash_distributed = db.session.query(db.func.coalesce(db.func.sum(CashDistribution.total_amount), 0)).scalar()
         total_cash_received = db.session.query(db.func.coalesce(db.func.sum(CashReceipt.amount_received), 0)).scalar()
-        low_stock_count = Inventory.query.filter(
-            Inventory.quantity <= db.session.query(db.func.coalesce(db.func.min(Item.minimum_stock), 0)).join(Item, Inventory.item_id == Item.id)
+        low_stock_count = db.session.query(Inventory).join(Item, Inventory.item_id == Item.id).filter(
+            Inventory.quantity <= Item.minimum_stock
         ).count()
         rows.append(['Total Item Types', total_items])
         rows.append(['Total Stock Quantity', total_inventory])
@@ -9179,6 +9492,228 @@ def reports_data_json(report_type):
         return jsonify({'success': False, 'message': friendly_message(e)}), 400
 
 
+# ============ ANALYTICS DETAILS ENDPOINT ============
+@app.route('/api/analytics-details/<metric_type>', methods=['GET'])
+@login_required
+def analytics_details(metric_type):
+    try:
+        headers = []
+        rows = []
+        title = ''
+        if metric_type == 'items':
+            title = 'Item Types'
+            headers = ['Code', 'Name', 'Category', 'Unit', 'Min Stock']
+            for item in Item.query.order_by(Item.name).all():
+                rows.append([item.item_code or '-', item.name, item.category.name if item.category else '-', item.unit, item.minimum_stock or 0])
+        elif metric_type == 'suppliers':
+            title = 'Suppliers'
+            headers = ['Name', 'Contact', 'Phone', 'Email', 'Status']
+            for s in Supplier.query.order_by(Supplier.name).all():
+                rows.append([s.name, s.contact_person or '-', s.phone or '-', s.email or '-', s.status or 'Active'])
+        elif metric_type == 'warehouses':
+            title = 'Warehouses'
+            headers = ['Code', 'Name', 'Address', 'Capacity']
+            for w in Warehouse.query.order_by(Warehouse.name).all():
+                rows.append([w.code or '-', w.name, w.address or '-', w.capacity or 0])
+        elif metric_type == 'incidents':
+            title = 'Incidents'
+            headers = ['Date', 'Name', 'Type', 'Severity', 'Status']
+            for inc in Incident.query.order_by(Incident.created_at.desc()).all():
+                rows.append([inc.created_at.strftime('%Y-%m-%d') if inc.created_at else '-', inc.incident_name, inc.incident_type or '-', inc.severity or '-', inc.status or '-'])
+        elif metric_type == 'beneficiaries':
+            title = 'Beneficiaries'
+            headers = ['Name', 'Ward', 'Family Members', 'Phone', 'Status']
+            for b in Beneficiary.query.order_by(Beneficiary.name).all():
+                rows.append([b.name, b.ward or '-', b.family_members or 1, b.phone or '-', b.status or '-'])
+        elif metric_type == 'distributions':
+            title = 'Distributions'
+            headers = ['Date', 'Distribution No', 'Incident', 'Items', 'Status']
+            for d in Distribution.query.order_by(Distribution.distribution_date.desc()).limit(200).all():
+                items_list = ', '.join([di.item.name + ' (' + str(di.quantity) + ')' for di in d.items[:3]]) if d.items else '-'
+                rows.append([d.distribution_date.strftime('%Y-%m-%d') if d.distribution_date else '-', d.distribution_no, d.incident.incident_name if d.incident else '-', items_list, d.status or '-'])
+        elif metric_type == 'receipts':
+            title = 'Stock Receipts'
+            headers = ['Date', 'Receipt No', 'Source', 'Items', 'Total Qty']
+            for r in StockReceipt.query.order_by(StockReceipt.date.desc()).limit(200).all():
+                items_list = ', '.join([ri.item.name + ' (' + str(ri.quantity) + ')' for ri in r.items[:3]]) if r.items else '-'
+                total_qty = sum([ri.quantity for ri in r.items]) if r.items else 0
+                rows.append([r.date.strftime('%Y-%m-%d') if r.date else '-', r.receipt_no, r.source_type or '-', items_list, total_qty])
+        elif metric_type == 'cash_funds':
+            title = 'Cash Funds'
+            headers = ['Name', 'Fund No', 'Funding Source', 'Allocated', 'Balance']
+            for cf in CashFund.query.order_by(CashFund.name).all():
+                rows.append([cf.name, cf.fund_no or '-', cf.funding_source or '-', cf.allocated_amount or 0, cf.current_balance or 0])
+        elif metric_type == 'cash_received':
+            title = 'Cash Receipts'
+            headers = ['Date', 'Receipt No', 'Fund', 'Received By', 'Amount']
+            for cr in CashReceipt.query.order_by(CashReceipt.receipt_date.desc()).limit(200).all():
+                rows.append([cr.receipt_date.strftime('%Y-%m-%d') if cr.receipt_date else '-', cr.receipt_no, cr.fund.name if cr.fund else '-', cr.received_by or '-', cr.amount_received or 0])
+        elif metric_type == 'cash_distributed':
+            title = 'Cash Distributions'
+            headers = ['Date', 'Distribution No', 'Incident', 'Beneficiaries', 'Amount']
+            for cd in CashDistribution.query.order_by(CashDistribution.distribution_date.desc()).limit(200).all():
+                ben_names = ', '.join([b.name for b in cd.beneficiaries[:3]]) if cd.beneficiaries else '-'
+                rows.append([cd.distribution_date.strftime('%Y-%m-%d') if cd.distribution_date else '-', cd.distribution_no, cd.incident.incident_name if cd.incident else '-', ben_names, cd.total_amount or 0])
+        elif metric_type == 'low_stock':
+            title = 'Low Stock Items'
+            headers = ['Item', 'Warehouse', 'Quantity', 'Min Stock', 'Deficit']
+            low_items = db.session.query(Inventory).join(Item, Inventory.item_id == Item.id).filter(Inventory.quantity <= Item.minimum_stock).all()
+            for inv in low_items:
+                deficit = inv.item.minimum_stock - inv.quantity if inv.item else 0
+                rows.append([inv.item.name if inv.item else '-', inv.warehouse.name if inv.warehouse else '-', inv.quantity, inv.item.minimum_stock if inv.item else 0, deficit])
+        else:
+            return jsonify({'success': False, 'message': f'Unknown metric type: {metric_type}'}), 400
+        return jsonify({'success': True, 'title': title, 'headers': headers, 'rows': rows})
+    except Exception as e:
+        return jsonify({'success': False, 'message': friendly_message(e)}), 400
+
+
+# ============ MONTHLY DETAILS ENDPOINT ============
+@app.route('/api/monthly-details/<metric_type>', methods=['GET'])
+@login_required
+def monthly_details(metric_type):
+    try:
+        month = request.args.get('month', datetime.now().strftime('%Y-%m'))
+        try:
+            year, mon = map(int, month.split('-'))
+        except:
+            year, mon = datetime.now().year, datetime.now().month
+        start = date(year, mon, 1)
+        if mon == 12:
+            end = date(year+1, 1, 1)
+        else:
+            end = date(year, mon+1, 1)
+        from datetime import timedelta
+        end = end - timedelta(days=1)
+        month_label = start.strftime('%B %Y')
+        headers = []
+        rows = []
+        title = ''
+        if metric_type == 'receipts':
+            title = f'Stock Receipts - {month_label}'
+            headers = ['Receipt No', 'Date', 'Warehouse', 'Source Type', 'Items', 'Total Qty']
+            for r in StockReceipt.query.filter(db.func.date(StockReceipt.date) >= start, db.func.date(StockReceipt.date) <= end).order_by(StockReceipt.date.desc()).all():
+                items_list = ', '.join([ri.item.name + ' (' + str(ri.quantity) + ')' for ri in r.items[:3]]) if r.items else '-'
+                total_qty = sum([ri.quantity for ri in r.items]) if r.items else 0
+                rows.append([r.receipt_no, r.date.strftime('%Y-%m-%d') if r.date else '-', r.warehouse.name if r.warehouse else '-', r.source_type or '-', items_list, total_qty])
+        elif metric_type == 'distributions':
+            title = f'Distributions - {month_label}'
+            headers = ['Distribution No', 'Date', 'Incident', 'Items', 'Status']
+            for d in Distribution.query.filter(db.func.date(Distribution.distribution_date) >= start, db.func.date(Distribution.distribution_date) <= end).order_by(Distribution.distribution_date.desc()).all():
+                items_list = ', '.join([di.item.name + ' (' + str(di.quantity) + ')' for di in d.items[:3]]) if d.items else '-'
+                rows.append([d.distribution_no, d.distribution_date.strftime('%Y-%m-%d') if d.distribution_date else '-', d.incident.incident_name if d.incident else '-', items_list, d.status or '-'])
+        elif metric_type == 'incidents':
+            title = f'Incidents - {month_label}'
+            headers = ['Date', 'Name', 'Type', 'Severity', 'Status']
+            for inc in Incident.query.filter(db.func.date(Incident.start_date) >= start, db.func.date(Incident.start_date) <= end).order_by(Incident.start_date.desc()).all():
+                rows.append([inc.start_date.strftime('%Y-%m-%d') if inc.start_date else '-', inc.incident_name, inc.incident_type or '-', inc.severity or '-', inc.status or '-'])
+        else:
+            return jsonify({'success': False, 'message': f'Unknown metric type: {metric_type}'}), 400
+        return jsonify({'success': True, 'title': title, 'headers': headers, 'rows': rows})
+    except Exception as e:
+        return jsonify({'success': False, 'message': friendly_message(e)}), 400
+
+
+# ============ INCIDENT SUMMARY DETAILS ENDPOINT ============
+@app.route('/api/incident-summary-details/<metric_type>', methods=['GET'])
+@login_required
+def incident_summary_details(metric_type):
+    try:
+        date_from = request.args.get('date_from')
+        date_to = request.args.get('date_to')
+        fiscal_year = request.args.get('fiscal_year')
+        ward_id = request.args.get('ward_id', type=int)
+        q = Incident.query.order_by(Incident.start_date.desc())
+        if ward_id: q = q.filter(Incident.ward == ward_id)
+        if fiscal_year: q = q.filter(Incident.fiscal_year == fiscal_year)
+        if date_from or date_to:
+            from sqlalchemy import or_
+            bs_filters = []
+            ad_filters = []
+            if date_from and is_valid_nepali_date(date_from):
+                bs_filters.append(Incident.disaster_date_bs >= date_from)
+                try:
+                    ad_filters.append(Incident.start_date >= datetime.strptime(bs_to_ad(date_from), '%Y-%m-%d').date())
+                except Exception: pass
+            if date_to and is_valid_nepali_date(date_to):
+                bs_filters.append(Incident.disaster_date_bs <= date_to)
+                try:
+                    ad_filters.append(Incident.start_date <= datetime.strptime(bs_to_ad(date_to), '%Y-%m-%d').date())
+                except Exception: pass
+            conditions = []
+            if bs_filters: conditions.append(db.and_(*bs_filters))
+            if ad_filters: conditions.append(db.and_(*ad_filters))
+            if conditions:
+                q = q.filter(or_(*conditions))
+        all_incidents = q.all()
+        headers = []
+        rows = []
+        title = ''
+        if metric_type == 'all':
+            title = 'All Incidents'
+            headers = ['Date', 'Name', 'Type', 'Ward', 'Severity', 'Deaths', 'Injured', 'Affected']
+            for inc in all_incidents:
+                deaths = (inc.death_male or 0) + (inc.death_female or 0)
+                injured = (inc.injured_male or 0) + (inc.injured_female or 0)
+                rows.append([inc.start_date.strftime('%Y-%m-%d') if inc.start_date else '-', inc.incident_name, inc.incident_type or '-', ward_name_filter(inc.ward), inc.severity or '-', deaths, injured, inc.affected_people or 0])
+        elif metric_type == 'deaths':
+            title = 'Incidents with Deaths'
+            headers = ['Date', 'Name', 'Type', 'Ward', 'Death Male', 'Death Female', 'Total Deaths']
+            for inc in all_incidents:
+                deaths = (inc.death_male or 0) + (inc.death_female or 0)
+                if deaths > 0:
+                    rows.append([inc.start_date.strftime('%Y-%m-%d') if inc.start_date else '-', inc.incident_name, inc.incident_type or '-', ward_name_filter(inc.ward), inc.death_male or 0, inc.death_female or 0, deaths])
+        elif metric_type == 'injured':
+            title = 'Incidents with Injuries'
+            headers = ['Date', 'Name', 'Type', 'Ward', 'Injured Male', 'Injured Female', 'Total Injured']
+            for inc in all_incidents:
+                injured = (inc.injured_male or 0) + (inc.injured_female or 0)
+                if injured > 0:
+                    rows.append([inc.start_date.strftime('%Y-%m-%d') if inc.start_date else '-', inc.incident_name, inc.incident_type or '-', ward_name_filter(inc.ward), inc.injured_male or 0, inc.injured_female or 0, injured])
+        elif metric_type == 'missing':
+            title = 'Incidents with Missing Persons'
+            headers = ['Date', 'Name', 'Type', 'Ward', 'Missing Male', 'Missing Female', 'Total Missing']
+            for inc in all_incidents:
+                missing = (inc.missing_male or 0) + (inc.missing_female or 0)
+                if missing > 0:
+                    rows.append([inc.start_date.strftime('%Y-%m-%d') if inc.start_date else '-', inc.incident_name, inc.incident_type or '-', ward_name_filter(inc.ward), inc.missing_male or 0, inc.missing_female or 0, missing])
+        elif metric_type == 'affected_households':
+            title = 'Incidents - Affected Households'
+            headers = ['Date', 'Name', 'Type', 'Ward', 'Affected Households']
+            for inc in all_incidents:
+                if (inc.affected_households or 0) > 0:
+                    rows.append([inc.start_date.strftime('%Y-%m-%d') if inc.start_date else '-', inc.incident_name, inc.incident_type or '-', ward_name_filter(inc.ward), inc.affected_households])
+        elif metric_type == 'affected_people':
+            title = 'Incidents - Affected People'
+            headers = ['Date', 'Name', 'Type', 'Ward', 'Male', 'Female', 'Total Affected']
+            for inc in all_incidents:
+                if (inc.affected_people or 0) > 0:
+                    rows.append([inc.start_date.strftime('%Y-%m-%d') if inc.start_date else '-', inc.incident_name, inc.incident_type or '-', ward_name_filter(inc.ward), inc.affected_people_male or 0, inc.affected_people_female or 0, inc.affected_people or 0])
+        elif metric_type == 'houses_destroyed':
+            title = 'Incidents - Houses Destroyed'
+            headers = ['Date', 'Name', 'Type', 'Ward', 'Houses Destroyed', 'Public Buildings Destroyed']
+            for inc in all_incidents:
+                if (inc.house_destroyed or 0) > 0 or (inc.public_building_destroyed or 0) > 0:
+                    rows.append([inc.start_date.strftime('%Y-%m-%d') if inc.start_date else '-', inc.incident_name, inc.incident_type or '-', ward_name_filter(inc.ward), inc.house_destroyed or 0, inc.public_building_destroyed or 0])
+        elif metric_type == 'houses_damaged':
+            title = 'Incidents - Houses Damaged'
+            headers = ['Date', 'Name', 'Type', 'Ward', 'Houses Damaged', 'Public Buildings Damaged']
+            for inc in all_incidents:
+                if (inc.house_damaged or 0) > 0 or (inc.public_building_damaged or 0) > 0:
+                    rows.append([inc.start_date.strftime('%Y-%m-%d') if inc.start_date else '-', inc.incident_name, inc.incident_type or '-', ward_name_filter(inc.ward), inc.house_damaged or 0, inc.public_building_damaged or 0])
+        elif metric_type == 'estimated_loss':
+            title = 'Incidents - Estimated Loss'
+            headers = ['Date', 'Name', 'Type', 'Ward', 'Estimated Loss (NRs)']
+            for inc in all_incidents:
+                if (inc.estimated_loss or 0) > 0:
+                    rows.append([inc.start_date.strftime('%Y-%m-%d') if inc.start_date else '-', inc.incident_name, inc.incident_type or '-', ward_name_filter(inc.ward), inc.estimated_loss or 0])
+        else:
+            return jsonify({'success': False, 'message': f'Unknown metric type: {metric_type}'}), 400
+        return jsonify({'success': True, 'title': title, 'headers': headers, 'rows': rows})
+    except Exception as e:
+        return jsonify({'success': False, 'message': friendly_message(e)}), 400
+
+
 # ============ PRINT REPORT PREVIEW (HTML) ============
 @app.route('/print-report/<report_type>', methods=['GET'])
 @login_required
@@ -9187,6 +9722,14 @@ def print_report_preview(report_type):
         from urllib.parse import urlencode
         params = [(k, v) for k, v in request.args.items()]
         return redirect('/incident-summary-preview?' + urlencode(params))
+    if report_type == 'bin-card':
+        from urllib.parse import urlencode
+        params = [(k, v) for k, v in request.args.items() if k != 'auto']
+        return redirect('/api/inventory/bin-card' + (('?' + urlencode(params)) if params else ''))
+    if report_type == 'stock-book':
+        from urllib.parse import urlencode
+        params = [(k, v) for k, v in request.args.items() if k != 'auto']
+        return redirect('/api/inventory/stock-book' + (('?' + urlencode(params)) if params else ''))
     try:
         headers, rows = get_report_data(report_type, request.args)
         report_titles = {
@@ -9253,8 +9796,8 @@ def print_report_preview(report_type):
         report_header = AppSettings.get_setting('report_header', '')
         # Compute totals for numeric columns
         totals = []
+        first_numeric = -1
         if rows and rows[0] and rows[0][0] != 'No data found':
-            first_numeric = -1
             for col_idx in range(len(rows[0])):
                 if isinstance(rows[0][col_idx], (int, float)):
                     if first_numeric == -1:
@@ -9263,6 +9806,142 @@ def print_report_preview(report_type):
                     totals.append(total)
                 else:
                     totals.append('')
+        if report_type == 'disaster-assessments':
+            incident_id = request.args.get('incident_id', type=int)
+            q = DisasterAssessment.query.order_by(DisasterAssessment.disaster_date_bs.desc())
+            if incident_id: q = q.filter(DisasterAssessment.incident_id == incident_id)
+            disaster_type = request.args.get('disaster_type')
+            if disaster_type: q = q.filter(DisasterAssessment.disaster_type == disaster_type)
+            fiscal_year = request.args.get('fiscal_year')
+            if fiscal_year: q = q.filter(DisasterAssessment.fiscal_year == fiscal_year)
+            ward_id = request.args.get('ward_id', type=int)
+            if ward_id: q = q.join(Incident).filter(Incident.ward == ward_id)
+            if from_: q = q.filter(DisasterAssessment.disaster_date_bs >= from_)
+            if to_: q = q.filter(DisasterAssessment.disaster_date_bs <= to_)
+
+            assessment_rows = []
+            for a in q.all():
+                try:
+                    incident = a.incident
+                    inc_name = incident.incident_name if incident else '-'
+                except Exception:
+                    incident = None
+                    inc_name = '-'
+
+                relief_beneficiaries = []
+                cash_beneficiaries = []
+                if incident:
+                    for dist in incident.distributions:
+                        if (dist.status or '').lower() == 'cancelled':
+                            continue
+                        relief_beneficiaries.extend(dist.beneficiaries or [])
+                    for cash_dist in incident.cash_distributions:
+                        if (cash_dist.status or '').lower() == 'cancelled':
+                            continue
+                        cash_beneficiaries.extend(cash_dist.beneficiaries or [])
+
+                def beneficiary_key(item, name_attr, id_attr):
+                    ben_id = getattr(item, 'beneficiary_id', None)
+                    if ben_id:
+                        return f'id:{ben_id}'
+                    ident = getattr(item, id_attr, None) or ''
+                    name = getattr(item, name_attr, None) or ''
+                    return f'name:{name.strip().lower()}|{ident.strip().lower()}'
+
+                relief_keys = {beneficiary_key(b, 'family_name', 'id_number') for b in relief_beneficiaries}
+                cash_keys = {beneficiary_key(b, 'name', 'national_id') for b in cash_beneficiaries}
+
+                linked_beneficiaries = {}
+
+                def add_linked_beneficiary(beneficiary):
+                    if beneficiary:
+                        linked_beneficiaries[beneficiary.id] = beneficiary
+
+                def resolve_beneficiary(item, name_attr, id_attr):
+                    add_linked_beneficiary(getattr(item, 'beneficiary', None))
+                    ben_id = getattr(item, 'beneficiary_id', None)
+                    if ben_id:
+                        add_linked_beneficiary(db.session.get(Beneficiary, ben_id))
+                        return
+                    ident = (getattr(item, id_attr, None) or '').strip()
+                    if ident:
+                        ben = Beneficiary.query.filter(Beneficiary.national_id == ident).first()
+                        if ben:
+                            add_linked_beneficiary(ben)
+                            return
+                    name = (getattr(item, name_attr, None) or '').strip()
+                    if name:
+                        add_linked_beneficiary(Beneficiary.query.filter(db.func.lower(Beneficiary.name) == name.lower()).first())
+
+                for b in relief_beneficiaries:
+                    resolve_beneficiary(b, 'family_name', 'id_number')
+                for b in cash_beneficiaries:
+                    resolve_beneficiary(b, 'name', 'national_id')
+
+                dynamic_ssf_family = sum(1 for ben in linked_beneficiaries.values() if ben.in_social_security_fund)
+                dynamic_poor_household = sum(1 for ben in linked_beneficiaries.values() if ben.poverty_card_holder)
+                total_livestock_lost = (a.cattle_lost or 0) + (a.poultry_lost or 0) + (a.goats_sheep_lost or 0) + (a.other_livestock_lost or 0)
+                total_livestock_injured = (a.cattle_injured or 0) + (a.poultry_injured or 0) + (a.goats_sheep_injured or 0) + (a.other_livestock_injured or 0)
+                assessment_rows.append({
+                    'date': a.disaster_date_bs or '',
+                    'incident': inc_name,
+                    'disaster_type': a.disaster_type or '',
+                    'ward': ward_name_filter(incident.ward) if incident and incident.ward else '-',
+                    'tole': a.tole or (incident.tole if incident else '') or '-',
+                    'fiscal_year': a.fiscal_year or '',
+                    'affected_households': a.affected_households or 0,
+                    'affected_people': a.affected_people or 0,
+                    'affected_people_male': a.affected_people_male or 0,
+                    'affected_people_female': a.affected_people_female or 0,
+                    'affected_people_child': a.affected_people_child or 0,
+                    'affected_people_pregnant': a.affected_people_pregnant or 0,
+                    'affected_people_old_age': a.affected_people_old_age or 0,
+                    'ssf_family': dynamic_ssf_family if linked_beneficiaries else (a.ssf_family or 0),
+                    'poor_household': dynamic_poor_household if linked_beneficiaries else (a.poor_household or 0),
+                    'deaths': a.deaths or 0,
+                    'injured': a.injured or 0,
+                    'missing_persons': a.missing_persons or 0,
+                    'house_destroyed': a.house_destroyed or 0,
+                    'house_damaged': a.house_damaged or 0,
+                    'public_building_destroyed': a.public_building_destroyed or 0,
+                    'public_building_damaged': a.public_building_damaged or 0,
+                    'estimated_loss': a.estimated_loss or 0,
+                    'agriculture_crop_damage': a.agriculture_crop_damage or '',
+                    'road_blocked': a.road_blocked,
+                    'electricity_blocked': a.electricity_blocked,
+                    'communication_blocked': a.communication_blocked,
+                    'drinking_water_disrupted': a.drinking_water_disrupted,
+                    'cattle_lost': a.cattle_lost or 0,
+                    'cattle_injured': a.cattle_injured or 0,
+                    'poultry_lost': a.poultry_lost or 0,
+                    'poultry_injured': a.poultry_injured or 0,
+                    'goats_sheep_lost': a.goats_sheep_lost or 0,
+                    'goats_sheep_injured': a.goats_sheep_injured or 0,
+                    'other_livestock_lost': a.other_livestock_lost or 0,
+                    'other_livestock_injured': a.other_livestock_injured or 0,
+                    'livestock_lost_total': total_livestock_lost,
+                    'livestock_injured_total': total_livestock_injured,
+                    'livestock_missing': 0,
+                    'relief_beneficiaries': len(relief_keys),
+                    'cash_beneficiaries': len(cash_keys),
+                    'total_beneficiaries': len(relief_keys | cash_keys),
+                    'remarks': a.remarks or '',
+                })
+
+            total_fields = [
+                'affected_households', 'affected_people', 'affected_people_male', 'affected_people_female',
+                'affected_people_child', 'affected_people_pregnant', 'affected_people_old_age',
+                'ssf_family', 'poor_household', 'deaths', 'injured', 'missing_persons',
+                'house_destroyed', 'house_damaged', 'public_building_destroyed', 'public_building_damaged',
+                'estimated_loss', 'livestock_lost_total', 'livestock_injured_total', 'livestock_missing',
+                'relief_beneficiaries', 'cash_beneficiaries', 'total_beneficiaries',
+            ]
+            assessment_totals = {field: sum(row[field] for row in assessment_rows) for field in total_fields}
+
+            return render_template('print_disaster_assessment.html', title=title, headers=headers, rows=assessment_rows,
+                                   office=office, address=address, filter_summary=filter_summary,
+                                   report_header=report_header, totals=assessment_totals,
+                                   generated_at=f"{today_bs()} {now_val.strftime('%H:%M')}")
         return render_template('print_report.html', title=title, headers=headers, rows=rows,
                                office=office, address=address, filter_summary=filter_summary,
                                report_header=report_header, totals=totals, first_numeric=first_numeric,
@@ -9546,92 +10225,187 @@ def print_incident(id):
     report_header = AppSettings.get_setting('report_header', '')
     return render_template('print_incident.html', incident=incident, office=office, address=address, report_header=report_header)
 
+def _bin_card_events(item_ids, warehouse_id):
+    """Build sorted bin card ledger events for the given item ids in a warehouse.
+
+    Each movement line is returned as a dict with keys: date, type, ref, party,
+    in, out, batch, remarks, expiry_date, item_name, sort_key. Quantities of
+    every item are kept separate so a group of items can be shown on one card.
+    """
+    events = []
+    for item_id in item_ids:
+        item = db_get(Item, item_id)
+        item_name = item.name if item else ''
+        receipts = [r for r in StockReceiptItem.query.filter_by(item_id=item_id).all()
+                    if r.receipt and r.receipt.warehouse_id == warehouse_id]
+        adjustments = ManualAdjustment.query.filter_by(item_id=item_id, warehouse_id=warehouse_id).all()
+        dist_items = [d for d in DistributionItem.query.filter_by(item_id=item_id).all()
+                      if d.warehouse_id == warehouse_id and d.distribution and d.distribution.status != 'Cancelled']
+        transfers_out = [t for t in StockTransferItem.query.filter_by(item_id=item_id).all()
+                         if t.transfer and t.transfer.from_warehouse_id == warehouse_id and t.transfer.status == 'Completed']
+        transfers_in = [t for t in StockTransferItem.query.filter_by(item_id=item_id).all()
+                        if t.transfer and t.transfer.to_warehouse_id == warehouse_id and t.transfer.status == 'Completed']
+
+        for r in receipts:
+            events.append({'date': ad_to_bs_date(r.receipt.date) or '',
+                           'type': 'Receipt', 'ref': r.receipt.receipt_no,
+                           'party': r.receipt.source_name or '',
+                           'in': r.quantity, 'out': 0,
+                           'batch': r.batch_no or '', 'remarks': r.receipt.remarks or '',
+                           'expiry_date': r.expiry_date, 'item_name': item_name,
+                           'sort_key': (r.receipt.date or date.min, r.receipt.id)})
+        for a in adjustments:
+            if a.adjustment_type in ('Increase', 'Correction_Increase'):
+                events.append({'date': ad_to_bs_date(a.date) or '',
+                               'type': 'Adjustment (+)', 'ref': a.adjustment_no, 'party': '',
+                               'in': a.adjusted_quantity, 'out': 0, 'batch': '', 'expiry_date': None,
+                               'remarks': a.reason or '', 'item_name': item_name,
+                               'sort_key': (a.date or date.min, a.id)})
+            else:
+                events.append({'date': ad_to_bs_date(a.date) or '',
+                               'type': 'Adjustment (-)', 'ref': a.adjustment_no, 'party': '',
+                               'in': 0, 'out': a.adjusted_quantity, 'batch': '', 'expiry_date': None,
+                               'remarks': a.reason or '', 'item_name': item_name,
+                               'sort_key': (a.date or date.min, a.id)})
+        for d in dist_items:
+            events.append({'date': ad_to_bs_date(d.distribution.distribution_date) or '',
+                           'type': 'Distribution', 'ref': d.distribution.distribution_no,
+                           'party': d.distribution.destination or d.distribution.receiver or '',
+                           'in': 0, 'out': d.quantity,
+                           'batch': d.batch_no or '', 'remarks': '', 'expiry_date': None,
+                           'item_name': item_name,
+                           'sort_key': (d.distribution.distribution_date or date.min, d.distribution.id)})
+        for t in transfers_out:
+            events.append({'date': ad_to_bs_date(t.transfer.transfer_date) or '',
+                           'type': 'Transfer Out', 'ref': t.transfer.transfer_no,
+                           'party': t.transfer.to_warehouse.name if t.transfer.to_warehouse else '',
+                           'in': 0, 'out': t.quantity,
+                           'batch': t.batch_no or '', 'remarks': t.transfer.reason or '', 'expiry_date': None,
+                           'item_name': item_name,
+                           'sort_key': (t.transfer.transfer_date or date.min, t.transfer.id)})
+        for t in transfers_in:
+            events.append({'date': ad_to_bs_date(t.transfer.transfer_date) or '',
+                           'type': 'Transfer In', 'ref': t.transfer.transfer_no,
+                           'party': t.transfer.from_warehouse.name if t.transfer.from_warehouse else '',
+                           'in': t.quantity, 'out': 0,
+                           'batch': t.batch_no or '', 'remarks': t.transfer.reason or '', 'expiry_date': None,
+                           'item_name': item_name,
+                           'sort_key': (t.transfer.transfer_date or date.min, t.transfer.id)})
+
+    events.sort(key=lambda e: e['sort_key'])
+    return events
+
+
 @app.route('/api/inventory/bin-card', methods=['GET'])
 @login_required
 def print_bin_card():
     item_id = request.args.get('item_id', type=int)
+    group_id = request.args.get('group_id', type=int)
     warehouse_id = request.args.get('warehouse_id', type=int)
-    if not item_id or not warehouse_id:
-        return jsonify({'success': False, 'message': 'Item and warehouse are required'}), 400
-    item = db_get(Item, item_id)
+    from_date_str = request.args.get('date_from') or request.args.get('from_date')
+    to_date_str = request.args.get('date_to') or request.args.get('to_date')
+    if not warehouse_id:
+        return jsonify({'success': False, 'message': 'Warehouse is required'}), 400
+    if not item_id and not group_id:
+        return jsonify({'success': False, 'message': 'Item (or group) and warehouse are required'}), 400
     warehouse = db_get(Warehouse, warehouse_id)
-    if not item or not warehouse:
-        return jsonify({'success': False, 'message': 'Item or warehouse not found'}), 404
-    inv = Inventory.query.filter_by(item_id=item_id, warehouse_id=warehouse_id).first()
+    if not warehouse:
+        return jsonify({'success': False, 'message': 'Warehouse not found'}), 404
 
-    receipts = StockReceiptItem.query.filter_by(item_id=item_id).all()
-    receipts = [r for r in receipts if r.receipt and r.receipt.warehouse_id == warehouse_id]
-    adjustments = ManualAdjustment.query.filter_by(item_id=item_id, warehouse_id=warehouse_id).all()
-    dist_items = DistributionItem.query.filter_by(item_id=item_id).all()
-    dist_items = [d for d in dist_items if d.warehouse_id == warehouse_id and d.distribution and d.distribution.status != 'Cancelled']
-    transfers_out = StockTransferItem.query.filter_by(item_id=item_id).all()
-    transfers_out = [t for t in transfers_out if t.transfer and t.transfer.from_warehouse_id == warehouse_id]
-    transfers_in = StockTransferItem.query.filter_by(item_id=item_id).all()
-    transfers_in = [t for t in transfers_in if t.transfer and t.transfer.to_warehouse_id == warehouse_id]
+    group = None
+    item = None
+    item_ids = []
+    if group_id:
+        group = db_get(ItemGroup, group_id)
+        if not group:
+            return jsonify({'success': False, 'message': 'Group not found'}), 404
+        item_ids = [i.id for i in group.items]
+        if not item_ids:
+            return jsonify({'success': False, 'message': 'Group has no items'}), 404
+    else:
+        item = db_get(Item, item_id)
+        if not item:
+            return jsonify({'success': False, 'message': 'Item not found'}), 404
+        item_ids = [item.id]
 
-    events = []
-    for r in receipts:
-        events.append({'date': ad_to_bs_date(r.receipt.date) or '',
-                       'type': 'Receipt', 'ref': r.receipt.receipt_no,
-                       'party': r.receipt.source_name or '',
-                       'in': r.quantity, 'out': 0,
-                       'batch': r.batch_no or '', 'remarks': r.receipt.remarks or '',
-                       'sort_key': (r.receipt.date or date.min, r.receipt.id)})
-    for a in adjustments:
-        if a.adjustment_type in ('Increase', 'Correction_Increase'):
-            events.append({'date': ad_to_bs_date(a.date) or '',
-                           'type': 'Adjustment (+%s)' % a.reason if a.reason else 'Adjustment (+)',
-                           'ref': a.adjustment_no, 'party': '',
-                           'in': a.adjusted_quantity, 'out': 0, 'batch': '',
-                           'remarks': a.reason or '', 'sort_key': (a.date or date.min, a.id)})
-        else:
-            events.append({'date': ad_to_bs_date(a.date) or '',
-                           'type': 'Adjustment (-%s)' % a.reason if a.reason else 'Adjustment (-)',
-                           'ref': a.adjustment_no, 'party': '',
-                           'in': 0, 'out': a.adjusted_quantity, 'batch': '',
-                           'remarks': a.reason or '', 'sort_key': (a.date or date.min, a.id)})
-    for d in dist_items:
-        events.append({'date': ad_to_bs_date(d.distribution.distribution_date) or '',
-                       'type': 'Distribution', 'ref': d.distribution.distribution_no,
-                       'party': d.distribution.destination or d.distribution.receiver or '',
-                       'in': 0, 'out': d.quantity,
-                       'batch': d.batch_no or '', 'remarks': '',
-                       'sort_key': (d.distribution.distribution_date or date.min, d.distribution.id)})
-    for t in transfers_out:
-        events.append({'date': ad_to_bs_date(t.transfer.transfer_date) or '',
-                       'type': 'Transfer Out', 'ref': t.transfer.transfer_no,
-                       'party': t.transfer.to_warehouse.name if t.transfer.to_warehouse else '',
-                       'in': 0, 'out': t.quantity,
-                       'batch': t.batch_no or '', 'remarks': t.transfer.reason or '',
-                       'sort_key': (t.transfer.transfer_date or date.min, t.transfer.id)})
-    for t in transfers_in:
-        events.append({'date': ad_to_bs_date(t.transfer.transfer_date) or '',
-                       'type': 'Transfer In', 'ref': t.transfer.transfer_no,
-                       'party': t.transfer.from_warehouse.name if t.transfer.from_warehouse else '',
-                       'in': t.quantity, 'out': 0,
-                       'batch': t.batch_no or '', 'remarks': t.transfer.reason or '',
-                       'sort_key': (t.transfer.transfer_date or date.min, t.transfer.id)})
+    events = _bin_card_events(item_ids, warehouse_id)
 
-    events.sort(key=lambda e: e['sort_key'])
+    current_balance = db.session.query(db.func.coalesce(db.func.sum(Inventory.quantity), 0)).filter(
+        Inventory.item_id.in_(item_ids), Inventory.warehouse_id == warehouse_id
+    ).scalar() or 0
+    total_in_all = sum(e['in'] for e in events)
+    total_out_all = sum(e['out'] for e in events)
+    opening_balance = current_balance - (total_in_all - total_out_all)
 
-    running = 0
+    from_date = None
+    to_date = None
+    if from_date_str:
+        ad_from = bs_to_ad(from_date_str)
+        if ad_from:
+            from_date = datetime.strptime(ad_from, '%Y-%m-%d').date()
+    if to_date_str:
+        ad_to_v = bs_to_ad(to_date_str)
+        if ad_to_v:
+            to_date = datetime.strptime(ad_to_v, '%Y-%m-%d').date()
+
+    if from_date or to_date:
+        filtered_events = []
+        running_before_filter = opening_balance
+        for e in events:
+            event_date = e['sort_key'][0]
+            if from_date and event_date < from_date:
+                running_before_filter += e['in'] - e['out']
+                continue
+            if to_date and event_date > to_date:
+                continue
+            filtered_events.append(e)
+        events = filtered_events
+        opening_balance = running_before_filter
+
+    running = opening_balance
     seq = 0
+    if from_date or opening_balance:
+        seq += 1
+        opening_event = {
+            'sno': seq, 'date': from_date_str or '', 'ref': '',
+            'type': 'Opening Balance', 'party': '', 'in': 0, 'out': 0,
+            'balance': opening_balance, 'batch': '', 'remarks': '',
+            'expiry_date': None,
+        }
+    else:
+        opening_event = None
     for e in events:
         seq += 1
         e['sno'] = seq
-        if e['type'] in ('Receipt', 'Transfer In') or e['type'].startswith('Adjustment (+'):
-            running += e['in']
-        elif e['type'] in ('Distribution', 'Transfer Out') or e['type'].startswith('Adjustment (-'):
-            running -= e['out']
+        running += e['in'] - e['out']
         e['balance'] = running
+    if opening_event:
+        events.insert(0, opening_event)
 
+    exp_dates = [e['expiry_date'] for e in events if e.get('expiry_date')]
+    next_expiry = ad_to_bs_date(min(exp_dates)) if exp_dates else ''
+
+    unit_label = item.unit if item else 'Multiple'
+    if group:
+        tracking_no = ''
+        item_code = ''
+        desc_label = group.name
+    else:
+        tracking_no = item.barcode or item.uuid or item.item_code or ''
+        item_code = item.item_code or ''
+        desc_label = item.name
     office = AppSettings.get_setting('office_name', 'LEOC')
     address = AppSettings.get_setting('address', '')
     report_header = AppSettings.get_setting('report_header', '')
     now_val = datetime.now()
-    return render_template('print_bin_card.html', item=item, warehouse=warehouse, inv=inv,
+    return render_template('print_bin_card.html', item=item, group=group, warehouse=warehouse,
                            events=events, office=office, address=address,
-                           current_balance=inv.quantity if inv else 0,
+                           current_balance=current_balance,
+                           unit_label=unit_label, tracking_no=tracking_no,
+                           item_code=item_code, desc_label=desc_label,
+                           next_expiry=next_expiry,
+                           filter_from=from_date_str or '',
+                           filter_to=to_date_str or '',
                            report_header=report_header,
                            generated_at=f"{today_bs()} {now_val.strftime('%H:%M')}")
 
@@ -9640,11 +10414,23 @@ def print_bin_card():
 def print_stock_book():
     from collections import OrderedDict
     warehouse_id = request.args.get('warehouse_id', type=int)
-    from_date_str = request.args.get('from_date')
-    to_date_str = request.args.get('to_date')
+    group_id = request.args.get('group_id', type=int)
+    item_id = request.args.get('item_id', type=int)
+    category_id = request.args.get('category_id', type=int)
+    from_date_str = request.args.get('from_date') or request.args.get('date_from')
+    to_date_str = request.args.get('to_date') or request.args.get('date_to')
     warehouse = db_get(Warehouse, warehouse_id) if warehouse_id else None
     if not warehouse:
         return jsonify({'success': False, 'message': 'Warehouse is required'}), 400
+    group = db_get(ItemGroup, group_id) if group_id else None
+    if group_id and not group:
+        return jsonify({'success': False, 'message': 'Group not found'}), 404
+    selected_item = db_get(Item, item_id) if item_id else None
+    if item_id and not selected_item:
+        return jsonify({'success': False, 'message': 'Item not found'}), 404
+    selected_category = db_get(Category, category_id) if category_id else None
+    if category_id and not selected_category:
+        return jsonify({'success': False, 'message': 'Category not found'}), 404
 
     from_date = None
     to_date = None
@@ -9658,6 +10444,13 @@ def print_stock_book():
             to_date = datetime.strptime(ad_to, '%Y-%m-%d').date()
 
     all_inv = Inventory.query.filter_by(warehouse_id=warehouse_id).all()
+    if group:
+        group_item_ids = {i.id for i in group.items}
+        all_inv = [inv for inv in all_inv if inv.item and inv.item.id in group_item_ids]
+    if item_id:
+        all_inv = [inv for inv in all_inv if inv.item and inv.item.id == item_id]
+    if category_id:
+        all_inv = [inv for inv in all_inv if inv.item and inv.item.category_id == category_id]
     rows = []
     grand_opening = grand_received = grand_dispatched = grand_balance = 0
 
@@ -9675,108 +10468,41 @@ def print_stock_book():
         all_adjustments = ManualAdjustment.query.filter_by(item_id=item.id, warehouse_id=warehouse_id).all()
 
         all_transfers_out = StockTransferItem.query.filter_by(item_id=item.id).all()
-        all_transfers_out = [t for t in all_transfers_out if t.transfer and t.transfer.from_warehouse_id == warehouse_id]
+        all_transfers_out = [t for t in all_transfers_out if t.transfer and t.transfer.from_warehouse_id == warehouse_id and t.transfer.status == 'Completed']
 
         all_transfers_in = StockTransferItem.query.filter_by(item_id=item.id).all()
-        all_transfers_in = [t for t in all_transfers_in if t.transfer and t.transfer.to_warehouse_id == warehouse_id]
+        all_transfers_in = [t for t in all_transfers_in if t.transfer and t.transfer.to_warehouse_id == warehouse_id and t.transfer.status == 'Completed']
 
-        def sum_receipts_before(rcpts, cutoff):
-            return sum(r.quantity for r in rcpts if r.receipt and (cutoff is None or r.receipt.date < cutoff))
+        events = []
+        for r in all_receipts:
+            events.append({'date': r.receipt.date, 'in': r.quantity or 0, 'out': 0})
+        for d in all_dist_items:
+            events.append({'date': d.distribution.distribution_date, 'in': 0, 'out': d.quantity or 0})
+        for a in all_adjustments:
+            if a.adjustment_type in ('Increase', 'Correction_Increase'):
+                events.append({'date': a.date, 'in': a.adjusted_quantity or 0, 'out': 0})
+            else:
+                events.append({'date': a.date, 'in': 0, 'out': a.adjusted_quantity or 0})
+        for t in all_transfers_in:
+            events.append({'date': t.transfer.transfer_date, 'in': t.quantity or 0, 'out': 0})
+        for t in all_transfers_out:
+            events.append({'date': t.transfer.transfer_date, 'in': 0, 'out': t.quantity or 0})
 
-        def sum_dispatches_before(dsps, cutoff):
-            return sum(d.quantity for d in dsps if d.distribution and (cutoff is None or d.distribution.distribution_date < cutoff))
-
-        def sum_adjustments_before(adj, cutoff):
-            total = 0
-            for a in adj:
-                if cutoff is not None and a.date and a.date >= cutoff:
-                    continue
-                if a.adjustment_type in ('Increase', 'Correction_Increase'):
-                    total += a.adjusted_quantity
-                else:
-                    total -= a.adjusted_quantity
-            return total
-
-        def sum_transfers_before(trns, cutoff):
-            total = 0
-            for t in trns:
-                if cutoff is not None and t.transfer and t.transfer.transfer_date and t.transfer.transfer_date >= cutoff:
-                    continue
-                total += t.quantity
-            return total
-
-        def sum_receipts_in_range(rcpts, frm, to):
-            total = 0
-            for r in rcpts:
-                if r.receipt and r.receipt.date:
-                    if frm and r.receipt.date < frm:
-                        continue
-                    if to and r.receipt.date > to:
-                        continue
-                    total += r.quantity
-            return total
-
-        def sum_dispatches_in_range(dsps, frm, to):
-            total = 0
-            for d in dsps:
-                if d.distribution and d.distribution.distribution_date:
-                    if frm and d.distribution.distribution_date < frm:
-                        continue
-                    if to and d.distribution.distribution_date > to:
-                        continue
-                    total += d.quantity
-            return total
-
-        def sum_adjustments_in_range(adj, frm, to):
-            total = 0
-            for a in adj:
-                if a.date:
-                    if frm and a.date < frm:
-                        continue
-                    if to and a.date > to:
-                        continue
-                    if a.adjustment_type in ('Increase', 'Correction_Increase'):
-                        total += a.adjusted_quantity
-                    else:
-                        total -= a.adjusted_quantity
-            return total
-
-        def sum_transfers_in_range(trns, frm, to):
-            total = 0
-            for t in trns:
-                if t.transfer and t.transfer.transfer_date:
-                    if frm and t.transfer.transfer_date < frm:
-                        continue
-                    if to and t.transfer.transfer_date > to:
-                        continue
-                    total += t.quantity
-            return total
-
-        # Opening balance: quantity before from_date
-        opening = inv.quantity
-        if from_date:
-            opening = 0
-            opening += sum_receipts_before(all_receipts, from_date)
-            opening -= sum_dispatches_before(all_dist_items, from_date)
-            opening += sum_adjustments_before(all_adjustments, from_date)
-            opening += sum_transfers_before(all_transfers_in, from_date)
-            opening -= sum_transfers_before(all_transfers_out, from_date)
-            opening = max(opening, 0)
-
-        # Period transactions
-        received = sum_receipts_in_range(all_receipts, from_date, to_date)
-        received += sum_transfers_in_range(all_transfers_in, from_date, to_date)
-        adj_in = sum_adjustments_in_range(all_adjustments, from_date, to_date)
-        if adj_in > 0:
-            received += adj_in
-
-        dispatched = sum_dispatches_in_range(all_dist_items, from_date, to_date)
-        dispatched += sum_transfers_in_range(all_transfers_out, from_date, to_date)
-        if adj_in < 0:
-            dispatched += abs(adj_in)
+        net_all = sum(e['in'] - e['out'] for e in events)
+        opening = (inv.quantity or 0) - net_all
+        received = 0
+        dispatched = 0
+        for e in events:
+            event_date = e['date'] or date.min
+            if from_date and event_date < from_date:
+                opening += e['in'] - e['out']
+                continue
+            if to_date and event_date > to_date:
+                continue
+            received += e['in']
+            dispatched += e['out']
 
         closing = opening + received - dispatched
-        closing = max(closing, 0)
 
         cat_name = item.category.name if item.category else 'Uncategorized'
         cat_name_np = item.category.name_np if item.category else 'वर्गीकरण नभएका'
@@ -9823,12 +10549,14 @@ def print_stock_book():
     fiscal_year = AppSettings.get_setting('active_fiscal_year', '')
     report_header = AppSettings.get_setting('report_header', '')
     now_val = datetime.now()
-    return render_template('print_stock_book.html', warehouse=warehouse, grouped_rows=grouped_rows,
+    return render_template('print_stock_book.html', warehouse=warehouse, group=group,
+                           selected_item=selected_item, selected_category=selected_category,
+                           grouped_rows=grouped_rows,
                            office=office, address=address, report_header=report_header,
                            from_date=from_date_str or '', to_date=to_date_str or '',
                            grand_opening=grand_opening, grand_received=grand_received,
                            grand_dispatched=grand_dispatched, grand_balance=grand_balance,
-                            fiscal_year=fiscal_year, generated_at=f"{today_bs()} {now_val.strftime('%H:%M')}")
+                           fiscal_year=fiscal_year, generated_at=f"{today_bs()} {now_val.strftime('%H:%M')}")
 
 # ============ DATABASE INITIALIZATION ============
 def init_db():
@@ -9907,7 +10635,7 @@ def init_db():
                     try:
                         db.session.execute(db.text(f"ALTER TABLE distribution ADD COLUMN {col}"))
                     except Exception:
-                        pass
+                        db.session.rollback()
                 if dist_mig:
                     db.session.commit()
                 if 'dispatch_id' in dist_cols:
@@ -9916,6 +10644,7 @@ def init_db():
                         db.session.commit()
                         print("[MIGRATE] Dropped NOT NULL constraint on distribution.dispatch_id")
                     except Exception:
+                        db.session.rollback()
                         try:
                             db.session.execute(db.text("ALTER TABLE distribution DROP COLUMN dispatch_id"))
                             db.session.commit()
@@ -9932,9 +10661,10 @@ def init_db():
                 for col in di_mig:
                     try:
                         db.session.execute(db.text(f"ALTER TABLE distribution_item ADD COLUMN {col}"))
-                        db.session.commit()
                     except Exception:
-                        pass
+                        db.session.rollback()
+                if di_mig:
+                    db.session.commit()
             if 'distribution_beneficiary' in inspector.get_table_names():
                 dbencols = [c['name'] for c in inspector.get_columns('distribution_beneficiary')]
                 if 'status' not in dbencols:

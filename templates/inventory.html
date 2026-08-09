@@ -131,28 +131,37 @@
                 </select>
             </div>
             <div class="col-md-3">
-                <label class="form-label fw-semibold">Item <span class="text-danger">*</span></label>
+                <label class="form-label fw-semibold">Item</label>
                 <select class="form-select form-select-sm" id="printItem">
                     <option value="">Select item...</option>
                 </select>
             </div>
-            <div class="col-md-2 d-grid">
+            <div class="col-md-3">
+                <label class="form-label fw-semibold">Group</label>
+                <select class="form-select form-select-sm" id="printGroup" onchange="onPrintGroupChange()">
+                    <option value="">Select group...</option>
+                </select>
+            </div>
+            <div class="col-md-3 d-grid">
                 <button class="btn btn-outline-primary btn-sm" onclick="printBinCard()">
                     <i class="bi bi-card-list me-1"></i>Print Bin Card
                 </button>
             </div>
-            <div class="col-md-2">
+            <div class="col-md-3">
                 <label class="form-label fw-semibold">From Date</label>
                 <input type="text" class="form-control form-control-sm nepali-date" placeholder="YYYY-MM-DD" id="stockBookFrom">
             </div>
-            <div class="col-md-2">
+            <div class="col-md-3">
                 <label class="form-label fw-semibold">To Date</label>
                 <input type="text" class="form-control form-control-sm nepali-date" placeholder="YYYY-MM-DD" id="stockBookTo">
             </div>
-            <div class="col-md-2 d-grid">
+            <div class="col-md-3 d-grid">
                 <button class="btn btn-outline-success btn-sm" onclick="printStockBook()">
                     <i class="bi bi-book me-1"></i>Print Stock Book
                 </button>
+            </div>
+            <div class="col-md-3">
+                <small class="text-muted">Select a Group (or an Item) to print a group/individual document.</small>
             </div>
         </div>
     </div>
@@ -243,6 +252,11 @@ async function loadFormData() {
             groupSel.innerHTML += `<option value="${g.id}">${g.name}</option>`;
         });
 
+        const printGroupSel = document.getElementById('printGroup');
+        (d.item_groups || []).forEach(g => {
+            printGroupSel.innerHTML += `<option value="${g.id}">${g.name}</option>`;
+        });
+
         const catSel = document.getElementById('filterCategory');
         (d.categories || []).forEach(c => {
             catSel.innerHTML += `<option value="${c.id}">${c.name}</option>`;
@@ -329,14 +343,28 @@ async function loadSummary() {
     } catch (e) { showToast('danger', 'Error loading summary: ' + e.message); }
 }
 
+function onPrintGroupChange() {
+    if (document.getElementById('printGroup').value) {
+        document.getElementById('printItem').value = '';
+    }
+}
+
 function printBinCard() {
     const itemId = document.getElementById('printItem').value;
+    const groupId = document.getElementById('printGroup').value;
     const warehouseId = document.getElementById('printWarehouse').value;
-    if (!itemId || !warehouseId) {
-        showToast('warning', 'Please select both an item and a warehouse to print bin card');
+    if (!warehouseId) {
+        showToast('warning', 'Please select a warehouse to print bin card');
         return;
     }
-    window.open(`/api/inventory/bin-card?item_id=${itemId}&warehouse_id=${warehouseId}`, '_blank');
+    if (!itemId && !groupId) {
+        showToast('warning', 'Please select an item or a group to print bin card');
+        return;
+    }
+    let url = `/api/inventory/bin-card?warehouse_id=${warehouseId}`;
+    if (itemId) url += `&item_id=${itemId}`;
+    if (groupId) url += `&group_id=${groupId}`;
+    window.open(url, '_blank');
 }
 
 function printStockBook() {
@@ -345,9 +373,11 @@ function printStockBook() {
         showToast('warning', 'Please select a warehouse to print stock book');
         return;
     }
+    const groupId = document.getElementById('printGroup').value;
     const fromDate = document.getElementById('stockBookFrom').value;
     const toDate = document.getElementById('stockBookTo').value;
     let url = `/api/inventory/stock-book?warehouse_id=${warehouseId}`;
+    if (groupId) url += `&group_id=${groupId}`;
     if (fromDate) url += `&from_date=${fromDate}`;
     if (toDate) url += `&to_date=${toDate}`;
     window.open(url, '_blank');

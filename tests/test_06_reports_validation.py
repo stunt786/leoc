@@ -313,6 +313,84 @@ class ReportGenerationTest(LeocTestCase):
         resp = self.client.get(f'/api/inventory/stock-book?warehouse_id={wh["id"]}')
         self.assertEqual(resp.status_code, 200)
 
+    def test_bin_card_group(self):
+        self.login()
+        cat = self.create_category()
+        wh = self.create_warehouse()
+
+        resp = self.client.post('/api/item-groups', json={'name': 'Stationary'})
+        self.assertIn(resp.status_code, (200, 201), resp.get_json())
+        group = resp.get_json()['item_group']
+
+        item1 = self.create_item(cat['id'], name=f'Pen-{uuid.uuid4().hex[:6]}')
+        item2 = self.create_item(cat['id'], name=f'Paper-{uuid.uuid4().hex[:6]}')
+        for item in (item1, item2):
+            resp = self.client.put(f'/api/items/{item["id"]}', json={'group_id': group['id']})
+            self.assertEqual(resp.status_code, 200, resp.get_json())
+
+        self.create_stock_receipt(wh['id'], item1['id'], quantity=20)
+        self.create_stock_receipt(wh['id'], item2['id'], quantity=10)
+
+        resp = self.client.get(f'/api/inventory/bin-card?group_id={group["id"]}&warehouse_id={wh["id"]}')
+        self.assertEqual(resp.status_code, 200)
+        html = resp.get_data(as_text=True)
+        self.assertIn(group['name'], html)
+        self.assertIn('Pen', html)
+        self.assertIn('Paper', html)
+
+        resp = self.client.get(f'/api/reports-data/bin-card?group_id={group["id"]}&warehouse_id={wh["id"]}')
+        self.assertEqual(resp.status_code, 200)
+        data = resp.get_json()
+        self.assertTrue(data.get('success', False))
+
+    def test_bin_card_requires_selection(self):
+        self.login()
+        wh = self.create_warehouse()
+        resp = self.client.get(f'/api/inventory/bin-card?warehouse_id={wh["id"]}')
+        self.assertEqual(resp.status_code, 400)
+        resp = self.client.get(f'/api/inventory/bin-card?group_id=999&warehouse_id={wh["id"]}')
+        self.assertEqual(resp.status_code, 404)
+
+    def test_stock_book_by_group(self):
+        self.login()
+        cat = self.create_category()
+        wh = self.create_warehouse()
+
+        resp = self.client.post('/api/item-groups', json={'name': 'Food'})
+        self.assertIn(resp.status_code, (200, 201), resp.get_json())
+        group = resp.get_json()['item_group']
+
+        item1 = self.create_item(cat['id'], name=f'Rice-{uuid.uuid4().hex[:6]}')
+        item2 = self.create_item(cat['id'], name=f'Dal-{uuid.uuid4().hex[:6]}')
+        outside = self.create_item(cat['id'], name=f'Other-{uuid.uuid4().hex[:6]}')
+        for item in (item1, item2):
+            resp = self.client.put(f'/api/items/{item["id"]}', json={'group_id': group['id']})
+            self.assertEqual(resp.status_code, 200, resp.get_json())
+
+        self.create_stock_receipt(wh['id'], item1['id'], quantity=20)
+        self.create_stock_receipt(wh['id'], outside['id'], quantity=50)
+
+        resp = self.client.get(f'/api/inventory/stock-book?warehouse_id={wh["id"]}&group_id={group["id"]}')
+        self.assertEqual(resp.status_code, 200)
+        html = resp.get_data(as_text=True)
+        self.assertIn(group['name'], html)
+        self.assertIn('Rice', html)
+        self.assertNotIn('Other', html)
+
+        resp = self.client.get(f'/api/inventory/stock-book?warehouse_id={wh["id"]}&group_id=999')
+        self.assertEqual(resp.status_code, 404)
+
+    def test_reports_stock_book_group_redirect(self):
+        self.login()
+        cat = self.create_category()
+        wh = self.create_warehouse()
+        resp = self.client.post('/api/item-groups', json={'name': 'Stationery'})
+        self.assertIn(resp.status_code, (200, 201), resp.get_json())
+        group = resp.get_json()['item_group']
+        resp = self.client.get(f'/print-report/stock-book?warehouse_id={wh["id"]}&group_id={group["id"]}')
+        self.assertEqual(resp.status_code, 302)
+        self.assertIn('/api/inventory/stock-book', resp.headers.get('Location', ''))
+
     def test_daily_report_preview(self):
         self.login()
         inc = self.create_incident()

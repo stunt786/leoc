@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="ne">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }} - LEOC</title>
+    <style>
+        @page { size: A4; margin: 12mm; }
+        @font-face {
+            font-family: 'Noto Sans';
+            src: url('/static/fonts/NotoSans-Regular.ttf') format('truetype');
+            font-weight: 400;
+            font-style: normal;
+            font-display: swap;
+        }
+        @font-face {
+            font-family: 'Noto Sans';
+            src: url('/static/fonts/NotoSans-Bold.ttf') format('truetype');
+            font-weight: 700;
+            font-style: normal;
+            font-display: swap;
+        }
+        @font-face {
+            font-family: 'Noto Sans Devanagari';
+            src: url('/static/fonts/NotoSansDevanagari-Regular.ttf') format('truetype');
+            font-weight: 400;
+            font-style: normal;
+            font-display: swap;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            padding: 18px;
+            color: #1f2933;
+            background: #eef2f6;
+            font-family: 'Noto Sans', 'Noto Sans Devanagari', Arial, sans-serif;
+            font-size: 11px;
+            line-height: 1.45;
+        }
+        .no-print {
+            max-width: 1060px;
+            margin: 0 auto 12px;
+            display: flex;
+            gap: 8px;
+        }
+        .btn {
+            border: 1px solid #b8c2cc;
+            background: #fff;
+            color: #243b53;
+            border-radius: 4px;
+            padding: 7px 11px;
+            font: inherit;
+            cursor: pointer;
+        }
+        .btn-primary { background: #1d4ed8; border-color: #1d4ed8; color: #fff; }
+        .report {
+            max-width: 1060px;
+            margin: 0 auto;
+            background: #fff;
+            border: 1px solid #d9e2ec;
+            box-shadow: 0 14px 40px rgba(15, 23, 42, 0.12);
+        }
+        .masthead {
+            padding: 22px 28px 18px;
+            border-top: 8px solid #1f4e79;
+            border-bottom: 1px solid #cbd5e1;
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 20px;
+            align-items: start;
+        }
+        .office h1, .office h2, .office h3 {
+            margin: 0 0 4px;
+            font-weight: 700;
+            color: #102a43;
+        }
+        .office h1 { font-size: 20px; }
+        .office h2 { font-size: 15px; color: #1f4e79; }
+        .office h3 { font-size: 13px; color: #52616b; }
+        .report-title {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #d9e2ec;
+            font-size: 17px;
+            font-weight: 700;
+            color: #102a43;
+            letter-spacing: 0;
+        }
+        .meta-panel {
+            min-width: 220px;
+            border: 1px solid #d9e2ec;
+            background: #f8fafc;
+            padding: 12px;
+        }
+        .meta-row {
+            display: grid;
+            grid-template-columns: 74px 1fr;
+            gap: 8px;
+            padding: 4px 0;
+            border-bottom: 1px solid #e6edf5;
+        }
+        .meta-row:last-child { border-bottom: 0; }
+        .label {
+            color: #627d98;
+            font-size: 9px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+        .value { color: #102a43; font-weight: 700; }
+        .content { padding: 22px 28px 26px; }
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+        .summary-card {
+            border: 1px solid #d9e2ec;
+            border-left: 4px solid #1f4e79;
+            background: #fbfdff;
+            padding: 9px 10px;
+            min-height: 62px;
+        }
+        .summary-card.critical { border-left-color: #b42318; }
+        .summary-card.warn { border-left-color: #b54708; }
+        .summary-card.green { border-left-color: #21725e; }
+        .summary-number {
+            margin-top: 5px;
+            font-size: 18px;
+            line-height: 1;
+            font-weight: 700;
+            color: #102a43;
+        }
+        .assessment {
+            border: 1px solid #cbd5e1;
+            margin-top: 14px;
+            break-inside: avoid;
+            page-break-inside: avoid;
+        }
+        .assessment-head {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 12px;
+            padding: 12px 14px;
+            background: #eaf2f8;
+            border-bottom: 1px solid #cbd5e1;
+        }
+        .assessment-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: #102a43;
+        }
+        .assessment-subtitle {
+            margin-top: 2px;
+            color: #486581;
+            font-size: 10px;
+        }
+        .badge {
+            display: inline-block;
+            border: 1px solid #9fb3c8;
+            background: #fff;
+            color: #1f4e79;
+            padding: 4px 8px;
+            border-radius: 999px;
+            font-size: 10px;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+        .section {
+            padding: 12px 14px;
+            border-bottom: 1px solid #e6edf5;
+        }
+        .section:last-child { border-bottom: 0; }
+        .section-title {
+            margin: 0 0 8px;
+            font-size: 11px;
+            font-weight: 700;
+            color: #1f4e79;
+            text-transform: uppercase;
+        }
+        .data-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+        }
+        .data-grid.six { grid-template-columns: repeat(6, 1fr); }
+        .data-grid.three { grid-template-columns: repeat(3, 1fr); }
+        .data-box {
+            border: 1px solid #d9e2ec;
+            background: #fff;
+            padding: 8px;
+            min-height: 48px;
+        }
+        .data-box .value {
+            display: block;
+            margin-top: 4px;
+            font-size: 14px;
+        }
+        .impact-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 8px;
+        }
+        .impact-table th,
+        .impact-table td {
+            border: 1px solid #d9e2ec;
+            padding: 6px 7px;
+            vertical-align: top;
+        }
+        .impact-table th {
+            background: #f1f5f9;
+            color: #334e68;
+            font-size: 10px;
+            text-align: left;
+        }
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+        .status-line {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 8px;
+        }
+        .status {
+            border: 1px solid #b8c2cc;
+            background: #f8fafc;
+            padding: 4px 8px;
+            border-radius: 3px;
+            font-size: 10px;
+        }
+        .status.affected {
+            border-color: #f5c2c7;
+            background: #fff1f2;
+            color: #9f1239;
+        }
+        .note {
+            border: 1px solid #fde68a;
+            background: #fffbeb;
+            padding: 9px 10px;
+            color: #713f12;
+            white-space: pre-wrap;
+        }
+        .summary-table-wrap {
+            margin-top: 18px;
+            break-inside: avoid;
+            page-break-inside: avoid;
+        }
+        .summary-table-title {
+            padding: 9px 10px;
+            background: #1f4e79;
+            color: #fff;
+            font-weight: 700;
+            font-size: 12px;
+        }
+        .summary-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 9px;
+        }
+        .summary-table th,
+        .summary-table td {
+            border: 1px solid #cbd5e1;
+            padding: 5px;
+        }
+        .summary-table th { background: #eaf2f8; color: #102a43; }
+        .summary-table tfoot td { background: #f1f5f9; font-weight: 700; }
+        .empty {
+            padding: 52px 20px;
+            text-align: center;
+            color: #627d98;
+            border: 1px dashed #bcccdc;
+            background: #f8fafc;
+        }
+        .signatures {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 18px;
+            margin-top: 34px;
+        }
+        .signature {
+            padding-top: 26px;
+            border-top: 1px solid #1f2933;
+            text-align: center;
+            color: #334e68;
+        }
+        .signature strong {
+            display: block;
+            color: #102a43;
+        }
+        .generated {
+            margin-top: 18px;
+            padding-top: 10px;
+            border-top: 1px solid #d9e2ec;
+            text-align: center;
+            color: #627d98;
+            font-size: 9px;
+        }
+        @media print {
+            body {
+                padding: 0;
+                background: #fff;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+            .no-print { display: none !important; }
+            .report {
+                max-width: none;
+                border: 0;
+                box-shadow: none;
+            }
+            .content { padding: 18px 0 0; }
+            .masthead { padding: 0 0 14px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="no-print">
+        <button class="btn btn-primary" onclick="window.print()">Print / PDF</button>
+        <button class="btn" onclick="window.close()">Close</button>
+    </div>
+
+    <main class="report">
+        <header class="masthead">
+            <div class="office">
+                {% if report_header %}
+                    {% for line in report_header.strip().split('\n') %}
+                        {% set l = line.strip() %}
+                        {% if l %}
+                            {% if loop.first %}<h1>{{ l }}</h1>{% elif loop.index == 2 %}<h2>{{ l }}</h2>{% else %}<h3>{{ l }}</h3>{% endif %}
+                        {% endif %}
+                    {% endfor %}
+                {% else %}
+                    <h1>{{ office or 'थलारा गाउँपालिका' }}</h1>
+                    <h2>स्थानीय आपतकालिन कार्यसञ्चालन केन्द्र (LEOC)</h2>
+                    {% if address %}<h3>{{ address }}</h3>{% endif %}
+                {% endif %}
+                <div class="report-title">{{ title }}</div>
+            </div>
+            <aside class="meta-panel">
+                <div class="meta-row"><span class="label">Generated</span><span class="value">{{ generated_at }}</span></div>
+                <div class="meta-row"><span class="label">Records</span><span class="value">{{ rows|length }}</span></div>
+                {% if filter_summary %}
+                <div class="meta-row"><span class="label">Filters</span><span class="value">{{ filter_summary }}</span></div>
+                {% endif %}
+            </aside>
+        </header>
+
+        <section class="content">
+            {% if rows %}
+            <div class="summary-grid">
+                <div class="summary-card"><span class="label">Affected HH</span><div class="summary-number">{{ totals.affected_households }}</div></div>
+                <div class="summary-card critical"><span class="label">Deaths</span><div class="summary-number">{{ totals.deaths }}</div></div>
+                <div class="summary-card warn"><span class="label">Injured</span><div class="summary-number">{{ totals.injured }}</div></div>
+                <div class="summary-card"><span class="label">Missing</span><div class="summary-number">{{ totals.missing_persons }}</div></div>
+                <div class="summary-card green"><span class="label">Beneficiaries</span><div class="summary-number">{{ totals.total_beneficiaries }}</div></div>
+                <div class="summary-card"><span class="label">Loss NRs.</span><div class="summary-number">{{ "{:,.0f}".format(totals.estimated_loss) }}</div></div>
+            </div>
+
+            {% for row in rows %}
+            <article class="assessment">
+                <div class="assessment-head">
+                    <div>
+                        <div class="assessment-title">{{ loop.index }}. {{ row.incident or 'N/A' }}</div>
+                        <div class="assessment-subtitle">
+                            {{ row.date or '-' }} | {{ row.disaster_type or '-' }} | {{ row.ward or '-' }} | {{ row.tole or '-' }}
+                        </div>
+                    </div>
+                    <div>
+                        <span class="badge">FY {{ row.fiscal_year or '-' }}</span>
+                    </div>
+                </div>
+
+                <section class="section">
+                    <h2 class="section-title">Human Impact</h2>
+                    <div class="data-grid six">
+                        <div class="data-box"><span class="label">Male</span><span class="value">{{ row.affected_people_male }}</span></div>
+                        <div class="data-box"><span class="label">Female</span><span class="value">{{ row.affected_people_female }}</span></div>
+                        <div class="data-box"><span class="label">Children</span><span class="value">{{ row.affected_people_child }}</span></div>
+                        <div class="data-box"><span class="label">Pregnant</span><span class="value">{{ row.affected_people_pregnant }}</span></div>
+                        <div class="data-box"><span class="label">Old Age</span><span class="value">{{ row.affected_people_old_age }}</span></div>
+                        <div class="data-box"><span class="label">Affected People</span><span class="value">{{ row.affected_people }}</span></div>
+                    </div>
+                    <table class="impact-table">
+                        <thead>
+                            <tr>
+                                <th class="text-center">Deaths</th>
+                                <th class="text-center">Injured</th>
+                                <th class="text-center">Missing</th>
+                                <th class="text-center">SSF Family</th>
+                                <th class="text-center">Poor Household</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td class="text-center">{{ row.deaths }}</td>
+                                <td class="text-center">{{ row.injured }}</td>
+                                <td class="text-center">{{ row.missing_persons }}</td>
+                                <td class="text-center">{{ row.ssf_family }}</td>
+                                <td class="text-center">{{ row.poor_household }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </section>
+
+                <section class="section">
+                    <h2 class="section-title">Household, Building And Economic Damage</h2>
+                    <div class="data-grid">
+                        <div class="data-box"><span class="label">Households Affected</span><span class="value">{{ row.affected_households }}</span></div>
+                        <div class="data-box"><span class="label">Houses Destroyed</span><span class="value">{{ row.house_destroyed }}</span></div>
+                        <div class="data-box"><span class="label">Houses Damaged</span><span class="value">{{ row.house_damaged }}</span></div>
+                        <div class="data-box"><span class="label">Estimated Loss</span><span class="value">NRs. {{ "{:,.0f}".format(row.estimated_loss) }}</span></div>
+                    </div>
+                    <table class="impact-table">
+                        <thead>
+                            <tr>
+                                <th class="text-center">Public Buildings Destroyed</th>
+                                <th class="text-center">Public Buildings Damaged</th>
+                                <th>Agriculture / Crop Damage</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td class="text-center">{{ row.public_building_destroyed }}</td>
+                                <td class="text-center">{{ row.public_building_damaged }}</td>
+                                <td>{{ row.agriculture_crop_damage or '-' }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <div class="status-line">
+                        <span class="status {{ 'affected' if row.road_blocked else '' }}">Road: {{ 'Affected' if row.road_blocked else 'Normal' }}</span>
+                        <span class="status {{ 'affected' if row.electricity_blocked else '' }}">Electricity: {{ 'Affected' if row.electricity_blocked else 'Normal' }}</span>
+                        <span class="status {{ 'affected' if row.communication_blocked else '' }}">Communication: {{ 'Affected' if row.communication_blocked else 'Normal' }}</span>
+                        <span class="status {{ 'affected' if row.drinking_water_disrupted else '' }}">Drinking Water: {{ 'Affected' if row.drinking_water_disrupted else 'Normal' }}</span>
+                    </div>
+                </section>
+
+                <section class="section">
+                    <h2 class="section-title">Livestock Impact</h2>
+                    <table class="impact-table">
+                        <thead>
+                            <tr>
+                                <th>Livestock</th>
+                                <th class="text-center">Deaths / Lost</th>
+                                <th class="text-center">Injured</th>
+                                <th class="text-center">Missing</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Cattle</td><td class="text-center">{{ row.cattle_lost }}</td><td class="text-center">{{ row.cattle_injured }}</td><td class="text-center">0</td></tr>
+                            <tr><td>Poultry</td><td class="text-center">{{ row.poultry_lost }}</td><td class="text-center">{{ row.poultry_injured }}</td><td class="text-center">0</td></tr>
+                            <tr><td>Goats / Sheep</td><td class="text-center">{{ row.goats_sheep_lost }}</td><td class="text-center">{{ row.goats_sheep_injured }}</td><td class="text-center">0</td></tr>
+                            <tr><td>Other Livestock</td><td class="text-center">{{ row.other_livestock_lost }}</td><td class="text-center">{{ row.other_livestock_injured }}</td><td class="text-center">0</td></tr>
+                            <tr>
+                                <th>Total</th>
+                                <th class="text-center">{{ row.livestock_lost_total }}</th>
+                                <th class="text-center">{{ row.livestock_injured_total }}</th>
+                                <th class="text-center">{{ row.livestock_missing }}</th>
+                            </tr>
+                        </tbody>
+                    </table>
+                </section>
+
+                <section class="section">
+                    <h2 class="section-title">Beneficiary And Assistance Status</h2>
+                    <div class="data-grid three">
+                        <div class="data-box"><span class="label">Relief Beneficiaries</span><span class="value">{{ row.relief_beneficiaries }}</span></div>
+                        <div class="data-box"><span class="label">Cash Beneficiaries</span><span class="value">{{ row.cash_beneficiaries }}</span></div>
+                        <div class="data-box"><span class="label">Total Unique Beneficiaries</span><span class="value">{{ row.total_beneficiaries }}</span></div>
+                    </div>
+                </section>
+
+                {% if row.remarks %}
+                <section class="section">
+                    <h2 class="section-title">Remarks / Other Incident Information</h2>
+                    <div class="note">{{ row.remarks }}</div>
+                </section>
+                {% endif %}
+            </article>
+            {% endfor %}
+
+            <section class="summary-table-wrap">
+                <div class="summary-table-title">Consolidated Summary</div>
+                <table class="summary-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Incident</th>
+                            <th>Type</th>
+                            <th>Ward</th>
+                            <th class="text-center">HH</th>
+                            <th class="text-center">House Dst.</th>
+                            <th class="text-center">House Dmg.</th>
+                            <th class="text-center">Public Dst.</th>
+                            <th class="text-center">Public Dmg.</th>
+                            <th class="text-center">Deaths</th>
+                            <th class="text-center">Injured</th>
+                            <th class="text-center">Missing</th>
+                            <th class="text-center">Livestock Lost</th>
+                            <th class="text-center">Livestock Inj.</th>
+                            <th class="text-center">Benef.</th>
+                            <th class="text-right">Loss</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in rows %}
+                        <tr>
+                            <td>{{ row.date }}</td>
+                            <td>{{ row.incident }}</td>
+                            <td>{{ row.disaster_type }}</td>
+                            <td>{{ row.ward }}</td>
+                            <td class="text-center">{{ row.affected_households }}</td>
+                            <td class="text-center">{{ row.house_destroyed }}</td>
+                            <td class="text-center">{{ row.house_damaged }}</td>
+                            <td class="text-center">{{ row.public_building_destroyed }}</td>
+                            <td class="text-center">{{ row.public_building_damaged }}</td>
+                            <td class="text-center">{{ row.deaths }}</td>
+                            <td class="text-center">{{ row.injured }}</td>
+                            <td class="text-center">{{ row.missing_persons }}</td>
+                            <td class="text-center">{{ row.livestock_lost_total }}</td>
+                            <td class="text-center">{{ row.livestock_injured_total }}</td>
+                            <td class="text-center">{{ row.total_beneficiaries }}</td>
+                            <td class="text-right">{{ "{:,.0f}".format(row.estimated_loss) }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="4">Total</td>
+                            <td class="text-center">{{ totals.affected_households }}</td>
+                            <td class="text-center">{{ totals.house_destroyed }}</td>
+                            <td class="text-center">{{ totals.house_damaged }}</td>
+                            <td class="text-center">{{ totals.public_building_destroyed }}</td>
+                            <td class="text-center">{{ totals.public_building_damaged }}</td>
+                            <td class="text-center">{{ totals.deaths }}</td>
+                            <td class="text-center">{{ totals.injured }}</td>
+                            <td class="text-center">{{ totals.missing_persons }}</td>
+                            <td class="text-center">{{ totals.livestock_lost_total }}</td>
+                            <td class="text-center">{{ totals.livestock_injured_total }}</td>
+                            <td class="text-center">{{ totals.total_beneficiaries }}</td>
+                            <td class="text-right">{{ "{:,.0f}".format(totals.estimated_loss) }}</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </section>
+            {% else %}
+            <div class="empty">No disaster assessment data found.</div>
+            {% endif %}
+
+            <footer>
+                <div class="signatures">
+                    <div class="signature"><strong>Assessor</strong><span>मूल्याङ्कनकर्ता</span></div>
+                    <div class="signature"><strong>Ward Officer</strong><span>वडा अधिकारी</span></div>
+                    <div class="signature"><strong>LEOC Head</strong><span>प्रमुख</span></div>
+                    <div class="signature"><strong>Chief Administrative Officer</strong><span>प्रमुख प्रशासकीय अधिकृत</span></div>
+                </div>
+                <div class="generated">Generated on {{ generated_at }} | {{ office or 'थलारा गाउँपालिका' }} - LEOC</div>
+            </footer>
+        </section>
+    </main>
+
+    <script>
+    (function() {
+        var p = new URLSearchParams(window.location.search);
+        if (p.get('auto') === '1') {
+            var timer = setInterval(function() {
+                if (document.readyState === 'complete') {
+                    clearInterval(timer);
+                    setTimeout(function() { window.print(); }, 300);
+                }
+            }, 100);
+        }
+    })();
+    </script>
+</body>
+</html>

@@ -20809,3 +20809,247 @@ TypeError: 'builtin_function_or_method' object is not iterable
 2026-08-08 23:07:52,089 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:167]
 2026-08-08 23:10:11,297 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:167]
 2026-08-08 23:12:25,280 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:167]
+2026-08-08 23:51:09,233 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:167]
+2026-08-09 08:33:10,652 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:167]
+2026-08-09 08:40:06,875 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:167]
+2026-08-09 08:47:25,543 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:167]
+2026-08-09 08:54:33,371 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:167]
+2026-08-09 08:57:19,650 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:167]
+2026-08-09 09:01:33,916 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:167]
+2026-08-09 09:04:38,520 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:167]
+2026-08-09 09:10:01,432 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:167]
+2026-08-09 09:23:43,741 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:167]
+2026-08-09 09:24:34,636 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:167]
+2026-08-09 09:24:56,583 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:167]
+2026-08-09 09:29:36,080 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:167]
+2026-08-09 09:29:59,489 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:167]
+2026-08-09 09:31:07,767 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:167]
+2026-08-09 09:33:24,686 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:167]
+2026-08-09 09:34:00,277 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:167]
+2026-08-09 09:41:50,938 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:167]
+2026-08-09 09:42:28,713 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:167]
+2026-08-09 09:42:47,219 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:167]
+2026-08-09 09:43:18,510 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:167]
+2026-08-09 09:51:52,955 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:167]
+2026-08-09 10:01:19,750 ERROR: Exception on /reports [GET] [in /home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py:825]
+Traceback (most recent call last):
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py", line 1455, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py", line 869, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py", line 867, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py", line 852, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/auth_helpers.py", line 76, in decorated_function
+    return f(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/app.py", line 2375, in reports_page
+    def index():
+               ^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/templating.py", line 152, in render_template
+    return _render(app, template, context)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/templating.py", line 133, in _render
+    rv = template.render(context)
+         ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/jinja2/environment.py", line 1295, in render
+    self.environment.handle_exception()
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/jinja2/environment.py", line 942, in handle_exception
+    raise rewrite_traceback_stack(source=source)
+  File "/home/prakash/Documents/App Development/leoc/templates/reports.html", line 1, in top-level template code
+    {% extends "base.html" %}
+  File "/home/prakash/Documents/App Development/leoc/templates/base.html", line 192, in top-level template code
+    <a href="{{ url_for('rainfall_status_page') }}" class="nav-item sub-item {% if request.path == '/rainfall-status' %}active{% endif %}">
+    ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py", line 1071, in url_for
+    return self.handle_url_build_error(error, endpoint, values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py", line 1060, in url_for
+    rv = url_adapter.build(  # type: ignore[union-attr]
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/werkzeug/routing/map.py", line 919, in build
+    raise BuildError(endpoint, values, method, self)
+werkzeug.routing.exceptions.BuildError: Could not build url for endpoint 'rainfall_status_page'. Did you mean 'new.critical_infrastructure_page' instead?
+2026-08-09 10:01:24,130 ERROR: Exception on /reports [GET] [in /home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py:825]
+Traceback (most recent call last):
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py", line 1455, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py", line 869, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py", line 867, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py", line 852, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/auth_helpers.py", line 76, in decorated_function
+    return f(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/app.py", line 2375, in reports_page
+    def index():
+               ^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/templating.py", line 152, in render_template
+    return _render(app, template, context)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/templating.py", line 133, in _render
+    rv = template.render(context)
+         ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/jinja2/environment.py", line 1295, in render
+    self.environment.handle_exception()
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/jinja2/environment.py", line 942, in handle_exception
+    raise rewrite_traceback_stack(source=source)
+  File "/home/prakash/Documents/App Development/leoc/templates/reports.html", line 1, in top-level template code
+    {% extends "base.html" %}
+  File "/home/prakash/Documents/App Development/leoc/templates/base.html", line 192, in top-level template code
+    <a href="{{ url_for('rainfall_status_page') }}" class="nav-item sub-item {% if request.path == '/rainfall-status' %}active{% endif %}">
+    ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py", line 1071, in url_for
+    return self.handle_url_build_error(error, endpoint, values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py", line 1060, in url_for
+    rv = url_adapter.build(  # type: ignore[union-attr]
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/werkzeug/routing/map.py", line 919, in build
+    raise BuildError(endpoint, values, method, self)
+werkzeug.routing.exceptions.BuildError: Could not build url for endpoint 'rainfall_status_page'. Did you mean 'new.critical_infrastructure_page' instead?
+2026-08-09 10:01:40,820 ERROR: Exception on /incidents [GET] [in /home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py:825]
+Traceback (most recent call last):
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py", line 1455, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py", line 869, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py", line 867, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py", line 852, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/auth_helpers.py", line 76, in decorated_function
+    return f(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/app.py", line 2365, in incidents_page
+    if current_user.is_authenticated:
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/templating.py", line 152, in render_template
+    return _render(app, template, context)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/templating.py", line 133, in _render
+    rv = template.render(context)
+         ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/jinja2/environment.py", line 1295, in render
+    self.environment.handle_exception()
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/jinja2/environment.py", line 942, in handle_exception
+    raise rewrite_traceback_stack(source=source)
+  File "/home/prakash/Documents/App Development/leoc/templates/incidents.html", line 1, in top-level template code
+    {% extends "base.html" %}
+  File "/home/prakash/Documents/App Development/leoc/templates/base.html", line 192, in top-level template code
+    <a href="{{ url_for('rainfall_status_page') }}" class="nav-item sub-item {% if request.path == '/rainfall-status' %}active{% endif %}">
+    ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py", line 1071, in url_for
+    return self.handle_url_build_error(error, endpoint, values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py", line 1060, in url_for
+    rv = url_adapter.build(  # type: ignore[union-attr]
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/werkzeug/routing/map.py", line 919, in build
+    raise BuildError(endpoint, values, method, self)
+werkzeug.routing.exceptions.BuildError: Could not build url for endpoint 'rainfall_status_page'. Did you mean 'new.critical_infrastructure_page' instead?
+2026-08-09 10:01:46,896 ERROR: Exception on / [GET] [in /home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py:825]
+Traceback (most recent call last):
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py", line 1455, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py", line 869, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py", line 867, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py", line 852, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/auth_helpers.py", line 76, in decorated_function
+    return f(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/app.py", line 2315, in index
+    db.session.execute(
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/templating.py", line 152, in render_template
+    return _render(app, template, context)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/templating.py", line 133, in _render
+    rv = template.render(context)
+         ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/jinja2/environment.py", line 1295, in render
+    self.environment.handle_exception()
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/jinja2/environment.py", line 942, in handle_exception
+    raise rewrite_traceback_stack(source=source)
+  File "/home/prakash/Documents/App Development/leoc/templates/index.html", line 1, in top-level template code
+    {% extends "base.html" %}
+  File "/home/prakash/Documents/App Development/leoc/templates/base.html", line 192, in top-level template code
+    <a href="{{ url_for('rainfall_status_page') }}" class="nav-item sub-item {% if request.path == '/rainfall-status' %}active{% endif %}">
+    ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py", line 1071, in url_for
+    return self.handle_url_build_error(error, endpoint, values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py", line 1060, in url_for
+    rv = url_adapter.build(  # type: ignore[union-attr]
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/werkzeug/routing/map.py", line 919, in build
+    raise BuildError(endpoint, values, method, self)
+werkzeug.routing.exceptions.BuildError: Could not build url for endpoint 'rainfall_status_page'. Did you mean 'new.critical_infrastructure_page' instead?
+2026-08-09 10:04:30,680 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:167]
+2026-08-09 10:05:08,601 ERROR: Exception on / [GET] [in /home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py:825]
+Traceback (most recent call last):
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py", line 1455, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py", line 869, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py", line 867, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py", line 852, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/auth_helpers.py", line 76, in decorated_function
+    return f(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/app.py", line 2315, in index
+    db.session.execute(
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/templating.py", line 152, in render_template
+    return _render(app, template, context)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/templating.py", line 133, in _render
+    rv = template.render(context)
+         ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/jinja2/environment.py", line 1295, in render
+    self.environment.handle_exception()
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/jinja2/environment.py", line 942, in handle_exception
+    raise rewrite_traceback_stack(source=source)
+  File "/home/prakash/Documents/App Development/leoc/templates/index.html", line 1, in top-level template code
+    {% extends "base.html" %}
+  File "/home/prakash/Documents/App Development/leoc/templates/base.html", line 192, in top-level template code
+    <a href="{{ url_for('rainfall_status_page') }}" class="nav-item sub-item {% if request.path == '/rainfall-status' %}active{% endif %}">
+    ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py", line 1071, in url_for
+    return self.handle_url_build_error(error, endpoint, values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py", line 1060, in url_for
+    rv = url_adapter.build(  # type: ignore[union-attr]
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/werkzeug/routing/map.py", line 919, in build
+    raise BuildError(endpoint, values, method, self)
+werkzeug.routing.exceptions.BuildError: Could not build url for endpoint 'rainfall_status_page'. Did you mean 'new.critical_infrastructure_page' instead?
+2026-08-09 10:05:24,509 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:167]
+2026-08-09 10:08:05,571 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:167]
+2026-08-09 10:08:37,723 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:167]

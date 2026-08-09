@@ -7,7 +7,7 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
     <style>
-        @page { size: A4 landscape; margin: 10mm; }
+        @page { size: A4 landscape; margin: 8mm; }
         @font-face {
             font-family: 'Noto Sans';
             src: url('/static/fonts/NotoSans-Regular.ttf') format('truetype');
@@ -23,153 +23,321 @@
             font-display: swap;
         }
         @font-face {
-            font-family: 'Kokila';
-            src: url('/static/fonts/Kokila-Regular.ttf') format('truetype');
+            font-family: 'Noto Sans Devanagari';
+            src: url('/static/fonts/NotoSansDevanagari-Regular.ttf') format('truetype');
             font-weight: 400;
             font-style: normal;
             font-display: swap;
         }
-        @font-face {
-            font-family: 'Kokila';
-            src: url('/static/fonts/Kokila-Regular.ttf') format('truetype');
-            font-weight: 700;
-            font-style: normal;
-            font-display: swap;
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            padding: 12px;
+            background: #fff;
+            color: #101214;
+            font-family: 'Noto Sans', 'Noto Sans Devanagari', Arial, sans-serif;
+            font-size: 10px;
         }
-        body { font-family: 'Noto Sans', 'Kokila', 'Noto Sans Devanagari', 'Inter', sans-serif; padding: 15px; font-size: 11px; }
-        @media print { body { padding: 0; } .no-print { display: none !important; } }
-        .header { text-align: center; margin-bottom: 5px; border-bottom: 2px solid #2c5282; padding-bottom: 8px; }
-        .header h4 { margin-bottom: 2px; font-weight: 700; color: #1a365d; }
-        .header h5 { color: #2c5282; font-weight: 600; }
-        .header h6 { color: #4a5568; font-weight: 600; }
-        table { font-size: 10px; }
-        table th { white-space: nowrap; font-size: 10px; }
-        .footer { margin-top: 25px; }
-        .field-label { font-weight: 600; color: #495057; }
-        .signature-line { border-top: 1px solid #000; width: 200px; display: inline-block; margin-top: 5px; }
-        .totals-row { font-weight: 700; background-color: #e9ecef; }
-        .striped tbody tr:nth-of-type(even) { background-color: #f8f9fa; }
-        .category-header td { background-color: #2c5282; color: #fff; font-weight: 700; font-size: 11px; padding: 5px 8px; }
-        .subtotal-row td { background-color: #e2e8f0; font-weight: 600; font-style: italic; }
+        @media print {
+            body { padding: 0; }
+            .no-print { display: none !important; }
+            thead { display: table-header-group; }
+            tfoot { display: table-footer-group; }
+            tr { break-inside: avoid; page-break-inside: avoid; }
+        }
+        .no-print { margin-bottom: 10px; }
+        .sheet {
+            width: 100%;
+            margin: 0 auto;
+        }
+        .document-header {
+            display: grid;
+            grid-template-columns: 84px 1fr 240px;
+            gap: 12px;
+            align-items: center;
+            border: 1.5px solid #111;
+            border-bottom: 0;
+            padding: 8px 10px;
+        }
+        .emblem {
+            width: 70px;
+            height: 70px;
+            object-fit: contain;
+            display: block;
+            margin: 0 auto;
+        }
+        .office-block {
+            text-align: center;
+            line-height: 1.2;
+        }
+        .office-name {
+            color: #b9003d;
+            font-size: 18px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+        .office-subtitle {
+            color: #b9003d;
+            font-size: 11px;
+            font-weight: 700;
+        }
+        .report-title {
+            margin-top: 4px;
+            color: #111;
+            font-size: 22px;
+            line-height: 1;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+        .meta-box {
+            border-left: 1px solid #111;
+            padding-left: 12px;
+            font-size: 9px;
+            line-height: 1.5;
+        }
+        .meta-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 8px;
+            border-bottom: 1px dotted #999;
+        }
+        .meta-label {
+            color: #333;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+        .meta-value {
+            text-align: right;
+            font-weight: 500;
+        }
+        .filter-band {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            border: 1.5px solid #111;
+            border-bottom: 0;
+            background: #f6f8fb;
+        }
+        .filter-cell {
+            min-height: 28px;
+            padding: 5px 8px;
+            border-right: 1px solid #111;
+        }
+        .filter-cell:last-child { border-right: 0; }
+        .filter-cell span {
+            display: block;
+            color: #53606d;
+            font-size: 8px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+        .filter-cell strong {
+            display: block;
+            color: #111;
+            font-size: 10px;
+            font-weight: 700;
+            overflow-wrap: anywhere;
+        }
+        table.stock-book {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
+        .stock-book th,
+        .stock-book td {
+            border: 1px solid #111;
+            padding: 4px 5px;
+            vertical-align: middle;
+            overflow-wrap: anywhere;
+        }
+        .stock-book th {
+            background: #1f3145;
+            color: #fff;
+            text-align: center;
+            font-size: 9px;
+            line-height: 1.15;
+            font-weight: 700;
+        }
+        .stock-book td {
+            height: 24px;
+            font-size: 9px;
+            line-height: 1.2;
+        }
+        .category-row td {
+            background: #dce8f6;
+            color: #0f243a;
+            font-size: 10px;
+            font-weight: 700;
+        }
+        .subtotal-row td {
+            background: #eef2f6;
+            font-weight: 700;
+        }
+        .grand-row td {
+            background: #111;
+            color: #fff;
+            font-weight: 700;
+            font-size: 10px;
+        }
+        .num { text-align: right; font-variant-numeric: tabular-nums; }
+        .center { text-align: center; }
+        .muted { color: #66717d; font-size: 8px; }
+        .item-name { font-weight: 600; }
+        .footer {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 22px;
+            margin-top: 28px;
+            font-size: 10px;
+            text-align: center;
+        }
+        .signature-line {
+            display: block;
+            width: 160px;
+            max-width: 100%;
+            margin: 0 auto 5px;
+            border-top: 1px solid #111;
+        }
     </style>
 </head>
 <body>
-    <div class="no-print mb-3">
+    <div class="no-print">
         <button class="btn btn-primary btn-sm" onclick="window.print()"><i class="bi bi-printer"></i> Print</button>
         <button class="btn btn-outline-secondary btn-sm" onclick="window.close()"><i class="bi bi-x-lg"></i> Close</button>
     </div>
 
-    <div class="header">
-        {% if report_header %}
-        {% for line in report_header.strip().split('\n') %}
-        {% set l = line.strip() %}
-        {% if l %}
-        {% if loop.first %}<h4>{{ l }}</h4>{% else %}<h5>{{ l }}</h5>{% endif %}
-        {% endif %}
-        {% endfor %}
-        {% else %}
-        <h4>{{ office or 'थलारा गाउँपालिका' }}</h4>
-        <h5>स्थानीय आपतकालिन कार्यसञ्चालन केन्द्र (LEOC)</h5>
-        {% endif %}
-        {% if address %}<small class="text-muted">{{ address }}</small>{% endif %}
-        <h6 class="mt-2">स्टक बुक (Stock Book)</h6>
-        <p class="mb-0">
-            <strong>Warehouse / गोदाम:</strong> {{ warehouse.name }} &nbsp;|&nbsp;
-            {% if from_date or to_date %}
-            <strong>Period / अवधि:</strong> {{ from_date or 'Start' }} to {{ to_date or 'End' }} &nbsp;|&nbsp;
-            {% endif %}
-            <strong>Fiscal Year:</strong> {{ fiscal_year or '' }}
-        </p>
-    </div>
+    <main class="sheet">
+        <section class="document-header">
+            <img class="emblem" src="{{ url_for('static', filename='Emblem_of_Nepal.png') }}" alt="Nepal Emblem">
+            <div class="office-block">
+                {% if report_header %}
+                    {% for line in report_header.strip().split('\n') %}
+                        {% set l = line.strip() %}
+                        {% if l %}
+                            {% if loop.first %}
+                                <div class="office-name">{{ l }}</div>
+                            {% else %}
+                                <div class="office-subtitle">{{ l }}</div>
+                            {% endif %}
+                        {% endif %}
+                    {% endfor %}
+                {% else %}
+                    <div class="office-name">{{ office or 'थलारा गाउँपालिका' }}</div>
+                    <div class="office-subtitle">स्थानीय आपतकालिन कार्यसञ्चालन केन्द्र (LEOC)</div>
+                    {% if address %}<div class="office-subtitle">{{ address }}</div>{% endif %}
+                {% endif %}
+                <div class="report-title">Stock Book</div>
+                <div class="muted">स्टक बुक</div>
+            </div>
+            <div class="meta-box">
+                <div class="meta-row"><span class="meta-label">Warehouse</span><span class="meta-value">{{ warehouse.name }}</span></div>
+                <div class="meta-row"><span class="meta-label">Warehouse Code</span><span class="meta-value">{{ warehouse.code or '-' }}</span></div>
+                <div class="meta-row"><span class="meta-label">Fiscal Year</span><span class="meta-value">{{ fiscal_year or '-' }}</span></div>
+                <div class="meta-row"><span class="meta-label">Generated</span><span class="meta-value">{{ generated_at }}</span></div>
+            </div>
+        </section>
 
-    <table class="table table-bordered table-sm striped mb-0">
-        <thead class="table-dark">
-            <tr>
-                <th style="width:30px;">S.No</th>
-                <th style="width:80px;">Item Code / कोड</th>
-                <th style="width:180px;">Item Name / सामानको नाम</th>
-                <th style="width:80px;">Group / समूह</th>
-                <th style="width:45px;">Unit / एकाइ</th>
-                <th style="width:60px;">Opening / मौ. वा</th>
-                <th style="width:60px;">Received / प्राप्त</th>
-                <th style="width:60px;">Dispatched / खर्च</th>
-                <th style="width:60px;">Closing / मौ. जि</th>
-                <th>Remarks / टिप्पणी</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% if grouped_rows %}
-                {% for cat_name, cat_data in grouped_rows.items() %}
-                    <tr class="category-header">
-                        <td colspan="10">{{ cat_name }}{% if cat_data.category_name_np %} ({{ cat_data.category_name_np }}){% endif %}</td>
-                    </tr>
-                    {% for row in cat_data.item_rows %}
-                        <tr>
-                            <td class="text-center">{{ row.serial_no }}</td>
-                            <td><small>{{ row.item_code }}</small></td>
-                            <td>{{ row.item_name }}{% if row.local_name %} ({{ row.local_name }}){% endif %}</td>
-                            <td>{{ row.group_name }}</td>
-                            <td class="text-center">{{ row.unit }}</td>
-                            <td class="text-end">{{ row.opening }}</td>
-                            <td class="text-end">{{ row.received }}</td>
-                            <td class="text-end">{{ row.dispatched }}</td>
-                            <td class="text-end fw-bold">{{ row.balance }}</td>
+        <section class="filter-band">
+            <div class="filter-cell">
+                <span>Period</span>
+                <strong>{{ from_date or 'Beginning' }} to {{ to_date or 'Current' }}</strong>
+            </div>
+            <div class="filter-cell">
+                <span>Category</span>
+                <strong>{{ selected_category.name if selected_category else 'All Categories' }}</strong>
+            </div>
+            <div class="filter-cell">
+                <span>Group</span>
+                <strong>{{ group.name if group else 'All Groups' }}</strong>
+            </div>
+            <div class="filter-cell">
+                <span>Item</span>
+                <strong>{{ selected_item.name if selected_item else 'All Items' }}</strong>
+            </div>
+        </section>
+
+        <table class="stock-book">
+            <colgroup>
+                <col style="width: 4%;">
+                <col style="width: 10%;">
+                <col style="width: 22%;">
+                <col style="width: 10%;">
+                <col style="width: 6%;">
+                <col style="width: 9%;">
+                <col style="width: 9%;">
+                <col style="width: 9%;">
+                <col style="width: 9%;">
+                <col style="width: 12%;">
+            </colgroup>
+            <thead>
+                <tr>
+                    <th>S.N.</th>
+                    <th>Item Code<br>कोड</th>
+                    <th>Item Description<br>सामानको विवरण</th>
+                    <th>Group<br>समूह</th>
+                    <th>Unit<br>एकाइ</th>
+                    <th>Opening<br>मौज्दात</th>
+                    <th>Received<br>प्राप्त</th>
+                    <th>Dispatched<br>निकासा</th>
+                    <th>Closing<br>बाँकी</th>
+                    <th>Remarks<br>कैफियत</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if grouped_rows %}
+                    {% for cat_name, cat_data in grouped_rows.items() %}
+                        <tr class="category-row">
+                            <td colspan="10">{{ cat_name }}{% if cat_data.category_name_np %} / {{ cat_data.category_name_np }}{% endif %}</td>
+                        </tr>
+                        {% for row in cat_data.item_rows %}
+                            <tr>
+                                <td class="center">{{ row.serial_no }}</td>
+                                <td>{{ row.item_code or '-' }}</td>
+                                <td>
+                                    <span class="item-name">{{ row.item_name }}</span>
+                                    {% if row.local_name %}<br><span class="muted">{{ row.local_name }}</span>{% endif %}
+                                </td>
+                                <td>{{ row.group_name or '-' }}</td>
+                                <td class="center">{{ row.unit }}</td>
+                                <td class="num">{{ row.opening }}</td>
+                                <td class="num">{{ row.received }}</td>
+                                <td class="num">{{ row.dispatched }}</td>
+                                <td class="num">{{ row.balance }}</td>
+                                <td></td>
+                            </tr>
+                        {% endfor %}
+                        <tr class="subtotal-row">
+                            <td colspan="5" class="num">Subtotal</td>
+                            <td class="num">{{ cat_data.subtotal.opening }}</td>
+                            <td class="num">{{ cat_data.subtotal.received }}</td>
+                            <td class="num">{{ cat_data.subtotal.dispatched }}</td>
+                            <td class="num">{{ cat_data.subtotal.balance }}</td>
                             <td></td>
                         </tr>
                     {% endfor %}
-                    <tr class="subtotal-row">
-                        <td colspan="5" class="text-end">Subtotal / उपजम्मा</td>
-                        <td class="text-end">{{ cat_data.subtotal.opening }}</td>
-                        <td class="text-end">{{ cat_data.subtotal.received }}</td>
-                        <td class="text-end">{{ cat_data.subtotal.dispatched }}</td>
-                        <td class="text-end">{{ cat_data.subtotal.balance }}</td>
-                        <td></td>
+                {% else %}
+                    <tr>
+                        <td colspan="10" class="center" style="height:42px;">No stock records found for this warehouse.</td>
                     </tr>
-                {% endfor %}
-            {% else %}
-                <tr>
-                    <td colspan="10" class="text-center py-3 text-muted">No stock records found for this warehouse.</td>
+                {% endif %}
+            </tbody>
+            <tfoot>
+                <tr class="grand-row">
+                    <td colspan="5" class="num">Grand Total</td>
+                    <td class="num">{{ grand_opening }}</td>
+                    <td class="num">{{ grand_received }}</td>
+                    <td class="num">{{ grand_dispatched }}</td>
+                    <td class="num">{{ grand_balance }}</td>
+                    <td></td>
                 </tr>
-            {% endif %}
-        </tbody>
-        <tfoot>
-            <tr class="totals-row">
-                <td colspan="5" class="text-end fw-bold">Total / जम्मा</td>
-                <td class="text-end">{{ grand_opening }}</td>
-                <td class="text-end">{{ grand_received }}</td>
-                <td class="text-end">{{ grand_dispatched }}</td>
-                <td class="text-end">{{ grand_balance }}</td>
-                <td></td>
-            </tr>
-        </tfoot>
-    </table>
+            </tfoot>
+        </table>
 
-    <div class="footer">
-        <div class="row mt-3">
-            <div class="col-3 text-center">
-                <div class="signature-line"></div>
-                <div class="mt-1"><strong>Recorded By / लेखा गर्ने</strong></div>
-                <small class="text-muted">(Name & Signature)</small>
-            </div>
-            <div class="col-3 text-center">
-                <div class="signature-line"></div>
-                <div class="mt-1"><strong>Checked By / जाँच गर्ने</strong></div>
-                <small class="text-muted">(Name & Signature)</small>
-            </div>
-            <div class="col-3 text-center">
-                <div class="signature-line"></div>
-                <div class="mt-1"><strong>Store Keeper / भण्डारपाल</strong></div>
-                <small class="text-muted">(Name & Signature)</small>
-            </div>
-            <div class="col-3 text-center">
-                <div class="signature-line"></div>
-                <div class="mt-1"><strong>Section Head / शाखा हे.</strong></div>
-                <small class="text-muted">(Name & Signature)</small>
-            </div>
-        </div>
-        <div class="text-center mt-3">
-            <small class="text-muted">Generated on {{ generated_at }} | {{ office or 'थलारा गाउँपालिका' }} - LEOC</small>
-        </div>
-    </div>
+        <section class="footer">
+            <div><span class="signature-line"></span>Recorded By</div>
+            <div><span class="signature-line"></span>Checked By</div>
+            <div><span class="signature-line"></span>Store Keeper</div>
+            <div><span class="signature-line"></span>Section Head</div>
+        </section>
+    </main>
 </body>
 </html>
