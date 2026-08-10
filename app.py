@@ -10963,10 +10963,9 @@ def init_db():
                 for col in mig:
                     try:
                         db.session.execute(db.text(f"ALTER TABLE incident ADD COLUMN {col}"))
+                        db.session.commit()
                     except Exception:
-                        pass
-                if mig:
-                    db.session.commit()
+                        db.session.rollback()
             if 'distribution' in inspector.get_table_names():
                 dist_cols = [c['name'] for c in inspector.get_columns('distribution')]
                 dist_mig = []
@@ -10988,10 +10987,9 @@ def init_db():
                 for col in dist_mig:
                     try:
                         db.session.execute(db.text(f"ALTER TABLE distribution ADD COLUMN {col}"))
+                        db.session.commit()
                     except Exception:
                         db.session.rollback()
-                if dist_mig:
-                    db.session.commit()
                 if 'dispatch_id' in dist_cols:
                     try:
                         db.session.execute(db.text("ALTER TABLE distribution ALTER COLUMN dispatch_id DROP NOT NULL"))
@@ -11015,10 +11013,9 @@ def init_db():
                 for col in di_mig:
                     try:
                         db.session.execute(db.text(f"ALTER TABLE distribution_item ADD COLUMN {col}"))
+                        db.session.commit()
                     except Exception:
                         db.session.rollback()
-                if di_mig:
-                    db.session.commit()
             if 'distribution_beneficiary' in inspector.get_table_names():
                 dbencols = [c['name'] for c in inspector.get_columns('distribution_beneficiary')]
                 if 'status' not in dbencols:
@@ -11026,19 +11023,19 @@ def init_db():
                         db.session.execute(db.text("ALTER TABLE distribution_beneficiary ADD COLUMN status VARCHAR(20) DEFAULT 'Received'"))
                         db.session.commit()
                     except Exception:
-                        pass
+                        db.session.rollback()
                 if 'photo' not in dbencols:
                     try:
                         db.session.execute(db.text("ALTER TABLE distribution_beneficiary ADD COLUMN photo VARCHAR(255)"))
                         db.session.commit()
                     except Exception:
-                        pass
+                        db.session.rollback()
                 if 'document' not in dbencols:
                     try:
                         db.session.execute(db.text("ALTER TABLE distribution_beneficiary ADD COLUMN document VARCHAR(255)"))
                         db.session.commit()
                     except Exception:
-                        pass
+                        db.session.rollback()
             if 'cash_distribution' in inspector.get_table_names():
                 cdcols = [c['name'] for c in inspector.get_columns('cash_distribution')]
                 if 'fiscal_year' not in cdcols:
@@ -11046,31 +11043,31 @@ def init_db():
                         db.session.execute(db.text("ALTER TABLE cash_distribution ADD COLUMN fiscal_year VARCHAR(20)"))
                         db.session.commit()
                     except Exception:
-                        pass
+                        db.session.rollback()
                 if 'photo' not in cdcols:
                     try:
                         db.session.execute(db.text("ALTER TABLE cash_distribution ADD COLUMN photo VARCHAR(500)"))
                         db.session.commit()
                     except Exception:
-                        pass
+                        db.session.rollback()
                 if 'document' not in cdcols:
                     try:
                         db.session.execute(db.text("ALTER TABLE cash_distribution ADD COLUMN document VARCHAR(500)"))
                         db.session.commit()
                     except Exception:
-                        pass
+                        db.session.rollback()
                 if 'cash_request_ids' not in cdcols:
                     try:
                         db.session.execute(db.text("ALTER TABLE cash_distribution ADD COLUMN cash_request_ids TEXT DEFAULT '[]'"))
                         db.session.commit()
                     except Exception:
-                        pass
+                        db.session.rollback()
                 if 'distribution_id' not in cdcols:
                     try:
                         db.session.execute(db.text("ALTER TABLE cash_distribution ADD COLUMN distribution_id INTEGER REFERENCES distribution(id)"))
                         db.session.commit()
                     except Exception:
-                        pass
+                        db.session.rollback()
             if 'cash_distribution_beneficiary' in inspector.get_table_names():
                 cdbcols = [c['name'] for c in inspector.get_columns('cash_distribution_beneficiary')]
                 if 'cash_request_id' not in cdbcols:
@@ -11078,7 +11075,7 @@ def init_db():
                         db.session.execute(db.text("ALTER TABLE cash_distribution_beneficiary ADD COLUMN cash_request_id INTEGER REFERENCES cash_request(id)"))
                         db.session.commit()
                     except Exception:
-                        pass
+                        db.session.rollback()
                 try:
                     db.session.execute(db.text("""
                         UPDATE cash_distribution_beneficiary SET cash_request_id = (
@@ -11095,7 +11092,7 @@ def init_db():
                         db.session.execute(db.text("ALTER TABLE cash_request ADD COLUMN fiscal_year VARCHAR(20)"))
                         db.session.commit()
                     except Exception:
-                        pass
+                        db.session.rollback()
             if 'warehouse' in inspector.get_table_names():
                 wh_cols = [c['name'] for c in inspector.get_columns('warehouse')]
                 wh_mig = []
@@ -11104,10 +11101,9 @@ def init_db():
                 for col in wh_mig:
                     try:
                         db.session.execute(db.text(f"ALTER TABLE warehouse ADD COLUMN {col}"))
+                        db.session.commit()
                     except Exception:
-                        pass
-                if wh_mig:
-                    db.session.commit()
+                        db.session.rollback()
 
             if 'weekly_forecast' in inspector.get_table_names():
                 wf_cols = [c['name'] for c in inspector.get_columns('weekly_forecast')]
@@ -11316,10 +11312,9 @@ def init_db():
                 for col in u_mig:
                     try:
                         db.session.execute(db.text(f"ALTER TABLE \"user\" ADD COLUMN {col}"))
+                        db.session.commit()
                     except Exception:
-                        pass
-                if u_mig:
-                    db.session.commit()
+                        db.session.rollback()
                 existing = db.session.execute(db.text("SELECT id FROM \"user\" WHERE username = 'admin'")).fetchone()
                 if not existing:
                     import secrets as _sec
@@ -11339,13 +11334,13 @@ def init_db():
                         db.session.execute(db.text("ALTER TABLE category ADD COLUMN is_predefined BOOLEAN DEFAULT 0"))
                         db.session.commit()
                     except Exception:
-                        pass
+                        db.session.rollback()
                 if 'name_np' not in cat_cols:
                     try:
                         db.session.execute(db.text("ALTER TABLE category ADD COLUMN name_np VARCHAR(100)"))
                         db.session.commit()
                     except Exception:
-                        pass
+                        db.session.rollback()
                 dialect = db.engine.dialect.name
                 insert_sql = "INSERT OR IGNORE INTO category (name, name_np, is_predefined) VALUES (:n, :np, 1)" if dialect == 'sqlite' else \
                     "INSERT INTO category (name, name_np, is_predefined) VALUES (:n, :np, TRUE) ON CONFLICT (name) DO NOTHING"
@@ -11410,12 +11405,12 @@ def init_db():
                         db.session.execute(db.text(insert_sql), {'n': pname, 'np': predefined_names_np.get(pname, '')})
                         db.session.execute(db.text(update_sql), {'n': pname})
                     except Exception:
-                        pass
+                        db.session.rollback()
                 for pname, np_name in predefined_names_np.items():
                     try:
                         db.session.execute(db.text(update_np_sql), {'n': pname, 'np': np_name})
                     except Exception:
-                        pass
+                        db.session.rollback()
                 db.session.commit()
             if 'stock_receipt' in inspector.get_table_names():
                 sr_cols = [c['name'] for c in inspector.get_columns('stock_receipt')]
@@ -11424,7 +11419,7 @@ def init_db():
                         db.session.execute(db.text("UPDATE stock_receipt SET received_by = CAST(received_by AS TEXT) WHERE received_by IS NOT NULL"))
                         db.session.commit()
                     except Exception:
-                        pass
+                        db.session.rollback()
             if 'item' in inspector.get_table_names():
                 item_cols = [c['name'] for c in inspector.get_columns('item')]
                 if 'group_id' not in item_cols:
@@ -11432,27 +11427,28 @@ def init_db():
                         db.session.execute(db.text("ALTER TABLE item ADD COLUMN group_id INTEGER REFERENCES item_group(id)"))
                         db.session.commit()
                     except Exception:
-                        pass
+                        db.session.rollback()
                 try:
                     db.session.execute(db.text("ALTER TABLE item ADD CONSTRAINT item_name_unique UNIQUE (name)"))
                     db.session.commit()
                 except Exception:
+                    db.session.rollback()
                     try:
                         db.session.execute(db.text("CREATE UNIQUE INDEX IF NOT EXISTS ix_item_name ON item (name)"))
                         db.session.commit()
                     except Exception:
-                        pass
+                        db.session.rollback()
             if 'supplier' in inspector.get_table_names():
                 try:
                     db.session.execute(db.text("ALTER TABLE supplier ADD CONSTRAINT supplier_phone_unique UNIQUE (phone)"))
                     db.session.commit()
                 except Exception:
-                    pass
+                    db.session.rollback()
                 try:
                     db.session.execute(db.text("ALTER TABLE supplier ADD CONSTRAINT supplier_email_unique UNIQUE (email)"))
                     db.session.commit()
                 except Exception:
-                    pass
+                    db.session.rollback()
             if not AppSettings.get_setting('office_name'):
                 AppSettings.set_setting('office_name', 'थलारा गाउँपालिका')
             if not AppSettings.get_setting('fiscal_years'):

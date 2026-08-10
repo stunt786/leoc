@@ -58,6 +58,9 @@
             <select class="form-select form-select-sm" style="width:auto" id="categoryFilter" onchange="filterItems()">
                 <option value="">All Categories</option>
             </select>
+            <select class="form-select form-select-sm" style="width:auto" id="groupFilter" onchange="filterItems()">
+                <option value="">All Groups</option>
+            </select>
         </div>
     </div>
     <div class="card-body p-0">
@@ -69,6 +72,7 @@
                         <th>Item Code</th>
                         <th>Name</th>
                         <th>Category</th>
+                        <th>Group</th>
                         <th>Unit</th>
                         <th>Type</th>
                         <th>Status</th>
@@ -76,7 +80,7 @@
                     </tr>
                 </thead>
                 <tbody id="itemTableBody">
-                    <tr><td colspan="8" class="text-center py-4"><div class="spinner-border text-primary"></div></td></tr>
+                    <tr><td colspan="9" class="text-center py-4"><div class="spinner-border text-primary"></div></td></tr>
                 </tbody>
             </table>
         </div>
@@ -418,9 +422,9 @@ async function loadData() {
         document.getElementById('totalCategories').textContent = categories.length;
 
         groups = d.item_groups || [];
-        const groupSel = document.getElementById('item_group_id');
-        groupSel.innerHTML = '<option value="">No Group</option>' +
-            groups.map(g => `<option value="${g.id}">${g.name}</option>`).join('');
+        const groupOpts = groups.map(g => `<option value="${g.id}">${g.name}</option>`).join('');
+        document.getElementById('item_group_id').innerHTML = '<option value="">No Group</option>' + groupOpts;
+        document.getElementById('groupFilter').innerHTML = '<option value="">All Groups</option>' + groupOpts;
 
         const units = d.units || [];
         const unitSel = document.getElementById('item_unit');
@@ -459,16 +463,18 @@ function updateStats() {
 function filterItems() {
     const catId = document.getElementById('categoryFilter').value;
     const status = document.getElementById('statusFilter').value;
+    const groupId = document.getElementById('groupFilter').value;
     let filtered = items;
     if (catId) filtered = filtered.filter(i => i.category_id == catId);
     if (status) filtered = filtered.filter(i => i.status === status);
+    if (groupId) filtered = filtered.filter(i => i.group_id == groupId);
     renderItems(filtered);
 }
 
 function renderItems(data) {
     const tbody = document.getElementById('itemTableBody');
     if (data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">No items found</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-3">No items found</td></tr>';
         return;
     }
     tbody.innerHTML = data.map(i => `<tr data-id="${i.id}">
@@ -478,6 +484,7 @@ function renderItems(data) {
         <td><strong>${esc(i.item_code || '-')}</strong></td>
         <td>${esc(i.local_name ? i.name + ' (' + i.local_name + ')' : i.name)}</td>
         <td>${esc(i.category_name || '-')}</td>
+        <td>${esc(i.group_name || '-')}</td>
         <td>${esc(i.unit || '-')}</td>
         <td>${i.is_distributable !== false ? '<span class="badge bg-success-subtle text-success">Distributable</span>' : '<span class="badge bg-warning-subtle text-warning">Transfer Only</span>'}</td>
         <td><span class="badge ${i.status === 'Inactive' ? 'bg-secondary' : 'bg-success'}">${esc(i.status || 'Active')}</span></td>

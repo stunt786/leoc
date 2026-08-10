@@ -511,7 +511,9 @@ function processMapData(d) {
       if (layer.getBounds) boundaryBounds = layer.getBounds();
     });
   }
-  if (!boundaryBounds) { showToast('danger', 'No boundary data available'); return; }
+  if (!boundaryBounds) {
+    showToast('warning', 'Boundary data unavailable - displaying markers only');
+  }
 
   boundaryGroup = L.layerGroup();
   if (d.boundary && d.boundary.features) {
@@ -541,8 +543,8 @@ function processMapData(d) {
     }).addTo(wardsGroup);
   }
 
-  boundaryGroup.addTo(mapInstance);
-  wardsGroup.addTo(mapInstance);
+  if (boundaryGroup.getLayers().length) boundaryGroup.addTo(mapInstance);
+  if (wardsGroup.getLayers().length) wardsGroup.addTo(mapInstance);
 
   layersControl = L.control.layers({
     '<span class="bi bi-globe2"></span> OpenStreetMap': osmLayer,
@@ -603,14 +605,30 @@ function processMapData(d) {
   }
   document.getElementById('count-warehouses').textContent = markerMap.warehouses.length;
 
-  mapInstance.fitBounds(boundaryBounds, { padding: [15, 15] });
-  const z = mapInstance.getZoom();
-  if (z > 14) mapInstance.setZoom(14);
+  const fitTo = boundaryBounds || getMarkerBounds();
+  if (fitTo) {
+    mapInstance.fitBounds(fitTo, { padding: [15, 15] });
+    const z = mapInstance.getZoom();
+    if (z > 14) mapInstance.setZoom(14);
+  } else {
+    mapInstance.setView([29.35, 80.94], 13);
+  }
 
   // Thalara boundary starts hidden (user can enable via layer control)
   mapInstance.removeLayer(boundaryGroup);
 
   updateTotalCount();
+}
+
+function getMarkerBounds() {
+  const allBounds = L.latLngBounds([]);
+  let hasPts = false;
+  Object.keys(markerMap).forEach(function(key) {
+    markerMap[key].forEach(function(mk) {
+      if (mk.getLatLng) { allBounds.extend(mk.getLatLng()); hasPts = true; }
+    });
+  });
+  return hasPts ? allBounds : null;
 }
 
 function processModulesData(d) {

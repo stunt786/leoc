@@ -105,13 +105,18 @@
                 <div class="card-body py-2">
                     <div class="row g-2 align-items-end">
                         <div class="col-md-3">
-                            <label class="form-label small mb-1">Item Group</label>
-                            <select class="form-select form-select-sm" id="dist_group_filter" onchange="onGroupFilterChange()">
-                                <option value="">All Groups</option>
-                            </select>
+                            <label class="form-label small mb-1">Item Groups (select multiple)</label>
+                            <div class="dropdown" id="groupDropdown">
+                                <button class="btn btn-sm btn-outline-primary w-100 text-start dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" id="groupDropdownBtn">
+                                    <span id="groupDropdownLabel">No groups selected</span>
+                                </button>
+                                <ul class="dropdown-menu" id="groupDropdownMenu" style="max-height:200px;overflow-y:auto">
+                                </ul>
+                            </div>
+                            <input type="hidden" id="dist_group_filter" value="">
                         </div>
                         <div class="col-md-3" id="groupItemsPreview" style="display:none">
-                            <label class="form-label small mb-1">Items in Group</label>
+                            <label class="form-label small mb-1">Items in Selected Groups</label>
                             <div id="groupItemsList" class="small text-muted" style="max-height:60px;overflow-y:auto"></div>
                         </div>
                         <div class="col-md-2">
@@ -128,7 +133,7 @@
                             <button type="button" class="btn btn-sm btn-primary w-100" onclick="addGroupItemsToAll()"><i class="bi bi-plus-circle me-1"></i>Add All Group Items</button>
                         </div>
                     </div>
-                    <div class="small text-muted mt-1" id="groupHint">Select a group to quickly add all its items to every beneficiary row</div>
+                    <div class="small text-muted mt-1" id="groupHint">Select one or more groups, then click "Add All Group Items" to add their items to every beneficiary row</div>
                 </div>
             </div>
             <div class="table-responsive">
@@ -507,10 +512,7 @@ async function loadFormData() {
             `<option value="${w.id}">${w.name}</option>`
         ).join('');
 
-        const grpSel = document.getElementById('dist_group_filter');
-        grpSel.innerHTML = '<option value="">All Groups</option>' + itemGroupsList.map(g =>
-            `<option value="${g.id}">${g.name}</option>`
-        ).join('');
+        populateGroupDropdown();
 
         const grpWhSel = document.getElementById('groupWarehouse');
         grpWhSel.innerHTML = '<option value="">Default</option>' + warehouseList.map(w =>
@@ -715,9 +717,7 @@ function warehouseOptionsHtml(selectedWh) {
 
 function itemOptionsHtml(disabledNames, excludeSel) {
     disabledNames = disabledNames || [];
-    const groupId = document.getElementById('dist_group_filter')?.value || '';
-    const filteredItems = groupId ? itemsList.filter(i => String(i.group_id) === String(groupId)) : itemsList;
-    return filteredItems.map(i => {
+    return itemsList.map(i => {
         const remaining = benItemRemaining(i.name, excludeSel);
         const isCurrent = excludeSel && excludeSel.value === i.name;
         const disabled = (!isCurrent && (disabledNames.indexOf(i.name) !== -1 || remaining <= 0)) ? ' disabled' : '';
@@ -2271,36 +2271,74 @@ document.getElementById('newBenForm').addEventListener('submit', async function(
     }
 });
 
-function onGroupFilterChange() {
-    const groupId = document.getElementById('dist_group_filter').value;
+function populateGroupDropdown() {
+    const menu = document.getElementById('groupDropdownMenu');
+    menu.innerHTML = '<li><a class="dropdown-item" href="#"><div class="form-check"><input class="form-check-input group-check-all" type="checkbox" id="groupCheckAll" onchange="toggleAllGroups(this)"><label class="form-check-label" for="groupCheckAll">Select All</label></div></a></li>' +
+        '<li><hr class="dropdown-divider"></li>' +
+        itemGroupsList.map(g => {
+            return `<li><a class="dropdown-item" href="#"><div class="form-check"><input class="form-check-input group-check" type="checkbox" value="${g.id}" onchange="onGroupCheckboxChange()"><label class="form-check-label">${g.name}</label></div></a></li>`;
+        }).join('');
+    document.getElementById('dist_group_filter').value = '';
+}
+
+function toggleAllGroups(masterCb) {
+    document.querySelectorAll('#groupDropdownMenu .group-check').forEach(cb => {
+        cb.checked = masterCb.checked;
+    });
+    onGroupCheckboxChange();
+}
+
+function onGroupCheckboxChange() {
+    const checked = document.querySelectorAll('#groupDropdownMenu .group-check:checked');
+    const label = document.getElementById('groupDropdownLabel');
+    if (checked.length === 0) {
+        label.textContent = 'No groups selected';
+        document.getElementById('dist_group_filter').value = '';
+    } else {
+        const names = Array.from(checked).map(cb => {
+            const g = itemGroupsList.find(g => String(g.id) === String(cb.value));
+            return g ? g.name : '';
+        }).filter(Boolean);
+        label.textContent = names.length <= 2 ? names.join(', ') : `${names.length} groups selected`;
+        document.getElementById('dist_group_filter').value = Array.from(checked).map(cb => cb.value).join(',');
+    }
+    updateGroupItemsPreview();
+}
+
+function getSelectedGroupIds() {
+    const val = document.getElementById('dist_group_filter').value;
+    if (!val) return [];
+    return val.split(',').filter(Boolean);
+}
+
+function getItemsForGroups(groupIds) {
+    if (!groupIds || groupIds.length === 0) return itemsList;
+    return itemsList.filter(i => groupIds.some(gid => String(i.group_id) === String(gid)));
+}
+
+function updateGroupItemsPreview() {
     const preview = document.getElementById('groupItemsPreview');
     const listEl = document.getElementById('groupItemsList');
-    if (!groupId) {
+    const groupIds = getSelectedGroupIds();
+    if (groupIds.length === 0) {
         preview.style.display = 'none';
-        refreshAllBenItemOptions();
         return;
     }
-    const groupItems = itemsList.filter(i => String(i.group_id) === String(groupId));
+    const groupItems = getItemsForGroups(groupIds);
     if (groupItems.length === 0) {
-        listEl.innerHTML = '<em>No items in this group</em>';
+        listEl.innerHTML = '<em>No items in selected groups</em>';
     } else {
         listEl.innerHTML = groupItems.map(i => `<span class="badge bg-light text-dark me-1 mb-1">${i.name}</span>`).join('');
     }
     preview.style.display = '';
-    refreshAllBenItemOptions();
-}
-
-function getItemsForGroup(groupId) {
-    if (!groupId) return itemsList;
-    return itemsList.filter(i => String(i.group_id) === String(groupId));
 }
 
 function addGroupItemsToAll() {
     const incidentId = document.getElementById('dist_incident_id').value;
     if (!incidentId) { showToast('danger', 'Please select an incident first'); return; }
-    const groupId = document.getElementById('dist_group_filter').value;
-    const groupItems = getItemsForGroup(groupId);
-    if (groupItems.length === 0) { showToast('danger', 'No items found in the selected group'); return; }
+    const groupIds = getSelectedGroupIds();
+    const groupItems = getItemsForGroups(groupIds);
+    if (groupItems.length === 0) { showToast('danger', 'No items found in the selected group(s)'); return; }
 
     const qty = parseInt(document.getElementById('groupQty').value) || 1;
     const whId = document.getElementById('groupWarehouse').value || document.getElementById('dist_warehouse_id').value || '';
@@ -2355,8 +2393,11 @@ function addGroupItemsToAll() {
     });
     refreshAllBenItemOptions();
     updateCashTotal();
-    const groupName = itemGroupsList.find(g => String(g.id) === String(groupId))?.name || 'group';
-    showToast('success', `Added ${groupItems.length} item(s) from "${groupName}" group to ${registryRows.length} beneficiary(ies)`);
+    const selectedNames = groupIds.map(gid => {
+        const g = itemGroupsList.find(g => String(g.id) === String(gid));
+        return g ? g.name : '';
+    }).filter(Boolean);
+    showToast('success', `Added ${groupItems.length} item(s) from ${selectedNames.length} group(s) to ${registryRows.length} beneficiary(ies)`);
 }
 
 document.addEventListener('DOMContentLoaded', function() {

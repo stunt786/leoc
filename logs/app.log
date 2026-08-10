@@ -21148,3 +21148,648 @@ werkzeug.routing.exceptions.BuildError: Could not build url for endpoint 'rainfa
 2026-08-10 10:06:19,757 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:167]
 2026-08-10 10:17:24,274 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:167]
 2026-08-10 10:24:36,363 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:167]
+2026-08-10 12:43:16,874 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:167]
+2026-08-10 12:43:20,675 ERROR: Exception on /inventory [GET] [in /home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py:825]
+Traceback (most recent call last):
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 143, in __init__
+    self._dbapi_connection = engine.raw_connection()
+                             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 3309, in raw_connection
+    return self.pool.connect()
+           ^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 447, in connect
+    return _ConnectionFairy._checkout(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 1264, in _checkout
+    fairy = _ConnectionRecord.checkout(pool)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 711, in checkout
+    rec = pool._do_get()
+          ^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/impl.py", line 177, in _do_get
+    with util.safe_reraise():
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/util/langhelpers.py", line 224, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/impl.py", line 175, in _do_get
+    return self._create_connection()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 388, in _create_connection
+    return _ConnectionRecord(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 673, in __init__
+    self.__connect()
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 899, in __connect
+    with util.safe_reraise():
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/util/langhelpers.py", line 224, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 895, in __connect
+    self.dbapi_connection = connection = pool._invoke_creator(self)
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/engine/create.py", line 661, in connect
+    return dialect.connect(*cargs, **cparams)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 630, in connect
+    return self.loaded_dbapi.connect(*cargs, **cparams)  # type: ignore[no-any-return]  # NOQA: E501
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/psycopg2/__init__.py", line 122, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+psycopg2.OperationalError: connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py", line 1455, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py", line 869, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py", line 867, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py", line 852, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/auth_helpers.py", line 72, in decorated_function
+    if not current_user.is_authenticated:
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/werkzeug/local.py", line 311, in __get__
+    obj = instance._get_current_object()
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/werkzeug/local.py", line 515, in _get_current_object
+    return get_name(local())
+                    ^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask_login/utils.py", line 25, in <lambda>
+    current_user = LocalProxy(lambda: _get_user())
+                                      ^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask_login/utils.py", line 370, in _get_user
+    current_app.login_manager._load_user()
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask_login/login_manager.py", line 364, in _load_user
+    user = self._user_callback(user_id)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/app.py", line 187, in load_user
+    return get_user_from_db(db, int(user_id))
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/auth_helpers.py", line 109, in get_user_from_db
+    result = db.session.execute(
+             ^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/orm/scoping.py", line 765, in execute
+    return self._proxied.execute(
+           ^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 2351, in execute
+    return self._execute_internal(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 2239, in _execute_internal
+    conn = self._connection_for_bind(bind)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 2108, in _connection_for_bind
+    return trans._connection_for_bind(engine, execution_options)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<string>", line 2, in _connection_for_bind
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/orm/state_changes.py", line 137, in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 1187, in _connection_for_bind
+    conn = bind.connect()
+           ^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 3285, in connect
+    return self._connection_cls(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 145, in __init__
+    Connection._handle_dbapi_exception_noconnection(
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 2448, in _handle_dbapi_exception_noconnection
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 143, in __init__
+    self._dbapi_connection = engine.raw_connection()
+                             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 3309, in raw_connection
+    return self.pool.connect()
+           ^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 447, in connect
+    return _ConnectionFairy._checkout(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 1264, in _checkout
+    fairy = _ConnectionRecord.checkout(pool)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 711, in checkout
+    rec = pool._do_get()
+          ^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/impl.py", line 177, in _do_get
+    with util.safe_reraise():
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/util/langhelpers.py", line 224, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/impl.py", line 175, in _do_get
+    return self._create_connection()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 388, in _create_connection
+    return _ConnectionRecord(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 673, in __init__
+    self.__connect()
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 899, in __connect
+    with util.safe_reraise():
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/util/langhelpers.py", line 224, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 895, in __connect
+    self.dbapi_connection = connection = pool._invoke_creator(self)
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/engine/create.py", line 661, in connect
+    return dialect.connect(*cargs, **cparams)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 630, in connect
+    return self.loaded_dbapi.connect(*cargs, **cparams)  # type: ignore[no-any-return]  # NOQA: E501
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/psycopg2/__init__.py", line 122, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+sqlalchemy.exc.OperationalError: (psycopg2.OperationalError) connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2026-08-10 13:01:49,361 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:167]
+2026-08-10 13:01:53,190 ERROR: Exception on /items [GET] [in /home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py:825]
+Traceback (most recent call last):
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 143, in __init__
+    self._dbapi_connection = engine.raw_connection()
+                             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 3309, in raw_connection
+    return self.pool.connect()
+           ^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 447, in connect
+    return _ConnectionFairy._checkout(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 1264, in _checkout
+    fairy = _ConnectionRecord.checkout(pool)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 711, in checkout
+    rec = pool._do_get()
+          ^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/impl.py", line 177, in _do_get
+    with util.safe_reraise():
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/util/langhelpers.py", line 224, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/impl.py", line 175, in _do_get
+    return self._create_connection()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 388, in _create_connection
+    return _ConnectionRecord(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 673, in __init__
+    self.__connect()
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 899, in __connect
+    with util.safe_reraise():
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/util/langhelpers.py", line 224, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 895, in __connect
+    self.dbapi_connection = connection = pool._invoke_creator(self)
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/engine/create.py", line 661, in connect
+    return dialect.connect(*cargs, **cparams)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 630, in connect
+    return self.loaded_dbapi.connect(*cargs, **cparams)  # type: ignore[no-any-return]  # NOQA: E501
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/psycopg2/__init__.py", line 122, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+psycopg2.OperationalError: connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py", line 1455, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py", line 869, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py", line 867, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py", line 852, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/auth_helpers.py", line 72, in decorated_function
+    if not current_user.is_authenticated:
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/werkzeug/local.py", line 311, in __get__
+    obj = instance._get_current_object()
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/werkzeug/local.py", line 515, in _get_current_object
+    return get_name(local())
+                    ^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask_login/utils.py", line 25, in <lambda>
+    current_user = LocalProxy(lambda: _get_user())
+                                      ^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask_login/utils.py", line 370, in _get_user
+    current_app.login_manager._load_user()
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask_login/login_manager.py", line 364, in _load_user
+    user = self._user_callback(user_id)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/app.py", line 187, in load_user
+    return get_user_from_db(db, int(user_id))
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/auth_helpers.py", line 109, in get_user_from_db
+    result = db.session.execute(
+             ^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/orm/scoping.py", line 765, in execute
+    return self._proxied.execute(
+           ^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 2351, in execute
+    return self._execute_internal(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 2239, in _execute_internal
+    conn = self._connection_for_bind(bind)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 2108, in _connection_for_bind
+    return trans._connection_for_bind(engine, execution_options)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<string>", line 2, in _connection_for_bind
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/orm/state_changes.py", line 137, in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 1187, in _connection_for_bind
+    conn = bind.connect()
+           ^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 3285, in connect
+    return self._connection_cls(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 145, in __init__
+    Connection._handle_dbapi_exception_noconnection(
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 2448, in _handle_dbapi_exception_noconnection
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 143, in __init__
+    self._dbapi_connection = engine.raw_connection()
+                             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 3309, in raw_connection
+    return self.pool.connect()
+           ^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 447, in connect
+    return _ConnectionFairy._checkout(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 1264, in _checkout
+    fairy = _ConnectionRecord.checkout(pool)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 711, in checkout
+    rec = pool._do_get()
+          ^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/impl.py", line 177, in _do_get
+    with util.safe_reraise():
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/util/langhelpers.py", line 224, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/impl.py", line 175, in _do_get
+    return self._create_connection()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 388, in _create_connection
+    return _ConnectionRecord(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 673, in __init__
+    self.__connect()
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 899, in __connect
+    with util.safe_reraise():
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/util/langhelpers.py", line 224, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 895, in __connect
+    self.dbapi_connection = connection = pool._invoke_creator(self)
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/engine/create.py", line 661, in connect
+    return dialect.connect(*cargs, **cparams)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 630, in connect
+    return self.loaded_dbapi.connect(*cargs, **cparams)  # type: ignore[no-any-return]  # NOQA: E501
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/psycopg2/__init__.py", line 122, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+sqlalchemy.exc.OperationalError: (psycopg2.OperationalError) connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2026-08-10 14:10:08,081 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:167]
+2026-08-10 14:11:59,085 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:167]
+2026-08-10 14:12:04,117 ERROR: Exception on / [GET] [in /home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py:825]
+Traceback (most recent call last):
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 143, in __init__
+    self._dbapi_connection = engine.raw_connection()
+                             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 3309, in raw_connection
+    return self.pool.connect()
+           ^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 447, in connect
+    return _ConnectionFairy._checkout(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 1264, in _checkout
+    fairy = _ConnectionRecord.checkout(pool)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 711, in checkout
+    rec = pool._do_get()
+          ^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/impl.py", line 177, in _do_get
+    with util.safe_reraise():
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/util/langhelpers.py", line 224, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/impl.py", line 175, in _do_get
+    return self._create_connection()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 388, in _create_connection
+    return _ConnectionRecord(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 673, in __init__
+    self.__connect()
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 899, in __connect
+    with util.safe_reraise():
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/util/langhelpers.py", line 224, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 895, in __connect
+    self.dbapi_connection = connection = pool._invoke_creator(self)
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/engine/create.py", line 661, in connect
+    return dialect.connect(*cargs, **cparams)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 630, in connect
+    return self.loaded_dbapi.connect(*cargs, **cparams)  # type: ignore[no-any-return]  # NOQA: E501
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/psycopg2/__init__.py", line 122, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+psycopg2.OperationalError: connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py", line 1455, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py", line 869, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py", line 867, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py", line 852, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/auth_helpers.py", line 72, in decorated_function
+    if not current_user.is_authenticated:
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/werkzeug/local.py", line 311, in __get__
+    obj = instance._get_current_object()
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/werkzeug/local.py", line 515, in _get_current_object
+    return get_name(local())
+                    ^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask_login/utils.py", line 25, in <lambda>
+    current_user = LocalProxy(lambda: _get_user())
+                                      ^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask_login/utils.py", line 370, in _get_user
+    current_app.login_manager._load_user()
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask_login/login_manager.py", line 364, in _load_user
+    user = self._user_callback(user_id)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/app.py", line 187, in load_user
+    return get_user_from_db(db, int(user_id))
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/auth_helpers.py", line 109, in get_user_from_db
+    result = db.session.execute(
+             ^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/orm/scoping.py", line 765, in execute
+    return self._proxied.execute(
+           ^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 2351, in execute
+    return self._execute_internal(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 2239, in _execute_internal
+    conn = self._connection_for_bind(bind)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 2108, in _connection_for_bind
+    return trans._connection_for_bind(engine, execution_options)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<string>", line 2, in _connection_for_bind
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/orm/state_changes.py", line 137, in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 1187, in _connection_for_bind
+    conn = bind.connect()
+           ^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 3285, in connect
+    return self._connection_cls(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 145, in __init__
+    Connection._handle_dbapi_exception_noconnection(
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 2448, in _handle_dbapi_exception_noconnection
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 143, in __init__
+    self._dbapi_connection = engine.raw_connection()
+                             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 3309, in raw_connection
+    return self.pool.connect()
+           ^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 447, in connect
+    return _ConnectionFairy._checkout(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 1264, in _checkout
+    fairy = _ConnectionRecord.checkout(pool)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 711, in checkout
+    rec = pool._do_get()
+          ^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/impl.py", line 177, in _do_get
+    with util.safe_reraise():
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/util/langhelpers.py", line 224, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/impl.py", line 175, in _do_get
+    return self._create_connection()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 388, in _create_connection
+    return _ConnectionRecord(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 673, in __init__
+    self.__connect()
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 899, in __connect
+    with util.safe_reraise():
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/util/langhelpers.py", line 224, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 895, in __connect
+    self.dbapi_connection = connection = pool._invoke_creator(self)
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/engine/create.py", line 661, in connect
+    return dialect.connect(*cargs, **cparams)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 630, in connect
+    return self.loaded_dbapi.connect(*cargs, **cparams)  # type: ignore[no-any-return]  # NOQA: E501
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/psycopg2/__init__.py", line 122, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+sqlalchemy.exc.OperationalError: (psycopg2.OperationalError) connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2026-08-10 14:15:46,821 INFO: LEOC Application started [in /home/prakash/Documents/App Development/leoc/app.py:167]
+2026-08-10 14:15:50,480 ERROR: Exception on /gis-map [GET] [in /home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py:825]
+Traceback (most recent call last):
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 143, in __init__
+    self._dbapi_connection = engine.raw_connection()
+                             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 3309, in raw_connection
+    return self.pool.connect()
+           ^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 447, in connect
+    return _ConnectionFairy._checkout(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 1264, in _checkout
+    fairy = _ConnectionRecord.checkout(pool)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 711, in checkout
+    rec = pool._do_get()
+          ^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/impl.py", line 177, in _do_get
+    with util.safe_reraise():
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/util/langhelpers.py", line 224, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/impl.py", line 175, in _do_get
+    return self._create_connection()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 388, in _create_connection
+    return _ConnectionRecord(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 673, in __init__
+    self.__connect()
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 899, in __connect
+    with util.safe_reraise():
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/util/langhelpers.py", line 224, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 895, in __connect
+    self.dbapi_connection = connection = pool._invoke_creator(self)
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/engine/create.py", line 661, in connect
+    return dialect.connect(*cargs, **cparams)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 630, in connect
+    return self.loaded_dbapi.connect(*cargs, **cparams)  # type: ignore[no-any-return]  # NOQA: E501
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/psycopg2/__init__.py", line 122, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+psycopg2.OperationalError: connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py", line 1455, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py", line 869, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py", line 867, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask/app.py", line 852, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask_login/utils.py", line 284, in decorated_view
+    elif not current_user.is_authenticated:
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/werkzeug/local.py", line 311, in __get__
+    obj = instance._get_current_object()
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/werkzeug/local.py", line 515, in _get_current_object
+    return get_name(local())
+                    ^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask_login/utils.py", line 25, in <lambda>
+    current_user = LocalProxy(lambda: _get_user())
+                                      ^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask_login/utils.py", line 370, in _get_user
+    current_app.login_manager._load_user()
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/flask_login/login_manager.py", line 364, in _load_user
+    user = self._user_callback(user_id)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/app.py", line 187, in load_user
+    return get_user_from_db(db, int(user_id))
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/auth_helpers.py", line 109, in get_user_from_db
+    result = db.session.execute(
+             ^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/orm/scoping.py", line 765, in execute
+    return self._proxied.execute(
+           ^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 2351, in execute
+    return self._execute_internal(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 2239, in _execute_internal
+    conn = self._connection_for_bind(bind)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 2108, in _connection_for_bind
+    return trans._connection_for_bind(engine, execution_options)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<string>", line 2, in _connection_for_bind
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/orm/state_changes.py", line 137, in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 1187, in _connection_for_bind
+    conn = bind.connect()
+           ^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 3285, in connect
+    return self._connection_cls(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 145, in __init__
+    Connection._handle_dbapi_exception_noconnection(
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 2448, in _handle_dbapi_exception_noconnection
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 143, in __init__
+    self._dbapi_connection = engine.raw_connection()
+                             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 3309, in raw_connection
+    return self.pool.connect()
+           ^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 447, in connect
+    return _ConnectionFairy._checkout(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 1264, in _checkout
+    fairy = _ConnectionRecord.checkout(pool)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 711, in checkout
+    rec = pool._do_get()
+          ^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/impl.py", line 177, in _do_get
+    with util.safe_reraise():
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/util/langhelpers.py", line 224, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/impl.py", line 175, in _do_get
+    return self._create_connection()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 388, in _create_connection
+    return _ConnectionRecord(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 673, in __init__
+    self.__connect()
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 899, in __connect
+    with util.safe_reraise():
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/util/langhelpers.py", line 224, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 895, in __connect
+    self.dbapi_connection = connection = pool._invoke_creator(self)
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/engine/create.py", line 661, in connect
+    return dialect.connect(*cargs, **cparams)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 630, in connect
+    return self.loaded_dbapi.connect(*cargs, **cparams)  # type: ignore[no-any-return]  # NOQA: E501
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/prakash/Documents/App Development/leoc/venv/lib/python3.12/site-packages/psycopg2/__init__.py", line 122, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+sqlalchemy.exc.OperationalError: (psycopg2.OperationalError) connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)

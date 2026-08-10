@@ -25,6 +25,7 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 
 COPY requirements.txt .
 COPY *.py ./
+COPY *.json ./
 COPY backup_cron.sh entrypoint-cron.sh ./
 COPY templates/ templates/
 COPY static/ static/
