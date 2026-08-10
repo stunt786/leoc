@@ -1350,6 +1350,13 @@ class Incident(db.Model):
             'other_livestock_lost': self.other_livestock_lost,
             'other_livestock_injured': self.other_livestock_injured,
             'rescue_operations': self.rescue_operations,
+            'can_delete': (
+                Distribution.query.filter_by(incident_id=self.id).count() == 0
+                and CashDistribution.query.filter_by(incident_id=self.id).count() == 0
+                and CashRequest.query.filter_by(incident_id=self.id).count() == 0
+                and DisasterAssessment.query.filter_by(incident_id=self.id).count() == 0
+                and DailyBulletin.query.filter(DailyBulletin.incidents.any(id=self.id)).count() == 0
+            ),
         }
 
 # ============ DISTRIBUTION MODEL (unified relief request + dispatch + distribution) ============
@@ -4297,6 +4304,30 @@ def manage_incident(id):
         return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
     try:
         if request.method == 'DELETE':
+            related = []
+            dist_count = Distribution.query.filter_by(incident_id=id).count()
+            if dist_count:
+                related.append(f'{dist_count} relief distribution(s)')
+            cash_dist_count = CashDistribution.query.filter_by(incident_id=id).count()
+            if cash_dist_count:
+                related.append(f'{cash_dist_count} cash distribution(s)')
+            cash_req_count = CashRequest.query.filter_by(incident_id=id).count()
+            if cash_req_count:
+                related.append(f'{cash_req_count} cash request(s)')
+            asm_count = DisasterAssessment.query.filter_by(incident_id=id).count()
+            if asm_count:
+                related.append(f'{asm_count} disaster assessment(s)')
+            bulletin_count = DailyBulletin.query.filter(DailyBulletin.incidents.any(id=id)).count()
+            if bulletin_count:
+                related.append(f'{bulletin_count} daily bulletin(s)')
+            if related:
+                return jsonify({
+                    'success': False,
+                    'message': (
+                        f'Incident "{incident.incident_name}" cannot be deleted because it is linked to '
+                        f'{", ".join(related)}. Cancel or delete these records first.'
+                    )
+                }), 409
             db.session.delete(incident)
             db.session.commit()
             return jsonify({'success': True, 'message': 'Incident deleted'})
@@ -4501,12 +4532,11 @@ def _validate_distribution_beneficiaries(beneficiaries_payload, allowed_items, f
             raise ValueError(f'Duplicate beneficiary "{family_name}" with item "{item_name}" in the same distribution request')
         if ben_id:
             seen.add(key)
-            # --- Per-incident check: always limited to 1 ---
+            # --- Per-incident check: always limited to 1 (across ALL fiscal years) ---
             if incident_id:
                 same_inc_count = db.session.query(db.func.count(db.distinct(Distribution.id))).join(
                     DistributionBeneficiary, DistributionBeneficiary.distribution_id == Distribution.id
                 ).filter(
-                    Distribution.fiscal_year == fiscal_year,
                     Distribution.status != 'Cancelled',
                     Distribution.id != exclude_distribution_id,
                     Distribution.incident_id == incident_id,
@@ -4515,7 +4545,6 @@ def _validate_distribution_beneficiaries(beneficiaries_payload, allowed_items, f
                 cash_same_inc = db.session.query(db.func.count(db.distinct(CashDistribution.id))).join(
                     CashDistributionBeneficiary, CashDistributionBeneficiary.distribution_id == CashDistribution.id
                 ).filter(
-                    CashDistribution.fiscal_year == fiscal_year,
                     CashDistribution.status != 'Cancelled',
                     CashDistribution.incident_id == incident_id,
                     CashDistributionBeneficiary.beneficiary_id == ben_id
@@ -4528,8 +4557,8 @@ def _validate_distribution_beneficiaries(beneficiaries_payload, allowed_items, f
                 same_inc_count += cash_same_inc.scalar() or 0
                 if same_inc_count >= 1:
                     raise ValueError(
-                        f'Beneficiary "{family_name}" has already received relief for this incident '
-                        f'in fiscal year {fiscal_year}. A beneficiary may receive only ONE distribution per incident.'
+                        f'Beneficiary "{family_name}" has already received relief for this incident. '
+                        f'A beneficiary may receive only ONE distribution per incident.'
                     )
             # --- Across-incidents check: limited by distribution_repetitions ---
             item_incidents = set(r[0] for r in db.session.query(Distribution.incident_id).join(
@@ -5629,11 +5658,10 @@ def handle_cash_distributions():
             if ben_id:
                 seen_beneficiaries.add(ben_id)
 
-            # --- Per-incident check: always limited to 1 ---
+            # --- Per-incident check: always limited to 1 (across ALL fiscal years) ---
             same_inc_count = db.session.query(db.func.count(db.distinct(CashDistribution.id))).join(
                 CashDistributionBeneficiary, CashDistributionBeneficiary.distribution_id == CashDistribution.id
             ).filter(
-                CashDistribution.fiscal_year == fiscal_year,
                 CashDistribution.status != 'Cancelled',
                 CashDistribution.incident_id == incident.id,
                 db.or_(
@@ -5646,7 +5674,6 @@ def handle_cash_distributions():
                 item_same_inc = db.session.query(db.func.count(db.distinct(Distribution.id))).join(
                     DistributionBeneficiary, DistributionBeneficiary.distribution_id == Distribution.id
                 ).filter(
-                    Distribution.fiscal_year == fiscal_year,
                     Distribution.status != 'Cancelled',
                     Distribution.incident_id == incident.id,
                     DistributionBeneficiary.beneficiary_id == ben_id
@@ -5655,7 +5682,7 @@ def handle_cash_distributions():
                     item_same_inc = item_same_inc.filter(Distribution.id != edit_dist_id)
                 same_inc_count += item_same_inc.scalar() or 0
             if same_inc_count >= 1:
-                return jsonify({'success': False, 'message': f'Beneficiary "{ben_name}" has already received relief for this incident in fiscal year {fiscal_year}. A beneficiary may receive only ONE distribution per incident.'}), 400
+                return jsonify({'success': False, 'message': f'Beneficiary "{ben_name}" has already received relief for this incident. A beneficiary may receive only ONE distribution per incident.'}), 400
 
             # --- Across-incidents check: limited by distribution_repetitions ---
             if ben_id:
@@ -10581,20 +10608,20 @@ def _bin_card_events(item_ids, warehouse_id):
                            'in': r.quantity, 'out': 0,
                            'batch': r.batch_no or '', 'remarks': r.receipt.remarks or '',
                            'expiry_date': r.expiry_date, 'item_name': item_name,
-                           'sort_key': (r.receipt.date or date.min, r.receipt.id)})
+                           'sort_key': (r.receipt.date or date.min, 0, r.receipt.id)})
         for a in adjustments:
             if a.adjustment_type in ('Increase', 'Correction_Increase'):
                 events.append({'date': ad_to_bs_date(a.date) or '',
                                'type': 'Adjustment (+)', 'ref': a.adjustment_no, 'party': '',
                                'in': a.adjusted_quantity, 'out': 0, 'batch': '', 'expiry_date': None,
                                'remarks': a.reason or '', 'item_name': item_name,
-                               'sort_key': (a.date or date.min, a.id)})
+                               'sort_key': (a.date or date.min, 1, a.id)})
             else:
                 events.append({'date': ad_to_bs_date(a.date) or '',
                                'type': 'Adjustment (-)', 'ref': a.adjustment_no, 'party': '',
                                'in': 0, 'out': a.adjusted_quantity, 'batch': '', 'expiry_date': None,
                                'remarks': a.reason or '', 'item_name': item_name,
-                               'sort_key': (a.date or date.min, a.id)})
+                               'sort_key': (a.date or date.min, 1, a.id)})
         for d in dist_items:
             events.append({'date': ad_to_bs_date(d.distribution.distribution_date) or '',
                            'type': 'Distribution', 'ref': d.distribution.distribution_no,
@@ -10602,7 +10629,7 @@ def _bin_card_events(item_ids, warehouse_id):
                            'in': 0, 'out': d.quantity,
                            'batch': d.batch_no or '', 'remarks': '', 'expiry_date': None,
                            'item_name': item_name,
-                           'sort_key': (d.distribution.distribution_date or date.min, d.distribution.id)})
+                           'sort_key': (d.distribution.distribution_date or date.min, 2, d.distribution.id)})
         for t in transfers_out:
             events.append({'date': ad_to_bs_date(t.transfer.transfer_date) or '',
                            'type': 'Transfer Out', 'ref': t.transfer.transfer_no,
@@ -10610,7 +10637,7 @@ def _bin_card_events(item_ids, warehouse_id):
                            'in': 0, 'out': t.quantity,
                            'batch': t.batch_no or '', 'remarks': t.transfer.reason or '', 'expiry_date': None,
                            'item_name': item_name,
-                           'sort_key': (t.transfer.transfer_date or date.min, t.transfer.id)})
+                           'sort_key': (t.transfer.transfer_date or date.min, 2, t.transfer.id)})
         for t in transfers_in:
             events.append({'date': ad_to_bs_date(t.transfer.transfer_date) or '',
                            'type': 'Transfer In', 'ref': t.transfer.transfer_no,
@@ -10618,7 +10645,7 @@ def _bin_card_events(item_ids, warehouse_id):
                            'in': t.quantity, 'out': 0,
                            'batch': t.batch_no or '', 'remarks': t.transfer.reason or '', 'expiry_date': None,
                            'item_name': item_name,
-                           'sort_key': (t.transfer.transfer_date or date.min, t.transfer.id)})
+                           'sort_key': (t.transfer.transfer_date or date.min, 2, t.transfer.id)})
 
     events.sort(key=lambda e: e['sort_key'])
     return events
@@ -10803,33 +10830,32 @@ def print_stock_book():
 
         events = []
         for r in all_receipts:
-            events.append({'date': r.receipt.date, 'in': r.quantity or 0, 'out': 0})
+            events.append({'date': r.receipt.date, 'in': r.quantity or 0, 'out': 0, 'type_priority': 0})
         for d in all_dist_items:
-            events.append({'date': d.distribution.distribution_date, 'in': 0, 'out': d.quantity or 0})
+            events.append({'date': d.distribution.distribution_date, 'in': 0, 'out': d.quantity or 0, 'type_priority': 2})
         for a in all_adjustments:
             if a.adjustment_type in ('Increase', 'Correction_Increase'):
-                events.append({'date': a.date, 'in': a.adjusted_quantity or 0, 'out': 0})
+                events.append({'date': a.date, 'in': a.adjusted_quantity or 0, 'out': 0, 'type_priority': 1})
             else:
-                events.append({'date': a.date, 'in': 0, 'out': a.adjusted_quantity or 0})
+                events.append({'date': a.date, 'in': 0, 'out': a.adjusted_quantity or 0, 'type_priority': 1})
         for t in all_transfers_in:
-            events.append({'date': t.transfer.transfer_date, 'in': t.quantity or 0, 'out': 0})
+            events.append({'date': t.transfer.transfer_date, 'in': t.quantity or 0, 'out': 0, 'type_priority': 2})
         for t in all_transfers_out:
-            events.append({'date': t.transfer.transfer_date, 'in': 0, 'out': t.quantity or 0})
+            events.append({'date': t.transfer.transfer_date, 'in': 0, 'out': t.quantity or 0, 'type_priority': 2})
+        events.sort(key=lambda e: (e['date'] or date.min, e['type_priority']))
 
-        net_all = sum(e['in'] - e['out'] for e in events)
-        opening = (inv.quantity or 0) - net_all
         received = 0
         dispatched = 0
         for e in events:
             event_date = e['date'] or date.min
             if from_date and event_date < from_date:
-                opening += e['in'] - e['out']
                 continue
             if to_date and event_date > to_date:
                 continue
             received += e['in']
             dispatched += e['out']
 
+        opening = max(0, (inv.quantity or 0) - received + dispatched)
         closing = opening + received - dispatched
 
         cat_name = item.category.name if item.category else 'Uncategorized'
@@ -11132,38 +11158,40 @@ def init_db():
                             db.session.rollback()
                             print(f"[WARN] Could not add {col_name} to weekly_forecast: {e}")
                 # Backfill combined suggestion from per-day suggestion fields
-                try:
-                    rows = db.session.execute(db.text(
-                        "SELECT id, start_suggestion, mid_suggestion, end_suggestion, suggestion FROM weekly_forecast"
-                    )).fetchall()
-                    for r in rows:
-                        if r[4]:
-                            continue
-                        parts = [p for p in [r[1], r[2], r[3]] if p]
-                        if parts:
-                            combined = "\n".join(parts)
-                            db.session.execute(db.text(
-                                "UPDATE weekly_forecast SET suggestion = :s WHERE id = :i"
-                            ), {"s": combined, "i": r[0]})
-                    db.session.commit()
-                except Exception as e:
-                    db.session.rollback()
-                    print(f"[WARN] Could not backfill suggestion in weekly_forecast: {e}")
+                if 'mid_suggestion' in wf_cols:
+                    try:
+                        rows = db.session.execute(db.text(
+                            "SELECT id, start_suggestion, mid_suggestion, end_suggestion, suggestion FROM weekly_forecast"
+                        )).fetchall()
+                        for r in rows:
+                            if r[4]:
+                                continue
+                            parts = [p for p in [r[1], r[2], r[3]] if p]
+                            if parts:
+                                combined = "\n".join(parts)
+                                db.session.execute(db.text(
+                                    "UPDATE weekly_forecast SET suggestion = :s WHERE id = :i"
+                                ), {"s": combined, "i": r[0]})
+                        db.session.commit()
+                    except Exception as e:
+                        db.session.rollback()
+                        print(f"[WARN] Could not backfill suggestion in weekly_forecast: {e}")
                 # Migrate mid_weather to sun_weather if mid_weather exists
-                try:
-                    rows = db.session.execute(db.text(
-                        "SELECT id, mid_weather, mid_weather_desc, sun_weather FROM weekly_forecast WHERE mid_weather IS NOT NULL AND sun_weather IS NULL"
-                    )).fetchall()
-                    for r in rows:
-                        db.session.execute(db.text(
-                            "UPDATE weekly_forecast SET sun_weather = :sw, sun_weather_desc = :swd WHERE id = :i"
-                        ), {"sw": r[1], "swd": r[2], "i": r[0]})
-                    db.session.commit()
-                    if rows:
-                        print(f"[MIGRATE] Migrated mid_weather to sun_weather for {len(rows)} records")
-                except Exception as e:
-                    db.session.rollback()
-                    print(f"[WARN] Could not migrate mid_weather to sun_weather: {e}")
+                if 'mid_weather' in wf_cols:
+                    try:
+                        rows = db.session.execute(db.text(
+                            "SELECT id, mid_weather, mid_weather_desc, sun_weather FROM weekly_forecast WHERE mid_weather IS NOT NULL AND sun_weather IS NULL"
+                        )).fetchall()
+                        for r in rows:
+                            db.session.execute(db.text(
+                                "UPDATE weekly_forecast SET sun_weather = :sw, sun_weather_desc = :swd WHERE id = :i"
+                            ), {"sw": r[1], "swd": r[2], "i": r[0]})
+                        db.session.commit()
+                        if rows:
+                            print(f"[MIGRATE] Migrated mid_weather to sun_weather for {len(rows)} records")
+                    except Exception as e:
+                        db.session.rollback()
+                        print(f"[WARN] Could not migrate mid_weather to sun_weather: {e}")
 
             if 'dispatch' in inspector.get_table_names() and 'distribution_item' in inspector.get_table_names():
                 dialect = db.engine.dialect.name

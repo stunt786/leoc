@@ -545,8 +545,9 @@ function renderIncidents(data) {
             <td class="text-end">
                 <button class="btn btn-sm btn-outline-secondary" onclick="viewIncident(${i.id})" title="View"><i class="bi bi-eye"></i></button>
                 <button class="btn btn-sm btn-outline-info" onclick="showIncidentHistory(${i.id})" title="History"><i class="bi bi-clock-history"></i></button>
-                <button class="btn btn-sm btn-outline-primary" onclick="editIncident(${i.id})" title="Edit"><i class="bi bi-pencil"></i></button>
-                <button class="btn btn-sm btn-outline-danger" onclick="deleteIncident(${i.id})" title="Delete"><i class="bi bi-trash"></i></button>
+                ${i.status !== 'Closed' ? `<button class="btn btn-sm btn-outline-primary" onclick="editIncident(${i.id})" title="Edit"><i class="bi bi-pencil"></i></button>` : ''}
+                ${i.status === 'Active' ? `<button class="btn btn-sm btn-outline-success" onclick="closeIncident(${i.id})" title="Close Incident"><i class="bi bi-check-circle"></i></button>` : ''}
+                ${i.can_delete ? `<button class="btn btn-sm btn-outline-danger" onclick="deleteIncident(${i.id})" title="Delete"><i class="bi bi-trash"></i></button>` : ''}
             </td>
         </tr>`;
     }).join('');
@@ -685,6 +686,14 @@ async function saveIncident() {
         bootstrap.Modal.getInstance(document.getElementById('incidentModal')).hide();
         loadIncidents();
     } else { showToast('danger', d.message); }
+}
+
+async function closeIncident(id) {
+    if (!confirm('Close this incident?')) return;
+    const r = await fetch('/api/incidents/' + id, {method:'PUT', headers:{'Content-Type':'application/json','X-CSRFToken':csrf}, body: JSON.stringify({status:'Closed'})});
+    const d = await r.json();
+    if (d.success) { showToast('success', 'Incident closed'); loadIncidents(); }
+    else showToast('danger', d.message);
 }
 
 async function deleteIncident(id) {

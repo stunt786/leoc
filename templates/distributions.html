@@ -484,7 +484,7 @@ async function loadFormData() {
         const d = await r.json();
         if (!d.success) { showToast('danger', d.message); return; }
 
-        itemsList = d.items || [];
+        itemsList = (d.items || []).filter(i => i.is_distributable !== false);
         warehouseList = d.warehouses || [];
         itemGroupsList = d.item_groups || [];
         incidentsList = (d.incidents || []).filter(i => i.status === 'Active');
@@ -843,7 +843,7 @@ function onIncidentChange() {
             const remaining = Math.max(0, limit - totalUsed);
             let html = `Affected Households: <strong>${limit}</strong> | Already Beneficiated (this incident): <strong>${sameIncCount}</strong> | Selected: <strong>${currentCount}</strong> | Remaining: <strong class="${remaining === 0 ? 'text-success' : 'text-warning'}">${remaining}</strong>`;
             const otherIncCount = alreadyBenificiatedIds.size - sameIncCount;
-            if (otherIncCount > 0) html += ` | <span class="text-info"><i class="bi bi-info-circle me-1"></i>${otherIncCount} beneficated in other incident(s) this FY</span>`;
+            if (otherIncCount > 0) html += ` | <span class="text-info"><i class="bi bi-info-circle me-1"></i>${otherIncCount} beneficated in other incident(s)</span>`;
             if (cashModuleBeneficiaryIds.size > 0) html += ` | <span class="text-warning"><i class="bi bi-cash me-1"></i>${cashModuleBeneficiaryIds.size} received cash from Cash Module this FY</span>`;
             infoEl.innerHTML = html;
         }
@@ -884,13 +884,13 @@ async function loadAlreadyBeneficiated() {
     cashModuleBeneficiaryIds = new Set();
     beneficiaryDistHistory = {};
     const currentIncidentId = document.getElementById('dist_incident_id').value;
-    if (!currentIncidentId || !activeFiscalYear) return;
+    if (!currentIncidentId) return;
     try {
-        const r = await fetch(`/api/distributions?fiscal_year=${encodeURIComponent(activeFiscalYear)}`);
+        const r = await fetch('/api/distributions');
         const d = await r.json();
         if (d.success && d.distributions) {
             d.distributions.forEach(dist => {
-                if (dist.status === 'Completed') {
+                if (dist.status !== 'Cancelled') {
                     const isSameIncident = String(dist.incident_id) === String(currentIncidentId);
                     const seenPerDist = new Set();
                     (dist.beneficiaries || []).forEach(b => {
@@ -901,18 +901,19 @@ async function loadAlreadyBeneficiated() {
                             if (!beneficiaryDistHistory[b.beneficiary_id]) beneficiaryDistHistory[b.beneficiary_id] = [];
                             beneficiaryDistHistory[b.beneficiary_id].push({
                                 type: 'Material', incident: dist.incident_name, incident_id: dist.incident_id,
-                                date: dist.distribution_date, dist_no: dist.distribution_no, distribution_id: dist.id
+                                date: dist.distribution_date, dist_no: dist.distribution_no, distribution_id: dist.id,
+                                fiscal_year: dist.fiscal_year
                             });
                         }
                     });
                 }
             });
         }
-        const cr = await fetch(`/api/cash-distributions?fiscal_year=${encodeURIComponent(activeFiscalYear)}`);
+        const cr = await fetch('/api/cash-distributions');
         const cd = await cr.json();
         if (cd.success && cd.distributions) {
             cd.distributions.forEach(cdist => {
-                if (cdist.status === 'Completed') {
+                if (cdist.status !== 'Cancelled') {
                     const isSameIncident = String(cdist.incident_id) === String(currentIncidentId);
                     const seenPerDist = new Set();
                     (cdist.beneficiaries || []).forEach(b => {
@@ -927,7 +928,8 @@ async function loadAlreadyBeneficiated() {
                             beneficiaryDistHistory[b.beneficiary_id].push({
                                 type: 'Cash', incident: cdist.incident_name, incident_id: cdist.incident_id,
                                 date: cdist.distribution_date, dist_no: cdist.distribution_no, amount: b.amount,
-                                distribution_id: cdist.distribution_id || cdist.id
+                                distribution_id: cdist.distribution_id || cdist.id,
+                                fiscal_year: cdist.fiscal_year
                             });
                         }
                     });
@@ -971,7 +973,9 @@ function getIncidentDistCount(benId) {
 function getTotalIncidentsCount(benId) {
     const incidents = new Set();
     getBeneficiaryHistory(benId).forEach(h => {
-        if (h.incident_id) incidents.add(String(h.incident_id));
+        if (!h.incident_id) return;
+        if (activeFiscalYear && h.fiscal_year && String(h.fiscal_year) !== String(activeFiscalYear)) return;
+        incidents.add(String(h.incident_id));
     });
     const currentIncidentId = getCurrentIncidentId();
     return incidents.size + (currentIncidentId && !incidents.has(String(currentIncidentId)) ? 1 : 0);
@@ -1150,7 +1154,7 @@ function showBenHistoryWarning(benId, benName) {
             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body">
-            <p><strong>${benName}</strong> has prior distribution history in fiscal year ${activeFiscalYear}:</p>
+            <p><strong>${benName}</strong> has prior distribution history:</p>
             <table class="table table-sm table-bordered"><thead class="table-light"><tr><th>Type</th><th>Incident</th><th>Date</th><th>Reference</th></tr></thead><tbody>${rows}</tbody></table>
             <div class="alert alert-info mb-0"><i class="bi bi-info-circle me-1"></i>This beneficiary has already received aid for <strong>${totalIncidents}</strong> other incident(s) this fiscal year (limit: ${distributionReps} incident(s)). Do you want to add them to this distribution?</div>
         </div>

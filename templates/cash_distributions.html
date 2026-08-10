@@ -345,13 +345,13 @@ async function loadAlreadyBeneficiated() {
     sameIncidentBenIds = new Set();
     beneficiaryDistHistory = {};
     const currentIncidentId = document.getElementById('cdIncident').value;
-    if (!currentIncidentId || !activeFiscalYear) return;
+    if (!currentIncidentId) return;
     try {
-        const r = await fetch(`/api/distributions?fiscal_year=${encodeURIComponent(activeFiscalYear)}`);
+        const r = await fetch('/api/distributions');
         const d = await r.json();
         if (d.success && d.distributions) {
             d.distributions.forEach(dist => {
-                if (dist.status === 'Completed') {
+                if (dist.status !== 'Cancelled') {
                     const isSameIncident = String(dist.incident_id) === String(currentIncidentId);
                     const seenPerDist = new Set();
                     (dist.beneficiaries || []).forEach(b => {
@@ -362,18 +362,19 @@ async function loadAlreadyBeneficiated() {
                             if (!beneficiaryDistHistory[b.beneficiary_id]) beneficiaryDistHistory[b.beneficiary_id] = [];
                             beneficiaryDistHistory[b.beneficiary_id].push({
                                 type: 'Material', incident: dist.incident_name, incident_id: dist.incident_id,
-                                date: dist.distribution_date, dist_no: dist.distribution_no, distribution_id: dist.id
+                                date: dist.distribution_date, dist_no: dist.distribution_no, distribution_id: dist.id,
+                                fiscal_year: dist.fiscal_year
                             });
                         }
                     });
                 }
             });
         }
-        const cr = await fetch(`/api/cash-distributions?fiscal_year=${encodeURIComponent(activeFiscalYear)}`);
+        const cr = await fetch('/api/cash-distributions');
         const cd = await cr.json();
         if (cd.success && cd.distributions) {
             cd.distributions.forEach(cdist => {
-                if (cdist.status === 'Completed') {
+                if (cdist.status !== 'Cancelled') {
                     const isSameIncident = String(cdist.incident_id) === String(currentIncidentId);
                     const seenPerDist = new Set();
                     (cdist.beneficiaries || []).forEach(b => {
@@ -385,7 +386,8 @@ async function loadAlreadyBeneficiated() {
                             beneficiaryDistHistory[b.beneficiary_id].push({
                                 type: 'Cash', incident: cdist.incident_name, incident_id: cdist.incident_id,
                                 date: cdist.distribution_date, dist_no: cdist.distribution_no, amount: b.amount,
-                                distribution_id: cdist.distribution_id || cdist.id
+                                distribution_id: cdist.distribution_id || cdist.id,
+                                fiscal_year: cdist.fiscal_year
                             });
                         }
                     });
@@ -424,7 +426,9 @@ function getIncidentDistCount(benId) {
 function getTotalIncidentsCount(benId) {
     const incidents = new Set();
     getBeneficiaryHistory(benId).forEach(h => {
-        if (h.incident_id) incidents.add(String(h.incident_id));
+        if (!h.incident_id) return;
+        if (activeFiscalYear && h.fiscal_year && String(h.fiscal_year) !== String(activeFiscalYear)) return;
+        incidents.add(String(h.incident_id));
     });
     const currentIncidentId = document.getElementById('cdIncident').value;
     return incidents.size + (currentIncidentId && !incidents.has(String(currentIncidentId)) ? 1 : 0);
@@ -583,7 +587,7 @@ function showCrossIncidentWarning(benId, benName) {
             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body">
-            <p><strong>${benName}</strong> has prior distribution history in fiscal year ${activeFiscalYear}:</p>
+            <p><strong>${benName}</strong> has prior distribution history:</p>
             <table class="table table-sm table-bordered"><thead class="table-light"><tr><th>Type</th><th>Incident</th><th>Date</th><th>Reference</th></tr></thead><tbody>${rows}</tbody></table>
             <div class="alert alert-warning mb-0"><i class="bi bi-exclamation-triangle me-1"></i><strong>Warning:</strong> This beneficiary has already received aid for ${totalIncidents - 1} other incident(s) this fiscal year (limit: ${distributionReps} incident(s)). Adding them to <strong>${currentIncName}</strong> will use one of their remaining incident slots. Do you want to proceed?</div>
         </div>
