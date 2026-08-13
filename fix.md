@@ -5,6 +5,8 @@
 192.168.101.10
 username: thalaramun
 password: thalaraMUN@3
+
+Connection to server: use ssh thalaramun@192.168.101.10 
  
 application location directory: /home/thalaramun/leoc
 **Aplication is using docker on port 5002, and requires sudo access for any changes on server so always use sudo with docker commands

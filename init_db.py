@@ -423,6 +423,13 @@ def run_migrations():
         'distribution': [
             ('files', 'TEXT'),
         ],
+        'disaster_assessment': [
+            ('affected_people_child', 'INTEGER DEFAULT 0'),
+            ('affected_people_pregnant', 'INTEGER DEFAULT 0'),
+            ('affected_people_old_age', 'INTEGER DEFAULT 0'),
+            ('ssf_family', 'INTEGER DEFAULT 0'),
+            ('poor_household', 'INTEGER DEFAULT 0'),
+        ],
     }
     
     migrated = 0

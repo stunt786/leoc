@@ -406,7 +406,7 @@ const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('con
 let items = [];
 let categories = [];
 let groups = [];
-let historyPaginator = new Paginator({perPage: 25, onPageChange: () => renderHistoryEvents(_historyAllEvents)});
+let historyPaginator = new Paginator({perPage: 25, paginationId: 'historyPagination', infoId: 'historyInfo', onPageChange: () => renderHistoryEvents(_historyAllEvents)});
 
 async function loadData() {
     try {

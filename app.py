@@ -6788,6 +6788,8 @@ def daily_report_preview():
     }
 
     office_name = AppSettings.get_setting('office_name', 'थलारा गाउँपालिका')
+    address = AppSettings.get_setting('address', 'खोली, बझाङ, सुदूरपश्चिम प्रदेश, नेपाल')
+    report_header = AppSettings.get_setting('report_header', '')
 
     sit_rep_no = None
     if start_bs == end_bs and start_bs:
@@ -6829,7 +6831,8 @@ def daily_report_preview():
     return render_template('daily_report_print.html', total=total, ward_stats=ward_stats,
                            disaster_type_stats=disaster_type_stats, incidents=incidents,
                            start_bs=start_bs, end_bs=end_bs,
-                           office_name=office_name, sit_rep_no=sit_rep_no, generated_at=datetime.now(),
+                           office_name=office_name, address=address, report_header=report_header,
+                           sit_rep_no=sit_rep_no, generated_at=datetime.now(),
                            weather_status=weather_status,
                            notice_title=notice_title,
                            notice_description=notice_description,

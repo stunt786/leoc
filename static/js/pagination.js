@@ -8,6 +8,8 @@ class Paginator {
         this.infoId = options.infoId || 'tableInfo';
         this.maxVisible = options.maxVisible || 7;
         this.onPageChange = options.onPageChange || null;
+        this._id = 'paginator_' + Math.random().toString(36).substr(2, 9);
+        window[this._id] = this;
         this.update(this.totalItems);
     }
 
@@ -46,10 +48,11 @@ class Paginator {
         if (!ul) return;
         if (this.totalPages <= 1) { ul.innerHTML = ''; return; }
 
+        const paginatorId = this._id;
         let html = '';
         const prevPage = Math.max(1, this.currentPage - 1);
         html += `<li class="page-item ${this.currentPage === 1 ? 'disabled' : ''}">
-            <a class="page-link" href="#" onclick="event.preventDefault();paginator.goToPage(${prevPage})">&laquo;</a></li>`;
+            <a class="page-link" href="#" onclick="event.preventDefault();window['${paginatorId}'].goToPage(${prevPage})">&laquo;</a></li>`;
 
         const maxVis = this.maxVisible;
         let startPage, endPage;
@@ -67,23 +70,23 @@ class Paginator {
         }
 
         if (startPage > 1) {
-            html += `<li class="page-item"><a class="page-link" href="#" onclick="event.preventDefault();paginator.goToPage(1)">1</a></li>`;
+            html += `<li class="page-item"><a class="page-link" href="#" onclick="event.preventDefault();window['${paginatorId}'].goToPage(1)">1</a></li>`;
             if (startPage > 2) html += '<li class="page-item disabled"><span class="page-link">...</span></li>';
         }
 
         for (let i = startPage; i <= endPage; i++) {
             html += `<li class="page-item ${i === this.currentPage ? 'active' : ''}">
-                <a class="page-link" href="#" onclick="event.preventDefault();paginator.goToPage(${i})">${i}</a></li>`;
+                <a class="page-link" href="#" onclick="event.preventDefault();window['${paginatorId}'].goToPage(${i})">${i}</a></li>`;
         }
 
         if (endPage < this.totalPages) {
             if (endPage < this.totalPages - 1) html += '<li class="page-item disabled"><span class="page-link">...</span></li>';
-            html += `<li class="page-item"><a class="page-link" href="#" onclick="event.preventDefault();paginator.goToPage(${this.totalPages})">${this.totalPages}</a></li>`;
+            html += `<li class="page-item"><a class="page-link" href="#" onclick="event.preventDefault();window['${paginatorId}'].goToPage(${this.totalPages})">${this.totalPages}</a></li>`;
         }
 
         const nextPage = Math.min(this.totalPages, this.currentPage + 1);
         html += `<li class="page-item ${this.currentPage === this.totalPages ? 'disabled' : ''}">
-            <a class="page-link" href="#" onclick="event.preventDefault();paginator.goToPage(${nextPage})">&raquo;</a></li>`;
+            <a class="page-link" href="#" onclick="event.preventDefault();window['${paginatorId}'].goToPage(${nextPage})">&raquo;</a></li>`;
 
         ul.innerHTML = html;
     }
